@@ -48,7 +48,7 @@ class _DonorsListScreenState extends State<DonorsListScreen>
               controller: _tabController,
               tabs: const [
                 Tab(icon: Icon(Icons.volunteer_activism), text: 'Fundraising'),
-                Tab(icon: Icon(Icons.search), text: 'MEC Research'),
+                Tab(icon: Icon(Icons.search), text: 'Donor Research'),
                 Tab(icon: Icon(Icons.phone_callback), text: 'Call Time'),
               ],
               labelColor: Colors.white,
@@ -70,6 +70,7 @@ class _DonorsListScreenState extends State<DonorsListScreen>
           child: BrandedBackground(
             child: TabBarView(
               controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(),
               children: const [
                 FundraisingTab(),
                 MecResearchTab(),

@@ -6,7 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/call_time_list.dart';
-import 'package:bluebubbles/models/crm/mec_contribution.dart';
 import 'package:bluebubbles/services/crm/call_time_repository.dart';
 import 'package:bluebubbles/services/crm/mec_repository.dart';
 
@@ -56,6 +55,32 @@ Color _statusColor(String status) {
 }
 
 final _currencyFormat = NumberFormat.simpleCurrency();
+
+// ---------------------------------------------------------------------------
+// Party colors
+// ---------------------------------------------------------------------------
+
+const _partyOptions = ['All', 'Democrat', 'Republican', 'Progressive', 'Conservative'];
+
+Color _partyColor(String? party) {
+  if (party == null || party.isEmpty) return Colors.grey;
+  final lower = party.toLowerCase();
+  if (lower.contains('democrat')) return BrandColors.democratBlue;
+  if (lower.contains('republican')) return BrandColors.republicanRed;
+  if (lower.contains('progressive')) return const Color(0xFF10B981); // green
+  if (lower.contains('conservative')) return Colors.orange;
+  return Colors.grey;
+}
+
+String _partyLabel(String? party) {
+  if (party == null || party.isEmpty) return '';
+  final lower = party.toLowerCase();
+  if (lower.contains('democrat')) return 'D';
+  if (lower.contains('republican')) return 'R';
+  if (lower.contains('progressive')) return 'P';
+  if (lower.contains('conservative')) return 'C';
+  return '?';
+}
 
 // ---------------------------------------------------------------------------
 // CallTimeTab
@@ -318,6 +343,12 @@ class _CallTimeTabState extends State<CallTimeTab> {
               Text(list.description!, style: BrandTextStyles.subtitle),
             ],
 
+            // Filter summary chips
+            if (list.filters != null && list.filters!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildFilterSummary(list.filters!),
+            ],
+
             const SizedBox(height: 12),
 
             // Progress bar
@@ -343,6 +374,59 @@ class _CallTimeTabState extends State<CallTimeTab> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Show a compact summary of the saved filter criteria on list cards.
+  Widget _buildFilterSummary(Map<String, dynamic> filters) {
+    final chips = <Widget>[];
+
+    final party = filters['party'] as String?;
+    if (party != null && party.isNotEmpty && party != 'All') {
+      chips.add(_buildMiniChip(party, _partyColor(party)));
+    }
+
+    final state = filters['state'] as String?;
+    if (state != null && state.isNotEmpty) {
+      chips.add(_buildMiniChip(state, BrandColors.momentumBlue));
+    }
+
+    final yearFrom = filters['yearFrom'];
+    final yearTo = filters['yearTo'];
+    if (yearFrom != null || yearTo != null) {
+      final label = '${yearFrom ?? '...'}-${yearTo ?? '...'}';
+      chips.add(_buildMiniChip(label, BrandColors.slateBlue));
+    }
+
+    final minTotal = filters['minTotal'];
+    if (minTotal != null) {
+      chips.add(_buildMiniChip(
+        '\$${NumberFormat.compact().format(minTotal)}+',
+        BrandColors.sunriseGold,
+      ));
+    }
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: chips,
+    );
+  }
+
+  Widget _buildMiniChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.5), width: 0.5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -523,6 +607,9 @@ class _CallTimeTabState extends State<CallTimeTab> {
     final location =
         [city, state].where((s) => s.isNotEmpty).join(', ');
 
+    // Extract party info from joined mec_donors data
+    final party = donor?['party'] as String?;
+
     final statusColor = _statusColor(item.callStatus);
     final statusLabel =
         _statusLabels[item.callStatus] ?? item.callStatus;
@@ -535,6 +622,7 @@ class _CallTimeTabState extends State<CallTimeTab> {
           item: item,
           location: location,
           employer: employer,
+          party: party,
           statusLabel: statusLabel,
           statusColor: statusColor,
           onSave: (status, notes, pledged) =>
@@ -585,70 +673,229 @@ class _CallTimeTabState extends State<CallTimeTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // Create list dialog
+  // Create list dialog (enhanced with Smart List Builder filters)
   // ---------------------------------------------------------------------------
 
   Future<void> _showCreateListDialog() async {
     final nameController = TextEditingController();
     final descController = TextEditingController();
 
+    // Filter state for the dialog
+    String filterState = 'MO';
+    String filterParty = 'All';
+
+    final yearFromController = TextEditingController();
+    final yearToController = TextEditingController();
+    final minTotalController = TextEditingController();
+
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: BrandColors.unityBlue,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text('New Call Time List',
-              style: TextStyle(color: Colors.white)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('Name *'),
-                autofocus: true,
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: BrandColors.unityBlue,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _inputDecoration('Description (optional)'),
-                maxLines: 2,
+              title: const Text('New Call Time List',
+                  style: TextStyle(color: Colors.white)),
+              content: SingleChildScrollView(
+                child: SizedBox(
+                  width: double.maxFinite,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Name
+                      TextField(
+                        controller: nameController,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: _inputDecoration('Name *'),
+                        autofocus: true,
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Description
+                      TextField(
+                        controller: descController,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: _inputDecoration('Description (optional)'),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Smart List Builder section
+                      const Text(
+                        'Smart List Builder',
+                        style: TextStyle(
+                          color: BrandColors.sunriseGold,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Set default filters for this list (optional)',
+                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // State filter
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 80,
+                            child: Text('State',
+                                style: TextStyle(color: Colors.white70, fontSize: 13)),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              style: const TextStyle(color: Colors.white),
+                              decoration: _inputDecoration('e.g. MO'),
+                              controller: TextEditingController(text: filterState),
+                              onChanged: (v) => filterState = v.trim().toUpperCase(),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Party filter
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 80,
+                            child: Text('Party',
+                                style: TextStyle(color: Colors.white70, fontSize: 13)),
+                          ),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: filterParty,
+                              dropdownColor: BrandColors.unityBlue,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: _inputDecoration(''),
+                              items: _partyOptions
+                                  .map((p) => DropdownMenuItem(
+                                        value: p,
+                                        child: Text(p,
+                                            style: TextStyle(
+                                              color: p == 'All'
+                                                  ? Colors.white
+                                                  : _partyColor(p),
+                                            )),
+                                      ))
+                                  .toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setDialogState(() => filterParty = val);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Year range
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 80,
+                            child: Text('Years',
+                                style: TextStyle(color: Colors.white70, fontSize: 13)),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: yearFromController,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: _inputDecoration('From'),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8),
+                            child: Text('-',
+                                style: TextStyle(color: Colors.white54)),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: yearToController,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: _inputDecoration('To'),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Min contribution total
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 80,
+                            child: Text('Min \$',
+                                style: TextStyle(color: Colors.white70, fontSize: 13)),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: minTotalController,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: _inputDecoration('Min total contributions'),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(decimal: true),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child:
-                  const Text('Cancel', style: TextStyle(color: Colors.white70)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (nameController.text.trim().isEmpty) return;
-                Navigator.pop(ctx, true);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: BrandColors.sunriseGold,
-                foregroundColor: BrandColors.unityBlue,
-              ),
-              child: const Text('Create'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel',
+                      style: TextStyle(color: Colors.white70)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (nameController.text.trim().isEmpty) return;
+                    Navigator.pop(ctx, true);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: BrandColors.sunriseGold,
+                    foregroundColor: BrandColors.unityBlue,
+                  ),
+                  child: const Text('Create'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
 
     if (result == true && nameController.text.trim().isNotEmpty) {
+      // Build filters JSONB from the dialog state
+      final filters = <String, dynamic>{};
+      if (filterState.isNotEmpty) filters['state'] = filterState;
+      if (filterParty != 'All') filters['party'] = filterParty;
+      final yearFrom = int.tryParse(yearFromController.text);
+      final yearTo = int.tryParse(yearToController.text);
+      if (yearFrom != null) filters['yearFrom'] = yearFrom;
+      if (yearTo != null) filters['yearTo'] = yearTo;
+      final minTotal = double.tryParse(minTotalController.text);
+      if (minTotal != null) filters['minTotal'] = minTotal;
+
       try {
         await _repo.createList(
           name: nameController.text.trim(),
           description: descController.text.trim().isEmpty
               ? null
               : descController.text.trim(),
+          filters: filters.isEmpty ? null : filters,
         );
         _showSuccess('List created');
         _loadLists();
@@ -659,6 +906,9 @@ class _CallTimeTabState extends State<CallTimeTab> {
 
     nameController.dispose();
     descController.dispose();
+    yearFromController.dispose();
+    yearToController.dispose();
+    minTotalController.dispose();
   }
 
   // ---------------------------------------------------------------------------
@@ -710,28 +960,50 @@ class _CallTimeTabState extends State<CallTimeTab> {
   }
 
   // ---------------------------------------------------------------------------
-  // Add donors dialog
+  // Add donors dialog (Smart Donor Search)
   // ---------------------------------------------------------------------------
 
   Future<void> _showAddDonorsDialog(int listId) async {
-    await showDialog(
+    // Pre-populate filters from the list's saved filters if available
+    final listFilters = _selectedList?.filters;
+
+    await showGeneralDialog(
       context: context,
-      builder: (ctx) => _AddDonorsDialog(
-        mecRepo: _mecRepo,
-        onAdd: (donorIds, suggestedAsk) async {
-          try {
-            await _repo.addItems(
-              listId: listId,
-              donorIds: donorIds,
-              suggestedAsk: suggestedAsk,
-            );
-            _showSuccess('${donorIds.length} donor(s) added');
-            _loadListDetail(listId);
-          } catch (e) {
-            _showError('Failed to add donors: $e');
-          }
-        },
-      ),
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return _SmartDonorSearchDialog(
+          mecRepo: _mecRepo,
+          initialFilters: listFilters,
+          onAdd: (donorIds, suggestedAsk) async {
+            try {
+              await _repo.addItems(
+                listId: listId,
+                donorIds: donorIds,
+                suggestedAsk: suggestedAsk,
+              );
+              _showSuccess('${donorIds.length} donor(s) added');
+              _loadListDetail(listId);
+            } catch (e) {
+              _showError('Failed to add donors: $e');
+            }
+          },
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          )),
+          child: child,
+        );
+      },
     );
   }
 
@@ -741,7 +1013,7 @@ class _CallTimeTabState extends State<CallTimeTab> {
 
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
-      labelText: label,
+      labelText: label.isEmpty ? null : label,
       labelStyle: const TextStyle(color: Colors.white54),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
@@ -751,18 +1023,21 @@ class _CallTimeTabState extends State<CallTimeTab> {
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: BrandColors.momentumBlue),
       ),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     );
   }
 }
 
 // =============================================================================
-// _ExpandableItemTile — stateful widget for individual call items
+// _ExpandableItemTile -- stateful widget for individual call items
 // =============================================================================
 
 class _ExpandableItemTile extends StatefulWidget {
   final CallTimeListItem item;
   final String location;
   final String employer;
+  final String? party;
   final String statusLabel;
   final Color statusColor;
   final Future<void> Function(String status, String? notes, double? pledged)
@@ -773,6 +1048,7 @@ class _ExpandableItemTile extends StatefulWidget {
     required this.item,
     required this.location,
     required this.employer,
+    this.party,
     required this.statusLabel,
     required this.statusColor,
     required this.onSave,
@@ -835,6 +1111,13 @@ class _ExpandableItemTileState extends State<_ExpandableItemTile> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Party indicator dot
+                if (widget.party != null && widget.party!.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, right: 8),
+                    child: _buildPartyDot(widget.party!),
+                  ),
+                ],
                 // Left: donor info
                 Expanded(
                   child: Column(
@@ -981,6 +1264,32 @@ class _ExpandableItemTileState extends State<_ExpandableItemTile> {
     );
   }
 
+  Widget _buildPartyDot(String party) {
+    final color = _partyColor(party);
+    final label = _partyLabel(party);
+    return Tooltip(
+      message: party,
+      child: Container(
+        width: 22,
+        height: 22,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.25),
+          shape: BoxShape.circle,
+          border: Border.all(color: color, width: 1.5),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildCallStatusChip(String label, Color color) {
     final isSkipped = widget.item.callStatus == 'skipped';
     return Container(
@@ -1034,49 +1343,87 @@ class _ExpandableItemTileState extends State<_ExpandableItemTile> {
 }
 
 // =============================================================================
-// _AddDonorsDialog — search MEC contributions and add donors to a list
+// _SmartDonorSearchDialog -- full-screen dialog for smart donor search
 // =============================================================================
 
-class _AddDonorsDialog extends StatefulWidget {
+class _SmartDonorSearchDialog extends StatefulWidget {
   final MecRepository mecRepo;
+  final Map<String, dynamic>? initialFilters;
   final Future<void> Function(List<int> donorIds, double? suggestedAsk) onAdd;
 
-  const _AddDonorsDialog({
+  const _SmartDonorSearchDialog({
     required this.mecRepo,
+    this.initialFilters,
     required this.onAdd,
   });
 
   @override
-  State<_AddDonorsDialog> createState() => _AddDonorsDialogState();
+  State<_SmartDonorSearchDialog> createState() =>
+      _SmartDonorSearchDialogState();
 }
 
-class _AddDonorsDialogState extends State<_AddDonorsDialog> {
-  final TextEditingController _searchController = TextEditingController();
+class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
+  // Search / filter controllers
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _askController = TextEditingController();
+  final TextEditingController _yearFromController = TextEditingController();
+  final TextEditingController _yearToController = TextEditingController();
+  final TextEditingController _minAmountController = TextEditingController();
 
-  List<MecContribution> _results = [];
+  String _stateFilter = 'MO';
+  String _partyFilter = 'All';
+  bool _filtersExpanded = true;
+
+  List<Map<String, dynamic>> _results = [];
   final Set<int> _selectedIds = {};
   bool _searching = false;
+  bool _hasSearched = false;
   Timer? _debounce;
 
   @override
+  void initState() {
+    super.initState();
+    // Pre-populate from list's saved filters
+    final f = widget.initialFilters;
+    if (f != null) {
+      _stateFilter = (f['state'] as String?) ?? 'MO';
+      _partyFilter = (f['party'] as String?) ?? 'All';
+      final yf = f['yearFrom'];
+      if (yf != null) _yearFromController.text = yf.toString();
+      final yt = f['yearTo'];
+      if (yt != null) _yearToController.text = yt.toString();
+      final mt = f['minTotal'];
+      if (mt != null) _minAmountController.text = mt.toString();
+    }
+  }
+
+  @override
   void dispose() {
-    _searchController.dispose();
+    _nameController.dispose();
     _askController.dispose();
+    _yearFromController.dispose();
+    _yearToController.dispose();
+    _minAmountController.dispose();
     _debounce?.cancel();
     super.dispose();
   }
 
-  Future<void> _search(String query) async {
-    if (query.trim().isEmpty) {
-      setState(() => _results = []);
-      return;
-    }
-    setState(() => _searching = true);
+  Future<void> _search() async {
+    setState(() {
+      _searching = true;
+      _hasSearched = true;
+    });
     try {
-      final results = await widget.mecRepo.searchContributions(
-        query: query.trim(),
-        limit: 50,
+      final results = await widget.mecRepo.searchDonors(
+        state: _stateFilter.isNotEmpty ? _stateFilter : null,
+        party: _partyFilter != 'All' ? _partyFilter : null,
+        yearFrom: int.tryParse(_yearFromController.text),
+        yearTo: int.tryParse(_yearToController.text),
+        minTotal: double.tryParse(_minAmountController.text),
+        nameQuery:
+            _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
+        individualsOnly: true,
+        limit: 100,
       );
       if (mounted) {
         setState(() {
@@ -1085,167 +1432,647 @@ class _AddDonorsDialogState extends State<_AddDonorsDialog> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _searching = false);
+      if (mounted) {
+        setState(() => _searching = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Search failed: $e'),
+            backgroundColor: BrandColors.error,
+          ),
+        );
+      }
     }
   }
 
-  void _onSearchChanged(String value) {
+  void _onNameChanged(String value) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), () {
-      _search(value);
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      _search();
     });
+  }
+
+  InputDecoration _filterInputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.white24),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: BrandColors.momentumBlue),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      isDense: true,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: BrandColors.unityBlue,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Add Donors', style: TextStyle(color: Colors.white)),
-      content: SizedBox(
-        width: double.maxFinite,
-        height: 420,
+    final mediaQuery = MediaQuery.of(context);
+    final topPadding = mediaQuery.padding.top;
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        margin: EdgeInsets.only(top: topPadding + 40),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E2A42),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
         child: Column(
           children: [
-            // Search field
-            TextField(
-              controller: _searchController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Search by name, company, or committee...',
-                hintStyle: const TextStyle(color: Colors.white38),
-                prefixIcon:
-                    const Icon(Icons.search, color: Colors.white54),
-                suffixIcon: _searching
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: BrandColors.sunriseGold,
-                          ),
-                        ),
-                      )
-                    : null,
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Colors.white24),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide:
-                      const BorderSide(color: BrandColors.momentumBlue),
+            // Handle bar
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 4),
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white30,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              onChanged: _onSearchChanged,
             ),
-            const SizedBox(height: 8),
 
-            // Suggested ask field
-            TextField(
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+              child: Row(
+                children: [
+                  const Icon(Icons.person_search,
+                      color: BrandColors.sunriseGold, size: 24),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Smart Donor Search',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(color: Colors.white12, height: 16),
+
+            // Content
+            Expanded(
+              child: Column(
+                children: [
+                  // Filters section (collapsible)
+                  _buildFiltersSection(),
+
+                  // Results
+                  Expanded(child: _buildResults()),
+                ],
+              ),
+            ),
+
+            // Bottom action bar
+            _buildBottomBar(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFiltersSection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: BrandColors.unityBlue.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        children: [
+          // Collapsible header
+          InkWell(
+            onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    _filtersExpanded
+                        ? Icons.filter_list
+                        : Icons.filter_list_off,
+                    color: BrandColors.momentumBlue,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Filters',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    _filtersExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: Colors.white54,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          if (_filtersExpanded) ...[
+            const Divider(color: Colors.white12, height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              child: Column(
+                children: [
+                  // Name search
+                  TextField(
+                    controller: _nameController,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Search by donor name...',
+                      hintStyle:
+                          const TextStyle(color: Colors.white38, fontSize: 14),
+                      prefixIcon:
+                          const Icon(Icons.search, color: Colors.white54, size: 20),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Colors.white24),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            const BorderSide(color: BrandColors.momentumBlue),
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      isDense: true,
+                    ),
+                    onChanged: _onNameChanged,
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Row 1: State + Party
+                  Row(
+                    children: [
+                      // State
+                      SizedBox(
+                        width: 80,
+                        child: TextField(
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: _filterInputDecoration('State'),
+                          controller: TextEditingController(text: _stateFilter),
+                          onChanged: (v) =>
+                              _stateFilter = v.trim().toUpperCase(),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+
+                      // Party
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _partyFilter,
+                          dropdownColor: BrandColors.unityBlue,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 13),
+                          decoration: _filterInputDecoration('Party'),
+                          items: _partyOptions
+                              .map((p) => DropdownMenuItem(
+                                    value: p,
+                                    child: Text(p,
+                                        style: TextStyle(
+                                          color: p == 'All'
+                                              ? Colors.white
+                                              : _partyColor(p),
+                                          fontSize: 13,
+                                        )),
+                                  ))
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _partyFilter = val);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Row 2: Year range + Min amount
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 70,
+                        child: TextField(
+                          controller: _yearFromController,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: _filterInputDecoration('From'),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Text('-',
+                            style: TextStyle(color: Colors.white54)),
+                      ),
+                      SizedBox(
+                        width: 70,
+                        child: TextField(
+                          controller: _yearToController,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: _filterInputDecoration('To'),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: _minAmountController,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: _filterInputDecoration('Min \$ Total'),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Search button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _searching ? null : _search,
+                      icon: _searching
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.search, size: 18),
+                      label: Text(_searching ? 'Searching...' : 'Search Donors'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: BrandColors.momentumBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResults() {
+    if (!_hasSearched) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.person_search, size: 48, color: Colors.white24),
+            const SizedBox(height: 12),
+            Text(
+              'Set filters and tap Search\nto find donors',
+              textAlign: TextAlign.center,
+              style: BrandTextStyles.bodySecondary,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_searching) {
+      return const Center(
+        child: CircularProgressIndicator(color: BrandColors.sunriseGold),
+      );
+    }
+
+    if (_results.isEmpty) {
+      return Center(
+        child: Text(
+          'No donors found matching your criteria.\nTry adjusting the filters.',
+          textAlign: TextAlign.center,
+          style: BrandTextStyles.bodySecondary,
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Results header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(
+            children: [
+              Text(
+                '${_results.length} donor${_results.length == 1 ? '' : 's'} found',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              if (_selectedIds.isNotEmpty)
+                Text(
+                  '${_selectedIds.length} selected',
+                  style: const TextStyle(
+                    color: BrandColors.sunriseGold,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              const SizedBox(width: 8),
+              // Select all / deselect all
+              if (_results.isNotEmpty)
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (_selectedIds.length == _results.length) {
+                        _selectedIds.clear();
+                      } else {
+                        _selectedIds.clear();
+                        for (final r in _results) {
+                          final id = (r['donor_id'] as num?)?.toInt();
+                          if (id != null) _selectedIds.add(id);
+                        }
+                      }
+                    });
+                  },
+                  child: Text(
+                    _selectedIds.length == _results.length
+                        ? 'Deselect All'
+                        : 'Select All',
+                    style: const TextStyle(
+                      color: BrandColors.momentumBlue,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        // Results list
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            itemCount: _results.length,
+            itemBuilder: (ctx, index) {
+              final donor = _results[index];
+              return _buildDonorResultTile(donor);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDonorResultTile(Map<String, dynamic> donor) {
+    final donorId = (donor['donor_id'] as num?)?.toInt();
+    final name = donor['donor_name'] as String? ?? 'Unknown';
+    final totalGiven = (donor['total_amount'] as num?)?.toDouble() ?? 0;
+    final numContributions = (donor['contribution_count'] as num?)?.toInt() ?? 0;
+    final city = donor['city'] as String? ?? '';
+    final state = donor['state'] as String? ?? '';
+    final location = [city, state].where((s) => s.isNotEmpty).join(', ');
+    final parties = donor['parties'] as List<dynamic>? ?? [];
+
+    final isSelected = donorId != null && _selectedIds.contains(donorId);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? BrandColors.momentumBlue.withOpacity(0.15)
+            : BrandColors.unityBlue.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isSelected
+              ? BrandColors.momentumBlue.withOpacity(0.5)
+              : Colors.white12,
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: donorId == null
+            ? null
+            : () {
+                setState(() {
+                  if (_selectedIds.contains(donorId)) {
+                    _selectedIds.remove(donorId);
+                  } else {
+                    _selectedIds.add(donorId);
+                  }
+                });
+              },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              // Checkbox
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: isSelected,
+                  onChanged: donorId == null
+                      ? null
+                      : (val) {
+                          setState(() {
+                            if (val == true) {
+                              _selectedIds.add(donorId);
+                            } else {
+                              _selectedIds.remove(donorId);
+                            }
+                          });
+                        },
+                  activeColor: BrandColors.sunriseGold,
+                  checkColor: BrandColors.unityBlue,
+                  side: const BorderSide(color: Colors.white38),
+                ),
+              ),
+              const SizedBox(width: 10),
+
+              // Donor info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Name row with party chips
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (parties.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          ...parties.take(3).map((p) {
+                            final partyStr = p.toString();
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: _buildPartyChip(partyStr),
+                            );
+                          }),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    // Details row
+                    Text(
+                      [
+                        if (location.isNotEmpty) location,
+                        '$numContributions contribution${numContributions == 1 ? '' : 's'}',
+                      ].join(' \u2022 '),
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Total amount
+              Text(
+                _currencyFormat.format(totalGiven),
+                style: const TextStyle(
+                  color: BrandColors.sunriseGold,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPartyChip(String party) {
+    final color = _partyColor(party);
+    final label = _partyLabel(party);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.5), width: 0.5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomBar() {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+          16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A2438),
+        border: Border(top: BorderSide(color: Colors.white12)),
+      ),
+      child: Row(
+        children: [
+          // Suggested ask
+          Expanded(
+            child: TextField(
               controller: _askController,
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
               decoration: InputDecoration(
-                labelText: 'Suggested Ask (\$, optional)',
-                labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
+                labelText: 'Suggested Ask (\$)',
+                labelStyle:
+                    const TextStyle(color: Colors.white54, fontSize: 12),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: Colors.white24),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                   borderSide:
                       const BorderSide(color: BrandColors.momentumBlue),
                 ),
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                isDense: true,
               ),
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
             ),
-            const SizedBox(height: 8),
+          ),
+          const SizedBox(width: 12),
 
-            // Results
-            Expanded(
-              child: _results.isEmpty
-                  ? Center(
-                      child: Text(
-                        _searchController.text.isEmpty
-                            ? 'Type to search MEC donors'
-                            : 'No results found',
-                        style: BrandTextStyles.bodySecondary,
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _results.length,
-                      itemBuilder: (ctx, index) {
-                        final c = _results[index];
-                        final isSelected = _selectedIds.contains(c.id);
-                        return CheckboxListTile(
-                          value: isSelected,
-                          onChanged: (val) {
-                            setState(() {
-                              if (val == true) {
-                                _selectedIds.add(c.id);
-                              } else {
-                                _selectedIds.remove(c.id);
-                              }
-                            });
-                          },
-                          activeColor: BrandColors.sunriseGold,
-                          checkColor: BrandColors.unityBlue,
-                          title: Text(
-                            c.contributorDisplayName,
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 14),
-                          ),
-                          subtitle: Text(
-                            [
-                              if (c.city != null) c.city,
-                              if (c.state != null) c.state,
-                              if (c.contributionAmount != null)
-                                c.formattedAmount,
-                            ].join(' \u2022 '),
-                            style: const TextStyle(
-                                color: Colors.white54, fontSize: 12),
-                          ),
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                        );
-                      },
-                    ),
+          // Add button
+          ElevatedButton.icon(
+            onPressed: _selectedIds.isEmpty
+                ? null
+                : () async {
+                    final ask = double.tryParse(_askController.text);
+                    Navigator.pop(context);
+                    await widget.onAdd(_selectedIds.toList(), ask);
+                  },
+            icon: const Icon(Icons.person_add, size: 18),
+            label: Text(
+              _selectedIds.isEmpty
+                  ? 'Add Selected'
+                  : 'Add ${_selectedIds.length}',
             ),
-          ],
-        ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: BrandColors.sunriseGold,
+              foregroundColor: BrandColors.unityBlue,
+              disabledBackgroundColor: Colors.white12,
+              disabledForegroundColor: Colors.white38,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
-        ),
-        ElevatedButton(
-          onPressed: _selectedIds.isEmpty
-              ? null
-              : () async {
-                  final ask = double.tryParse(_askController.text);
-                  Navigator.pop(context);
-                  await widget.onAdd(_selectedIds.toList(), ask);
-                },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: BrandColors.sunriseGold,
-            foregroundColor: BrandColors.unityBlue,
-            disabledBackgroundColor: Colors.white12,
-            disabledForegroundColor: Colors.white38,
-          ),
-          child: Text(
-            _selectedIds.isEmpty
-                ? 'Add Selected'
-                : 'Add Selected (${_selectedIds.length})',
-          ),
-        ),
-      ],
     );
   }
 }

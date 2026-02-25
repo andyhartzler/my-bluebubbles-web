@@ -23,13 +23,14 @@ class _MecResearchTabState extends State<MecResearchTab> {
   final _dateFormat = DateFormat.yMMMd();
 
   // Search state
-  List<MecContribution> _contributions = [];
+  List<Map<String, dynamic>> _donors = [];
   bool _loading = false;
+  bool _hasSearched = false;
   String? _error;
   int? _yearFrom;
   int? _yearTo;
-  double? _minAmount;
-  Timer? _debounce;
+  String _selectedState = 'MO';
+  String? _selectedParty;
 
   // Profile state
   bool _inProfileMode = false;
@@ -40,58 +41,61 @@ class _MecResearchTabState extends State<MecResearchTab> {
   String? _profileLastName;
   String? _profileCompany;
 
-  @override
-  void initState() {
-    super.initState();
-    _searchController.addListener(_onSearchChanged);
-  }
+  // US states list
+  static const List<String> _usStates = [
+    'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+    'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+    'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+    'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+    'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+    'DC',
+  ];
+
+  // Party options with colors
+  static const List<_PartyOption> _partyOptions = [
+    _PartyOption(label: 'All', value: null, color: Colors.white70),
+    _PartyOption(label: 'Democrat', value: 'democrat', color: Colors.blue),
+    _PartyOption(label: 'Republican', value: 'republican', color: Colors.red),
+    _PartyOption(label: 'Progressive', value: 'progressive', color: Colors.green),
+    _PartyOption(label: 'Conservative', value: 'conservative', color: Colors.orange),
+  ];
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _searchController.dispose();
     _minAmountController.dispose();
     super.dispose();
   }
 
   // ---------------------------------------------------------------------------
-  // Search logic
+  // Donor search
   // ---------------------------------------------------------------------------
 
-  void _onSearchChanged() {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      if (_searchController.text.trim().isNotEmpty) {
-        _performSearch();
-      }
-    });
-  }
-
   Future<void> _performSearch() async {
-    final query = _searchController.text.trim();
-    if (query.isEmpty) return;
-
-    // Parse min amount from controller
+    final nameQuery = _searchController.text.trim();
     final minAmountText = _minAmountController.text.trim();
-    _minAmount = minAmountText.isNotEmpty ? double.tryParse(minAmountText) : null;
+    final minTotal = minAmountText.isNotEmpty ? double.tryParse(minAmountText) : null;
 
     setState(() {
       _loading = true;
       _error = null;
+      _hasSearched = true;
     });
 
     try {
-      final results = await _repository.searchContributions(
-        query: query,
+      final results = await _repository.searchDonors(
+        nameQuery: nameQuery.isNotEmpty ? nameQuery : null,
+        state: _selectedState.isNotEmpty ? _selectedState : null,
         yearFrom: _yearFrom,
         yearTo: _yearTo,
-        minAmount: _minAmount,
-        limit: 200,
+        minTotal: minTotal,
+        party: _selectedParty,
+        limit: 100,
       );
 
       if (!mounted) return;
       setState(() {
-        _contributions = results;
+        _donors = results;
         _loading = false;
       });
     } catch (e) {
@@ -107,17 +111,28 @@ class _MecResearchTabState extends State<MecResearchTab> {
   // Profile logic
   // ---------------------------------------------------------------------------
 
-  Future<void> _openProfile(MecContribution contribution) async {
-    final lastName = contribution.contributorLastName ?? '';
-    final firstName = contribution.contributorFirstName;
-    final company = contribution.contributorCompany;
+  Future<void> _openProfileFromDonor(Map<String, dynamic> donor) async {
+    final lastName = (donor['contributor_last_name'] as String?) ?? '';
+    final firstName = donor['contributor_first_name'] as String?;
+    final company = donor['contributor_company'] as String?;
 
     if (lastName.isEmpty && (company == null || company.isEmpty)) return;
+
+    // Build display name
+    String displayName;
+    if (company != null && company.isNotEmpty && lastName.isEmpty) {
+      displayName = company;
+    } else {
+      final parts = <String>[];
+      if (lastName.isNotEmpty) parts.add(lastName);
+      if (firstName != null && firstName.isNotEmpty) parts.add(firstName);
+      displayName = parts.join(', ');
+    }
 
     setState(() {
       _inProfileMode = true;
       _profileLoading = true;
-      _profileName = contribution.contributorDisplayName;
+      _profileName = displayName;
       _profileFirstName = firstName;
       _profileLastName = lastName;
       _profileCompany = company;
@@ -154,6 +169,40 @@ class _MecResearchTabState extends State<MecResearchTab> {
   }
 
   // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  Color _partyColor(String party) {
+    switch (party.toLowerCase()) {
+      case 'democrat':
+        return Colors.blue;
+      case 'republican':
+        return Colors.red;
+      case 'progressive':
+        return Colors.green;
+      case 'conservative':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _donorDisplayName(Map<String, dynamic> donor) {
+    final lastName = (donor['contributor_last_name'] as String?) ?? '';
+    final firstName = (donor['contributor_first_name'] as String?) ?? '';
+    final company = (donor['contributor_company'] as String?) ?? '';
+
+    if (lastName.isNotEmpty || firstName.isNotEmpty) {
+      final parts = <String>[];
+      if (lastName.isNotEmpty) parts.add(lastName);
+      if (firstName.isNotEmpty) parts.add(firstName);
+      return parts.join(', ');
+    }
+    if (company.isNotEmpty) return company;
+    return 'Unknown';
+  }
+
+  // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
 
@@ -173,12 +222,16 @@ class _MecResearchTabState extends State<MecResearchTab> {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        // Search bar
+        // Name search
         _buildSearchBar(),
         const SizedBox(height: 12),
 
-        // Filter row
+        // State dropdown + year range row
         _buildFilterRow(),
+        const SizedBox(height: 12),
+
+        // Party filter chips
+        _buildPartyChips(),
         const SizedBox(height: 16),
 
         // Search button
@@ -187,7 +240,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
           child: ElevatedButton.icon(
             onPressed: _performSearch,
             icon: const Icon(Icons.search, color: Colors.white),
-            label: const Text('Search MEC Database',
+            label: const Text('Search Donor Database',
                 style: TextStyle(color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: BrandColors.unityBlue,
@@ -203,13 +256,12 @@ class _MecResearchTabState extends State<MecResearchTab> {
         // Results section
         if (_loading) _buildLoadingIndicator(),
         if (_error != null) _buildErrorMessage(),
-        if (!_loading && _error == null && _contributions.isNotEmpty)
+        if (!_loading && _error == null && _hasSearched && _donors.isNotEmpty)
           _buildResultsSection(),
-        if (!_loading &&
-            _error == null &&
-            _contributions.isEmpty &&
-            _searchController.text.trim().isNotEmpty)
+        if (!_loading && _error == null && _hasSearched && _donors.isEmpty)
           _buildEmptyState(),
+        if (!_loading && _error == null && !_hasSearched)
+          _buildInitialState(),
       ],
     );
   }
@@ -219,8 +271,8 @@ class _MecResearchTabState extends State<MecResearchTab> {
       controller: _searchController,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.search, color: Colors.white70),
-        labelText: 'Search contributors, companies, or committees',
+        prefixIcon: const Icon(Icons.person_search, color: Colors.white70),
+        labelText: 'Search by donor name',
         labelStyle: const TextStyle(color: Colors.white70),
         filled: true,
         fillColor: BrandColors.unityBlue.withOpacity(0.7),
@@ -230,11 +282,11 @@ class _MecResearchTabState extends State<MecResearchTab> {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white24),
+          borderSide: const BorderSide(color: Colors.white24),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: BrandColors.momentumBlue, width: 2),
+          borderSide: const BorderSide(color: BrandColors.momentumBlue, width: 2),
         ),
       ),
       onSubmitted: (_) => _performSearch(),
@@ -247,6 +299,12 @@ class _MecResearchTabState extends State<MecResearchTab> {
 
     return Row(
       children: [
+        // State dropdown
+        Expanded(
+          child: _buildStateDropdown(),
+        ),
+        const SizedBox(width: 8),
+
         // Year From dropdown
         Expanded(
           child: _buildYearDropdown(
@@ -289,17 +347,51 @@ class _MecResearchTabState extends State<MecResearchTab> {
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.white24),
+                borderSide: const BorderSide(color: Colors.white24),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide:
-                    BorderSide(color: BrandColors.momentumBlue, width: 2),
+                    const BorderSide(color: BrandColors.momentumBlue, width: 2),
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStateDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: BrandColors.unityBlue.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedState,
+          isExpanded: true,
+          dropdownColor: BrandColors.unityBlue,
+          iconEnabledColor: Colors.white70,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          items: [
+            const DropdownMenuItem<String>(
+              value: '',
+              child: Text('All States',
+                  style: TextStyle(color: Colors.white70, fontSize: 13)),
+            ),
+            ..._usStates.map(
+              (s) => DropdownMenuItem<String>(
+                value: s,
+                child: Text(s, style: const TextStyle(fontSize: 13)),
+              ),
+            ),
+          ],
+          onChanged: (v) => setState(() => _selectedState = v ?? ''),
+        ),
+      ),
     );
   }
 
@@ -344,6 +436,37 @@ class _MecResearchTabState extends State<MecResearchTab> {
     );
   }
 
+  Widget _buildPartyChips() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _partyOptions.map((option) {
+        final isSelected = _selectedParty == option.value;
+        return ChoiceChip(
+          label: Text(
+            option.label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : option.color,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              fontSize: 13,
+            ),
+          ),
+          selected: isSelected,
+          selectedColor: option.value == null
+              ? BrandColors.momentumBlue
+              : option.color.withOpacity(0.8),
+          backgroundColor: BrandColors.unityBlue.withOpacity(0.7),
+          side: BorderSide(
+            color: isSelected ? Colors.transparent : option.color.withOpacity(0.5),
+          ),
+          onSelected: (_) {
+            setState(() => _selectedParty = option.value);
+          },
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildLoadingIndicator() {
     return const Center(
       child: Padding(
@@ -352,7 +475,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
           children: [
             CircularProgressIndicator(color: BrandColors.momentumBlue),
             SizedBox(height: 16),
-            Text('Searching...', style: BrandTextStyles.subtitle),
+            Text('Searching donors...', style: BrandTextStyles.subtitle),
           ],
         ),
       ),
@@ -377,6 +500,28 @@ class _MecResearchTabState extends State<MecResearchTab> {
     );
   }
 
+  Widget _buildInitialState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(48),
+        child: Column(
+          children: [
+            Icon(Icons.how_to_vote, size: 56, color: BrandColors.sunriseGold.withOpacity(0.6)),
+            const SizedBox(height: 16),
+            const Text('Donor Research', style: BrandTextStyles.titleLarge),
+            const SizedBox(height: 8),
+            const Text(
+              'Use the filters above to search 3M+ donor records.\n'
+              'Results are aggregated by donor with party affiliations.',
+              style: BrandTextStyles.subtitle,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     return const Center(
       child: Padding(
@@ -385,10 +530,9 @@ class _MecResearchTabState extends State<MecResearchTab> {
           children: [
             Icon(Icons.search_off, size: 48, color: Colors.white38),
             SizedBox(height: 12),
-            Text('No contributions found',
-                style: BrandTextStyles.subtitle),
+            Text('No donors found', style: BrandTextStyles.subtitle),
             SizedBox(height: 4),
-            Text('Try a different search term or adjust filters',
+            Text('Try a different name, state, or adjust filters',
                 style: BrandTextStyles.caption),
           ],
         ),
@@ -400,42 +544,65 @@ class _MecResearchTabState extends State<MecResearchTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Result count
+        // Result count header
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
-            _contributions.length >= 200
-                ? 'Showing first 200 results'
-                : 'Found ${_contributions.length} contributions',
+            _donors.length >= 100
+                ? 'Showing first 100 donors'
+                : 'Found ${_donors.length} donor${_donors.length == 1 ? '' : 's'}',
             style: BrandTextStyles.subtitle,
           ),
         ),
 
-        // Result cards
-        ...List.generate(_contributions.length, (i) {
-          final c = _contributions[i];
-          return _buildContributionCard(c);
+        // Donor cards
+        ...List.generate(_donors.length, (i) {
+          final donor = _donors[i];
+          return _buildDonorCard(donor);
         }),
       ],
     );
   }
 
-  Widget _buildContributionCard(MecContribution c) {
+  Widget _buildDonorCard(Map<String, dynamic> donor) {
+    final name = _donorDisplayName(donor);
+    final totalAmount = (donor['total_amount'] as num?)?.toDouble() ?? 0.0;
+    final contributionCount = (donor['contribution_count'] as num?)?.toInt() ?? 0;
+    final city = donor['city'] as String?;
+    final state = donor['state'] as String?;
+    final employer = donor['employer'] as String?;
+    final occupation = donor['occupation'] as String?;
+    final firstYear = (donor['first_year'] as num?)?.toInt();
+    final lastYear = (donor['last_year'] as num?)?.toInt();
+    final avgAmount = (donor['avg_amount'] as num?)?.toDouble();
+    final parties = (donor['parties'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+    final committees = (donor['committees'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+
+    final location = [city, state]
+        .where((s) => s != null && s.isNotEmpty)
+        .join(', ');
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: BrandedCard(
-        onTap: () => _openProfile(c),
+        onTap: () => _openProfileFromDonor(donor),
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top row: name + amount
+            // Top row: name + total amount
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Text(
-                    c.contributorDisplayName,
+                    name,
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -444,45 +611,114 @@ class _MecResearchTabState extends State<MecResearchTab> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  c.formattedAmount,
-                  style: BrandTextStyles.title,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _currencyFormat.format(totalAmount),
+                      style: const TextStyle(
+                        color: BrandColors.sunriseGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                      ),
+                    ),
+                    Text(
+                      '$contributionCount contribution${contributionCount == 1 ? '' : 's'}',
+                      style: BrandTextStyles.caption,
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
 
-            // Bottom row: committee, date, location, employer
-            if (c.committeeName != null)
-              Text(c.committeeName!,
-                  style: BrandTextStyles.bodySecondary,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 2),
-            Row(
-              children: [
-                Text(c.formattedDate, style: BrandTextStyles.caption),
-                if (c.city != null || c.state != null) ...[
-                  const Text('  |  ', style: BrandTextStyles.caption),
-                  Text(
-                    [c.city, c.state]
-                        .where((s) => s != null && s.isNotEmpty)
-                        .join(', '),
-                    style: BrandTextStyles.caption,
-                  ),
-                ],
-              ],
-            ),
-            if (c.employer != null && c.employer!.isNotEmpty)
+            // Location + employer/occupation
+            if (location.isNotEmpty || (employer != null && employer.isNotEmpty))
               Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  c.employer!,
-                  style: BrandTextStyles.caption,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    if (location.isNotEmpty) ...[
+                      const Icon(Icons.location_on, size: 14, color: Colors.white54),
+                      const SizedBox(width: 4),
+                      Text(location, style: BrandTextStyles.caption),
+                    ],
+                    if (location.isNotEmpty && employer != null && employer.isNotEmpty)
+                      const Text('  |  ', style: BrandTextStyles.caption),
+                    if (employer != null && employer.isNotEmpty) ...[
+                      const Icon(Icons.business, size: 14, color: Colors.white54),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          occupation != null && occupation.isNotEmpty
+                              ? '$employer ($occupation)'
+                              : employer,
+                          style: BrandTextStyles.caption,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
+
+            // Year range + avg amount
+            Row(
+              children: [
+                if (firstYear != null && lastYear != null) ...[
+                  const Icon(Icons.calendar_today, size: 13, color: Colors.white54),
+                  const SizedBox(width: 4),
+                  Text(
+                    firstYear == lastYear ? '$firstYear' : '$firstYear - $lastYear',
+                    style: BrandTextStyles.caption,
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                if (avgAmount != null) ...[
+                  Text(
+                    'Avg: ${_currencyFormat.format(avgAmount)}',
+                    style: BrandTextStyles.caption,
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                if (committees.isNotEmpty)
+                  Text(
+                    '${committees.length} committee${committees.length == 1 ? '' : 's'}',
+                    style: BrandTextStyles.caption,
+                  ),
+              ],
+            ),
+
+            // Party chips
+            if (parties.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: parties.map((party) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: _partyColor(party).withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _partyColor(party).withOpacity(0.6),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      party[0].toUpperCase() + party.substring(1),
+                      style: TextStyle(
+                        color: _partyColor(party),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
           ],
         ),
       ),
@@ -768,4 +1004,20 @@ class _MecResearchTabState extends State<MecResearchTab> {
       ],
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Party option helper
+// ---------------------------------------------------------------------------
+
+class _PartyOption {
+  final String label;
+  final String? value;
+  final Color color;
+
+  const _PartyOption({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 }

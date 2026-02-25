@@ -15,6 +15,45 @@ class MecRepository {
       _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
 
   // ---------------------------------------------------------------------------
+  // searchDonors (RPC — aggregated donor search)
+  // ---------------------------------------------------------------------------
+
+  /// Smart donor search using the search_donors RPC function.
+  ///
+  /// Returns aggregated donor rows with total amounts, party affiliations,
+  /// and committee counts rather than individual contributions.
+  Future<List<Map<String, dynamic>>> searchDonors({
+    String? state,
+    int? yearFrom,
+    int? yearTo,
+    double? minTotal,
+    double? maxTotal,
+    String? party,
+    String? nameQuery,
+    bool individualsOnly = true,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    if (!isReady) return [];
+
+    final params = <String, dynamic>{
+      'p_individuals_only': individualsOnly,
+      'p_limit': limit,
+      'p_offset': offset,
+    };
+    if (state != null && state.isNotEmpty) params['p_state'] = state;
+    if (yearFrom != null) params['p_year_from'] = yearFrom;
+    if (yearTo != null) params['p_year_to'] = yearTo;
+    if (minTotal != null) params['p_min_total'] = minTotal;
+    if (maxTotal != null) params['p_max_total'] = maxTotal;
+    if (party != null && party.isNotEmpty) params['p_party'] = party;
+    if (nameQuery != null && nameQuery.isNotEmpty) params['p_name_query'] = nameQuery;
+
+    final data = await _readClient.rpc('search_donors', params: params);
+    return (data as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+  }
+
+  // ---------------------------------------------------------------------------
   // searchContributions
   // ---------------------------------------------------------------------------
 
