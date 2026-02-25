@@ -216,7 +216,7 @@ serve(async (req) => {
 
       await sendBBMessage(
         phone,
-        "You've been opted out of this survey. Reply START to any future survey to re-subscribe."
+        "You've opted out of this survey. You'll still receive future surveys."
       );
 
       return new Response(JSON.stringify({ ok: true, action: "opted_out" }), {
