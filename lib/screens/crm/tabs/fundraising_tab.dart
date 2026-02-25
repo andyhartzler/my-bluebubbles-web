@@ -203,7 +203,7 @@ class _FundraisingTabState extends State<FundraisingTab> {
 
   double _calculateRecurringTotal(List<Donor> donors) {
     return donors
-        .where((donor) => Donor.inferRecurringFromDonations(donor.donations))
+        .where((donor) => donor.isRecurringDonor == true)
         .fold<double>(0, (sum, donor) => sum + (donor.totalDonated ?? 0));
   }
 
@@ -225,8 +225,7 @@ class _FundraisingTabState extends State<FundraisingTab> {
       filtered = filtered
           .where(
             (donor) =>
-                Donor.inferRecurringFromDonations(donor.donations) ==
-                _recurringFilter,
+                (donor.isRecurringDonor == true) == _recurringFilter,
           )
           .toList();
     }

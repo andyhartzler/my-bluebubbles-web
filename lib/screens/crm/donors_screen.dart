@@ -320,9 +320,9 @@ class _DonorsScreenState extends State<DonorsScreen> {
                     formatter.format(total),
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  if (donor.donations.isNotEmpty)
+                  if (donor.donationCount > 0)
                     Text(
-                      '${donor.donations.length} gifts',
+                      '${donor.donationCount} gifts',
                       style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
                     ),
                 ],
@@ -436,12 +436,12 @@ class _DonorsScreenState extends State<DonorsScreen> {
               ],
             ),
             const SizedBox(height: 6),
-            if (donor.donations.isNotEmpty)
+            if (donor.donationCount > 0)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Gifts recorded', style: theme.textTheme.bodySmall),
-                  Text(donor.donations.length.toString(), style: theme.textTheme.titleMedium),
+                  Text(donor.donationCount.toString(), style: theme.textTheme.titleMedium),
                 ],
               ),
             const SizedBox(height: 12),
