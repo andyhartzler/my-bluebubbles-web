@@ -8,7 +8,11 @@ import 'package:bluebubbles/models/crm/mec_contribution.dart';
 import 'package:bluebubbles/services/crm/mec_repository.dart';
 
 class MecResearchTab extends StatefulWidget {
-  const MecResearchTab({super.key});
+  /// Called when the user taps a committee name in a donor's contribution list.
+  /// Parameters: committeeId, committeeName, source ('mec' or 'fec').
+  final void Function(String committeeId, String committeeName, String source)? onNavigateToCommittee;
+
+  const MecResearchTab({super.key, this.onNavigateToCommittee});
 
   @override
   State<MecResearchTab> createState() => _MecResearchTabState();
@@ -1782,6 +1786,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
             final amount = (c['contribution_amount'] as num?)?.toDouble() ?? 0;
             final date = c['contribution_date'] as String? ?? '';
             final committee = c['committee_name'] as String? ?? '';
+            final mecId = c['mec_id'] as String? ?? '';
             String displayDate = date;
             if (date.isNotEmpty) {
               try { displayDate = _dateFormat.format(DateTime.parse(date)); } catch (_) {}
@@ -1803,7 +1808,28 @@ class _MecResearchTabState extends State<MecResearchTab> {
                 children: [
                   SizedBox(width: 90, child: Text(displayDate, style: BrandTextStyles.caption)),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(committee, style: const TextStyle(color: Colors.white, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: mecId.isNotEmpty && widget.onNavigateToCommittee != null
+                          ? () => widget.onNavigateToCommittee!(mecId, committee, 'mec')
+                          : null,
+                      child: Text(
+                        committee,
+                        style: TextStyle(
+                          color: mecId.isNotEmpty && widget.onNavigateToCommittee != null
+                              ? BrandColors.momentumBlue
+                              : Colors.white,
+                          fontSize: 13,
+                          decoration: mecId.isNotEmpty && widget.onNavigateToCommittee != null
+                              ? TextDecoration.underline
+                              : null,
+                          decorationColor: BrandColors.momentumBlue,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
                   const SizedBox(width: 8),
                   Text(_currencyFormat.format(amount), style: const TextStyle(color: BrandColors.sunriseGold, fontWeight: FontWeight.bold, fontSize: 14)),
                 ],
@@ -1859,6 +1885,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
                 (c['contribution_amount'] as num?)?.toDouble() ?? 0;
             final date = c['transaction_date'] as String? ?? '';
             final committee = c['committee_name'] as String? ?? '';
+            final cmteId = c['cmte_id'] as String? ?? '';
             String displayDate = date;
             if (date.isNotEmpty) {
               try { displayDate = _dateFormat.format(DateTime.parse(date)); } catch (_) {}
@@ -1880,7 +1907,28 @@ class _MecResearchTabState extends State<MecResearchTab> {
                 children: [
                   SizedBox(width: 90, child: Text(displayDate, style: BrandTextStyles.caption)),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(committee, style: const TextStyle(color: Colors.white, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: cmteId.isNotEmpty && widget.onNavigateToCommittee != null
+                          ? () => widget.onNavigateToCommittee!(cmteId, committee, 'fec')
+                          : null,
+                      child: Text(
+                        committee,
+                        style: TextStyle(
+                          color: cmteId.isNotEmpty && widget.onNavigateToCommittee != null
+                              ? BrandColors.success
+                              : Colors.white,
+                          fontSize: 13,
+                          decoration: cmteId.isNotEmpty && widget.onNavigateToCommittee != null
+                              ? TextDecoration.underline
+                              : null,
+                          decorationColor: BrandColors.success,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
                   const SizedBox(width: 8),
                   Text(_currencyFormat.format(amount), style: const TextStyle(color: BrandColors.sunriseGold, fontWeight: FontWeight.bold, fontSize: 14)),
                 ],
@@ -2024,20 +2072,9 @@ class _MecResearchTabState extends State<MecResearchTab> {
                       TextButton.icon(
                         onPressed: () {
                           Navigator.of(ctx).pop();
-                          _closeProfile();
-                          // Navigate to committee detail via parent's tab controller
-                          // For now, show a snackbar with the MEC ID
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Switch to Committees tab and search for $mecId',
-                              ),
-                              action: SnackBarAction(
-                                label: 'OK',
-                                onPressed: () {},
-                              ),
-                            ),
-                          );
+                          if (widget.onNavigateToCommittee != null) {
+                            widget.onNavigateToCommittee!(mecId, committeeName, 'mec');
+                          }
                         },
                         icon: const Icon(Icons.open_in_new,
                             color: BrandColors.momentumBlue, size: 16),
@@ -2175,14 +2212,25 @@ class _MecResearchTabState extends State<MecResearchTab> {
 
                 // Committee name
                 Expanded(
-                  child: Text(
-                    c.committeeName ?? 'Unknown Committee',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
+                  child: GestureDetector(
+                    onTap: c.mecId != null && c.mecId!.isNotEmpty && widget.onNavigateToCommittee != null
+                        ? () => widget.onNavigateToCommittee!(c.mecId!, c.committeeName ?? '', 'mec')
+                        : null,
+                    child: Text(
+                      c.committeeName ?? 'Unknown Committee',
+                      style: TextStyle(
+                        color: c.mecId != null && c.mecId!.isNotEmpty && widget.onNavigateToCommittee != null
+                            ? BrandColors.momentumBlue
+                            : Colors.white,
+                        fontSize: 13,
+                        decoration: c.mecId != null && c.mecId!.isNotEmpty && widget.onNavigateToCommittee != null
+                            ? TextDecoration.underline
+                            : null,
+                        decorationColor: BrandColors.momentumBlue,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 8),

@@ -42,10 +42,10 @@ class CommitteesTab extends StatefulWidget {
   const CommitteesTab({super.key});
 
   @override
-  State<CommitteesTab> createState() => _CommitteesTabState();
+  State<CommitteesTab> createState() => CommitteesTabState();
 }
 
-class _CommitteesTabState extends State<CommitteesTab> {
+class CommitteesTabState extends State<CommitteesTab> {
   final MecRepository _repository = MecRepository();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -78,6 +78,16 @@ class _CommitteesTabState extends State<CommitteesTab> {
 
   // Detail scroll controller (separate from list scroll controller)
   final ScrollController _detailScrollController = ScrollController();
+
+  /// Open a committee detail by its ID and source (called externally via GlobalKey).
+  void openCommitteeById(String committeeId, String committeeName, String source) {
+    _openCommitteeDetail({
+      'mec_id': committeeId,
+      'committee_id': committeeId,
+      'committee_name': committeeName,
+      'source': source,
+    });
+  }
 
   @override
   void initState() {

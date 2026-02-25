@@ -18,6 +18,7 @@ class DonorsListScreen extends StatefulWidget {
 class _DonorsListScreenState extends State<DonorsListScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final GlobalKey<CommitteesTabState> _committeesKey = GlobalKey<CommitteesTabState>();
 
   @override
   void initState() {
@@ -29,6 +30,15 @@ class _DonorsListScreenState extends State<DonorsListScreen>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _handleNavigateToCommittee(String committeeId, String committeeName, String source) {
+    // Switch to Committees tab (index 3)
+    _tabController.animateTo(3);
+    // Give the tab time to become visible, then open the committee detail
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _committeesKey.currentState?.openCommitteeById(committeeId, committeeName, source);
+    });
   }
 
   @override
@@ -75,11 +85,11 @@ class _DonorsListScreenState extends State<DonorsListScreen>
             child: TabBarView(
               controller: _tabController,
               physics: const NeverScrollableScrollPhysics(),
-              children: const [
-                FundraisingTab(),
-                MecResearchTab(),
-                CallTimeTab(),
-                CommitteesTab(),
+              children: [
+                const FundraisingTab(),
+                MecResearchTab(onNavigateToCommittee: _handleNavigateToCommittee),
+                const CallTimeTab(),
+                CommitteesTab(key: _committeesKey),
               ],
             ),
           ),
