@@ -1,16 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/survey_model.dart';
 import 'package:bluebubbles/services/crm/survey_repository.dart';
 import 'package:bluebubbles/screens/crm/survey_builder_screen.dart';
 import 'package:bluebubbles/screens/crm/survey_results_widget.dart';
-
-const _unityBlue = Color(0xFF273351);
-const _momentumBlue = Color(0xFF32A6DE);
-const _sunriseGold = Color(0xFFFDB813);
-const _grassrootsGreen = Color(0xFF43A047);
-const _actionRed = Color(0xFFE63946);
 
 class SurveysScreen extends StatefulWidget {
   const SurveysScreen({super.key});
@@ -19,38 +14,98 @@ class SurveysScreen extends StatefulWidget {
   State<SurveysScreen> createState() => _SurveysScreenState();
 }
 
-class _SurveysScreenState extends State<SurveysScreen> {
+class _SurveysScreenState extends State<SurveysScreen>
+    with TickerProviderStateMixin {
   final _repo = SurveyRepository();
-  List<Survey> _surveys = [];
+  late TabController _tabController;
+
+  List<Survey> _allSurveys = [];
   bool _loading = true;
-  String _filter = 'all'; // all, active, draft, completed
+  String? _error;
+  String _searchQuery = '';
+
+  final _searchController = TextEditingController();
+
+  // ---------------------------------------------------------------------------
+  // Filtering
+  // ---------------------------------------------------------------------------
+
+  List<Survey> get _filteredSurveys {
+    var filtered = _allSurveys;
+
+    // Text search
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      filtered = filtered
+          .where((s) => s.title.toLowerCase().contains(q))
+          .toList();
+    }
+
+    // Tab filter: 0=All, 1=Active, 2=Drafts, 3=Completed
+    final tabFilter = const [null, 'active', 'draft', 'completed'][_tabController.index];
+    if (tabFilter != null) {
+      filtered = filtered.where((s) => s.status == tabFilter).toList();
+    }
+
+    return filtered;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() {}); // rebuild for new filter
+      }
+    });
     _loadSurveys();
   }
 
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Data
+  // ---------------------------------------------------------------------------
+
   Future<void> _loadSurveys() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
     try {
-      final status = _filter == 'all' ? null : _filter;
-      final surveys = await _repo.fetchSurveys(status: status);
+      final surveys = await _repo.fetchSurveys(
+        searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
+      );
       if (mounted) {
         setState(() {
-          _surveys = surveys;
+          _allSurveys = surveys;
           _loading = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading surveys: $e')),
-        );
+        setState(() {
+          _error = 'Failed to load surveys: $e';
+          _loading = false;
+        });
       }
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Navigation
+  // ---------------------------------------------------------------------------
 
   void _openBuilder({Survey? existing}) async {
     final result = await Navigator.of(context).push<Survey>(
@@ -67,7 +122,16 @@ class _SurveysScreenState extends State<SurveysScreen> {
         builder: (_) => Scaffold(
           appBar: AppBar(
             title: Text(survey.title),
-            backgroundColor: _unityBlue,
+            elevation: 0,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: BrandColors.tileGradient,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ),
             foregroundColor: Colors.white,
           ),
           body: SurveyResultsWidget(
@@ -92,7 +156,10 @@ class _SurveysScreenState extends State<SurveysScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: _actionRed),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: BrandColors.error,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Delete'),
           ),
         ],
@@ -112,301 +179,533 @@ class _SurveysScreenState extends State<SurveysScreen> {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       children: [
-        // ── Header ──
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-          child: Row(
-            children: [
-              const Icon(Icons.poll_outlined, size: 28),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text('Surveys', style: theme.textTheme.headlineSmall),
-              ),
-              ElevatedButton.icon(
-                onPressed: () => _openBuilder(),
-                icon: const Icon(Icons.add),
-                label: const Text('Create Survey'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _momentumBlue,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // ── Filters ──
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: Row(
-            children: [
-              _FilterChip(
-                label: 'All',
-                selected: _filter == 'all',
-                onTap: () {
-                  setState(() => _filter = 'all');
-                  _loadSurveys();
-                },
-              ),
-              const SizedBox(width: 8),
-              _FilterChip(
-                label: 'Active',
-                selected: _filter == 'active',
-                onTap: () {
-                  setState(() => _filter = 'active');
-                  _loadSurveys();
-                },
-              ),
-              const SizedBox(width: 8),
-              _FilterChip(
-                label: 'Draft',
-                selected: _filter == 'draft',
-                onTap: () {
-                  setState(() => _filter = 'draft');
-                  _loadSurveys();
-                },
-              ),
-              const SizedBox(width: 8),
-              _FilterChip(
-                label: 'Completed',
-                selected: _filter == 'completed',
-                onTap: () {
-                  setState(() => _filter = 'completed');
-                  _loadSurveys();
-                },
-              ),
-            ],
-          ),
-        ),
-
-        const Divider(),
-
-        // ── Survey list ──
+        _buildHeader(),
+        _buildSearchBar(),
+        _buildTabBar(),
         Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _surveys.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.poll_outlined, size: 64, color: Colors.grey.shade600),
-                          const SizedBox(height: 16),
-                          const Text('No surveys yet'),
-                          const SizedBox(height: 8),
-                          ElevatedButton.icon(
-                            onPressed: () => _openBuilder(),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Create your first survey'),
-                          ),
-                        ],
+          child: BrandedBackground(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                : _error != null
+                    ? _buildErrorState()
+                    : TabBarView(
+                        controller: _tabController,
+                        children: List.generate(4, (_) => _buildSurveyList()),
                       ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadSurveys,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                        itemCount: _surveys.length,
-                        itemBuilder: (context, index) =>
-                            _buildSurveyCard(_surveys[index]),
-                      ),
-                    ),
+          ),
         ),
       ],
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Header
+  // ---------------------------------------------------------------------------
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Icon badge
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.poll_outlined, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 12),
+          // Title + count
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Surveys', style: BrandTextStyles.title),
+                Text(
+                  '${_allSurveys.length} survey${_allSurveys.length == 1 ? '' : 's'}',
+                  style: BrandTextStyles.subtitle,
+                ),
+              ],
+            ),
+          ),
+          // Create button
+          ElevatedButton.icon(
+            onPressed: () => _openBuilder(),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Create Survey'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: BrandColors.sunriseGold,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Search bar
+  // ---------------------------------------------------------------------------
+
+  Widget _buildSearchBar() {
+    return Container(
+      color: BrandColors.unityBlue,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: TextField(
+        controller: _searchController,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          hintText: 'Search surveys...',
+          hintStyle: const TextStyle(color: Colors.white54),
+          prefixIcon: const Icon(Icons.search, color: Colors.white54),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, color: Colors.white54, size: 18),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                    _loadSurveys();
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        ),
+        onChanged: (v) {
+          setState(() => _searchQuery = v);
+          _loadSurveys();
+        },
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tab bar
+  // ---------------------------------------------------------------------------
+
+  Widget _buildTabBar() {
+    return Container(
+      decoration: const BoxDecoration(color: BrandColors.unityBlue),
+      child: TabBar(
+        controller: _tabController,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white70,
+        indicatorColor: BrandColors.sunriseGold,
+        indicatorWeight: 3,
+        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.normal,
+          fontSize: 13,
+        ),
+        tabs: [
+          Tab(text: 'All (${_countForStatus(null)})'),
+          Tab(text: 'Active (${_countForStatus('active')})'),
+          Tab(text: 'Drafts (${_countForStatus('draft')})'),
+          Tab(text: 'Completed (${_countForStatus('completed')})'),
+        ],
+      ),
+    );
+  }
+
+  int _countForStatus(String? status) {
+    if (status == null) return _allSurveys.length;
+    return _allSurveys.where((s) => s.status == status).length;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Survey list (per tab)
+  // ---------------------------------------------------------------------------
+
+  Widget _buildSurveyList() {
+    final surveys = _filteredSurveys;
+
+    if (surveys.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadSurveys,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: surveys.length,
+        itemBuilder: (context, index) => _buildSurveyCard(surveys[index]),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Survey card
+  // ---------------------------------------------------------------------------
+
   Widget _buildSurveyCard(Survey survey) {
-    final theme = Theme.of(context);
     final dateFmt = DateFormat('MMM d, y');
     final statusColor = _statusColor(survey.status);
+    final statusLabel = _statusLabel(survey.status);
+    final hasProgress = survey.sessionCount > 0;
+    final progressValue =
+        hasProgress ? survey.completedCount / survey.sessionCount : 0.0;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          if (survey.status == 'draft') {
-            _openBuilder(existing: survey);
-          } else {
-            _openResults(survey);
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // Status indicator
-              Container(
-                width: 4,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: statusColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 16),
-
-              // Content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: BrandColors.unityBlue.withOpacity(0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => survey.status == 'draft'
+              ? _openBuilder(existing: survey)
+              : _openResults(survey),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Row 1: Title + Status badge + Menu ──
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            survey.title,
-                            style: theme.textTheme.titleMedium,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            survey.status.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: statusColor,
+                    Expanded(
+                      child: Text(
+                        survey.title,
+                        style: BrandTextStyles.title,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildStatusBadge(statusLabel, statusColor),
+                    const SizedBox(width: 4),
+                    _buildPopupMenu(survey),
+                  ],
+                ),
+
+                const SizedBox(height: 8),
+
+                // ── Row 2: Metadata chips ──
+                Wrap(
+                  spacing: 14,
+                  runSpacing: 6,
+                  children: [
+                    if (survey.eventId != null)
+                      _buildInfoChip(Icons.event, 'Event-linked', BrandColors.sunriseGold),
+                    _buildInfoChip(
+                      Icons.help_outline,
+                      '${survey.questions.length} question${survey.questions.length == 1 ? '' : 's'}',
+                      Colors.white70,
+                    ),
+                    if (hasProgress)
+                      _buildInfoChip(
+                        Icons.people,
+                        '${survey.completedCount}/${survey.sessionCount} completed',
+                        Colors.white70,
+                      ),
+                    if (survey.createdAt != null)
+                      _buildInfoChip(
+                        Icons.calendar_today,
+                        dateFmt.format(survey.createdAt!),
+                        Colors.white54,
+                      ),
+                  ],
+                ),
+
+                // ── Row 3: Progress bar (if sessions exist) ──
+                if (hasProgress) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: progressValue,
+                            minHeight: 6,
+                            backgroundColor: Colors.white.withOpacity(0.15),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              progressValue >= 1.0
+                                  ? BrandColors.success
+                                  : BrandColors.sunriseGold,
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        if (survey.eventId != null) ...[
-                          const Icon(Icons.event, size: 14, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Event-linked',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-                          ),
-                          const SizedBox(width: 12),
-                        ],
-                        Icon(Icons.help_outline, size: 14, color: Colors.grey.shade400),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${survey.questions.length} questions',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-                        ),
-                        const SizedBox(width: 12),
-                        if (survey.sessionCount > 0) ...[
-                          Icon(Icons.people, size: 14, color: Colors.grey.shade400),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${survey.completedCount}/${survey.sessionCount} completed',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (survey.createdAt != null) ...[
-                      const SizedBox(height: 2),
+                      ),
+                      const SizedBox(width: 10),
                       Text(
-                        'Created ${dateFmt.format(survey.createdAt!)}',
-                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                        '${(progressValue * 100).round()}%',
+                        style: BrandTextStyles.caption,
                       ),
                     ],
-                  ],
-                ),
-              ),
-
-              // Actions
-              PopupMenuButton<String>(
-                onSelected: (action) {
-                  switch (action) {
-                    case 'edit':
-                      _openBuilder(existing: survey);
-                      break;
-                    case 'results':
-                      _openResults(survey);
-                      break;
-                    case 'delete':
-                      _deleteSurvey(survey);
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                  if (survey.status != 'draft')
-                    const PopupMenuItem(value: 'results', child: Text('View Results')),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Delete', style: TextStyle(color: Colors.red)),
                   ),
                 ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  Widget _buildStatusBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.35),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          color: color == Colors.grey ? Colors.white70 : color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(IconData icon, String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 12, color: color),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPopupMenu(Survey survey) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert, color: Colors.white70, size: 20),
+      onSelected: (action) {
+        switch (action) {
+          case 'edit':
+            _openBuilder(existing: survey);
+            break;
+          case 'results':
+            _openResults(survey);
+            break;
+          case 'delete':
+            _deleteSurvey(survey);
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem(value: 'edit', child: Text('Edit')),
+        if (survey.status != 'draft')
+          const PopupMenuItem(value: 'results', child: Text('View Results')),
+        const PopupMenuItem(
+          value: 'delete',
+          child: Text('Delete', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Empty state
+  // ---------------------------------------------------------------------------
+
+  Widget _buildEmptyState() {
+    final isTabFiltered = _tabController.index != 0;
+    final isSearchFiltered = _searchQuery.isNotEmpty;
+
+    String title;
+    String subtitle;
+
+    if (isSearchFiltered) {
+      title = 'No matching surveys';
+      subtitle = 'Try a different search term.';
+    } else if (isTabFiltered) {
+      final tabName = const ['', 'active', 'draft', 'completed'][_tabController.index];
+      title = 'No $tabName surveys';
+      subtitle = 'Surveys with "$tabName" status will appear here.';
+    } else {
+      title = 'No surveys yet';
+      subtitle = 'Create your first survey to start collecting feedback.';
+    }
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: BrandColors.momentumBlue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.poll_outlined,
+                size: 64,
+                color: BrandColors.momentumBlue,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              title,
+              style: const TextStyle(
+                color: BrandColors.unityBlue,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: BrandColors.unityBlue.withOpacity(0.7),
+                fontSize: 14,
+              ),
+            ),
+            if (!isSearchFiltered && !isTabFiltered) ...[
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () => _openBuilder(),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Create Survey'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: BrandColors.sunriseGold,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Error state
+  // ---------------------------------------------------------------------------
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: BrandColors.error.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: BrandColors.error,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _error ?? 'An error occurred',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: BrandColors.unityBlue,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _loadSurveys,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: BrandColors.unityBlue,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
 
   Color _statusColor(String status) {
     switch (status) {
       case 'active':
-        return _grassrootsGreen;
+        return BrandColors.success;
       case 'draft':
         return Colors.grey;
       case 'paused':
-        return _sunriseGold;
+        return BrandColors.sunriseGold;
       case 'completed':
-        return _momentumBlue;
+        return BrandColors.momentumBlue;
       default:
         return Colors.grey;
     }
   }
-}
 
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? _momentumBlue.withOpacity(0.2) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? _momentumBlue : Colors.grey.shade600,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: selected ? _momentumBlue : Colors.grey.shade400,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'draft':
+        return 'Draft';
+      case 'paused':
+        return 'Paused';
+      case 'completed':
+        return 'Completed';
+      default:
+        return status;
+    }
   }
 }
