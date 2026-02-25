@@ -422,9 +422,9 @@ class _RecipientSelectorWidgetState extends State<RecipientSelectorWidget> {
     final name = member['name']?.toString() ?? '';
     final profilePics = member['profile_pictures'];
     final photos = MemberProfilePhoto.parseList(profilePics);
+    final url = photos.isNotEmpty ? photos.first.publicUrl : null;
 
-    if (photos.isNotEmpty) {
-      final url = photos.first.publicUrl;
+    if (url != null && url.isNotEmpty) {
       return CircleAvatar(
         backgroundImage: NetworkImage(url),
         backgroundColor: BrandColors.unityBlue.withOpacity(0.1),
