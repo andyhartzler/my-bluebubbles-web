@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
@@ -138,6 +139,12 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
             // ── Export row ──
             _buildExportRow(),
             const SizedBox(height: 16),
+
+            // ── Respondent list ──
+            if (s.sessionDetails.isNotEmpty) ...[
+              _buildRespondentList(s),
+              const SizedBox(height: 16),
+            ],
 
             // ── Per-question breakdown ──
             if (s.questionSummaries.isEmpty)
@@ -485,6 +492,245 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
         ],
       ),
     );
+  }
+
+  // ── Respondent List (Tier 3) ──────────────────────────────────────────────
+
+  Widget _buildRespondentList(SurveyResultsSummary s) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'Respondents',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: BrandColors.unityBlue,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: BrandColors.momentumBlue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${s.sessionDetails.length}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: BrandColors.momentumBlue,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...s.sessionDetails.map((detail) => _buildRespondentCard(detail, s)),
+      ],
+    );
+  }
+
+  Widget _buildRespondentCard(SurveySessionDetail detail, SurveyResultsSummary summary) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          leading: _buildRespondentAvatar(detail),
+          title: Text(
+            detail.displayName,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: BrandColors.unityBlue,
+            ),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (detail.memberName != null)
+                Text(
+                  detail.memberPhone ?? detail.session.phoneE164,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: detail.progress,
+                        backgroundColor: Colors.grey.shade200,
+                        valueColor: AlwaysStoppedAnimation(
+                          _statusColor(detail.displayStatus),
+                        ),
+                        minHeight: 6,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${detail.questionsAnswered}/${detail.totalQuestions}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          trailing: _buildStatusBadge(detail.displayStatus),
+          children: [
+            if (detail.responses.isNotEmpty)
+              ...detail.responses.map((r) {
+                final question = summary.questionSummaries
+                    .where((qs) => qs.question.id == r.questionId)
+                    .firstOrNull;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: BrandColors.momentumBlue.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${question?.question.questionOrder ?? '?'}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: BrandColors.momentumBlue,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              question?.question.questionText ?? 'Question',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              r.parsedResponse ?? r.rawResponse ?? '(empty)',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: BrandColors.unityBlue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            if (detail.responses.isEmpty)
+              Text(
+                detail.session.status == 'opted_out'
+                    ? 'Opted out before answering'
+                    : 'No responses yet',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade500,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRespondentAvatar(SurveySessionDetail detail) {
+    final name = detail.memberName ?? '';
+    final url = detail.profilePhotoUrl;
+    if (url != null && url.isNotEmpty) {
+      return CircleAvatar(
+        radius: 20,
+        backgroundImage: CachedNetworkImageProvider(url),
+        backgroundColor: BrandColors.unityBlue.withOpacity(0.1),
+      );
+    }
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: BrandColors.unityBlue.withOpacity(0.1),
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : '?',
+        style: const TextStyle(
+          color: BrandColors.unityBlue,
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String status) {
+    final color = _statusColor(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: color,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'Completed':
+        return BrandColors.success;
+      case 'In Progress':
+        return BrandColors.momentumBlue;
+      case 'Opted Out':
+        return BrandColors.error;
+      case 'No Response':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
   }
 
   // ── Question result card ───────────────────────────────────────────────────
