@@ -18,10 +18,10 @@ class MecRepository {
   // searchDonors (RPC — aggregated donor search)
   // ---------------------------------------------------------------------------
 
-  /// Smart donor search using the search_donors RPC function.
+  /// Smart donor search using the search_donors_v2 RPC function.
   ///
   /// Returns aggregated donor rows with total amounts, party affiliations,
-  /// and committee counts rather than individual contributions.
+  /// committee counts, and enrichment data (gender, age, phone, etc.).
   Future<List<Map<String, dynamic>>> searchDonors({
     String? state,
     int? yearFrom,
@@ -30,6 +30,16 @@ class MecRepository {
     double? maxTotal,
     String? party,
     String? nameQuery,
+    String? city,
+    String? zip,
+    String? employer,
+    String? occupation,
+    String? gender,
+    int? ageMin,
+    int? ageMax,
+    bool? hasPhone,
+    bool? hasEmail,
+    bool? isHomeowner,
     bool individualsOnly = true,
     int limit = 100,
     int offset = 0,
@@ -48,9 +58,34 @@ class MecRepository {
     if (maxTotal != null) params['p_max_total'] = maxTotal;
     if (party != null && party.isNotEmpty) params['p_party'] = party;
     if (nameQuery != null && nameQuery.isNotEmpty) params['p_name_query'] = nameQuery;
+    if (city != null && city.isNotEmpty) params['p_city'] = city;
+    if (zip != null && zip.isNotEmpty) params['p_zip'] = zip;
+    if (employer != null && employer.isNotEmpty) params['p_employer'] = employer;
+    if (occupation != null && occupation.isNotEmpty) params['p_occupation'] = occupation;
+    if (gender != null && gender.isNotEmpty) params['p_gender'] = gender;
+    if (ageMin != null) params['p_age_min'] = ageMin;
+    if (ageMax != null) params['p_age_max'] = ageMax;
+    if (hasPhone != null) params['p_has_phone'] = hasPhone;
+    if (hasEmail != null) params['p_has_email'] = hasEmail;
+    if (isHomeowner != null) params['p_is_homeowner'] = isHomeowner;
 
-    final data = await _readClient.rpc('search_donors', params: params);
+    final data = await _readClient.rpc('search_donors_v2', params: params);
     return (data as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+  }
+
+  // ---------------------------------------------------------------------------
+  // getDonorEnrichment
+  // ---------------------------------------------------------------------------
+
+  /// Fetch enrichment data for a specific donor by donor_id.
+  Future<Map<String, dynamic>?> getDonorEnrichment(int donorId) async {
+    if (!isReady) return null;
+    final data = await _readClient
+        .from('donor_enrichment')
+        .select()
+        .eq('donor_id', donorId)
+        .maybeSingle();
+    return data;
   }
 
   // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/screens/crm/tabs/fundraising_tab.dart';
 import 'package:bluebubbles/screens/crm/tabs/mec_research_tab.dart';
 import 'package:bluebubbles/screens/crm/tabs/call_time_tab.dart';
+import 'package:bluebubbles/screens/crm/tabs/committees_tab.dart';
 
 class DonorsListScreen extends StatefulWidget {
   final bool embed;
@@ -21,7 +22,7 @@ class _DonorsListScreenState extends State<DonorsListScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -46,10 +47,13 @@ class _DonorsListScreenState extends State<DonorsListScreen>
             bottom: false,
             child: TabBar(
               controller: _tabController,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
               tabs: const [
                 Tab(icon: Icon(Icons.volunteer_activism), text: 'Fundraising'),
                 Tab(icon: Icon(Icons.search), text: 'Donor Research'),
                 Tab(icon: Icon(Icons.phone_callback), text: 'Call Time'),
+                Tab(icon: Icon(Icons.account_balance), text: 'Committees'),
               ],
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white70,
@@ -75,6 +79,7 @@ class _DonorsListScreenState extends State<DonorsListScreen>
                 FundraisingTab(),
                 MecResearchTab(),
                 CallTimeTab(),
+                CommitteesTab(),
               ],
             ),
           ),

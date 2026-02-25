@@ -681,11 +681,10 @@ class _CallTimeTabState extends State<CallTimeTab> {
     final descController = TextEditingController();
 
     // Filter state for the dialog
-    String filterState = 'MO';
     String filterParty = 'All';
 
-    final yearFromController = TextEditingController();
-    final yearToController = TextEditingController();
+    int yearFrom = DateTime.now().year - 1;
+    int yearTo = DateTime.now().year;
     final minTotalController = TextEditingController();
 
     final result = await showDialog<bool>(
@@ -741,26 +740,6 @@ class _CallTimeTabState extends State<CallTimeTab> {
                       ),
                       const SizedBox(height: 12),
 
-                      // State filter
-                      Row(
-                        children: [
-                          const SizedBox(
-                            width: 80,
-                            child: Text('State',
-                                style: TextStyle(color: Colors.white70, fontSize: 13)),
-                          ),
-                          Expanded(
-                            child: TextField(
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _inputDecoration('e.g. MO'),
-                              controller: TextEditingController(text: filterState),
-                              onChanged: (v) => filterState = v.trim().toUpperCase(),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-
                       // Party filter
                       Row(
                         children: [
@@ -797,34 +776,28 @@ class _CallTimeTabState extends State<CallTimeTab> {
                       ),
                       const SizedBox(height: 10),
 
-                      // Year range
-                      Row(
+                      // Year range slider
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const SizedBox(
-                            width: 80,
-                            child: Text('Years',
-                                style: TextStyle(color: Colors.white70, fontSize: 13)),
+                          Text(
+                            'Years: $yearFrom - $yearTo',
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
                           ),
-                          Expanded(
-                            child: TextField(
-                              controller: yearFromController,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _inputDecoration('From'),
-                              keyboardType: TextInputType.number,
-                            ),
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8),
-                            child: Text('-',
-                                style: TextStyle(color: Colors.white54)),
-                          ),
-                          Expanded(
-                            child: TextField(
-                              controller: yearToController,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _inputDecoration('To'),
-                              keyboardType: TextInputType.number,
-                            ),
+                          RangeSlider(
+                            values: RangeValues(yearFrom.toDouble(), yearTo.toDouble()),
+                            min: 2002,
+                            max: DateTime.now().year.toDouble(),
+                            divisions: DateTime.now().year - 2002,
+                            labels: RangeLabels('$yearFrom', '$yearTo'),
+                            activeColor: BrandColors.sunriseGold,
+                            inactiveColor: Colors.white24,
+                            onChanged: (values) {
+                              setDialogState(() {
+                                yearFrom = values.start.round();
+                                yearTo = values.end.round();
+                              });
+                            },
                           ),
                         ],
                       ),
@@ -880,12 +853,9 @@ class _CallTimeTabState extends State<CallTimeTab> {
     if (result == true && nameController.text.trim().isNotEmpty) {
       // Build filters JSONB from the dialog state
       final filters = <String, dynamic>{};
-      if (filterState.isNotEmpty) filters['state'] = filterState;
       if (filterParty != 'All') filters['party'] = filterParty;
-      final yearFrom = int.tryParse(yearFromController.text);
-      final yearTo = int.tryParse(yearToController.text);
-      if (yearFrom != null) filters['yearFrom'] = yearFrom;
-      if (yearTo != null) filters['yearTo'] = yearTo;
+      filters['yearFrom'] = yearFrom;
+      filters['yearTo'] = yearTo;
       final minTotal = double.tryParse(minTotalController.text);
       if (minTotal != null) filters['minTotal'] = minTotal;
 
@@ -906,8 +876,6 @@ class _CallTimeTabState extends State<CallTimeTab> {
 
     nameController.dispose();
     descController.dispose();
-    yearFromController.dispose();
-    yearToController.dispose();
     minTotalController.dispose();
   }
 
@@ -1366,12 +1334,18 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
   // Search / filter controllers
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _askController = TextEditingController();
-  final TextEditingController _yearFromController = TextEditingController();
-  final TextEditingController _yearToController = TextEditingController();
   final TextEditingController _minAmountController = TextEditingController();
+  final TextEditingController _employerController = TextEditingController();
+  final TextEditingController _occupationController = TextEditingController();
 
-  String _stateFilter = 'MO';
   String _partyFilter = 'All';
+  String? _genderFilter;
+  int _yearFrom = DateTime.now().year - 1;
+  int _yearTo = DateTime.now().year;
+  double _ageMin = 18;
+  double _ageMax = 100;
+  bool _hasPhone = false;
+  bool _hasEmail = false;
   bool _filtersExpanded = true;
 
   List<Map<String, dynamic>> _results = [];
@@ -1386,12 +1360,11 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
     // Pre-populate from list's saved filters
     final f = widget.initialFilters;
     if (f != null) {
-      _stateFilter = (f['state'] as String?) ?? 'MO';
       _partyFilter = (f['party'] as String?) ?? 'All';
       final yf = f['yearFrom'];
-      if (yf != null) _yearFromController.text = yf.toString();
+      if (yf != null) _yearFrom = (yf as num).toInt();
       final yt = f['yearTo'];
-      if (yt != null) _yearToController.text = yt.toString();
+      if (yt != null) _yearTo = (yt as num).toInt();
       final mt = f['minTotal'];
       if (mt != null) _minAmountController.text = mt.toString();
     }
@@ -1401,9 +1374,9 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
   void dispose() {
     _nameController.dispose();
     _askController.dispose();
-    _yearFromController.dispose();
-    _yearToController.dispose();
     _minAmountController.dispose();
+    _employerController.dispose();
+    _occupationController.dispose();
     _debounce?.cancel();
     super.dispose();
   }
@@ -1415,13 +1388,23 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
     });
     try {
       final results = await widget.mecRepo.searchDonors(
-        state: _stateFilter.isNotEmpty ? _stateFilter : null,
         party: _partyFilter != 'All' ? _partyFilter : null,
-        yearFrom: int.tryParse(_yearFromController.text),
-        yearTo: int.tryParse(_yearToController.text),
+        yearFrom: _yearFrom,
+        yearTo: _yearTo,
         minTotal: double.tryParse(_minAmountController.text),
         nameQuery:
             _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
+        gender: _genderFilter,
+        ageMin: _ageMin > 18 ? _ageMin.round() : null,
+        ageMax: _ageMax < 100 ? _ageMax.round() : null,
+        employer: _employerController.text.trim().isNotEmpty
+            ? _employerController.text.trim()
+            : null,
+        occupation: _occupationController.text.trim().isNotEmpty
+            ? _occupationController.text.trim()
+            : null,
+        hasPhone: _hasPhone ? true : null,
+        hasEmail: _hasEmail ? true : null,
         individualsOnly: true,
         limit: 100,
       );
@@ -1597,6 +1580,7 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Name search
                   TextField(
@@ -1625,22 +1609,9 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Row 1: State + Party
+                  // Row 1: Party + Gender
                   Row(
                     children: [
-                      // State
-                      SizedBox(
-                        width: 80,
-                        child: TextField(
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
-                          decoration: _filterInputDecoration('State'),
-                          controller: TextEditingController(text: _stateFilter),
-                          onChanged: (v) =>
-                              _stateFilter = v.trim().toUpperCase(),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-
                       // Party
                       Expanded(
                         child: DropdownButtonFormField<String>(
@@ -1668,44 +1639,174 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
                           },
                         ),
                       ),
+                      const SizedBox(width: 10),
+
+                      // Gender
+                      SizedBox(
+                        width: 110,
+                        child: DropdownButtonFormField<String?>(
+                          value: _genderFilter,
+                          dropdownColor: BrandColors.unityBlue,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 13),
+                          decoration: _filterInputDecoration('Gender'),
+                          items: const [
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text('Any',
+                                  style: TextStyle(
+                                      color: Colors.white70, fontSize: 13)),
+                            ),
+                            DropdownMenuItem<String?>(
+                              value: 'Male',
+                              child: Text('Male',
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 13)),
+                            ),
+                            DropdownMenuItem<String?>(
+                              value: 'Female',
+                              child: Text('Female',
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 13)),
+                            ),
+                          ],
+                          onChanged: (val) {
+                            setState(() => _genderFilter = val);
+                          },
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 10),
 
-                  // Row 2: Year range + Min amount
+                  // Year range slider
+                  Text(
+                    'Years: $_yearFrom - $_yearTo',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                  RangeSlider(
+                    values: RangeValues(_yearFrom.toDouble(), _yearTo.toDouble()),
+                    min: 2002,
+                    max: DateTime.now().year.toDouble(),
+                    divisions: DateTime.now().year - 2002,
+                    labels: RangeLabels('$_yearFrom', '$_yearTo'),
+                    activeColor: BrandColors.sunriseGold,
+                    inactiveColor: Colors.white24,
+                    onChanged: (values) {
+                      setState(() {
+                        _yearFrom = values.start.round();
+                        _yearTo = values.end.round();
+                      });
+                    },
+                  ),
+
+                  // Age range slider
+                  Text(
+                    'Age: ${_ageMin.round()} - ${_ageMax.round()}',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                  RangeSlider(
+                    values: RangeValues(_ageMin, _ageMax),
+                    min: 18,
+                    max: 100,
+                    divisions: 82,
+                    labels: RangeLabels('${_ageMin.round()}', '${_ageMax.round()}'),
+                    activeColor: BrandColors.momentumBlue,
+                    inactiveColor: Colors.white24,
+                    onChanged: (values) {
+                      setState(() {
+                        _ageMin = values.start;
+                        _ageMax = values.end;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Row: Min amount
+                  TextField(
+                    controller: _minAmountController,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: _filterInputDecoration('Min \$ Total'),
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Row: Employer + Occupation
                   Row(
                     children: [
-                      SizedBox(
-                        width: 70,
+                      Expanded(
                         child: TextField(
-                          controller: _yearFromController,
+                          controller: _employerController,
                           style: const TextStyle(color: Colors.white, fontSize: 13),
-                          decoration: _filterInputDecoration('From'),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4),
-                        child: Text('-',
-                            style: TextStyle(color: Colors.white54)),
-                      ),
-                      SizedBox(
-                        width: 70,
-                        child: TextField(
-                          controller: _yearToController,
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
-                          decoration: _filterInputDecoration('To'),
-                          keyboardType: TextInputType.number,
+                          decoration: _filterInputDecoration('Employer'),
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: TextField(
-                          controller: _minAmountController,
+                          controller: _occupationController,
                           style: const TextStyle(color: Colors.white, fontSize: 13),
-                          decoration: _filterInputDecoration('Min \$ Total'),
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
+                          decoration: _filterInputDecoration('Occupation'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Row: Has Phone + Has Email checkboxes
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setState(() => _hasPhone = !_hasPhone),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: Checkbox(
+                                  value: _hasPhone,
+                                  onChanged: (val) =>
+                                      setState(() => _hasPhone = val ?? false),
+                                  activeColor: BrandColors.sunriseGold,
+                                  checkColor: BrandColors.unityBlue,
+                                  side: const BorderSide(color: Colors.white38),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(Icons.phone, size: 14, color: Colors.white54),
+                              const SizedBox(width: 4),
+                              const Text('Has Phone',
+                                  style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setState(() => _hasEmail = !_hasEmail),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: Checkbox(
+                                  value: _hasEmail,
+                                  onChanged: (val) =>
+                                      setState(() => _hasEmail = val ?? false),
+                                  activeColor: BrandColors.sunriseGold,
+                                  checkColor: BrandColors.unityBlue,
+                                  side: const BorderSide(color: Colors.white38),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(Icons.email, size: 14, color: Colors.white54),
+                              const SizedBox(width: 4),
+                              const Text('Has Email',
+                                  style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -1864,6 +1965,14 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
     final location = [city, state].where((s) => s.isNotEmpty).join(', ');
     final parties = donor['parties'] as List<dynamic>? ?? [];
 
+    // Enrichment data from search_donors_v2
+    final partyLean = donor['party_lean'] as String?;
+    final ageEstimate = (donor['age_estimate'] as num?)?.toInt();
+    final phoneMobile = donor['phone_mobile'] as String?;
+    final phoneHome = donor['phone_home'] as String?;
+    final hasPhoneData = (phoneMobile != null && phoneMobile.isNotEmpty) ||
+        (phoneHome != null && phoneHome.isNotEmpty);
+
     final isSelected = donorId != null && _selectedIds.contains(donorId);
 
     return Container(
@@ -1949,20 +2058,36 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
                             );
                           }),
                         ],
+                        if (partyLean != null && partyLean.isNotEmpty && parties.isEmpty) ...[
+                          const SizedBox(width: 6),
+                          _buildPartyChip(partyLean),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 3),
-                    // Details row
-                    Text(
-                      [
-                        if (location.isNotEmpty) location,
-                        '$numContributions contribution${numContributions == 1 ? '' : 's'}',
-                      ].join(' \u2022 '),
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                    // Details row with enrichment data
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            [
+                              if (location.isNotEmpty) location,
+                              '$numContributions contribution${numContributions == 1 ? '' : 's'}',
+                              if (ageEstimate != null) 'Age ~$ageEstimate',
+                            ].join(' \u2022 '),
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (hasPhoneData)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 4),
+                            child: Icon(Icons.phone, size: 13, color: BrandColors.success),
+                          ),
+                      ],
                     ),
                   ],
                 ),
