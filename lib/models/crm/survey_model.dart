@@ -311,14 +311,20 @@ class SurveyResultsSummary {
   final int totalResponded;
   final int totalCompleted;
   final int totalOptedOut;
+  final int totalInProgress;
+  final int totalNoResponse;
   final List<QuestionResultSummary> questionSummaries;
+  final List<SurveySessionDetail> sessionDetails;
 
   const SurveyResultsSummary({
     this.totalSent = 0,
     this.totalResponded = 0,
     this.totalCompleted = 0,
     this.totalOptedOut = 0,
+    this.totalInProgress = 0,
+    this.totalNoResponse = 0,
     this.questionSummaries = const [],
+    this.sessionDetails = const [],
   });
 
   double get responseRate => totalSent > 0 ? totalResponded / totalSent : 0;
@@ -355,4 +361,44 @@ class QuestionResultSummary {
     if (values.isEmpty) return null;
     return values.reduce((a, b) => a + b) / values.length;
   }
+}
+
+// ─── SurveySessionDetail ────────────────────────────────────────────────────
+
+class SurveySessionDetail {
+  final SurveySession session;
+  final String? memberName;
+  final String? memberPhone;
+  final String? profilePhotoUrl;
+  final int questionsAnswered;
+  final int totalQuestions;
+  final List<SurveyResponse> responses;
+
+  const SurveySessionDetail({
+    required this.session,
+    this.memberName,
+    this.memberPhone,
+    this.profilePhotoUrl,
+    this.questionsAnswered = 0,
+    this.totalQuestions = 0,
+    this.responses = const [],
+  });
+
+  String get displayStatus {
+    switch (session.status) {
+      case 'completed':
+        return 'Completed';
+      case 'opted_out':
+        return 'Opted Out';
+      case 'active':
+        return questionsAnswered > 0 ? 'In Progress' : 'No Response';
+      default:
+        return session.status;
+    }
+  }
+
+  String get displayName => memberName ?? session.phoneE164;
+
+  double get progress =>
+      totalQuestions > 0 ? questionsAnswered / totalQuestions : 0.0;
 }

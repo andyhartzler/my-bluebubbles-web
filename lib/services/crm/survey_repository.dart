@@ -263,17 +263,11 @@ class SurveyRepository {
     // Fetch sessions
     final sessionsData = await _readClient
         .from('survey_sessions')
-        .select('id, status')
+        .select('id, status, phone_e164, member_id, current_question_order, started_at, completed_at, last_message_at')
         .eq('survey_id', surveyId);
 
     final sessions =
         (sessionsData as List<dynamic>? ?? []).whereType<Map<String, dynamic>>().toList();
-
-    final totalSent = sessions.length;
-    final totalCompleted =
-        sessions.where((s) => s['status'] == 'completed').length;
-    final totalOptedOut =
-        sessions.where((s) => s['status'] == 'opted_out').length;
 
     // Fetch questions
     final questionsData = await _readClient
@@ -287,7 +281,9 @@ class SurveyRepository {
         .map((json) => SurveyQuestion.fromJson(json))
         .toList();
 
-    // Fetch all responses for this survey's sessions
+    final totalQuestions = questions.length;
+
+    // Fetch all responses
     final sessionIds = sessions.map((s) => s['id'] as String).toList();
     List<SurveyResponse> allResponses = [];
 
@@ -303,14 +299,118 @@ class SurveyRepository {
           .toList();
     }
 
-    // Unique sessions that have at least one response
+    // Fetch member data by member_id
+    final memberIds = sessions
+        .map((s) => s['member_id'] as String?)
+        .where((id) => id != null)
+        .cast<String>()
+        .toSet()
+        .toList();
+
+    Map<String, Map<String, dynamic>> memberMap = {};
+    if (memberIds.isNotEmpty) {
+      final membersData = await _readClient
+          .from('members')
+          .select('id, name, phone_e164, profile_pictures')
+          .inFilter('id', memberIds);
+
+      for (final m in (membersData as List<dynamic>? ?? [])) {
+        if (m is Map<String, dynamic> && m['id'] != null) {
+          memberMap[m['id'] as String] = m;
+        }
+      }
+    }
+
+    // Fetch members by phone for sessions without member_id
+    final phonesWithoutMember = sessions
+        .where((s) => s['member_id'] == null)
+        .map((s) => s['phone_e164'] as String?)
+        .where((p) => p != null && p.isNotEmpty)
+        .cast<String>()
+        .toSet()
+        .toList();
+
+    Map<String, Map<String, dynamic>> phoneMemberMap = {};
+    if (phonesWithoutMember.isNotEmpty) {
+      final phoneMembers = await _readClient
+          .from('members')
+          .select('id, name, phone_e164, profile_pictures')
+          .inFilter('phone_e164', phonesWithoutMember);
+
+      for (final m in (phoneMembers as List<dynamic>? ?? [])) {
+        if (m is Map<String, dynamic> && m['phone_e164'] != null) {
+          phoneMemberMap[m['phone_e164'] as String] = m;
+        }
+      }
+    }
+
+    // Build session details
+    final sessionDetails = <SurveySessionDetail>[];
+    int totalInProgress = 0;
+    int totalNoResponse = 0;
+
+    for (final s in sessions) {
+      final sessionId = s['id'] as String;
+      final memberId = s['member_id'] as String?;
+      final phone = s['phone_e164'] as String? ?? '';
+      final status = s['status'] as String? ?? '';
+
+      Map<String, dynamic>? member;
+      if (memberId != null && memberMap.containsKey(memberId)) {
+        member = memberMap[memberId];
+      } else if (phoneMemberMap.containsKey(phone)) {
+        member = phoneMemberMap[phone];
+      }
+
+      String? photoUrl;
+      if (member != null && member['profile_pictures'] != null) {
+        final pics = member['profile_pictures'];
+        if (pics is List && pics.isNotEmpty) {
+          final first = pics.first;
+          if (first is Map<String, dynamic>) {
+            photoUrl = first['publicUrl'] as String? ?? first['public_url'] as String?;
+          }
+        }
+      }
+
+      final sessionResponses = allResponses.where((r) => r.sessionId == sessionId).toList();
+      final answeredCount = sessionResponses.length;
+
+      if (status == 'active') {
+        if (answeredCount > 0) {
+          totalInProgress++;
+        } else {
+          totalNoResponse++;
+        }
+      }
+
+      sessionDetails.add(SurveySessionDetail(
+        session: SurveySession.fromJson(s),
+        memberName: member?['name'] as String?,
+        memberPhone: phone,
+        profilePhotoUrl: photoUrl,
+        questionsAnswered: answeredCount,
+        totalQuestions: totalQuestions,
+        responses: sessionResponses,
+      ));
+    }
+
+    sessionDetails.sort((a, b) {
+      const order = {'completed': 0, 'active': 1, 'opted_out': 2};
+      final aOrder = order[a.session.status] ?? 3;
+      final bOrder = order[b.session.status] ?? 3;
+      if (aOrder != bOrder) return aOrder.compareTo(bOrder);
+      return b.questionsAnswered.compareTo(a.questionsAnswered);
+    });
+
+    final totalSent = sessions.length;
+    final totalCompleted = sessions.where((s) => s['status'] == 'completed').length;
+    final totalOptedOut = sessions.where((s) => s['status'] == 'opted_out').length;
     final respondedSessionIds = allResponses.map((r) => r.sessionId).toSet();
     final totalResponded = respondedSessionIds.length;
 
-    // Group responses by question
     final questionSummaries = questions.map((q) {
-      final qResponses =
-          allResponses.where((r) => r.questionId == q.id).toList();
+      final qResponses = allResponses.where((r) => r.questionId == q.id).toList();
       return QuestionResultSummary(question: q, responses: qResponses);
     }).toList();
 
@@ -319,7 +419,10 @@ class SurveyRepository {
       totalResponded: totalResponded,
       totalCompleted: totalCompleted,
       totalOptedOut: totalOptedOut,
+      totalInProgress: totalInProgress,
+      totalNoResponse: totalNoResponse,
       questionSummaries: questionSummaries,
+      sessionDetails: sessionDetails,
     );
   }
 }
