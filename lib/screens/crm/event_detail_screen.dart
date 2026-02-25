@@ -27,6 +27,7 @@ import 'package:bluebubbles/models/crm/survey_model.dart';
 import 'package:bluebubbles/services/crm/survey_repository.dart';
 import 'package:bluebubbles/screens/crm/survey_builder_screen.dart';
 import 'package:bluebubbles/screens/crm/survey_results_widget.dart';
+import 'package:bluebubbles/models/crm/survey_suggested_questions.dart';
 import 'file_picker_materializer.dart';
 
 const _unityBlue = Color(0xFF273351);
@@ -254,6 +255,32 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     } catch (e) {
       if (mounted) setState(() => _surveysLoading = false);
     }
+  }
+
+  void _createFromTemplate() async {
+    final defaultQs = SurveyQuestionSuggestions.defaultPostEventQuestions;
+    final preSurvey = Survey(
+      eventId: _currentEvent.id,
+      title: 'Post-Event Feedback: ${_currentEvent.title ?? 'Event'}',
+      description: 'Automated post-event feedback survey',
+      targetAudience: 'all_attendees',
+      questions: defaultQs.asMap().entries.map((e) => SurveyQuestion(
+        questionText: e.value.text,
+        questionType: e.value.type,
+        options: e.value.options,
+        questionOrder: e.key + 1,
+      )).toList(),
+    );
+
+    final result = await Navigator.of(context).push<Survey>(
+      MaterialPageRoute(
+        builder: (_) => SurveyBuilderScreen(
+          existingSurvey: preSurvey,
+          eventId: _currentEvent.id,
+        ),
+      ),
+    );
+    if (result != null) _loadSurveys();
   }
 
   void _initFocusNodes() {
@@ -3527,23 +3554,37 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const Spacer(),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  final result = await Navigator.of(context).push<Survey>(
-                    MaterialPageRoute(
-                      builder: (_) => SurveyBuilderScreen(
-                        eventId: _currentEvent.id,
-                      ),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.of(context).push<Survey>(
+                        MaterialPageRoute(
+                          builder: (_) => SurveyBuilderScreen(
+                            eventId: _currentEvent.id,
+                          ),
+                        ),
+                      );
+                      if (result != null) _loadSurveys();
+                    },
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Create Survey'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _momentumBlue,
+                      foregroundColor: Colors.white,
                     ),
-                  );
-                  if (result != null) _loadSurveys();
-                },
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Create Survey'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _momentumBlue,
-                  foregroundColor: Colors.white,
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _createFromTemplate,
+                    icon: const Icon(Icons.flash_on, size: 18, color: _sunriseGold),
+                    label: const Text('Post-Event Template'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _sunriseGold,
+                      side: const BorderSide(color: _sunriseGold),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
