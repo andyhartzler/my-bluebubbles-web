@@ -409,7 +409,8 @@ function formatQuestion(
   total: number
 ): string {
   const lines: string[] = [];
-  lines.push(`Q${order} of ${total}: ${question.question_text}`);
+  // Q2, Q3, etc. — no "of N", and first question has no prefix at all
+  lines.push(`Q${order}: ${question.question_text}`);
   lines.push("");
 
   switch (question.question_type) {

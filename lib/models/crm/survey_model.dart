@@ -224,7 +224,12 @@ class SurveyQuestion {
   /// Format the question text as it will appear in an iMessage.
   String formatForMessage({required int questionNumber, required int totalQuestions}) {
     final buf = StringBuffer();
-    buf.writeln('Q$questionNumber of $totalQuestions: $questionText');
+    // First question: no prefix. Subsequent questions: Q2, Q3, etc. (no "of N")
+    if (questionNumber == 1) {
+      buf.writeln(questionText);
+    } else {
+      buf.writeln('Q$questionNumber: $questionText');
+    }
     buf.writeln();
     switch (questionType) {
       case 'yes_no':
@@ -391,6 +396,7 @@ class QuestionResultSummary {
 
 class SurveySessionDetail {
   final SurveySession session;
+  final String? memberId;
   final String? memberName;
   final String? memberPhone;
   final String? profilePhotoUrl;
@@ -400,6 +406,7 @@ class SurveySessionDetail {
 
   const SurveySessionDetail({
     required this.session,
+    this.memberId,
     this.memberName,
     this.memberPhone,
     this.profilePhotoUrl,

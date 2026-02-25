@@ -245,8 +245,8 @@ function formatFirstMessage(
   totalQuestions: number
 ): string {
   const lines: string[] = [];
-  lines.push(`\uD83D\uDCCA ${surveyTitle}`);
-  lines.push(`Q1 of ${totalQuestions}: ${question.question_text}`);
+  // First question: just the question text, no survey name, no Q1 prefix
+  lines.push(question.question_text);
   lines.push("");
 
   switch (question.question_type) {

@@ -1433,17 +1433,15 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
         ? 'Survey Title'
         : _titleController.text.trim();
 
-    if (_questions.isEmpty) return '\u{1F4CA} $title\n\nNo questions added yet.';
+    if (_questions.isEmpty) return '$title\n\nNo questions added yet.';
 
     final q = _questions.first;
     final qText = q.textController.text.trim().isEmpty
         ? 'Your question here?'
         : q.textController.text.trim();
 
-    final total = _questions.length;
     final buf = StringBuffer();
-    buf.writeln('\u{1F4CA} $title');
-    buf.writeln('Q1 of $total: $qText');
+    buf.writeln(qText);
     buf.writeln();
 
     switch (q.type) {

@@ -311,7 +311,7 @@ class SurveyRepository {
     if (memberIds.isNotEmpty) {
       final membersData = await _readClient
           .from('members')
-          .select('id, name, phone_e164, profile_pictures')
+          .select('id, name, phone_e164, profile_pictures, slack_user_id')
           .inFilter('id', memberIds);
 
       for (final m in (membersData as List<dynamic>? ?? [])) {
@@ -334,12 +334,38 @@ class SurveyRepository {
     if (phonesWithoutMember.isNotEmpty) {
       final phoneMembers = await _readClient
           .from('members')
-          .select('id, name, phone_e164, profile_pictures')
+          .select('id, name, phone_e164, profile_pictures, slack_user_id')
           .inFilter('phone_e164', phonesWithoutMember);
 
       for (final m in (phoneMembers as List<dynamic>? ?? [])) {
         if (m is Map<String, dynamic> && m['phone_e164'] != null) {
           phoneMemberMap[m['phone_e164'] as String] = m;
+        }
+      }
+    }
+
+    // Fetch Slack avatars for members that have slack_user_id
+    final allMembers = {...memberMap, ...phoneMemberMap.map((k, v) => MapEntry(v['id'] as String? ?? k, v))};
+    final slackUserIds = allMembers.values
+        .map((m) => m['slack_user_id'] as String?)
+        .where((id) => id != null && id.isNotEmpty)
+        .cast<String>()
+        .toSet()
+        .toList();
+
+    Map<String, String> slackAvatarMap = {}; // slack_user_id -> avatar_url
+    if (slackUserIds.isNotEmpty) {
+      final slackData = await _readClient
+          .from('slack_user_mapping')
+          .select('slack_user_id, slack_avatar_url, cached_avatar_path')
+          .inFilter('slack_user_id', slackUserIds);
+
+      for (final s in (slackData as List<dynamic>? ?? [])) {
+        if (s is Map<String, dynamic> && s['slack_user_id'] != null) {
+          final avatarUrl = s['cached_avatar_path'] as String? ?? s['slack_avatar_url'] as String?;
+          if (avatarUrl != null && avatarUrl.isNotEmpty) {
+            slackAvatarMap[s['slack_user_id'] as String] = avatarUrl;
+          }
         }
       }
     }
@@ -372,6 +398,13 @@ class SurveyRepository {
           }
         }
       }
+      // Fallback to Slack avatar if no profile picture
+      if ((photoUrl == null || photoUrl.isEmpty) && member != null) {
+        final slackId = member['slack_user_id'] as String?;
+        if (slackId != null && slackAvatarMap.containsKey(slackId)) {
+          photoUrl = slackAvatarMap[slackId];
+        }
+      }
 
       final sessionResponses = allResponses.where((r) => r.sessionId == sessionId).toList();
       final answeredCount = sessionResponses.length;
@@ -384,8 +417,12 @@ class SurveyRepository {
         }
       }
 
+      // Resolve member ID (from session or phone-matched member)
+      final resolvedMemberId = memberId ?? (member?['id'] as String?);
+
       sessionDetails.add(SurveySessionDetail(
         session: SurveySession.fromJson(s),
+        memberId: resolvedMemberId,
         memberName: member?['name'] as String?,
         memberPhone: phone,
         profilePhotoUrl: photoUrl,

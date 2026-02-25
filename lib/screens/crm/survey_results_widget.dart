@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/survey_model.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/survey_export_service.dart';
 import 'package:bluebubbles/services/crm/survey_repository.dart';
 
@@ -26,6 +29,7 @@ class SurveyResultsWidget extends StatefulWidget {
 
 class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
   final _repo = SurveyRepository();
+  final _memberRepo = MemberRepository();
   SurveyResultsSummary? _summary;
   bool _loading = true;
   bool _exporting = false;
@@ -107,6 +111,25 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
       }
     } finally {
       if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  // ── Navigation ────────────────────────────────────────────────────────────
+
+  Future<void> _navigateToMemberProfile(String memberId) async {
+    try {
+      final member = await _memberRepo.getMemberById(memberId);
+      if (member != null && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => MemberDetailScreen(member: member)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not load member: $e')),
+        );
+      }
     }
   }
 
@@ -668,6 +691,21 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                   fontStyle: FontStyle.italic,
                 ),
               ),
+            // View Member Profile button
+            if (detail.memberId != null) ...[
+              const Divider(height: 20),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => _navigateToMemberProfile(detail.memberId!),
+                  icon: const Icon(Icons.person, size: 16, color: BrandColors.momentumBlue),
+                  label: const Text(
+                    'View Member Profile',
+                    style: TextStyle(color: BrandColors.momentumBlue, fontSize: 13),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
