@@ -10,20 +10,29 @@ const corsHeaders = {
 // ── Word lists for parsing ──────────────────────────────────────────────────
 
 const YES_WORDS = new Set([
-  "yes", "y", "ya", "yea", "yeah", "yep", "yup", "sure", "ok", "okay",
-  "absolutely", "definitely", "of course",
+  "yes", "y", "ya", "yea", "yeah", "yep", "yup", "yah", "ye", "yee",
+  "sure", "ok", "okay", "k", "kk",
+  "absolutely", "definitely", "of course", "for sure", "totally",
+  "affirmative", "si", "yess", "yesss", "yea!", "yes!",
 ]);
 const NO_WORDS = new Set([
-  "no", "n", "nah", "naw", "nope", "never", "not really",
+  "no", "n", "nah", "naw", "nope", "never", "not really", "nah",
+  "negative", "noo", "nooo", "no!", "nope!",
 ]);
-const STOP_WORDS = new Set(["stop", "unsubscribe", "quit", "cancel"]);
-const SKIP_WORDS = new Set(["skip", "pass", "next"]);
+const STOP_WORDS = new Set(["stop", "unsubscribe", "quit", "cancel", "end"]);
+const SKIP_WORDS = new Set(["skip", "pass", "next", "n/a", "na"]);
 const TRUE_WORDS = new Set([
-  "true", "t", "yes", "y", "correct", "right",
+  "true", "t", "yes", "y", "correct", "right", "yep", "yup",
 ]);
 const FALSE_WORDS = new Set([
-  "false", "f", "no", "n", "incorrect", "wrong",
+  "false", "f", "no", "n", "incorrect", "wrong", "nope", "nah",
 ]);
+
+// Word-to-number map for rating questions
+const WORD_NUMBERS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5,
+  six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+};
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -51,12 +60,18 @@ function parseResponse(
     case "yes_no": {
       if (YES_WORDS.has(lower)) return { parsed: "yes", hint: null };
       if (NO_WORDS.has(lower)) return { parsed: "no", hint: null };
-      return { parsed: null, hint: 'Please reply YES or NO.' };
+      // Fuzzy: starts with y or n
+      if (lower.startsWith("y")) return { parsed: "yes", hint: null };
+      if (lower.startsWith("n")) return { parsed: "no", hint: null };
+      return { parsed: null, hint: "Please reply YES or NO." };
     }
 
     case "true_false": {
       if (TRUE_WORDS.has(lower)) return { parsed: "true", hint: null };
       if (FALSE_WORDS.has(lower)) return { parsed: "false", hint: null };
+      // Fuzzy: starts with t or f
+      if (lower.startsWith("t") || lower.startsWith("y")) return { parsed: "true", hint: null };
+      if (lower.startsWith("f") || lower.startsWith("n")) return { parsed: "false", hint: null };
       return { parsed: null, hint: "Please reply TRUE or FALSE." };
     }
 
@@ -67,9 +82,15 @@ function parseResponse(
         if (options.min != null) min = Number(options.min);
         if (options.max != null) max = Number(options.max);
       }
+      // Try numeric
       const num = parseInt(text.trim(), 10);
       if (!isNaN(num) && num >= min && num <= max) {
         return { parsed: String(num), hint: null };
+      }
+      // Try word numbers ("five", "three")
+      const wordNum = WORD_NUMBERS[lower];
+      if (wordNum !== undefined && wordNum >= min && wordNum <= max) {
+        return { parsed: String(wordNum), hint: null };
       }
       return { parsed: null, hint: `Please reply with a number ${min}-${max}.` };
     }
@@ -79,15 +100,27 @@ function parseResponse(
       if (!opts || opts.length === 0) {
         return { parsed: text.trim(), hint: null };
       }
+      // Try numeric
       const num = parseInt(text.trim(), 10);
       if (!isNaN(num) && num >= 1 && num <= opts.length) {
         return { parsed: opts[num - 1], hint: null };
       }
+      // Try exact match (case-insensitive)
       const exact = opts.find((o) => o.toLowerCase() === lower);
       if (exact) return { parsed: exact, hint: null };
-      if (lower.length === 1) {
-        const matches = opts.filter((o) => o.toLowerCase().startsWith(lower));
-        if (matches.length === 1) return { parsed: matches[0], hint: null };
+      // Try starts-with (single char or partial)
+      const startsMatches = opts.filter((o) => o.toLowerCase().startsWith(lower));
+      if (startsMatches.length === 1) return { parsed: startsMatches[0], hint: null };
+      // Try contains
+      const containsMatches = opts.filter((o) => o.toLowerCase().includes(lower));
+      if (containsMatches.length === 1) return { parsed: containsMatches[0], hint: null };
+      // Try if input contains an option
+      const reverseMatch = opts.find((o) => lower.includes(o.toLowerCase()));
+      if (reverseMatch) return { parsed: reverseMatch, hint: null };
+      // Try word number
+      const wordNum = WORD_NUMBERS[lower];
+      if (wordNum !== undefined && wordNum >= 1 && wordNum <= opts.length) {
+        return { parsed: opts[wordNum - 1], hint: null };
       }
       const optionsList = opts.map((o, i) => `${i + 1}. ${o}`).join(", ");
       return { parsed: null, hint: `Please reply with a number: ${optionsList}` };
@@ -98,22 +131,58 @@ function parseResponse(
       if (!opts || opts.length === 0) {
         return { parsed: text.trim(), hint: null };
       }
-      const parts = text.split(/[,\s]+/).map((p) => p.trim()).filter((p) => p.length > 0);
+
       const selected: string[] = [];
-      for (const part of parts) {
-        const num = parseInt(part, 10);
-        if (!isNaN(num) && num >= 1 && num <= opts.length) {
-          const opt = opts[num - 1];
+
+      // Strategy 1: Try matching option text in the input
+      for (const opt of opts) {
+        if (lower.includes(opt.toLowerCase())) {
           if (!selected.includes(opt)) selected.push(opt);
         }
       }
       if (selected.length > 0) {
         return { parsed: JSON.stringify(selected), hint: null };
       }
+
+      // Strategy 2: Extract numbers intelligently
+      // Strip filler words: "and", "&", "plus", punctuation
+      const cleaned = lower
+        .replace(/\band\b/gi, " ")
+        .replace(/[&+]/g, " ")
+        .replace(/[^0-9\s]/g, " ");
+
+      if (opts.length <= 9) {
+        // ≤9 options: each digit is a separate pick
+        // "13" → [1, 3], "41" → [4, 1], "1 and 3" → [1, 3]
+        const allDigits = cleaned.replace(/\s/g, "");
+        for (const ch of allDigits) {
+          const num = parseInt(ch, 10);
+          if (num >= 1 && num <= opts.length) {
+            const opt = opts[num - 1];
+            if (!selected.includes(opt)) selected.push(opt);
+          }
+        }
+      } else {
+        // >9 options: parse multi-digit numbers
+        const parts = cleaned.match(/\d+/g) ?? [];
+        for (const part of parts) {
+          const num = parseInt(part, 10);
+          if (num >= 1 && num <= opts.length) {
+            const opt = opts[num - 1];
+            if (!selected.includes(opt)) selected.push(opt);
+          }
+        }
+      }
+
+      if (selected.length > 0) {
+        return { parsed: JSON.stringify(selected), hint: null };
+      }
+
+      // Nothing matched
       const optionsList = opts.map((o, i) => `${i + 1}. ${o}`).join(", ");
       return {
         parsed: null,
-        hint: `Reply with numbers separated by commas (e.g. 1,3): ${optionsList}`,
+        hint: `I didn't catch that. Which ones? ${optionsList}`,
       };
     }
 
@@ -169,13 +238,8 @@ serve(async (req) => {
   try {
     const payload = await req.json();
 
-    // Extract sender phone from BB webhook payload
-    // BB sends: { data: { handle: { address: "+1..." }, text: "..." } }
-    // or various other shapes depending on BB version
     const data = payload.data ?? payload;
 
-    // CRITICAL: Skip outgoing messages (sent by us) to prevent infinite
-    // feedback loop. BB webhooks fire for ALL messages including our own.
     const isFromMe = data?.isFromMe ?? data?.is_from_me ?? false;
     if (isFromMe) {
       return new Response(JSON.stringify({ ok: true, skipped: "from_me" }), {
@@ -198,7 +262,6 @@ serve(async (req) => {
 
     const phone = normalizePhone(senderRaw);
 
-    // ── Fast exit: check for active survey session ──
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -220,22 +283,18 @@ serve(async (req) => {
 
     if (sessError) {
       console.error("Session lookup error:", sessError.message);
-      // Don't block BB webhook — return 200
       return new Response(JSON.stringify({ ok: true, error: sessError.message }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // No active session → fast exit (99% of messages)
     if (!session) {
       return new Response(JSON.stringify({ ok: true, skipped: "no_session" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ── Active session found — process the response ──
-
-    // Defense-in-depth: rate limit — ignore messages within 5s of last sent
+    // Rate limit — ignore messages within 5s of last sent
     if (session.last_message_at) {
       const lastMsg = new Date(session.last_message_at).getTime();
       if (Date.now() - lastMsg < 5000) {
@@ -264,7 +323,6 @@ serve(async (req) => {
       });
     }
 
-    // Fetch the current question properly (the join above may not match correctly)
     const { data: currentQ } = await supabase
       .from("survey_questions")
       .select("id, question_text, question_type, options, question_order")
@@ -281,7 +339,6 @@ serve(async (req) => {
 
     // Check SKIP
     if (SKIP_WORDS.has(lower)) {
-      // Advance to next question without recording response
       await advanceToNextQuestion(supabase, session, currentQ, phone);
       return new Response(JSON.stringify({ ok: true, action: "skipped" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -296,7 +353,6 @@ serve(async (req) => {
     );
 
     if (parsed === null && hint) {
-      // Unparseable — send retry hint and update last_message_at for rate limiting
       await supabase
         .from("survey_sessions")
         .update({ last_message_at: new Date().toISOString() })
@@ -323,7 +379,6 @@ serve(async (req) => {
     });
   } catch (err) {
     console.error("survey-webhook error:", err);
-    // Always return 200 to BB so it doesn't retry
     return new Response(
       JSON.stringify({ ok: true, error: (err as Error).message }),
       {
@@ -342,7 +397,6 @@ async function advanceToNextQuestion(
 ): Promise<void> {
   const nextOrder = session.current_question_order + 1;
 
-  // Check if there's a next question
   const { data: nextQ } = await supabase
     .from("survey_questions")
     .select("id, question_text, question_type, options, question_order")
@@ -351,7 +405,6 @@ async function advanceToNextQuestion(
     .maybeSingle();
 
   if (nextQ) {
-    // Update session to next question
     await supabase
       .from("survey_sessions")
       .update({
@@ -360,7 +413,6 @@ async function advanceToNextQuestion(
       })
       .eq("id", session.id);
 
-    // Get total question count for formatting
     const { count } = await supabase
       .from("survey_questions")
       .select("id", { count: "exact", head: true })
@@ -371,7 +423,6 @@ async function advanceToNextQuestion(
     const msg = formatQuestion(surveyTitle, nextQ, nextOrder, total);
     await sendBBMessage(phone, msg);
   } else {
-    // No more questions — mark complete
     await supabase
       .from("survey_sessions")
       .update({
@@ -386,7 +437,6 @@ async function advanceToNextQuestion(
       "Thank you for completing the survey! Your responses have been recorded."
     );
 
-    // Check if all sessions for this survey are complete
     const { count: activeCount } = await supabase
       .from("survey_sessions")
       .select("id", { count: "exact", head: true })
@@ -409,7 +459,6 @@ function formatQuestion(
   total: number
 ): string {
   const lines: string[] = [];
-  // Q2, Q3, etc. — no "of N", and first question has no prefix at all
   lines.push(`Q${order}: ${question.question_text}`);
   lines.push("");
 
@@ -439,8 +488,6 @@ function formatQuestion(
         opts.forEach((opt: string, i: number) => {
           lines.push(`${i + 1}. ${opt}`);
         });
-        lines.push("");
-        lines.push("Reply with the number");
       }
       break;
     }
@@ -450,8 +497,6 @@ function formatQuestion(
       choices.forEach((opt: string, i: number) => {
         lines.push(`${i + 1}. ${opt}`);
       });
-      lines.push("");
-      lines.push("Reply with numbers separated by commas (e.g. 1,3)");
       break;
     }
     case "short_answer":

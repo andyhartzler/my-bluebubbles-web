@@ -253,6 +253,9 @@ function formatFirstMessage(
     case "yes_no":
       lines.push("Reply YES or NO");
       break;
+    case "true_false":
+      lines.push("Reply TRUE or FALSE");
+      break;
     case "rating": {
       let min = 1;
       let max = 5;
@@ -271,10 +274,16 @@ function formatFirstMessage(
         question.options.forEach((opt: string, i: number) => {
           lines.push(`${i + 1}. ${opt}`);
         });
-        lines.push("");
-        lines.push("Reply with the number");
       }
       break;
+    case "multi_select": {
+      const opts = question.options;
+      const choices = Array.isArray(opts) ? opts : opts?.choices ?? [];
+      choices.forEach((opt: string, i: number) => {
+        lines.push(`${i + 1}. ${opt}`);
+      });
+      break;
+    }
     case "short_answer":
       lines.push("Reply with your answer");
       break;
