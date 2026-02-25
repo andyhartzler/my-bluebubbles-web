@@ -119,6 +119,8 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
         options: options,
         questionOrder: i + 1,
         ratingMax: q.type == 'rating' ? q.ratingMax : null,
+        ratingMinLabel: q.type == 'rating' ? q.ratingMinLabelController.text.trim() : null,
+        ratingMaxLabel: q.type == 'rating' ? q.ratingMaxLabelController.text.trim() : null,
       );
     }).toList();
   }
@@ -1298,6 +1300,42 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
                   ],
                   onChanged: (v) { if (v != null) setState(() => q.ratingMax = v); },
                 ),
+                const SizedBox(height: 12),
+                const Text('Rating Labels',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: BrandColors.unityBlue)),
+                const SizedBox(height: 4),
+                Text('Customize what 1 and ${q.ratingMax} mean for this question',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: q.ratingMinLabelController,
+                        decoration: InputDecoration(
+                          labelText: '1 =',
+                          hintText: 'Poor',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: q.ratingMaxLabelController,
+                        decoration: InputDecoration(
+                          labelText: '${q.ratingMax} =',
+                          hintText: 'Excellent',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                  ],
+                ),
               ],
 
               // Multi-select options
@@ -1452,7 +1490,9 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
         buf.writeln('Reply TRUE or FALSE');
         break;
       case 'rating':
-        buf.writeln('Reply 1-${q.ratingMax} (1=Poor, ${q.ratingMax}=Excellent)');
+        final minLbl = q.ratingMinLabelController.text.trim().isEmpty ? 'Poor' : q.ratingMinLabelController.text.trim();
+        final maxLbl = q.ratingMaxLabelController.text.trim().isEmpty ? 'Excellent' : q.ratingMaxLabelController.text.trim();
+        buf.writeln('Reply 1-${q.ratingMax} (1=$minLbl, ${q.ratingMax}=$maxLbl)');
         break;
       case 'multiple_choice':
       case 'multi_select':
@@ -1736,6 +1776,8 @@ class _EditableQuestion {
   String type;
   List<TextEditingController> optionControllers;
   int ratingMax;
+  final TextEditingController ratingMinLabelController;
+  final TextEditingController ratingMaxLabelController;
 
   /// Populated by SurveyQuestionSuggestions.suggestType() after a debounce.
   String? suggestedType;
@@ -1749,8 +1791,12 @@ class _EditableQuestion {
     this.type = 'yes_no',
     List<String>? options,
     this.ratingMax = 5,
+    String? ratingMinLabel,
+    String? ratingMaxLabel,
   })  : key = key ?? const Uuid().v4(),
         textController = TextEditingController(text: text ?? ''),
+        ratingMinLabelController = TextEditingController(text: ratingMinLabel ?? 'Poor'),
+        ratingMaxLabelController = TextEditingController(text: ratingMaxLabel ?? 'Excellent'),
         optionControllers = (options != null && options.isNotEmpty)
             ? options.map((o) => TextEditingController(text: o)).toList()
             : [TextEditingController(), TextEditingController()];
@@ -1762,11 +1808,15 @@ class _EditableQuestion {
       type: q.questionType,
       options: q.options.isNotEmpty ? q.options : null,
       ratingMax: q.ratingMax ?? 5,
+      ratingMinLabel: q.ratingMinLabel,
+      ratingMaxLabel: q.ratingMaxLabel,
     );
   }
 
   void dispose() {
     textController.dispose();
+    ratingMinLabelController.dispose();
+    ratingMaxLabelController.dispose();
     _typeSuggestDebounce?.cancel();
     for (final c in optionControllers) {
       c.dispose();

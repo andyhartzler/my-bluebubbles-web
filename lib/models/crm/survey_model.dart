@@ -155,6 +155,8 @@ class SurveyQuestion {
   final List<String> options;
   final int questionOrder;
   final int? ratingMax;
+  final String? ratingMinLabel;
+  final String? ratingMaxLabel;
 
   const SurveyQuestion({
     this.id,
@@ -164,11 +166,15 @@ class SurveyQuestion {
     this.options = const [],
     required this.questionOrder,
     this.ratingMax,
+    this.ratingMinLabel,
+    this.ratingMaxLabel,
   });
 
   factory SurveyQuestion.fromJson(Map<String, dynamic> json) {
     List<String> options = [];
     int? ratingMax;
+    String? ratingMinLabel;
+    String? ratingMaxLabel;
     final raw = json['options'];
     if (raw is List) {
       options = raw.map((e) => e.toString()).toList();
@@ -178,6 +184,14 @@ class SurveyQuestion {
       }
       if (raw['choices'] is List) {
         options = (raw['choices'] as List).map((e) => e.toString()).toList();
+      }
+      // Read custom rating labels
+      if (raw['labels'] is Map) {
+        final labels = raw['labels'] as Map;
+        final min = raw['min']?.toString() ?? '1';
+        final max = raw['max']?.toString() ?? '5';
+        ratingMinLabel = labels[min]?.toString();
+        ratingMaxLabel = labels[max]?.toString();
       }
     }
 
@@ -189,6 +203,8 @@ class SurveyQuestion {
       options: options,
       questionOrder: _parseSurveyInt(json['question_order']) ?? 0,
       ratingMax: ratingMax,
+      ratingMinLabel: ratingMinLabel,
+      ratingMaxLabel: ratingMaxLabel,
     );
   }
 
@@ -203,8 +219,13 @@ class SurveyQuestion {
       payload['options'] = options;
     } else if (questionType == 'multi_select' && options.isNotEmpty) {
       payload['options'] = options;
-    } else if (questionType == 'rating' && ratingMax != null && ratingMax != 5) {
-      payload['options'] = {'min': 1, 'max': ratingMax};
+    } else if (questionType == 'rating') {
+      final max = ratingMax ?? 5;
+      final ratingOpts = <String, dynamic>{'min': 1, 'max': max};
+      final minLbl = ratingMinLabel ?? 'Poor';
+      final maxLbl = ratingMaxLabel ?? 'Excellent';
+      ratingOpts['labels'] = {'1': minLbl, '$max': maxLbl};
+      payload['options'] = ratingOpts;
     }
     return payload;
   }
@@ -212,6 +233,7 @@ class SurveyQuestion {
   SurveyQuestion copyWith({
     String? id, String? surveyId, String? questionText, String? questionType,
     List<String>? options, int? questionOrder, int? ratingMax,
+    String? ratingMinLabel, String? ratingMaxLabel,
   }) => SurveyQuestion(
         id: id ?? this.id, surveyId: surveyId ?? this.surveyId,
         questionText: questionText ?? this.questionText,
@@ -219,6 +241,8 @@ class SurveyQuestion {
         options: options ?? this.options,
         questionOrder: questionOrder ?? this.questionOrder,
         ratingMax: ratingMax ?? this.ratingMax,
+        ratingMinLabel: ratingMinLabel ?? this.ratingMinLabel,
+        ratingMaxLabel: ratingMaxLabel ?? this.ratingMaxLabel,
       );
 
   /// Format the question text as it will appear in an iMessage.
@@ -240,7 +264,9 @@ class SurveyQuestion {
         break;
       case 'rating':
         final max = ratingMax ?? 5;
-        buf.writeln('Reply 1-$max (1=Poor, $max=Excellent)');
+        final minLbl = ratingMinLabel ?? 'Poor';
+        final maxLbl = ratingMaxLabel ?? 'Excellent';
+        buf.writeln('Reply 1-$max (1=$minLbl, $max=$maxLbl)');
         break;
       case 'multiple_choice':
         for (int i = 0; i < options.length; i++) {

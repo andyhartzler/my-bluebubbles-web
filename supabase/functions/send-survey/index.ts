@@ -253,9 +253,19 @@ function formatFirstMessage(
     case "yes_no":
       lines.push("Reply YES or NO");
       break;
-    case "rating":
-      lines.push("Reply 1-5 (1=Poor, 5=Excellent)");
+    case "rating": {
+      let min = 1;
+      let max = 5;
+      const opts = question.options;
+      if (opts && !Array.isArray(opts) && typeof opts === "object") {
+        if (opts.min != null) min = Number(opts.min);
+        if (opts.max != null) max = Number(opts.max);
+      }
+      const minLabel = opts?.labels?.[String(min)] ?? "Poor";
+      const maxLabel = opts?.labels?.[String(max)] ?? "Excellent";
+      lines.push(`Reply ${min}-${max} (${min}=${minLabel}, ${max}=${maxLabel})`);
       break;
+    }
     case "multiple_choice":
       if (question.options && Array.isArray(question.options)) {
         question.options.forEach((opt: string, i: number) => {
