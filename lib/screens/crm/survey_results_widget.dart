@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/survey_model.dart';
+import 'package:bluebubbles/services/crm/survey_export_service.dart';
 import 'package:bluebubbles/services/crm/survey_repository.dart';
 
-const _unityBlue = Color(0xFF273351);
-const _momentumBlue = Color(0xFF32A6DE);
-const _sunriseGold = Color(0xFFFDB813);
-const _grassrootsGreen = Color(0xFF43A047);
-const _actionRed = Color(0xFFE63946);
+const _brandedGreen = Color(0xFF43A047);
+const _brandedRed = Color(0xFFE63946);
 
 class SurveyResultsWidget extends StatefulWidget {
   final String surveyId;
@@ -27,6 +27,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
   final _repo = SurveyRepository();
   SurveyResultsSummary? _summary;
   bool _loading = true;
+  bool _exporting = false;
   String? _error;
 
   @override
@@ -58,6 +59,58 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
     }
   }
 
+  // ── Export methods ──────────────────────────────────────────────────────────
+
+  Future<void> _exportPdf() async {
+    setState(() => _exporting = true);
+    try {
+      final sessions = await _repo.fetchSessions(widget.surveyId);
+      final pdfBytes = await SurveyExportService.generatePdf(
+        surveyTitle: widget.surveyTitle,
+        summary: _summary!,
+        sessions: sessions,
+      );
+      await Printing.sharePdf(
+        bytes: pdfBytes,
+        filename: '${widget.surveyTitle.replaceAll(' ', '_')}_results.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  Future<void> _exportExcel() async {
+    setState(() => _exporting = true);
+    try {
+      final sessions = await _repo.fetchSessions(widget.surveyId);
+      final excelBytes = await SurveyExportService.generateExcel(
+        surveyTitle: widget.surveyTitle,
+        summary: _summary!,
+        sessions: sessions,
+      );
+      await Printing.sharePdf(
+        bytes: excelBytes,
+        filename: '${widget.surveyTitle.replaceAll(' ', '_')}_results.xlsx',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -65,16 +118,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
     }
 
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Error loading results: $_error'),
-            const SizedBox(height: 8),
-            ElevatedButton(onPressed: _load, child: const Text('Retry')),
-          ],
-        ),
-      );
+      return _buildErrorState();
     }
 
     final s = _summary!;
@@ -89,16 +133,15 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
           children: [
             // ── Summary cards ──
             _buildSummaryRow(s),
-            const SizedBox(height: 24),
+            const SizedBox(height: 4),
+
+            // ── Export row ──
+            _buildExportRow(),
+            const SizedBox(height: 16),
 
             // ── Per-question breakdown ──
             if (s.questionSummaries.isEmpty)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Text('No responses yet'),
-                ),
-              )
+              _buildEmptyState()
             else
               ...s.questionSummaries.map((qs) => _buildQuestionResult(qs)),
           ],
@@ -107,49 +150,204 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
     );
   }
 
+  // ── Error state ────────────────────────────────────────────────────────────
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.error_outline, size: 48, color: Colors.red),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Error loading results',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              _error ?? '',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _load,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: BrandColors.unityBlue,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Empty state ────────────────────────────────────────────────────────────
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: BrandColors.momentumBlue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.poll_outlined,
+                size: 48,
+                color: BrandColors.momentumBlue.withOpacity(0.5),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No responses yet',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Results will appear here once respondents start answering.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Summary row ────────────────────────────────────────────────────────────
+
   Widget _buildSummaryRow(SurveyResultsSummary s) {
     return Wrap(
       spacing: 12,
       runSpacing: 12,
       children: [
-        _SummaryCard(
+        _buildGradientSummaryCard(
           label: 'Sent',
           value: '${s.totalSent}',
           icon: Icons.send,
-          color: _momentumBlue,
         ),
-        _SummaryCard(
+        _buildGradientSummaryCard(
           label: 'Responded',
           value: '${s.totalResponded}',
           icon: Icons.reply,
-          color: _sunriseGold,
         ),
-        _SummaryCard(
+        _buildGradientSummaryCard(
           label: 'Completed',
           value: '${s.totalCompleted}',
           icon: Icons.check_circle,
-          color: _grassrootsGreen,
         ),
-        _SummaryCard(
+        _buildGradientSummaryCard(
           label: 'Response Rate',
           value: '${(s.responseRate * 100).toStringAsFixed(0)}%',
           icon: Icons.trending_up,
-          color: _momentumBlue,
         ),
-        _SummaryCard(
+        _buildGradientSummaryCard(
           label: 'Opted Out',
           value: '${s.totalOptedOut}',
           icon: Icons.block,
-          color: _actionRed,
         ),
       ],
     );
   }
 
+  Widget _buildGradientSummaryCard({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: BrandColors.unityBlue.withOpacity(0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: Colors.white, size: 24),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Export row ──────────────────────────────────────────────────────────────
+
+  Widget _buildExportRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          OutlinedButton.icon(
+            onPressed: _exporting ? null : _exportPdf,
+            icon: const Icon(Icons.picture_as_pdf, size: 18),
+            label: const Text('Export PDF'),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: _exporting ? null : _exportExcel,
+            icon: const Icon(Icons.table_chart, size: 18),
+            label: const Text('Export Excel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Question result card ───────────────────────────────────────────────────
+
   Widget _buildQuestionResult(QuestionResultSummary qs) {
-    final theme = Theme.of(context);
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade900.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: BrandColors.unityBlue.withOpacity(0.4),
+          width: 1,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -157,31 +355,44 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
           children: [
             Row(
               children: [
+                // Q badge — filled circle with branded background
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: _momentumBlue.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(4),
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: BrandColors.momentumBlue,
+                    shape: BoxShape.circle,
                   ),
                   child: Text(
-                    'Q${qs.question.questionOrder}',
-                    style: TextStyle(
-                      color: _momentumBlue,
+                    '${qs.question.questionOrder}',
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                      fontSize: 13,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     qs.question.questionText,
-                    style: theme.textTheme.titleSmall,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                Text(
-                  '${qs.responseCount} responses',
-                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: BrandColors.unityBlue.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${qs.responseCount} responses',
+                    style: const TextStyle(fontSize: 11, color: Colors.white70),
+                  ),
                 ),
               ],
             ),
@@ -208,6 +419,8 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
     }
   }
 
+  // ── Yes / No bar ───────────────────────────────────────────────────────────
+
   Widget _buildYesNoBar(QuestionResultSummary qs) {
     final dist = qs.distribution;
     final yesCount = dist['yes'] ?? 0;
@@ -230,7 +443,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                   Expanded(
                     flex: (yesPct * 100).round(),
                     child: Container(
-                      color: _grassrootsGreen,
+                      color: _brandedGreen,
                       alignment: Alignment.center,
                       child: Text(
                         'Yes ${(yesPct * 100).toStringAsFixed(0)}%',
@@ -246,7 +459,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                   Expanded(
                     flex: (noPct * 100).round(),
                     child: Container(
-                      color: _actionRed,
+                      color: _brandedRed,
                       alignment: Alignment.center,
                       child: Text(
                         'No ${(noPct * 100).toStringAsFixed(0)}%',
@@ -271,6 +484,8 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
     );
   }
 
+  // ── Rating display ─────────────────────────────────────────────────────────
+
   Widget _buildRatingDisplay(QuestionResultSummary qs) {
     final avg = qs.averageRating;
     final dist = qs.distribution;
@@ -286,7 +501,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                 style: const TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.bold,
-                  color: _sunriseGold,
+                  color: BrandColors.sunriseGold,
                 ),
               ),
               const SizedBox(width: 8),
@@ -297,7 +512,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                     children: List.generate(5, (i) {
                       return Icon(
                         i < avg.round() ? Icons.star : Icons.star_border,
-                        color: _sunriseGold,
+                        color: BrandColors.sunriseGold,
                         size: 20,
                       );
                     }),
@@ -321,7 +536,10 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
             padding: const EdgeInsets.symmetric(vertical: 2),
             child: Row(
               children: [
-                SizedBox(width: 16, child: Text('$rating', style: const TextStyle(fontSize: 12))),
+                SizedBox(
+                  width: 16,
+                  child: Text('$rating', style: const TextStyle(fontSize: 12)),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: ClipRRect(
@@ -329,7 +547,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                     child: LinearProgressIndicator(
                       value: pct,
                       backgroundColor: Colors.grey.shade800,
-                      valueColor: const AlwaysStoppedAnimation(_sunriseGold),
+                      valueColor: const AlwaysStoppedAnimation(BrandColors.sunriseGold),
                       minHeight: 16,
                     ),
                   ),
@@ -350,6 +568,8 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
       ],
     );
   }
+
+  // ── Bar chart (multiple choice) ────────────────────────────────────────────
 
   Widget _buildBarChart(QuestionResultSummary qs) {
     final dist = qs.distribution;
@@ -381,7 +601,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
                   child: LinearProgressIndicator(
                     value: pct,
                     backgroundColor: Colors.grey.shade800,
-                    valueColor: const AlwaysStoppedAnimation(_momentumBlue),
+                    valueColor: const AlwaysStoppedAnimation(BrandColors.momentumBlue),
                     minHeight: 20,
                   ),
                 ),
@@ -401,6 +621,8 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
       }).toList(),
     );
   }
+
+  // ── Short answer list ──────────────────────────────────────────────────────
 
   Widget _buildShortAnswerList(QuestionResultSummary qs) {
     if (qs.responses.isEmpty) return const Text('No responses yet');
@@ -423,51 +645,6 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
               ),
             );
           }).toList(),
-    );
-  }
-}
-
-// ── Summary card widget ─────────────────────────────────────────────────────
-
-class _SummaryCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  const _SummaryCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
