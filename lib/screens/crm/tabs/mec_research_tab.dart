@@ -1050,17 +1050,42 @@ class _MecResearchTabState extends State<MecResearchTab> {
     // When unified profile is available, use its data
     final profile = _unifiedProfile;
     if (profile != null) {
-      final mecTotal = (profile['mec_total'] as num?)?.toDouble() ?? 0.0;
-      final fecTotal = (profile['fec_total'] as num?)?.toDouble() ?? 0.0;
+      // Compute totals from contribution arrays (RPC doesn't return summary fields)
+      final mecContribs = (profile['mec_contributions'] as List<dynamic>?) ?? [];
+      final fecContribs = (profile['fec_contributions'] as List<dynamic>?) ?? [];
+      final mecTotal = mecContribs.fold<double>(0, (sum, c) => sum + ((c['contribution_amount'] as num?)?.toDouble() ?? 0));
+      final fecTotal = fecContribs.fold<double>(0, (sum, c) => sum + ((c['transaction_amount'] as num?)?.toDouble() ?? 0));
       final grandTotal = mecTotal + fecTotal;
-      final mecCount = (profile['mec_count'] as num?)?.toInt() ?? 0;
-      final fecCount = (profile['fec_count'] as num?)?.toInt() ?? 0;
+      final mecCount = mecContribs.length;
+      final fecCount = fecContribs.length;
       final totalCount = mecCount + fecCount;
-      final firstYear = (profile['first_year'] as num?)?.toInt();
-      final lastYear = (profile['last_year'] as num?)?.toInt();
 
-      // Gather metadata from unified profile enrichment or donor row
-      final enr = profile['enrichment'] as Map<String, dynamic>?;
+      // Compute year range from contributions
+      int? firstYear;
+      int? lastYear;
+      for (final c in mecContribs) {
+        final d = c['contribution_date'] as String?;
+        if (d != null && d.length >= 4) {
+          final y = int.tryParse(d.substring(0, 4));
+          if (y != null) {
+            firstYear = firstYear == null ? y : (y < firstYear ? y : firstYear);
+            lastYear = lastYear == null ? y : (y > lastYear ? y : lastYear);
+          }
+        }
+      }
+      for (final c in fecContribs) {
+        final d = c['transaction_date'] as String?;
+        if (d != null && d.length >= 4) {
+          final y = int.tryParse(d.substring(0, 4));
+          if (y != null) {
+            firstYear = firstYear == null ? y : (y < firstYear ? y : firstYear);
+            lastYear = lastYear == null ? y : (y > lastYear ? y : lastYear);
+          }
+        }
+      }
+
+      // Enrichment data is inside the 'donor' object (joined in the RPC)
+      final enr = profile['donor'] as Map<String, dynamic>?;
       final donorRow = _profileDonorRow;
 
       String? city = enr?['city'] as String? ??
@@ -1436,7 +1461,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
   // ===========================================================================
 
   Widget _buildEnrichmentSections() {
-    final enr = _enrichmentData ?? (_unifiedProfile?['enrichment'] as Map<String, dynamic>?);
+    final enr = _enrichmentData ?? (_unifiedProfile?['donor'] as Map<String, dynamic>?);
     final donorRow = _profileDonorRow;
     if (enr == null && donorRow == null) return const SizedBox.shrink();
 
@@ -1751,47 +1776,36 @@ class _MecResearchTabState extends State<MecResearchTab> {
             ],
           ),
           const SizedBox(height: 12),
-          // Committee breakdown
-          ...mecBreakdown.take(10).map((cb) {
-            final name = cb['committee_name'] as String? ?? 'Unknown';
-            final total = (cb['total'] as num?)?.toDouble() ?? 0;
-            final cnt = (cb['cnt'] as num?)?.toInt() ?? 0;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  Expanded(child: Text(name, style: BrandTextStyles.body.copyWith(fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                  Text('\u00D7$cnt', style: BrandTextStyles.caption),
-                  const SizedBox(width: 8),
-                  Text(_currencyFormat.format(total), style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 13, fontWeight: FontWeight.w600)),
-                ],
-              ),
-            );
-          }),
-          if (mecBreakdown.length > 10)
-            Text('+ ${mecBreakdown.length - 10} more committees', style: BrandTextStyles.caption),
-          // Individual MEC contributions
-          const SizedBox(height: 16),
-          const Divider(color: Colors.white12),
-          const SizedBox(height: 8),
-          Text('All Contributions (${mecContribs.length})',
-            style: BrandTextStyles.caption.copyWith(color: Colors.white54, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          ...mecContribs.map((c) {
+          // Individual MEC contributions with alternating rows
+          ...List.generate(mecContribs.length, (i) {
+            final c = mecContribs[i];
             final amount = (c['contribution_amount'] as num?)?.toDouble() ?? 0;
-            final date = c['date'] as String? ?? c['contribution_date'] as String? ?? '';
+            final date = c['contribution_date'] as String? ?? '';
             final committee = c['committee_name'] as String? ?? '';
             String displayDate = date;
             if (date.isNotEmpty) {
               try { displayDate = _dateFormat.format(DateTime.parse(date)); } catch (_) {}
             }
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 4),
+            return Container(
+              margin: const EdgeInsets.only(bottom: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: i.isEven
+                    ? BrandColors.unityBlue.withOpacity(0.5)
+                    : BrandColors.unityBlue.withOpacity(0.3),
+                borderRadius: i == 0
+                    ? const BorderRadius.vertical(top: Radius.circular(8))
+                    : i == mecContribs.length - 1
+                        ? const BorderRadius.vertical(bottom: Radius.circular(8))
+                        : BorderRadius.zero,
+              ),
               child: Row(
                 children: [
-                  SizedBox(width: 88, child: Text(displayDate, style: BrandTextStyles.caption.copyWith(fontSize: 11))),
-                  Expanded(child: Text(committee, style: BrandTextStyles.body.copyWith(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                  Text(_currencyFormat.format(amount), style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 12, fontWeight: FontWeight.w600)),
+                  SizedBox(width: 90, child: Text(displayDate, style: BrandTextStyles.caption)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(committee, style: const TextStyle(color: Colors.white, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  const SizedBox(width: 8),
+                  Text(_currencyFormat.format(amount), style: const TextStyle(color: BrandColors.sunriseGold, fontWeight: FontWeight.bold, fontSize: 14)),
                 ],
               ),
             );
@@ -1838,48 +1852,37 @@ class _MecResearchTabState extends State<MecResearchTab> {
             ],
           ),
           const SizedBox(height: 12),
-          // Committee breakdown
-          ...fecBreakdown.take(10).map((cb) {
-            final name = cb['committee_name'] as String? ?? 'Unknown';
-            final total = (cb['total'] as num?)?.toDouble() ?? 0;
-            final cnt = (cb['cnt'] as num?)?.toInt() ?? 0;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  Expanded(child: Text(name, style: BrandTextStyles.body.copyWith(fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                  Text('\u00D7$cnt', style: BrandTextStyles.caption),
-                  const SizedBox(width: 8),
-                  Text(_currencyFormat.format(total), style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 13, fontWeight: FontWeight.w600)),
-                ],
-              ),
-            );
-          }),
-          if (fecBreakdown.length > 10)
-            Text('+ ${fecBreakdown.length - 10} more committees', style: BrandTextStyles.caption),
-          // Individual FEC contributions
-          const SizedBox(height: 16),
-          const Divider(color: Colors.white12),
-          const SizedBox(height: 8),
-          Text('All Contributions (${fecContribs.length})',
-            style: BrandTextStyles.caption.copyWith(color: Colors.white54, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          ...fecContribs.map((c) {
-            final amount = (c['contribution_amount'] as num?)?.toDouble() ??
-                (c['transaction_amount'] as num?)?.toDouble() ?? 0;
-            final date = c['date'] as String? ?? c['transaction_date'] as String? ?? '';
+          // Individual FEC contributions with alternating rows
+          ...List.generate(fecContribs.length, (i) {
+            final c = fecContribs[i];
+            final amount = (c['transaction_amount'] as num?)?.toDouble() ??
+                (c['contribution_amount'] as num?)?.toDouble() ?? 0;
+            final date = c['transaction_date'] as String? ?? '';
             final committee = c['committee_name'] as String? ?? '';
             String displayDate = date;
             if (date.isNotEmpty) {
               try { displayDate = _dateFormat.format(DateTime.parse(date)); } catch (_) {}
             }
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 4),
+            return Container(
+              margin: const EdgeInsets.only(bottom: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: i.isEven
+                    ? BrandColors.unityBlue.withOpacity(0.5)
+                    : BrandColors.unityBlue.withOpacity(0.3),
+                borderRadius: i == 0
+                    ? const BorderRadius.vertical(top: Radius.circular(8))
+                    : i == fecContribs.length - 1
+                        ? const BorderRadius.vertical(bottom: Radius.circular(8))
+                        : BorderRadius.zero,
+              ),
               child: Row(
                 children: [
-                  SizedBox(width: 88, child: Text(displayDate, style: BrandTextStyles.caption.copyWith(fontSize: 11))),
-                  Expanded(child: Text(committee, style: BrandTextStyles.body.copyWith(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                  Text(_currencyFormat.format(amount), style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 12, fontWeight: FontWeight.w600)),
+                  SizedBox(width: 90, child: Text(displayDate, style: BrandTextStyles.caption)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(committee, style: const TextStyle(color: Colors.white, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  const SizedBox(width: 8),
+                  Text(_currencyFormat.format(amount), style: const TextStyle(color: BrandColors.sunriseGold, fontWeight: FontWeight.bold, fontSize: 14)),
                 ],
               ),
             );

@@ -553,22 +553,23 @@ class _CommitteesTabState extends State<CommitteesTab> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                // Status badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isActive ? BrandColors.success.withOpacity(0.2) : Colors.white12,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    status.isNotEmpty ? status : 'Unknown',
-                    style: TextStyle(
-                      color: isActive ? BrandColors.success : Colors.white54,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                // Status badge (only show if known)
+                if (status.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isActive ? BrandColors.success.withOpacity(0.2) : Colors.white12,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      status,
+                      style: TextStyle(
+                        color: isActive ? BrandColors.success : Colors.white54,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
             const SizedBox(height: 6),
@@ -736,21 +737,22 @@ class _CommitteesTabState extends State<CommitteesTab> {
                       spacing: 8,
                       runSpacing: 6,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isActive ? BrandColors.success.withOpacity(0.2) : Colors.white12,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            status.isNotEmpty ? status : 'Unknown',
-                            style: TextStyle(
-                              color: isActive ? BrandColors.success : Colors.white60,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
+                        if (status.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isActive ? BrandColors.success.withOpacity(0.2) : Colors.white12,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              status,
+                              style: TextStyle(
+                                color: isActive ? BrandColors.success : Colors.white60,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
-                        ),
                         if (party.isNotEmpty)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -936,7 +938,7 @@ class _CommitteesTabState extends State<CommitteesTab> {
           const SizedBox(height: 12),
           if (_donors.isEmpty && !_loadingMoreDonors)
             Text('No donor data available', style: BrandTextStyles.bodySecondary),
-          ..._donors.map((d) => _buildDonorRow(d, currencyFormat)),
+          ...List.generate(_donors.length, (i) => _buildDonorRow(_donors[i], currencyFormat, i)),
           if (_hasMoreDonors && !_loadingMoreDonors)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -997,8 +999,8 @@ class _CommitteesTabState extends State<CommitteesTab> {
     );
   }
 
-  Widget _buildDonorRow(Map<String, dynamic> donor, NumberFormat fmt) {
-    final name = donor['name'] as String? ?? 'Unknown';
+  Widget _buildDonorRow(Map<String, dynamic> donor, NumberFormat fmt, int index) {
+    final name = donor['name'] as String? ?? '';
     final total = (donor['total'] as num?)?.toDouble() ?? 0;
     final count = (donor['count'] as num?)?.toInt() ?? 0;
     final city = donor['city'] as String? ?? '';
@@ -1018,18 +1020,26 @@ class _CommitteesTabState extends State<CommitteesTab> {
     }
     final subtitle = subtitleParts.join(' \u00B7 '); // middle dot separator
 
-    return InkWell(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Opening donor profile for $name...'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2),
+      decoration: BoxDecoration(
+        color: index.isEven
+            ? BrandColors.unityBlue.withOpacity(0.5)
+            : BrandColors.unityBlue.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: InkWell(
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Opening donor profile for $name...'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1093,10 +1103,11 @@ class _CommitteesTabState extends State<CommitteesTab> {
                     fontSize: 13,
                   ),
                 ),
-                Text('$count gifts', style: BrandTextStyles.caption),
+                Text('$count contribution${count == 1 ? '' : 's'}', style: BrandTextStyles.caption),
               ],
             ),
           ],
+        ),
         ),
       ),
     );
