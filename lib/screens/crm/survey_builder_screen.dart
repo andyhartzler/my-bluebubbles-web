@@ -105,17 +105,20 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
     return _questions.asMap().entries.map((entry) {
       final i = entry.key;
       final q = entry.value;
+      List<String> options = [];
+      if (q.type == 'multiple_choice' || q.type == 'multi_select') {
+        options = q.optionControllers
+            .map((c) => c.text.trim())
+            .where((t) => t.isNotEmpty)
+            .toList();
+      }
       return SurveyQuestion(
         id: q.existingId,
         questionText: q.textController.text.trim(),
         questionType: q.type,
-        options: q.type == 'multiple_choice'
-            ? q.optionControllers
-                .map((c) => c.text.trim())
-                .where((t) => t.isNotEmpty)
-                .toList()
-            : [],
+        options: options,
         questionOrder: i + 1,
+        ratingMax: q.type == 'rating' ? q.ratingMax : null,
       );
     }).toList();
   }
@@ -1007,10 +1010,14 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
     switch (type) {
       case 'yes_no':
         return 'Yes/No';
+      case 'true_false':
+        return 'True/False';
       case 'rating':
         return 'Rating';
       case 'multiple_choice':
         return 'Multiple Choice';
+      case 'multi_select':
+        return 'Multi-Select';
       case 'short_answer':
         return 'Short Answer';
       default:
@@ -1022,10 +1029,14 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
     switch (type) {
       case 'yes_no':
         return BrandColors.success;
+      case 'true_false':
+        return BrandColors.royalBlue;
       case 'rating':
         return BrandColors.sunriseGold;
       case 'multiple_choice':
         return BrandColors.momentumBlue;
+      case 'multi_select':
+        return const Color(0xFF8B5CF6);
       case 'short_answer':
         return BrandColors.slateBlue;
       default:
@@ -1140,15 +1151,11 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
                       ),
                       items: const [
                         DropdownMenuItem(value: 'yes_no', child: Text('Yes / No')),
-                        DropdownMenuItem(value: 'rating', child: Text('Rating (1-5)')),
-                        DropdownMenuItem(
-                          value: 'multiple_choice',
-                          child: Text('Multiple Choice'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'short_answer',
-                          child: Text('Short Answer'),
-                        ),
+                        DropdownMenuItem(value: 'true_false', child: Text('True / False')),
+                        DropdownMenuItem(value: 'rating', child: Text('Rating')),
+                        DropdownMenuItem(value: 'multiple_choice', child: Text('Multiple Choice')),
+                        DropdownMenuItem(value: 'multi_select', child: Text('Multi-Select')),
+                        DropdownMenuItem(value: 'short_answer', child: Text('Short Answer')),
                       ],
                       onChanged: (v) {
                         if (v != null) {
@@ -1267,6 +1274,91 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
                   ),
                 ),
               ],
+
+              // Rating scale selector
+              if (q.type == 'rating') ...[
+                const SizedBox(height: 14),
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text('Rating Scale',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: BrandColors.unityBlue)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  value: q.ratingMax,
+                  decoration: InputDecoration(
+                    labelText: 'Scale',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 3, child: Text('1 - 3')),
+                    DropdownMenuItem(value: 5, child: Text('1 - 5')),
+                    DropdownMenuItem(value: 7, child: Text('1 - 7')),
+                    DropdownMenuItem(value: 10, child: Text('1 - 10')),
+                  ],
+                  onChanged: (v) { if (v != null) setState(() => q.ratingMax = v); },
+                ),
+              ],
+
+              // Multi-select options
+              if (q.type == 'multi_select') ...[
+                const SizedBox(height: 14),
+                const Divider(),
+                const SizedBox(height: 8),
+                Row(children: [
+                  const Expanded(child: Text('Answer Options',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: BrandColors.unityBlue))),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text('Recipients can select multiple',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF8B5CF6), fontWeight: FontWeight.w500)),
+                  ),
+                ]),
+                const SizedBox(height: 8),
+                ...q.optionControllers.asMap().entries.map((entry) {
+                  final oi = entry.key;
+                  final oc = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(children: [
+                      Container(
+                        width: 24, height: 24,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.grey.shade400),
+                        ),
+                        child: Center(child: Text('${oi + 1}',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade600))),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: TextFormField(
+                        controller: oc,
+                        decoration: InputDecoration(
+                          hintText: 'Option ${oi + 1}', isDense: true,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      )),
+                      if (q.optionControllers.length > 2)
+                        IconButton(
+                          icon: Icon(Icons.close, size: 18, color: Colors.grey.shade500),
+                          onPressed: () { setState(() { q.optionControllers[oi].dispose(); q.optionControllers.removeAt(oi); }); },
+                        ),
+                    ]),
+                  );
+                }),
+                TextButton.icon(
+                  onPressed: () { setState(() { q.optionControllers.add(TextEditingController()); }); },
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add option'),
+                  style: TextButton.styleFrom(foregroundColor: const Color(0xFF8B5CF6)),
+                ),
+              ],
             ],
           ),
         ),
@@ -1358,10 +1450,14 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
       case 'yes_no':
         buf.writeln('Reply YES or NO');
         break;
+      case 'true_false':
+        buf.writeln('Reply TRUE or FALSE');
+        break;
       case 'rating':
-        buf.writeln('Reply 1-5 (1=Poor, 5=Excellent)');
+        buf.writeln('Reply 1-${q.ratingMax} (1=Poor, ${q.ratingMax}=Excellent)');
         break;
       case 'multiple_choice':
+      case 'multi_select':
         final opts = q.optionControllers
             .map((c) => c.text.trim())
             .where((t) => t.isNotEmpty)
@@ -1374,7 +1470,11 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
           }
         }
         buf.writeln();
-        buf.writeln('Reply with the number');
+        if (q.type == 'multi_select') {
+          buf.writeln('Reply with numbers separated by commas (e.g. 1,3)');
+        } else {
+          buf.writeln('Reply with the number');
+        }
         break;
       case 'short_answer':
         buf.writeln('Reply with your answer');
@@ -1637,6 +1737,7 @@ class _EditableQuestion {
   final TextEditingController textController;
   String type;
   List<TextEditingController> optionControllers;
+  int ratingMax;
 
   /// Populated by SurveyQuestionSuggestions.suggestType() after a debounce.
   String? suggestedType;
@@ -1649,6 +1750,7 @@ class _EditableQuestion {
     String? text,
     this.type = 'yes_no',
     List<String>? options,
+    this.ratingMax = 5,
   })  : key = key ?? const Uuid().v4(),
         textController = TextEditingController(text: text ?? ''),
         optionControllers = (options != null && options.isNotEmpty)
@@ -1661,6 +1763,7 @@ class _EditableQuestion {
       text: q.questionText,
       type: q.questionType,
       options: q.options.isNotEmpty ? q.options : null,
+      ratingMax: q.ratingMax ?? 5,
     );
   }
 

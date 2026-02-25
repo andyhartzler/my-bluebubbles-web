@@ -154,6 +154,7 @@ class SurveyQuestion {
   final String questionType;
   final List<String> options;
   final int questionOrder;
+  final int? ratingMax;
 
   const SurveyQuestion({
     this.id,
@@ -162,13 +163,22 @@ class SurveyQuestion {
     required this.questionType,
     this.options = const [],
     required this.questionOrder,
+    this.ratingMax,
   });
 
   factory SurveyQuestion.fromJson(Map<String, dynamic> json) {
     List<String> options = [];
+    int? ratingMax;
     final raw = json['options'];
     if (raw is List) {
       options = raw.map((e) => e.toString()).toList();
+    } else if (raw is Map) {
+      if (raw['max'] != null) {
+        ratingMax = int.tryParse(raw['max'].toString());
+      }
+      if (raw['choices'] is List) {
+        options = (raw['choices'] as List).map((e) => e.toString()).toList();
+      }
     }
 
     return SurveyQuestion(
@@ -178,32 +188,37 @@ class SurveyQuestion {
       questionType: json['question_type'] as String? ?? 'short_answer',
       options: options,
       questionOrder: _parseSurveyInt(json['question_order']) ?? 0,
+      ratingMax: ratingMax,
     );
   }
 
-  Map<String, dynamic> toInsertPayload(String surveyId) => {
-        'survey_id': surveyId,
-        'question_text': questionText,
-        'question_type': questionType,
-        if (options.isNotEmpty) 'options': options,
-        'question_order': questionOrder,
-      };
+  Map<String, dynamic> toInsertPayload(String surveyId) {
+    final payload = <String, dynamic>{
+      'survey_id': surveyId,
+      'question_text': questionText,
+      'question_type': questionType,
+      'question_order': questionOrder,
+    };
+    if (questionType == 'multiple_choice' && options.isNotEmpty) {
+      payload['options'] = options;
+    } else if (questionType == 'multi_select' && options.isNotEmpty) {
+      payload['options'] = options;
+    } else if (questionType == 'rating' && ratingMax != null && ratingMax != 5) {
+      payload['options'] = {'min': 1, 'max': ratingMax};
+    }
+    return payload;
+  }
 
   SurveyQuestion copyWith({
-    String? id,
-    String? surveyId,
-    String? questionText,
-    String? questionType,
-    List<String>? options,
-    int? questionOrder,
-  }) =>
-      SurveyQuestion(
-        id: id ?? this.id,
-        surveyId: surveyId ?? this.surveyId,
+    String? id, String? surveyId, String? questionText, String? questionType,
+    List<String>? options, int? questionOrder, int? ratingMax,
+  }) => SurveyQuestion(
+        id: id ?? this.id, surveyId: surveyId ?? this.surveyId,
         questionText: questionText ?? this.questionText,
         questionType: questionType ?? this.questionType,
         options: options ?? this.options,
         questionOrder: questionOrder ?? this.questionOrder,
+        ratingMax: ratingMax ?? this.ratingMax,
       );
 
   /// Format the question text as it will appear in an iMessage.
@@ -211,13 +226,16 @@ class SurveyQuestion {
     final buf = StringBuffer();
     buf.writeln('Q$questionNumber of $totalQuestions: $questionText');
     buf.writeln();
-
     switch (questionType) {
       case 'yes_no':
         buf.writeln('Reply YES or NO');
         break;
+      case 'true_false':
+        buf.writeln('Reply TRUE or FALSE');
+        break;
       case 'rating':
-        buf.writeln('Reply 1-5 (1=Poor, 5=Excellent)');
+        final max = ratingMax ?? 5;
+        buf.writeln('Reply 1-$max (1=Poor, $max=Excellent)');
         break;
       case 'multiple_choice':
         for (int i = 0; i < options.length; i++) {
@@ -226,13 +244,19 @@ class SurveyQuestion {
         buf.writeln();
         buf.writeln('Reply with the number');
         break;
+      case 'multi_select':
+        for (int i = 0; i < options.length; i++) {
+          buf.writeln('${i + 1}. ${options[i]}');
+        }
+        buf.writeln();
+        buf.writeln('Reply with numbers separated by commas (e.g. 1,3)');
+        break;
       case 'short_answer':
         buf.writeln('Reply with your answer');
         break;
     }
-
     buf.writeln();
-    buf.write('Reply SKIP to skip · STOP to opt out');
+    buf.write('Reply SKIP to skip \u00B7 STOP to opt out');
     return buf.toString();
   }
 }
