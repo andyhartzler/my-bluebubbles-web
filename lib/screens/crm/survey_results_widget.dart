@@ -132,7 +132,7 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Summary cards ──
-            _buildSummaryRow(s),
+            _buildStatsDashboard(s),
             const SizedBox(height: 4),
 
             // ── Export row ──
@@ -240,79 +240,215 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
     );
   }
 
-  // ── Summary row ────────────────────────────────────────────────────────────
+  // ── Stats Dashboard — Tier 1: Hero Metrics ─────────────────────────────────
 
-  Widget _buildSummaryRow(SurveyResultsSummary s) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
+  Widget _buildStatsDashboard(SurveyResultsSummary s) {
+    return Column(
       children: [
-        _buildGradientSummaryCard(
-          label: 'Sent',
-          value: '${s.totalSent}',
-          icon: Icons.send,
+        // Tier 1: Hero metrics
+        Row(
+          children: [
+            Expanded(child: _buildHeroCard(
+              label: 'Sent',
+              value: '${s.totalSent}',
+              icon: Icons.send_rounded,
+              iconColor: BrandColors.momentumBlue,
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _buildCircularProgressCard(
+              label: 'Response Rate',
+              value: s.responseRate,
+              color: BrandColors.momentumBlue,
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _buildCircularProgressCard(
+              label: 'Completion',
+              value: s.completionRate,
+              color: BrandColors.success,
+            )),
+          ],
         ),
-        _buildGradientSummaryCard(
-          label: 'Responded',
-          value: '${s.totalResponded}',
-          icon: Icons.reply,
-        ),
-        _buildGradientSummaryCard(
-          label: 'Completed',
-          value: '${s.totalCompleted}',
-          icon: Icons.check_circle,
-        ),
-        _buildGradientSummaryCard(
-          label: 'Response Rate',
-          value: '${(s.responseRate * 100).toStringAsFixed(0)}%',
-          icon: Icons.trending_up,
-        ),
-        _buildGradientSummaryCard(
-          label: 'Opted Out',
-          value: '${s.totalOptedOut}',
-          icon: Icons.block,
+        const SizedBox(height: 12),
+        // Tier 2: Breakdown chips
+        Row(
+          children: [
+            Expanded(child: _buildBreakdownChip(
+              label: 'Completed',
+              count: s.totalCompleted,
+              color: BrandColors.success,
+            )),
+            const SizedBox(width: 8),
+            Expanded(child: _buildBreakdownChip(
+              label: 'In Progress',
+              count: s.totalInProgress,
+              color: BrandColors.momentumBlue,
+            )),
+            const SizedBox(width: 8),
+            Expanded(child: _buildBreakdownChip(
+              label: 'Opted Out',
+              count: s.totalOptedOut,
+              color: BrandColors.error,
+            )),
+            const SizedBox(width: 8),
+            Expanded(child: _buildBreakdownChip(
+              label: 'No Response',
+              count: s.totalNoResponse,
+              color: Colors.grey,
+            )),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildGradientSummaryCard({
+  Widget _buildHeroCard({
     required String label,
     required String value,
     required IconData icon,
+    required Color iconColor,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: BrandColors.tileGradient,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: BrandColors.unityBlue.withOpacity(0.3),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         children: [
-          Icon(icon, color: Colors.white, size: 24),
-          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 22),
+          ),
+          const SizedBox(height: 10),
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
+              color: BrandColors.unityBlue,
             ),
           ),
+          const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(color: Colors.white70, fontSize: 11),
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCircularProgressCard({
+    required String label,
+    required double value,
+    required Color color,
+  }) {
+    final pct = (value * 100).toStringAsFixed(0);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            width: 56,
+            height: 56,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: CircularProgressIndicator(
+                    value: value,
+                    strokeWidth: 5,
+                    backgroundColor: Colors.grey.shade200,
+                    valueColor: AlwaysStoppedAnimation(color),
+                    strokeCap: StrokeCap.round,
+                  ),
+                ),
+                Text(
+                  '$pct%',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: BrandColors.unityBlue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreakdownChip({
+    required String label,
+    required int count,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.15)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color.withOpacity(0.8),
+            ),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
