@@ -3,14 +3,16 @@ import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/services/crm/mec_repository.dart';
-import 'package:bluebubbles/services/crm/supabase_service.dart';
-import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/mec_committee.dart';
 import 'package:bluebubbles/models/crm/mec_contribution.dart';
 
 /// Committees tab — browse, search, and view detailed committee profiles
-/// including fundraising totals, contributions by year, top donors,
+/// including fundraising totals, contributions by year, donors with pagination,
 /// treasurer/candidate info, and election history.
+///
+/// Supports unified MEC + FEC committee search via the searchCommitteesUnified RPC,
+/// with source filtering (MEC / FEC / Both), and paginated donor lists via
+/// getCommitteeDonorsPaginated RPC.
 class CommitteesTab extends StatefulWidget {
   const CommitteesTab({super.key});
 
@@ -31,22 +33,32 @@ class _CommitteesTabState extends State<CommitteesTab> {
   int _offset = 0;
   String? _statusFilter;
   String? _partyFilter;
+  String _sourceFilter = 'both';
 
   // Detail state
   bool _showDetail = false;
-  MecCommittee? _selectedCommittee;
+  Map<String, dynamic>? _selectedCommitteeData; // raw search result row
+  MecCommittee? _selectedCommittee; // full MEC committee (null for FEC-only)
   Map<String, dynamic>? _committeeStats;
   List<MecContribution> _committeeContributions = [];
-  List<Map<String, dynamic>> _topContributors = [];
+  List<Map<String, dynamic>> _donors = [];
   bool _loadingDetail = false;
+  bool _loadingMoreDonors = false;
+  bool _hasMoreDonors = true;
+  int _donorOffset = 0;
+  String _donorSortBy = 'total';
 
   // Year expansion in detail view
   final Set<int> _expandedYears = {};
+
+  // Detail scroll controller (separate from list scroll controller)
+  final ScrollController _detailScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _detailScrollController.addListener(_onDetailScroll);
     _performSearch();
   }
 
@@ -54,6 +66,7 @@ class _CommitteesTabState extends State<CommitteesTab> {
   void dispose() {
     _searchController.dispose();
     _scrollController.dispose();
+    _detailScrollController.dispose();
     super.dispose();
   }
 
@@ -64,6 +77,24 @@ class _CommitteesTabState extends State<CommitteesTab> {
       _loadMore();
     }
   }
+
+  void _onDetailScroll() {
+    if (!_showDetail) return;
+    if (_detailScrollController.position.pixels >=
+        _detailScrollController.position.maxScrollExtent - 300) {
+      _loadMoreDonors();
+    }
+  }
+
+  /// Strip leading zeros from committee names (client-side backup
+  /// for the regexp_replace in the RPC).
+  String _cleanCommitteeName(String name) {
+    return name.replaceFirst(RegExp(r'^0+'), '');
+  }
+
+  // ============================================================
+  // Search / Browse
+  // ============================================================
 
   Future<void> _performSearch() async {
     if (!_repository.isReady) return;
@@ -103,89 +134,97 @@ class _CommitteesTabState extends State<CommitteesTab> {
   }
 
   Future<List<Map<String, dynamic>>> _searchCommittees(int offset) async {
-    if (!CRMConfig.crmEnabled) return [];
-
-    final supabase = CRMSupabaseService();
-    if (!supabase.isInitialized) return [];
-
-    final client = supabase.hasServiceRole ? supabase.privilegedClient : supabase.client;
     final query = _searchController.text.trim();
 
-    var builder = client.from('mec_committees').select();
+    final results = await _repository.searchCommitteesUnified(
+      query: query.isNotEmpty ? query : null,
+      status: _statusFilter,
+      party: _partyFilter,
+      source: _sourceFilter,
+      limit: 50,
+      offset: offset,
+    );
 
-    if (query.isNotEmpty) {
-      builder = builder.or(
-        'committee_name.ilike.%$query%,candidate_name.ilike.%$query%,treasurer_name.ilike.%$query%',
-      );
-    }
-
-    if (_statusFilter != null) {
-      builder = builder.eq('committee_status', _statusFilter!);
-    }
-    if (_partyFilter != null) {
-      builder = builder.eq('party_affiliation', _partyFilter!);
-    }
-
-    final data = await builder
-        .order('committee_name', ascending: true)
-        .range(offset, offset + 49);
-
-    return (data as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+    return results;
   }
 
-  Future<void> _openCommitteeDetail(String mecId, String name) async {
+  // ============================================================
+  // Detail View — open committee
+  // ============================================================
+
+  Future<void> _openCommitteeDetail(Map<String, dynamic> committeeData) async {
+    final source = (committeeData['source'] as String?) ?? 'mec';
+    final mecId = committeeData['mec_id'] as String? ?? committeeData['committee_id'] as String? ?? '';
+
     setState(() {
       _loadingDetail = true;
       _showDetail = true;
+      _selectedCommitteeData = committeeData;
+      _selectedCommittee = null;
       _expandedYears.clear();
+      _donors = [];
+      _donorOffset = 0;
+      _hasMoreDonors = true;
+      _donorSortBy = 'total';
     });
 
     try {
-      // Fetch committee info
-      final committee = await _repository.getCommittee(mecId);
+      MecCommittee? committee;
+      List<MecContribution> contributions = [];
+      Map<String, dynamic> stats = {};
 
-      // Fetch contributions for this committee
-      final contributions = await _repository.searchContributions(
-        mecId: mecId,
-        limit: 5000,
-        sortBy: 'contribution_date',
-        ascending: false,
-      );
+      // Only fetch full MEC committee data for MEC-source committees
+      if (source.toLowerCase() == 'mec') {
+        committee = await _repository.getCommittee(mecId);
 
-      // Fetch top contributors
-      final topContrib = await _repository.getTopContributors(
-        mecId: mecId,
-        limit: 50,
-      );
+        // Fetch contributions for year breakdown
+        contributions = await _repository.searchContributions(
+          mecId: mecId,
+          limit: 5000,
+          sortBy: 'contribution_date',
+          ascending: false,
+        );
 
-      // Calculate stats
-      double totalRaised = 0;
-      int contributionCount = contributions.length;
-      final yearTotals = <int, double>{};
-      final yearCounts = <int, int>{};
+        // Calculate stats from contributions
+        double totalRaised = 0;
+        int contributionCount = contributions.length;
+        final yearTotals = <int, double>{};
+        final yearCounts = <int, int>{};
 
-      for (final c in contributions) {
-        final amt = c.contributionAmount ?? 0;
-        totalRaised += amt;
-        final year = c.filingYear ?? c.contributionDate?.year ?? 0;
-        if (year > 0) {
-          yearTotals[year] = (yearTotals[year] ?? 0) + amt;
-          yearCounts[year] = (yearCounts[year] ?? 0) + 1;
+        for (final c in contributions) {
+          final amt = c.contributionAmount ?? 0;
+          totalRaised += amt;
+          final year = c.filingYear ?? c.contributionDate?.year ?? 0;
+          if (year > 0) {
+            yearTotals[year] = (yearTotals[year] ?? 0) + amt;
+            yearCounts[year] = (yearCounts[year] ?? 0) + 1;
+          }
         }
-      }
 
-      setState(() {
-        _selectedCommittee = committee;
-        _committeeContributions = contributions;
-        _topContributors = topContrib;
-        _committeeStats = {
+        stats = {
           'totalRaised': totalRaised,
           'contributionCount': contributionCount,
           'yearTotals': yearTotals,
           'yearCounts': yearCounts,
-          'avgContribution': contributionCount > 0 ? totalRaised / contributionCount : 0,
-          'uniqueDonors': topContrib.length,
+          'avgContribution': contributionCount > 0 ? totalRaised / contributionCount : 0.0,
         };
+      }
+
+      // Fetch paginated donors (works for both MEC and FEC via RPC)
+      final donors = await _repository.getCommitteeDonorsPaginated(
+        mecId: mecId,
+        limit: 100,
+        offset: 0,
+        sortBy: _donorSortBy,
+      );
+
+      setState(() {
+        _selectedCommittee = committee;
+        _committeeContributions = contributions;
+        _committeeStats = stats;
+        _donors = donors;
+        _donorOffset = donors.length;
+        _hasMoreDonors = donors.length >= 100;
         _loadingDetail = false;
       });
     } catch (e) {
@@ -200,6 +239,72 @@ class _CommitteesTabState extends State<CommitteesTab> {
       }
     }
   }
+
+  Future<void> _loadMoreDonors() async {
+    if (_loadingMoreDonors || !_hasMoreDonors) return;
+    final mecId = _selectedCommitteeData?['mec_id'] as String? ??
+        _selectedCommitteeData?['committee_id'] as String? ??
+        '';
+    if (mecId.isEmpty) return;
+
+    setState(() => _loadingMoreDonors = true);
+
+    try {
+      final more = await _repository.getCommitteeDonorsPaginated(
+        mecId: mecId,
+        limit: 100,
+        offset: _donorOffset,
+        sortBy: _donorSortBy,
+      );
+
+      setState(() {
+        _donors.addAll(more);
+        _donorOffset += more.length;
+        _hasMoreDonors = more.length >= 100;
+        _loadingMoreDonors = false;
+      });
+    } catch (e) {
+      setState(() => _loadingMoreDonors = false);
+    }
+  }
+
+  Future<void> _changeDonorSort(String sortBy) async {
+    if (sortBy == _donorSortBy) return;
+    final mecId = _selectedCommitteeData?['mec_id'] as String? ??
+        _selectedCommitteeData?['committee_id'] as String? ??
+        '';
+    if (mecId.isEmpty) return;
+
+    setState(() {
+      _donorSortBy = sortBy;
+      _donors = [];
+      _donorOffset = 0;
+      _hasMoreDonors = true;
+      _loadingMoreDonors = true;
+    });
+
+    try {
+      final donors = await _repository.getCommitteeDonorsPaginated(
+        mecId: mecId,
+        limit: 100,
+        offset: 0,
+        sortBy: sortBy,
+      );
+
+      setState(() {
+        _donors = donors;
+        _donorOffset = donors.length;
+        _hasMoreDonors = donors.length >= 100;
+        _loadingMoreDonors = false;
+      });
+    } catch (e) {
+      setState(() => _loadingMoreDonors = false);
+    }
+  }
+
+  // ============================================================
+  // Build
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -287,6 +392,26 @@ class _CommitteesTabState extends State<CommitteesTab> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
+            // Source filter chips
+            _buildFilterChip('Both', _sourceFilter == 'both', () {
+              setState(() => _sourceFilter = 'both');
+              _performSearch();
+            }),
+            const SizedBox(width: 6),
+            _buildFilterChip('MEC', _sourceFilter == 'mec', () {
+              setState(() => _sourceFilter = 'mec');
+              _performSearch();
+            }, color: BrandColors.momentumBlue),
+            const SizedBox(width: 6),
+            _buildFilterChip('FEC', _sourceFilter == 'fec', () {
+              setState(() => _sourceFilter = 'fec');
+              _performSearch();
+            }, color: BrandColors.success),
+            const SizedBox(width: 16),
+            // Divider
+            Container(width: 1, height: 24, color: Colors.white24),
+            const SizedBox(width: 16),
+            // Status filter chips
             _buildFilterChip('Active', _statusFilter == 'Active', () {
               setState(() => _statusFilter = _statusFilter == 'Active' ? null : 'Active');
               _performSearch();
@@ -296,7 +421,10 @@ class _CommitteesTabState extends State<CommitteesTab> {
               setState(() => _statusFilter = _statusFilter == 'Terminated' ? null : 'Terminated');
               _performSearch();
             }),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
+            Container(width: 1, height: 24, color: Colors.white24),
+            const SizedBox(width: 16),
+            // Party filter chips
             _buildFilterChip('Democrat', _partyFilter == 'Democrat', () {
               setState(() => _partyFilter = _partyFilter == 'Democrat' ? null : 'Democrat');
               _performSearch();
@@ -344,27 +472,31 @@ class _CommitteesTabState extends State<CommitteesTab> {
   }
 
   Widget _buildCommitteeCard(Map<String, dynamic> committee) {
-    final name = committee['committee_name'] as String? ?? 'Unknown Committee';
-    final mecId = committee['mec_id'] as String? ?? '';
+    final rawName = committee['committee_name'] as String? ?? 'Unknown Committee';
+    final name = _cleanCommitteeName(rawName);
+    final mecId = committee['mec_id'] as String? ?? committee['committee_id'] as String? ?? '';
     final type = committee['committee_type'] as String? ?? '';
     final status = committee['committee_status'] as String? ?? '';
     final party = committee['party_affiliation'] as String? ?? '';
     final candidate = committee['candidate_name'] as String? ?? '';
     final treasurer = committee['treasurer_name'] as String? ?? '';
+    final source = (committee['source'] as String? ?? 'mec').toUpperCase();
 
     final isActive = status.toLowerCase() == 'active';
     final isDem = party.toLowerCase().contains('democrat');
     final isRep = party.toLowerCase().contains('republican');
+    final isMec = source == 'MEC';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: BrandedCard(
-        onTap: () => _openCommitteeDetail(mecId, name),
+        onTap: () => _openCommitteeDetail(committee),
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Text(
@@ -375,6 +507,26 @@ class _CommitteesTabState extends State<CommitteesTab> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                // Source badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isMec
+                        ? BrandColors.momentumBlue.withOpacity(0.35)
+                        : BrandColors.success.withOpacity(0.35),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    source,
+                    style: TextStyle(
+                      color: isMec ? BrandColors.momentumBlue : BrandColors.success,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
                 // Status badge
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -383,7 +535,7 @@ class _CommitteesTabState extends State<CommitteesTab> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    status,
+                    status.isNotEmpty ? status : 'Unknown',
                     style: TextStyle(
                       color: isActive ? BrandColors.success : Colors.white54,
                       fontSize: 11,
@@ -423,7 +575,14 @@ class _CommitteesTabState extends State<CommitteesTab> {
                 children: [
                   const Icon(Icons.person, color: Colors.white54, size: 14),
                   const SizedBox(width: 4),
-                  Text('Candidate: $candidate', style: BrandTextStyles.caption),
+                  Expanded(
+                    child: Text(
+                      'Candidate: $candidate',
+                      style: BrandTextStyles.caption,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -433,13 +592,20 @@ class _CommitteesTabState extends State<CommitteesTab> {
                 children: [
                   const Icon(Icons.account_balance_wallet, color: Colors.white54, size: 14),
                   const SizedBox(width: 4),
-                  Text('Treasurer: $treasurer', style: BrandTextStyles.caption),
+                  Expanded(
+                    child: Text(
+                      'Treasurer: $treasurer',
+                      style: BrandTextStyles.caption,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
             ],
             const SizedBox(height: 4),
             Text(
-              'MEC ID: $mecId',
+              '${source} ID: $mecId',
               style: BrandTextStyles.caption.copyWith(fontSize: 10),
             ),
           ],
@@ -459,25 +625,36 @@ class _CommitteesTabState extends State<CommitteesTab> {
       );
     }
 
-    final c = _selectedCommittee;
-    if (c == null) return const SizedBox.shrink();
+    final data = _selectedCommitteeData;
+    if (data == null) return const SizedBox.shrink();
+
+    final source = (data['source'] as String? ?? 'mec').toUpperCase();
+    final isMecSource = source == 'MEC';
+    final c = _selectedCommittee; // may be null for FEC committees
+
+    // Use MecCommittee fields when available, fall back to search result data
+    final rawName = c?.committeeName ?? data['committee_name'] as String? ?? 'Unknown Committee';
+    final displayName = _cleanCommitteeName(rawName);
+    final mecId = data['mec_id'] as String? ?? data['committee_id'] as String? ?? '';
+    final status = c?.committeeStatus ?? data['committee_status'] as String? ?? '';
+    final party = c?.partyAffiliation ?? data['party_affiliation'] as String? ?? '';
+    final type = c?.committeeType ?? data['committee_type'] as String? ?? '';
+    final isActive = status.toLowerCase() == 'active';
+    final isDem = party.toLowerCase().contains('democrat');
+    final isRep = party.toLowerCase().contains('republican');
 
     final stats = _committeeStats ?? {};
     final totalRaised = (stats['totalRaised'] as double?) ?? 0;
     final contribCount = (stats['contributionCount'] as int?) ?? 0;
     final avgContrib = (stats['avgContribution'] as double?) ?? 0;
-    final uniqueDonors = (stats['uniqueDonors'] as int?) ?? 0;
     final yearTotals = (stats['yearTotals'] as Map<int, double>?) ?? {};
     final yearCounts = (stats['yearCounts'] as Map<int, int>?) ?? {};
 
-    final isDem = c.isDemocrat;
-    final isRep = c.isRepublican;
-    final isActive = (c.committeeStatus ?? '').toLowerCase() == 'active';
     final currencyFormat = NumberFormat.simpleCurrency();
 
     return Column(
       children: [
-        // Back button
+        // Back button header
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
           child: Row(
@@ -488,17 +665,37 @@ class _CommitteesTabState extends State<CommitteesTab> {
               ),
               Expanded(
                 child: Text(
-                  c.committeeName ?? 'Committee',
+                  displayName,
                   style: BrandTextStyles.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              // Source badge in header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isMecSource
+                      ? BrandColors.momentumBlue.withOpacity(0.35)
+                      : BrandColors.success.withOpacity(0.35),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  source,
+                  style: TextStyle(
+                    color: isMecSource ? BrandColors.momentumBlue : BrandColors.success,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
             ],
           ),
         ),
         Expanded(
           child: ListView(
+            controller: _detailScrollController,
             padding: const EdgeInsets.all(12),
             children: [
               // === Header Card ===
@@ -506,9 +703,11 @@ class _CommitteesTabState extends State<CommitteesTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(c.committeeName ?? '', style: BrandTextStyles.titleLarge),
+                    Text(displayName, style: BrandTextStyles.titleLarge),
                     const SizedBox(height: 8),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -517,7 +716,7 @@ class _CommitteesTabState extends State<CommitteesTab> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            c.committeeStatus ?? 'Unknown',
+                            status.isNotEmpty ? status : 'Unknown',
                             style: TextStyle(
                               color: isActive ? BrandColors.success : Colors.white60,
                               fontWeight: FontWeight.w600,
@@ -525,8 +724,7 @@ class _CommitteesTabState extends State<CommitteesTab> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        if (c.partyAffiliation != null && c.partyAffiliation!.isNotEmpty)
+                        if (party.isNotEmpty)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
@@ -538,87 +736,110 @@ class _CommitteesTabState extends State<CommitteesTab> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              c.partyAffiliation!,
+                              party,
                               style: const TextStyle(color: Colors.white, fontSize: 12),
                             ),
                           ),
-                        const SizedBox(width: 8),
-                        if (c.committeeType != null)
-                          Text(c.committeeType!, style: BrandTextStyles.caption),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text('MEC ID: ${c.mecId}', style: BrandTextStyles.caption),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // === Financial Summary ===
-              BrandedCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Financial Summary', style: BrandTextStyles.title),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _statBox('Total Raised', currencyFormat.format(totalRaised)),
-                        ),
-                        Expanded(
-                          child: _statBox('Contributions', NumberFormat.compact().format(contribCount)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _statBox('Avg Contribution', currencyFormat.format(avgContrib)),
-                        ),
-                        Expanded(
-                          child: _statBox('Unique Donors', '$uniqueDonors'),
+                        if (type.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white10,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              type,
+                              style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                          ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isMecSource
+                                ? BrandColors.momentumBlue.withOpacity(0.25)
+                                : BrandColors.success.withOpacity(0.25),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            source,
+                            style: TextStyle(
+                              color: isMecSource ? BrandColors.momentumBlue : BrandColors.success,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 6),
+                    Text('$source ID: $mecId', style: BrandTextStyles.caption),
                   ],
                 ),
               ),
               const SizedBox(height: 12),
 
-              // === Contact Info ===
-              _buildContactSection(c),
-              const SizedBox(height: 12),
-
-              // === Contributions by Year ===
-              BrandedCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Contributions by Year', style: BrandTextStyles.title),
-                    const SizedBox(height: 12),
-                    ...(_buildYearBreakdown(yearTotals, yearCounts, currencyFormat)),
-                  ],
+              // === Financial Summary (MEC only — we have contribution data) ===
+              if (isMecSource && contribCount > 0) ...[
+                BrandedCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Financial Summary', style: BrandTextStyles.title),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _statBox('Total Raised', currencyFormat.format(totalRaised)),
+                          ),
+                          Expanded(
+                            child: _statBox('Contributions', NumberFormat.compact().format(contribCount)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _statBox('Avg Contribution', currencyFormat.format(avgContrib)),
+                          ),
+                          Expanded(
+                            child: _statBox('Donors Loaded', '${_donors.length}${_hasMoreDonors ? '+' : ''}'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
+              ],
 
-              // === Top Donors ===
-              BrandedCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Top Donors (${_topContributors.length})', style: BrandTextStyles.title),
-                    const SizedBox(height: 12),
-                    ..._topContributors.take(25).map((d) => _buildTopDonorRow(d, currencyFormat)),
-                  ],
+              // === Contact Info (MEC only) ===
+              if (c != null) ...[
+                _buildContactSection(c),
+                const SizedBox(height: 12),
+              ],
+
+              // === Contributions by Year (MEC only) ===
+              if (isMecSource && yearTotals.isNotEmpty) ...[
+                BrandedCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Contributions by Year', style: BrandTextStyles.title),
+                      const SizedBox(height: 12),
+                      ...(_buildYearBreakdown(yearTotals, yearCounts, currencyFormat)),
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 12),
+              ],
+
+              // === Donors (all sources, paginated) ===
+              _buildDonorSection(currencyFormat),
               const SizedBox(height: 12),
 
-              // === Election History ===
-              if (c.electionHistory != null) ...[
+              // === Election History (MEC only) ===
+              if (c != null && c.electionHistory != null) ...[
                 BrandedCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -632,6 +853,15 @@ class _CommitteesTabState extends State<CommitteesTab> {
                 const SizedBox(height: 12),
               ],
 
+              // Loading more donors indicator
+              if (_loadingMoreDonors)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(
+                    child: CircularProgressIndicator(color: BrandColors.sunriseGold),
+                  ),
+                ),
+
               const SizedBox(height: 40),
             ],
           ),
@@ -639,6 +869,214 @@ class _CommitteesTabState extends State<CommitteesTab> {
       ],
     );
   }
+
+  // ============================================================
+  // Donor Section with sort + infinite scroll
+  // ============================================================
+
+  Widget _buildDonorSection(NumberFormat currencyFormat) {
+    return BrandedCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Donors (${_donors.length}${_hasMoreDonors ? '+' : ''})',
+                  style: BrandTextStyles.title,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Sort chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildSortChip('Total', 'total'),
+                const SizedBox(width: 6),
+                _buildSortChip('Count', 'count'),
+                const SizedBox(width: 6),
+                _buildSortChip('Name', 'name'),
+                const SizedBox(width: 6),
+                _buildSortChip('Last Date', 'last_date'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_donors.isEmpty && !_loadingMoreDonors)
+            Text('No donor data available', style: BrandTextStyles.bodySecondary),
+          ..._donors.map((d) => _buildDonorRow(d, currencyFormat)),
+          if (_hasMoreDonors && !_loadingMoreDonors)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Center(
+                child: TextButton(
+                  onPressed: _loadMoreDonors,
+                  child: const Text(
+                    'Load more donors...',
+                    style: TextStyle(color: BrandColors.sunriseGold),
+                  ),
+                ),
+              ),
+            ),
+          if (_loadingMoreDonors)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    color: BrandColors.sunriseGold,
+                    strokeWidth: 2,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSortChip(String label, String sortValue) {
+    final isSelected = _donorSortBy == sortValue;
+    return GestureDetector(
+      onTap: () => _changeDonorSort(sortValue),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? BrandColors.sunriseGold.withOpacity(0.8)
+              : Colors.white10,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? BrandColors.sunriseGold : Colors.white24,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white70,
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDonorRow(Map<String, dynamic> donor, NumberFormat fmt) {
+    final name = donor['name'] as String? ?? 'Unknown';
+    final total = (donor['total'] as num?)?.toDouble() ?? 0;
+    final count = (donor['count'] as num?)?.toInt() ?? 0;
+    final city = donor['city'] as String? ?? '';
+    final state = donor['state'] as String? ?? '';
+    final employer = donor['employer'] as String? ?? '';
+    final hasFec = donor['has_fec'] as bool? ?? false;
+
+    // Build the subtitle line
+    final subtitleParts = <String>[];
+    if (city.isNotEmpty) {
+      subtitleParts.add(state.isNotEmpty ? '$city, $state' : city);
+    } else if (state.isNotEmpty) {
+      subtitleParts.add(state);
+    }
+    if (employer.isNotEmpty) {
+      subtitleParts.add(employer);
+    }
+    final subtitle = subtitleParts.join(' \u00B7 '); // middle dot separator
+
+    return InkWell(
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Opening donor profile for $name...'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          name,
+                          style: BrandTextStyles.body.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (hasFec) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: BrandColors.success.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'FEC',
+                            style: TextStyle(
+                              color: BrandColors.success,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (subtitle.isNotEmpty)
+                    Text(
+                      subtitle,
+                      style: BrandTextStyles.caption,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  fmt.format(total),
+                  style: BrandTextStyles.body.copyWith(
+                    color: BrandColors.sunriseGold,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                Text('$count gifts', style: BrandTextStyles.caption),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // Shared Widgets
+  // ============================================================
 
   Widget _statBox(String label, String value) {
     return Column(
@@ -860,54 +1298,6 @@ class _CommitteesTabState extends State<CommitteesTab> {
             ),
           );
         }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildTopDonorRow(Map<String, dynamic> donor, NumberFormat fmt) {
-    final name = donor['name'] as String? ?? 'Unknown';
-    final total = (donor['total'] as num?)?.toDouble() ?? 0;
-    final count = (donor['count'] as num?)?.toInt() ?? 0;
-    final city = donor['city'] as String? ?? '';
-    final state = donor['state'] as String? ?? '';
-    final employer = donor['employer'] as String? ?? '';
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: BrandTextStyles.body.copyWith(fontSize: 13)),
-                if (city.isNotEmpty || employer.isNotEmpty)
-                  Text(
-                    [if (city.isNotEmpty) '$city, $state', if (employer.isNotEmpty) employer]
-                        .join(' · '),
-                    style: BrandTextStyles.caption,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                fmt.format(total),
-                style: BrandTextStyles.body.copyWith(
-                  color: BrandColors.sunriseGold,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
-              Text('$count gifts', style: BrandTextStyles.caption),
-            ],
-          ),
-        ],
       ),
     );
   }

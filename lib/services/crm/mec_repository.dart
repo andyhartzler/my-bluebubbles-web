@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/models/crm/fec_contribution.dart';
 import 'package:bluebubbles/models/crm/mec_contribution.dart';
 import 'package:bluebubbles/models/crm/mec_committee.dart';
 
@@ -361,6 +362,129 @@ class MecRepository {
           'occupation': a.occupation,
           'lastDate': a.lastDate?.toIso8601String(),
         }).toList();
+  }
+
+  // ---------------------------------------------------------------------------
+  // searchDonorsUnified (RPC — unified MEC+FEC search via search_donors_v3)
+  // ---------------------------------------------------------------------------
+
+  Future<List<Map<String, dynamic>>> searchDonorsUnified({
+    String? state,
+    int? yearFrom,
+    int? yearTo,
+    double? minTotal,
+    double? maxTotal,
+    String? party,
+    String? nameQuery,
+    String? city,
+    String? zip,
+    String? employer,
+    String? occupation,
+    String? gender,
+    int? ageMin,
+    int? ageMax,
+    bool? hasPhone,
+    bool? hasEmail,
+    bool? isHomeowner,
+    bool individualsOnly = true,
+    String source = 'both',
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    if (!isReady) return [];
+
+    final params = <String, dynamic>{
+      'p_individuals_only': individualsOnly,
+      'p_source': source,
+      'p_limit': limit,
+      'p_offset': offset,
+    };
+    if (state != null && state.isNotEmpty) params['p_state'] = state;
+    if (yearFrom != null) params['p_year_from'] = yearFrom;
+    if (yearTo != null) params['p_year_to'] = yearTo;
+    if (minTotal != null) params['p_min_total'] = minTotal;
+    if (maxTotal != null) params['p_max_total'] = maxTotal;
+    if (party != null && party.isNotEmpty) params['p_party'] = party;
+    if (nameQuery != null && nameQuery.isNotEmpty) params['p_name_query'] = nameQuery;
+    if (city != null && city.isNotEmpty) params['p_city'] = city;
+    if (zip != null && zip.isNotEmpty) params['p_zip'] = zip;
+    if (employer != null && employer.isNotEmpty) params['p_employer'] = employer;
+    if (occupation != null && occupation.isNotEmpty) params['p_occupation'] = occupation;
+    if (gender != null && gender.isNotEmpty) params['p_gender'] = gender;
+    if (ageMin != null) params['p_age_min'] = ageMin;
+    if (ageMax != null) params['p_age_max'] = ageMax;
+    if (hasPhone != null) params['p_has_phone'] = hasPhone;
+    if (hasEmail != null) params['p_has_email'] = hasEmail;
+    if (isHomeowner != null) params['p_is_homeowner'] = isHomeowner;
+
+    final data = await _readClient.rpc('search_donors_v3', params: params);
+    return (data as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+  }
+
+  // ---------------------------------------------------------------------------
+  // getDonorUnifiedProfile (RPC — full MEC+FEC profile)
+  // ---------------------------------------------------------------------------
+
+  Future<Map<String, dynamic>?> getDonorUnifiedProfile(int donorId) async {
+    if (!isReady) return null;
+
+    final data = await _readClient.rpc('get_donor_unified_profile', params: {
+      'p_donor_id': donorId,
+    });
+
+    if (data == null) return null;
+    return data as Map<String, dynamic>;
+  }
+
+  // ---------------------------------------------------------------------------
+  // getCommitteeDonorsPaginated (RPC — all donors for a committee)
+  // ---------------------------------------------------------------------------
+
+  Future<List<Map<String, dynamic>>> getCommitteeDonorsPaginated({
+    required String mecId,
+    int limit = 100,
+    int offset = 0,
+    String sortBy = 'total',
+    bool ascending = false,
+  }) async {
+    if (!isReady) return [];
+
+    final data = await _readClient.rpc('get_committee_donors_paginated', params: {
+      'p_mec_id': mecId,
+      'p_limit': limit,
+      'p_offset': offset,
+      'p_sort_by': sortBy,
+      'p_ascending': ascending,
+    });
+
+    return (data as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+  }
+
+  // ---------------------------------------------------------------------------
+  // searchCommitteesUnified (RPC — MEC+FEC committees)
+  // ---------------------------------------------------------------------------
+
+  Future<List<Map<String, dynamic>>> searchCommitteesUnified({
+    String? query,
+    String? status,
+    String? party,
+    String source = 'both',
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    if (!isReady) return [];
+
+    final params = <String, dynamic>{
+      'p_source': source,
+      'p_limit': limit,
+      'p_offset': offset,
+    };
+    if (query != null && query.isNotEmpty) params['p_query'] = query;
+    if (status != null && status.isNotEmpty) params['p_status'] = status;
+    if (party != null && party.isNotEmpty) params['p_party'] = party;
+
+    final data = await _readClient.rpc('search_committees_unified', params: params);
+    return (data as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
   }
 }
 

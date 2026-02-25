@@ -33,6 +33,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
   int _yearTo = DateTime.now().year;
   String _selectedState = 'MO';
   String? _selectedParty;
+  String _selectedSource = 'both'; // 'mec', 'fec', 'both'
 
   // Infinite scroll
   final ScrollController _scrollController = ScrollController();
@@ -41,6 +42,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
   bool _inProfileMode = false;
   Map<String, dynamic> _profileData = {};
   Map<String, dynamic>? _enrichmentData;
+  Map<String, dynamic>? _unifiedProfile;
   bool _profileLoading = false;
   String _profileName = '';
   Map<String, dynamic>? _profileDonorRow;
@@ -98,13 +100,14 @@ class _MecResearchTabState extends State<MecResearchTab> {
       final minAmountText = _minAmountController.text.trim();
       final minTotal = minAmountText.isNotEmpty ? double.tryParse(minAmountText) : null;
 
-      final results = await _repository.searchDonors(
+      final results = await _repository.searchDonorsUnified(
         nameQuery: nameQuery.isNotEmpty ? nameQuery : null,
         state: _selectedState.isNotEmpty ? _selectedState : null,
         yearFrom: _yearFrom,
         yearTo: _yearTo,
         minTotal: minTotal,
         party: _selectedParty,
+        source: _selectedSource,
         limit: 100,
         offset: _donors.length,
       );
@@ -139,13 +142,14 @@ class _MecResearchTabState extends State<MecResearchTab> {
     });
 
     try {
-      final results = await _repository.searchDonors(
+      final results = await _repository.searchDonorsUnified(
         nameQuery: nameQuery.isNotEmpty ? nameQuery : null,
         state: _selectedState.isNotEmpty ? _selectedState : null,
         yearFrom: _yearFrom,
         yearTo: _yearTo,
         minTotal: minTotal,
         party: _selectedParty,
+        source: _selectedSource,
         limit: 100,
         offset: 0,
       );
@@ -199,10 +203,30 @@ class _MecResearchTabState extends State<MecResearchTab> {
       _profileDonorRow = donor;
       _profileData = {};
       _enrichmentData = null;
+      _unifiedProfile = null;
     });
 
     try {
-      // Fetch contribution profile and enrichment data in parallel
+      // Try unified profile first if we have a donorId
+      if (donorId != null) {
+        final profileResult = await _repository.getDonorUnifiedProfile(donorId);
+        if (profileResult != null && mounted) {
+          setState(() {
+            _profileData = {
+              'contributions': <MecContribution>[],
+              'totalAmount': 0.0,
+              'count': 0,
+              'committees': <Map<String, dynamic>>[],
+            };
+            _unifiedProfile = profileResult;
+            _enrichmentData = null;
+            _profileLoading = false;
+          });
+          return;
+        }
+      }
+
+      // Fall back to old method if donorId is null or unified profile failed
       final futures = <Future>[];
       futures.add(_repository.getContributorProfile(
         lastName: lastName,
@@ -237,6 +261,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
       _inProfileMode = false;
       _profileData = {};
       _enrichmentData = null;
+      _unifiedProfile = null;
       _profileDonorRow = null;
       _profileName = '';
     });
@@ -307,6 +332,10 @@ class _MecResearchTabState extends State<MecResearchTab> {
 
         // Party filter chips
         _buildPartyChips(),
+        const SizedBox(height: 8),
+
+        // Source filter chips
+        _buildSourceChips(),
         const SizedBox(height: 16),
 
         // Search button
@@ -509,6 +538,46 @@ class _MecResearchTabState extends State<MecResearchTab> {
     );
   }
 
+  Widget _buildSourceChips() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          const Text('Source: ', style: BrandTextStyles.caption),
+          const SizedBox(width: 8),
+          _buildSourceChip('Both', 'both', BrandColors.sunriseGold),
+          const SizedBox(width: 6),
+          _buildSourceChip('MEC', 'mec', BrandColors.momentumBlue),
+          const SizedBox(width: 6),
+          _buildSourceChip('FEC', 'fec', BrandColors.success),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourceChip(String label, String value, Color color) {
+    final isSelected = _selectedSource == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedSource = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? color : BrandColors.unityBlue.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? Colors.white24 : Colors.transparent),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white70,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildLoadingIndicator() {
     return const Center(
       child: Padding(
@@ -553,7 +622,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
             const Text('Donor Research', style: BrandTextStyles.titleLarge),
             const SizedBox(height: 8),
             const Text(
-              'Use the filters above to search 3M+ donor records.\n'
+              'Use the filters above to search 4M+ donor records.\n'
               'Results are aggregated by donor with party affiliations.',
               style: BrandTextStyles.subtitle,
               textAlign: TextAlign.center,
@@ -646,6 +715,11 @@ class _MecResearchTabState extends State<MecResearchTab> {
             .toList() ??
         [];
 
+    // Source data from unified search
+    final dataSources = donor['data_sources'] as String? ?? 'MEC';
+    final mecTotal = (donor['mec_total'] as num?)?.toDouble() ?? 0.0;
+    final fecTotal = (donor['fec_total'] as num?)?.toDouble() ?? 0.0;
+
     // Enrichment data from search_donors_v2
     final partyLean = donor['party_lean'] as String?;
     final ageEstimate = (donor['age_estimate'] as num?)?.toInt();
@@ -675,13 +749,41 @@ class _MecResearchTabState extends State<MecResearchTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                          if (dataSources.contains('FEC'))
+                            Container(
+                              margin: const EdgeInsets.only(left: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: BrandColors.success.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: BrandColors.success.withOpacity(0.5), width: 0.5),
+                              ),
+                              child: const Text('FEC', style: TextStyle(color: BrandColors.success, fontSize: 9, fontWeight: FontWeight.w700)),
+                            ),
+                          if (dataSources.contains('MEC'))
+                            Container(
+                              margin: const EdgeInsets.only(left: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: BrandColors.momentumBlue.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: BrandColors.momentumBlue.withOpacity(0.5), width: 0.5),
+                              ),
+                              child: const Text('MEC', style: TextStyle(color: BrandColors.momentumBlue, fontSize: 9, fontWeight: FontWeight.w700)),
+                            ),
+                        ],
                       ),
                       // Enrichment badges row
                       const SizedBox(height: 4),
@@ -752,6 +854,10 @@ class _MecResearchTabState extends State<MecResearchTab> {
                       '$contributionCount contribution${contributionCount == 1 ? '' : 's'}',
                       style: BrandTextStyles.caption,
                     ),
+                    if (mecTotal > 0 && fecTotal > 0) ...[
+                      Text('MEC: ${_currencyFormat.format(mecTotal)}', style: BrandTextStyles.caption.copyWith(fontSize: 10)),
+                      Text('FEC: ${_currencyFormat.format(fecTotal)}', style: BrandTextStyles.caption.copyWith(fontSize: 10, color: BrandColors.success)),
+                    ],
                   ],
                 ),
               ],
@@ -919,18 +1025,224 @@ class _MecResearchTabState extends State<MecResearchTab> {
           // Enrichment sections (personal, contact, employment, political)
           _buildEnrichmentSections(),
 
-          // Committees section
-          _buildCommitteesSection(),
-          const SizedBox(height: 24),
+          // Unified MEC contributions section
+          _buildMecContributionsSection(),
+          const SizedBox(height: 12),
 
-          // Contributions timeline
-          _buildContributionsTimeline(),
+          // Unified FEC contributions section
+          _buildFecContributionsSection(),
+          const SizedBox(height: 16),
+
+          // Legacy committees section (fallback when _unifiedProfile is null)
+          if (_unifiedProfile == null) ...[
+            _buildCommitteesSection(),
+            const SizedBox(height: 24),
+          ],
+
+          // Legacy contributions timeline (fallback when _unifiedProfile is null)
+          if (_unifiedProfile == null)
+            _buildContributionsTimeline(),
         ],
       ],
     );
   }
 
   Widget _buildProfileHeader() {
+    // When unified profile is available, use its data
+    final profile = _unifiedProfile;
+    if (profile != null) {
+      final mecTotal = (profile['mec_total'] as num?)?.toDouble() ?? 0.0;
+      final fecTotal = (profile['fec_total'] as num?)?.toDouble() ?? 0.0;
+      final grandTotal = mecTotal + fecTotal;
+      final mecCount = (profile['mec_count'] as num?)?.toInt() ?? 0;
+      final fecCount = (profile['fec_count'] as num?)?.toInt() ?? 0;
+      final totalCount = mecCount + fecCount;
+      final firstYear = (profile['first_year'] as num?)?.toInt();
+      final lastYear = (profile['last_year'] as num?)?.toInt();
+
+      // Gather metadata from unified profile enrichment or donor row
+      final enr = profile['enrichment'] as Map<String, dynamic>?;
+      final donorRow = _profileDonorRow;
+
+      String? city = enr?['city'] as String? ??
+          donorRow?['city'] as String?;
+      String? state = enr?['state'] as String? ??
+          donorRow?['state'] as String?;
+      String? employer = enr?['current_employer'] as String? ??
+          donorRow?['current_employer'] as String? ??
+          donorRow?['employer'] as String?;
+      String? occupation = enr?['current_job_title'] as String? ??
+          donorRow?['current_job_title'] as String? ??
+          donorRow?['occupation'] as String?;
+
+      // Enrichment badges
+      final partyLean = enr?['party_lean'] as String? ??
+          donorRow?['party_lean'] as String?;
+      final ageEstimate = (enr?['age_estimate'] as num?)?.toInt() ??
+          (donorRow?['age_estimate'] as num?)?.toInt();
+      final gender = enr?['gender'] as String? ??
+          donorRow?['gender'] as String?;
+      final generation = enr?['generation'] as String?;
+      final isHomeowner = enr?['is_homeowner'] as bool? ??
+          donorRow?['is_homeowner'] as bool?;
+      final wealthScore = (enr?['wealth_score'] as num?)?.toDouble() ??
+          (donorRow?['wealth_score'] as num?)?.toDouble();
+      final phoneMobile = enr?['phone_mobile'] as String? ??
+          donorRow?['phone_mobile'] as String?;
+      final phoneHome = enr?['phone_home'] as String? ??
+          donorRow?['phone_home'] as String?;
+      final emailPersonal = enr?['email_personal'] as String? ??
+          donorRow?['email_personal'] as String?;
+      final hasPhone = (phoneMobile != null && phoneMobile.isNotEmpty) ||
+          (phoneHome != null && phoneHome.isNotEmpty);
+      final hasEmail = emailPersonal != null && emailPersonal.isNotEmpty;
+
+      return BrandedCard(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Name
+            Text(
+              _profileName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            // Enrichment badges
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (partyLean != null && partyLean.isNotEmpty)
+                  _buildEnrichmentChip(partyLean, _partyLeanColor(partyLean)),
+                if (ageEstimate != null)
+                  _buildEnrichmentChip('Age ~$ageEstimate', Colors.white54),
+                if (gender != null && gender.isNotEmpty)
+                  _buildEnrichmentChip(gender, Colors.white54),
+                if (generation != null && generation.isNotEmpty)
+                  _buildEnrichmentChip(generation, Colors.tealAccent),
+                if (isHomeowner == true)
+                  _buildEnrichmentChip('Homeowner', Colors.green),
+                if (wealthScore != null && wealthScore > 0)
+                  _buildEnrichmentChip(
+                    'Wealth: ${wealthScore.toStringAsFixed(0)}',
+                    BrandColors.sunriseGold,
+                  ),
+                if (hasPhone)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: BrandColors.success.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: BrandColors.success.withOpacity(0.5),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.phone, size: 11, color: BrandColors.success),
+                        SizedBox(width: 3),
+                        Text('Phone',
+                            style: TextStyle(
+                                color: BrandColors.success,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                if (hasEmail)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.lightBlue.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.lightBlue.withOpacity(0.5),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.email, size: 11, color: Colors.lightBlue),
+                        SizedBox(width: 3),
+                        Text('Email',
+                            style: TextStyle(
+                                color: Colors.lightBlue,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Total given
+            Text(
+              _currencyFormat.format(grandTotal),
+              style: const TextStyle(
+                color: BrandColors.sunriseGold,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            // Show MEC/FEC breakdown if both exist
+            if (mecTotal > 0 && fecTotal > 0) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: BrandColors.momentumBlue.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'MEC: ${_currencyFormat.format(mecTotal)}',
+                      style: const TextStyle(color: BrandColors.momentumBlue, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: BrandColors.success.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'FEC: ${_currencyFormat.format(fecTotal)}',
+                      style: const TextStyle(color: BrandColors.success, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 6),
+
+            // Count + year range
+            Text(
+              '$totalCount contribution${totalCount == 1 ? '' : 's'}'
+              '${firstYear != null && lastYear != null ? ' from $firstYear to $lastYear' : ''}',
+              style: BrandTextStyles.bodySecondary,
+            ),
+            const SizedBox(height: 8),
+
+            // Location / Employer / Occupation
+            _buildProfileMetaRow(city, state, employer, occupation),
+          ],
+        ),
+      );
+    }
+
+    // Legacy profile header (when _unifiedProfile is null)
     final totalAmount = _profileData['totalAmount'] as double? ?? 0.0;
     final count = _profileData['count'] as int? ?? 0;
     final firstYear = _profileData['firstYear'] as int?;
@@ -1125,7 +1437,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
   // ===========================================================================
 
   Widget _buildEnrichmentSections() {
-    final enr = _enrichmentData;
+    final enr = _enrichmentData ?? (_unifiedProfile?['enrichment'] as Map<String, dynamic>?);
     final donorRow = _profileDonorRow;
     if (enr == null && donorRow == null) return const SizedBox.shrink();
 
@@ -1348,6 +1660,128 @@ class _MecResearchTabState extends State<MecResearchTab> {
               fontSize: 13,
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // UNIFIED PROFILE: MEC CONTRIBUTIONS SECTION
+  // ===========================================================================
+
+  Widget _buildMecContributionsSection() {
+    final profile = _unifiedProfile;
+    if (profile == null) return const SizedBox.shrink();
+
+    final mecContribs = (profile['mec_contributions'] as List<dynamic>?) ?? [];
+    final mecBreakdown = (profile['mec_committee_breakdown'] as List<dynamic>?) ?? [];
+
+    if (mecContribs.isEmpty) return const SizedBox.shrink();
+
+    final totalMec = mecContribs.fold<double>(0, (sum, c) => sum + ((c['contribution_amount'] as num?)?.toDouble() ?? 0));
+
+    return BrandedCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: BrandColors.momentumBlue.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text('MEC', style: TextStyle(color: BrandColors.momentumBlue, fontSize: 11, fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(width: 8),
+              const Text('Missouri Contributions', style: BrandTextStyles.title),
+              const Spacer(),
+              Text(_currencyFormat.format(totalMec), style: const TextStyle(color: BrandColors.sunriseGold, fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Committee breakdown
+          ...mecBreakdown.take(10).map((cb) {
+            final name = cb['committee_name'] as String? ?? 'Unknown';
+            final total = (cb['total'] as num?)?.toDouble() ?? 0;
+            final cnt = (cb['cnt'] as num?)?.toInt() ?? 0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Expanded(child: Text(name, style: BrandTextStyles.body.copyWith(fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  Text('$cnt gift${cnt == 1 ? '' : 's'}', style: BrandTextStyles.caption),
+                  const SizedBox(width: 8),
+                  Text(_currencyFormat.format(total), style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 13, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            );
+          }),
+          if (mecBreakdown.length > 10)
+            Text('+ ${mecBreakdown.length - 10} more committees', style: BrandTextStyles.caption),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // UNIFIED PROFILE: FEC CONTRIBUTIONS SECTION
+  // ===========================================================================
+
+  Widget _buildFecContributionsSection() {
+    final profile = _unifiedProfile;
+    if (profile == null) return const SizedBox.shrink();
+
+    final fecContribs = (profile['fec_contributions'] as List<dynamic>?) ?? [];
+    final fecBreakdown = (profile['fec_committee_breakdown'] as List<dynamic>?) ?? [];
+
+    if (fecContribs.isEmpty) return const SizedBox.shrink();
+
+    final totalFec = fecContribs.fold<double>(0, (sum, c) => sum + ((c['contribution_amount'] as num?)?.toDouble() ?? 0));
+
+    return BrandedCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: BrandColors.success.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text('FEC', style: TextStyle(color: BrandColors.success, fontSize: 11, fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(width: 8),
+              const Text('Federal Contributions', style: BrandTextStyles.title),
+              const Spacer(),
+              Text(_currencyFormat.format(totalFec), style: const TextStyle(color: BrandColors.sunriseGold, fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Committee breakdown
+          ...fecBreakdown.take(10).map((cb) {
+            final name = cb['committee_name'] as String? ?? 'Unknown';
+            final total = (cb['total'] as num?)?.toDouble() ?? 0;
+            final cnt = (cb['cnt'] as num?)?.toInt() ?? 0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Expanded(child: Text(name, style: BrandTextStyles.body.copyWith(fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  Text('$cnt gift${cnt == 1 ? '' : 's'}', style: BrandTextStyles.caption),
+                  const SizedBox(width: 8),
+                  Text(_currencyFormat.format(total), style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 13, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            );
+          }),
+          if (fecBreakdown.length > 10)
+            Text('+ ${fecBreakdown.length - 10} more committees', style: BrandTextStyles.caption),
         ],
       ),
     );
