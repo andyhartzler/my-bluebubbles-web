@@ -108,12 +108,14 @@ class _SurveysScreenState extends State<SurveysScreen>
   // ---------------------------------------------------------------------------
 
   void _openBuilder({Survey? existing}) async {
-    final result = await Navigator.of(context).push<Survey>(
+    await Navigator.of(context).push<Survey>(
       MaterialPageRoute(
         builder: (_) => SurveyBuilderScreen(existingSurvey: existing),
       ),
     );
-    if (result != null) _loadSurveys();
+    // Always reload when returning from builder — survey may have been
+    // created, updated, or sent regardless of pop result.
+    _loadSurveys();
   }
 
   void _openResults(Survey survey) {

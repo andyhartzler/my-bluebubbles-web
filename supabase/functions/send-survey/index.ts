@@ -11,6 +11,32 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// Check iMessage availability for a phone number, fall back to SMS
+async function determineService(
+  phone: string,
+  bbUrl: string,
+  bbPassword: string,
+): Promise<string> {
+  // Email addresses are always iMessage
+  if (phone.includes("@")) return "iMessage";
+
+  try {
+    const resp = await fetch(
+      `${bbUrl}/api/v1/handle/availability/imessage?address=${encodeURIComponent(phone)}&password=${encodeURIComponent(bbPassword)}`,
+      { method: "GET" }
+    );
+    if (resp.ok) {
+      const json = await resp.json();
+      const available = json?.data?.available === true;
+      return available ? "iMessage" : "SMS";
+    }
+  } catch (err) {
+    console.warn(`iMessage check failed for ${phone}: ${(err as Error).message}`);
+  }
+  // Default to SMS if we can't determine
+  return "SMS";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -158,9 +184,23 @@ serve(async (req) => {
       totalQ
     );
 
+    // Determine transport service (iMessage vs SMS) for each recipient.
+    // Do this in parallel for speed, then send messages serially.
+    const serviceMap: Record<string, string> = {};
+    await Promise.all(
+      phones.map(async (phone) => {
+        serviceMap[phone] = await determineService(phone, bbUrl, bbPassword);
+      })
+    );
+
+    const iMessageCount = Object.values(serviceMap).filter((s) => s === "iMessage").length;
+    const smsCount = Object.values(serviceMap).filter((s) => s === "SMS").length;
+    console.log(`Transport breakdown: ${iMessageCount} iMessage, ${smsCount} SMS out of ${phones.length} total`);
+
     // Create sessions and send first question
     let sent = 0;
     const errors: string[] = [];
+    const smsFailed: string[] = [];
 
     for (const phone of phones) {
       try {
@@ -170,6 +210,8 @@ serve(async (req) => {
           .select("id")
           .eq("phone_e164", phone)
           .maybeSingle();
+
+        const service = serviceMap[phone] || "SMS";
 
         // Create session
         await supabase.from("survey_sessions").insert({
@@ -191,14 +233,15 @@ serve(async (req) => {
             body: JSON.stringify({
               addresses: [phone],
               message: firstMessage,
-              service: "iMessage",
+              service,
             }),
           }
         );
 
         if (!resp.ok) {
           const body = await resp.text();
-          errors.push(`${phone}: BB error ${resp.status} - ${body}`);
+          errors.push(`${phone} (${service}): BB error ${resp.status} - ${body}`);
+          if (service === "SMS") smsFailed.push(phone);
         } else {
           sent++;
         }
@@ -221,6 +264,8 @@ serve(async (req) => {
         success: true,
         sent,
         total: phones.length,
+        iMessageCount,
+        smsCount,
         errors: errors.length > 0 ? errors : undefined,
       }),
       {

@@ -156,12 +156,18 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
   }
 
   Future<void> _sendNow() async {
+    final recipientCount = _hasEvent ? null : _selectedPhones.length;
+    final recipientLabel = recipientCount != null
+        ? '$recipientCount recipient${recipientCount == 1 ? '' : 's'}'
+        : 'all matching attendees';
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Send Survey Now?'),
-        content: const Text(
-          'This will save the survey and immediately send it to all recipients via iMessage.',
+        content: Text(
+          'This will save the survey and immediately send it to $recipientLabel. '
+          'Messages will be sent via iMessage or SMS depending on each recipient\'s availability.',
         ),
         actions: [
           TextButton(
@@ -183,6 +189,32 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
     if (confirm != true) return;
 
     setState(() => _sending = true);
+
+    // Show a progress dialog that stays up while sending
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => PopScope(
+          canPop: false,
+          child: AlertDialog(
+            content: Row(
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Text(
+                    'Sending survey to $recipientLabel...\nThis may take a moment.',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     try {
       final survey = _buildSurvey(status: 'active');
       final questions = _buildQuestions();
@@ -204,17 +236,45 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
 
       final sent = result['sent'] ?? 0;
       final total = result['total'] ?? 0;
+      final iMsg = result['iMessageCount'] ?? 0;
+      final sms = result['smsCount'] ?? 0;
+      final errors = result['errors'] as List<dynamic>?;
+
+      // Dismiss progress dialog
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
 
       if (mounted) {
+        // Build a detailed result message
+        final buf = StringBuffer('Sent to $sent of $total recipients');
+        if (iMsg > 0 || sms > 0) {
+          buf.write(' ($iMsg iMessage, $sms SMS)');
+        }
+        if (errors != null && errors.isNotEmpty) {
+          buf.write('\n${errors.length} failed');
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Survey sent to $sent of $total recipients')),
+          SnackBar(
+            content: Text(buf.toString()),
+            duration: const Duration(seconds: 5),
+            backgroundColor: (errors != null && errors.isNotEmpty)
+                ? Colors.orange.shade800
+                : null,
+          ),
         );
         Navigator.of(context).pop(saved);
       }
     } catch (e) {
+      // Dismiss progress dialog
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text('Error sending survey: $e'),
+            backgroundColor: Colors.red.shade800,
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     } finally {

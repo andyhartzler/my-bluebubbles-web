@@ -201,6 +201,27 @@ function _extractOptions(options: any): string[] | null {
   return null;
 }
 
+async function determineService(
+  phone: string,
+  bbUrl: string,
+  bbPassword: string,
+): Promise<string> {
+  if (phone.includes("@")) return "iMessage";
+  try {
+    const resp = await fetch(
+      `${bbUrl}/api/v1/handle/availability/imessage?address=${encodeURIComponent(phone)}&password=${encodeURIComponent(bbPassword)}`,
+      { method: "GET" }
+    );
+    if (resp.ok) {
+      const json = await resp.json();
+      return json?.data?.available === true ? "iMessage" : "SMS";
+    }
+  } catch (err) {
+    console.warn(`iMessage check failed for ${phone}: ${(err as Error).message}`);
+  }
+  return "SMS";
+}
+
 async function sendBBMessage(phone: string, message: string): Promise<void> {
   const bbUrl = Deno.env.get("BLUEBUBBLES_URL");
   const bbPassword = Deno.env.get("BLUEBUBBLES_PASSWORD");
@@ -208,6 +229,8 @@ async function sendBBMessage(phone: string, message: string): Promise<void> {
     console.error("BlueBubbles not configured");
     return;
   }
+
+  const service = await determineService(phone, bbUrl, bbPassword);
 
   const resp = await fetch(
     `${bbUrl}/api/v1/chat/new?password=${encodeURIComponent(bbPassword)}`,
@@ -217,14 +240,14 @@ async function sendBBMessage(phone: string, message: string): Promise<void> {
       body: JSON.stringify({
         addresses: [phone],
         message,
-        service: "iMessage",
+        service,
       }),
     }
   );
 
   if (!resp.ok) {
     const body = await resp.text();
-    console.error(`BB send failed (${resp.status}): ${body}`);
+    console.error(`BB send failed for ${phone} via ${service} (${resp.status}): ${body}`);
   }
 }
 
