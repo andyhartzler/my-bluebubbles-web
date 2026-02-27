@@ -27,9 +27,7 @@ class SurveyRepository {
 
     var query = _readClient.from('surveys').select('''
       *,
-      survey_questions(*),
-      session_stats:survey_sessions(count),
-      completed_stats:survey_sessions(count)
+      survey_questions(*)
     ''');
 
     if (eventId != null) {

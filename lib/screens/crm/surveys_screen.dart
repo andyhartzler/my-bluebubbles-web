@@ -118,8 +118,8 @@ class _SurveysScreenState extends State<SurveysScreen>
     _loadSurveys();
   }
 
-  void _openResults(Survey survey) {
-    Navigator.of(context).push(
+  void _openResults(Survey survey) async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => Scaffold(
           backgroundColor: Colors.grey.shade50,
@@ -144,6 +144,8 @@ class _SurveysScreenState extends State<SurveysScreen>
         ),
       ),
     );
+    // Reload counts when returning — sessions may have progressed
+    _loadSurveys();
   }
 
   Future<void> _duplicateSurvey(Survey survey) async {

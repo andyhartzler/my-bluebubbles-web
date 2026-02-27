@@ -458,6 +458,9 @@ class SurveySessionDetail {
 
   String get displayName => memberName ?? session.phoneE164;
 
-  double get progress =>
-      totalQuestions > 0 ? questionsAnswered / totalQuestions : 0.0;
+  double get progress {
+    // Completed sessions are 100% even if some questions were skipped
+    if (session.status == 'completed') return 1.0;
+    return totalQuestions > 0 ? questionsAnswered / totalQuestions : 0.0;
+  }
 }
