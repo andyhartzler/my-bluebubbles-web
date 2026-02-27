@@ -577,13 +577,23 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          leading: _buildRespondentAvatar(detail),
-          title: Text(
-            detail.displayName,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: BrandColors.unityBlue,
+          leading: GestureDetector(
+            onTap: detail.memberId != null
+                ? () => _navigateToMemberProfile(detail.memberId!)
+                : null,
+            child: _buildRespondentAvatar(detail),
+          ),
+          title: GestureDetector(
+            onTap: detail.memberId != null
+                ? () => _navigateToMemberProfile(detail.memberId!)
+                : null,
+            child: Text(
+              detail.displayName,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: BrandColors.unityBlue,
+              ),
             ),
           ),
           subtitle: Column(

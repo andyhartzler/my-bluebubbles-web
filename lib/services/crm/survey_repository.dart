@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/survey_model.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
@@ -417,12 +418,13 @@ class SurveyRepository {
 
       String? photoUrl;
       if (member != null && member['profile_pictures'] != null) {
-        final pics = member['profile_pictures'];
-        if (pics is List && pics.isNotEmpty) {
-          final first = pics.first;
-          if (first is Map<String, dynamic>) {
-            photoUrl = first['publicUrl'] as String? ?? first['public_url'] as String?;
-          }
+        final photos = MemberProfilePhoto.parseList(member['profile_pictures']);
+        if (photos.isNotEmpty) {
+          final primary = photos.firstWhere(
+            (p) => p.isPrimary,
+            orElse: () => photos.first,
+          );
+          photoUrl = primary.publicUrl;
         }
       }
       // Fallback to Slack avatar if no profile picture
