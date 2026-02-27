@@ -7,35 +7,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-// Check iMessage availability for a phone number, fall back to SMS
-async function determineService(
-  phone: string,
-  bbUrl: string,
-  bbPassword: string,
-): Promise<string> {
-  // Email addresses are always iMessage
-  if (phone.includes("@")) return "iMessage";
-
-  try {
-    const resp = await fetch(
-      `${bbUrl}/api/v1/handle/availability/imessage?address=${encodeURIComponent(phone)}&password=${encodeURIComponent(bbPassword)}`,
-      { method: "GET" }
-    );
-    if (resp.ok) {
-      const json = await resp.json();
-      const available = json?.data?.available === true;
-      return available ? "iMessage" : "SMS";
-    }
-  } catch (err) {
-    console.warn(`iMessage check failed for ${phone}: ${(err as Error).message}`);
-  }
-  // Default to SMS if we can't determine
-  return "SMS";
-}
+// ── This edge function ONLY prepares survey sessions. ─────────────────────
+// Message sending is handled client-side via CRMMessageService for:
+//   - Real-time progress callbacks
+//   - iMessage/SMS detection using local BB connection (fast, cached)
+//   - No edge function timeout issues
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -43,21 +19,6 @@ serve(async (req) => {
   }
 
   try {
-    const bbUrl = Deno.env.get("BLUEBUBBLES_URL");
-    const bbPassword = Deno.env.get("BLUEBUBBLES_PASSWORD");
-
-    if (!bbUrl || !bbPassword) {
-      return new Response(
-        JSON.stringify({
-          error: "BlueBubbles not configured. Set BLUEBUBBLES_URL and BLUEBUBBLES_PASSWORD secrets.",
-        }),
-        {
-          status: 503,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
     const { survey_id, phone_list } = await req.json();
 
     if (!survey_id) {
@@ -110,10 +71,8 @@ serve(async (req) => {
     let phones: string[] = [];
 
     if (phone_list && Array.isArray(phone_list) && phone_list.length > 0) {
-      // Custom phone list
       phones = phone_list;
     } else if (survey.event_id) {
-      // Event-linked survey — get attendees
       let query = supabase
         .from("event_attendees")
         .select("phone_e164, member_id, members!left(phone_e164, opt_out)")
@@ -127,7 +86,6 @@ serve(async (req) => {
 
       if (attendees) {
         for (const a of attendees) {
-          // Use attendee phone or member phone
           const phone = a.phone_e164 || (a.members as any)?.phone_e164;
           const optOut = (a.members as any)?.opt_out;
           if (phone && !optOut) {
@@ -150,7 +108,7 @@ serve(async (req) => {
     // De-duplicate
     phones = [...new Set(phones)];
 
-    // Check for existing active sessions to avoid double-sending
+    // Check for existing active/completed sessions for THIS survey to avoid double-sending
     const { data: existing } = await supabase
       .from("survey_sessions")
       .select("phone_e164")
@@ -167,7 +125,8 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           message: "All recipients already have sessions",
-          sent: 0,
+          phones: [],
+          firstMessage: "",
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -175,81 +134,49 @@ serve(async (req) => {
       );
     }
 
-    // Format the first question
+    // Close any stale active sessions for these phones from OTHER surveys
+    // so the webhook doesn't pick the wrong session
+    await supabase
+      .from("survey_sessions")
+      .update({ status: "expired", completed_at: new Date().toISOString() })
+      .in("phone_e164", phones)
+      .eq("status", "active")
+      .neq("survey_id", survey_id);
+
+    // Format the first question (returned to client for sending)
     const firstQ = questions[0];
-    const totalQ = questions.length;
-    const firstMessage = formatFirstMessage(
-      survey.title,
-      firstQ,
-      totalQ
-    );
+    const firstMessage = formatFirstMessage(survey.title, firstQ, questions.length);
 
-    // Determine transport service (iMessage vs SMS) for each recipient.
-    // Do this in parallel for speed, then send messages serially.
-    const serviceMap: Record<string, string> = {};
-    await Promise.all(
-      phones.map(async (phone) => {
-        serviceMap[phone] = await determineService(phone, bbUrl, bbPassword);
-      })
-    );
-
-    const iMessageCount = Object.values(serviceMap).filter((s) => s === "iMessage").length;
-    const smsCount = Object.values(serviceMap).filter((s) => s === "SMS").length;
-    console.log(`Transport breakdown: ${iMessageCount} iMessage, ${smsCount} SMS out of ${phones.length} total`);
-
-    // Create sessions and send first question
-    let sent = 0;
-    const errors: string[] = [];
-    const smsFailed: string[] = [];
+    // Create sessions (NO message sending — client handles that)
+    const sessions: Array<{ phone: string; sessionId: string }> = [];
 
     for (const phone of phones) {
       try {
-        // Look up member_id if available
         const { data: member } = await supabase
           .from("members")
           .select("id")
           .eq("phone_e164", phone)
           .maybeSingle();
 
-        const service = serviceMap[phone] || "SMS";
+        const { data: session } = await supabase
+          .from("survey_sessions")
+          .insert({
+            survey_id,
+            phone_e164: phone,
+            member_id: member?.id ?? null,
+            current_question_order: 1,
+            status: "active",
+            started_at: new Date().toISOString(),
+            last_message_at: new Date().toISOString(),
+          })
+          .select("id")
+          .single();
 
-        // Create session
-        await supabase.from("survey_sessions").insert({
-          survey_id,
-          phone_e164: phone,
-          member_id: member?.id ?? null,
-          current_question_order: 1,
-          status: "active",
-          started_at: new Date().toISOString(),
-          last_message_at: new Date().toISOString(),
-        });
-
-        // Send first question via BlueBubbles
-        const resp = await fetch(
-          `${bbUrl}/api/v1/chat/new?password=${encodeURIComponent(bbPassword)}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              addresses: [phone],
-              message: firstMessage,
-              service,
-            }),
-          }
-        );
-
-        if (!resp.ok) {
-          const body = await resp.text();
-          errors.push(`${phone} (${service}): BB error ${resp.status} - ${body}`);
-          if (service === "SMS") smsFailed.push(phone);
-        } else {
-          sent++;
+        if (session) {
+          sessions.push({ phone, sessionId: session.id });
         }
-
-        // Rate limit: 1 msg/sec
-        await sleep(1000);
       } catch (err) {
-        errors.push(`${phone}: ${(err as Error).message}`);
+        console.error(`Failed to create session for ${phone}: ${(err as Error).message}`);
       }
     }
 
@@ -262,11 +189,10 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        sent,
-        total: phones.length,
-        iMessageCount,
-        smsCount,
-        errors: errors.length > 0 ? errors : undefined,
+        phones: sessions.map((s) => s.phone),
+        sessions,
+        firstMessage,
+        total: sessions.length,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -290,7 +216,6 @@ function formatFirstMessage(
   totalQuestions: number
 ): string {
   const lines: string[] = [];
-  // First question: just the question text, no survey name, no Q1 prefix
   lines.push(question.question_text);
   lines.push("");
 

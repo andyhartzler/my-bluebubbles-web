@@ -447,6 +447,8 @@ class SurveySessionDetail {
         return 'Completed';
       case 'opted_out':
         return 'Opted Out';
+      case 'expired':
+        return 'Expired';
       case 'active':
         return questionsAnswered > 0 ? 'In Progress' : 'No Response';
       default:

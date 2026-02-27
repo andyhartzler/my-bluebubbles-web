@@ -201,36 +201,16 @@ function _extractOptions(options: any): string[] | null {
   return null;
 }
 
-async function determineService(
-  phone: string,
-  bbUrl: string,
-  bbPassword: string,
-): Promise<string> {
-  if (phone.includes("@")) return "iMessage";
-  try {
-    const resp = await fetch(
-      `${bbUrl}/api/v1/handle/availability/imessage?address=${encodeURIComponent(phone)}&password=${encodeURIComponent(bbPassword)}`,
-      { method: "GET" }
-    );
-    if (resp.ok) {
-      const json = await resp.json();
-      return json?.data?.available === true ? "iMessage" : "SMS";
-    }
-  } catch (err) {
-    console.warn(`iMessage check failed for ${phone}: ${(err as Error).message}`);
-  }
-  return "SMS";
-}
-
-async function sendBBMessage(phone: string, message: string): Promise<void> {
+// Send a message via BlueBubbles using the known service type.
+// No iMessage availability check needed — the service is determined from the
+// incoming chat identifier or passed explicitly by the caller.
+async function sendBBMessage(phone: string, message: string, service: string = "iMessage"): Promise<void> {
   const bbUrl = Deno.env.get("BLUEBUBBLES_URL");
   const bbPassword = Deno.env.get("BLUEBUBBLES_PASSWORD");
   if (!bbUrl || !bbPassword) {
     console.error("BlueBubbles not configured");
     return;
   }
-
-  const service = await determineService(phone, bbUrl, bbPassword);
 
   const resp = await fetch(
     `${bbUrl}/api/v1/chat/new?password=${encodeURIComponent(bbPassword)}`,
@@ -283,6 +263,10 @@ serve(async (req) => {
       });
     }
 
+    // Extract service from chat identifier (e.g. "iMessage;-;+1234" or "SMS;-;+1234")
+    const chatIdentifier: string = data?.chats?.[0]?.chatIdentifier ?? "";
+    const incomingService = chatIdentifier.startsWith("SMS") ? "SMS" : "iMessage";
+
     const phone = normalizePhone(senderRaw);
 
     const supabase = createClient(
@@ -290,6 +274,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    // Order by started_at DESC to always pick the MOST RECENT active session
     const { data: session, error: sessError } = await supabase
       .from("survey_sessions")
       .select(
@@ -301,6 +286,7 @@ serve(async (req) => {
       )
       .eq("phone_e164", phone)
       .eq("status", "active")
+      .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -338,7 +324,8 @@ serve(async (req) => {
 
       await sendBBMessage(
         phone,
-        "You've opted out of this survey. You'll still receive future surveys."
+        "You've opted out of this survey. You'll still receive future surveys.",
+        incomingService
       );
 
       return new Response(JSON.stringify({ ok: true, action: "opted_out" }), {
@@ -362,7 +349,7 @@ serve(async (req) => {
 
     // Check SKIP
     if (SKIP_WORDS.has(lower)) {
-      await advanceToNextQuestion(supabase, session, currentQ, phone);
+      await advanceToNextQuestion(supabase, session, currentQ, phone, incomingService);
       return new Response(JSON.stringify({ ok: true, action: "skipped" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -380,7 +367,7 @@ serve(async (req) => {
         .from("survey_sessions")
         .update({ last_message_at: new Date().toISOString() })
         .eq("id", session.id);
-      await sendBBMessage(phone, hint);
+      await sendBBMessage(phone, hint, incomingService);
       return new Response(JSON.stringify({ ok: true, action: "retry_hint" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -395,7 +382,7 @@ serve(async (req) => {
     });
 
     // Advance to next question
-    await advanceToNextQuestion(supabase, session, currentQ, phone);
+    await advanceToNextQuestion(supabase, session, currentQ, phone, incomingService);
 
     return new Response(JSON.stringify({ ok: true, action: "recorded" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -416,7 +403,8 @@ async function advanceToNextQuestion(
   supabase: ReturnType<typeof createClient>,
   session: any,
   currentQuestion: any,
-  phone: string
+  phone: string,
+  service: string = "iMessage"
 ): Promise<void> {
   const nextOrder = session.current_question_order + 1;
 
@@ -444,7 +432,7 @@ async function advanceToNextQuestion(
     const total = count ?? nextOrder;
     const surveyTitle = session.survey?.title ?? "Survey";
     const msg = formatQuestion(surveyTitle, nextQ, nextOrder, total);
-    await sendBBMessage(phone, msg);
+    await sendBBMessage(phone, msg, service);
   } else {
     await supabase
       .from("survey_sessions")
@@ -457,7 +445,8 @@ async function advanceToNextQuestion(
 
     await sendBBMessage(
       phone,
-      "Thank you for completing the survey! Your responses have been recorded."
+      "Thank you for completing the survey! Your responses have been recorded.",
+      service
     );
 
     const { count: activeCount } = await supabase

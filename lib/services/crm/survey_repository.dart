@@ -202,9 +202,11 @@ class SurveyRepository {
     await _writeClient.from('surveys').update(payload).eq('id', id);
   }
 
-  // ── Send survey (calls edge function) ─────────────────────────────────────
+  // ── Prepare survey sessions (calls edge function) ────────────────────────
+  // Returns { phones, sessions, firstMessage, total }.
+  // Message sending is handled client-side via CRMMessageService.
 
-  Future<Map<String, dynamic>> sendSurvey(
+  Future<Map<String, dynamic>> prepareSurveySessions(
     String surveyId, {
     List<String>? phoneList,
   }) async {
@@ -458,7 +460,7 @@ class SurveyRepository {
     }
 
     sessionDetails.sort((a, b) {
-      const order = {'completed': 0, 'active': 1, 'opted_out': 2};
+      const order = {'completed': 0, 'active': 1, 'opted_out': 2, 'expired': 3};
       final aOrder = order[a.session.status] ?? 3;
       final bOrder = order[b.session.status] ?? 3;
       if (aOrder != bOrder) return aOrder.compareTo(bOrder);

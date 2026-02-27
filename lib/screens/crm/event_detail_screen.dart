@@ -24,6 +24,7 @@ import 'package:bluebubbles/services/crm/phone_normalizer.dart';
 import 'package:bluebubbles/screens/crm/qr_scanner_screen.dart';
 import 'package:bluebubbles/widgets/event_map_widget.dart';
 import 'package:bluebubbles/models/crm/survey_model.dart';
+import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/survey_repository.dart';
 import 'package:bluebubbles/screens/crm/survey_builder_screen.dart';
 import 'package:bluebubbles/screens/crm/survey_results_widget.dart';
@@ -3698,10 +3699,40 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                   ElevatedButton(
                     onPressed: () async {
                       try {
-                        await _surveyRepository.sendSurvey(survey.id!);
+                        // Prepare sessions (edge function creates sessions, returns phones + message)
+                        final prep = await _surveyRepository.prepareSurveySessions(survey.id!);
+                        final phones = (prep['phones'] as List<dynamic>?)
+                                ?.map((p) => p.toString())
+                                .toList() ??
+                            [];
+                        final firstMessage = prep['firstMessage'] as String? ?? '';
+
+                        if (phones.isEmpty) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(prep['message'] as String? ?? 'No recipients')),
+                            );
+                          }
+                          return;
+                        }
+
+                        // Send messages client-side
+                        final msgService = CRMMessageService.instance;
+                        int sent = 0;
+                        for (final phone in phones) {
+                          final ok = await msgService.sendSimpleMessage(
+                            phoneNumber: phone,
+                            message: firstMessage,
+                          );
+                          if (ok) sent++;
+                          if (phones.indexOf(phone) < phones.length - 1) {
+                            await Future.delayed(CRMMessageService.delayBetweenMessages);
+                          }
+                        }
+
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Survey sent!')),
+                            SnackBar(content: Text('Survey sent to $sent of ${phones.length} recipients')),
                           );
                           _loadSurveys();
                         }

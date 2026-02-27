@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:bluebubbles/models/crm/survey_model.dart';
 import 'package:bluebubbles/models/crm/survey_suggested_questions.dart';
+import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/survey_repository.dart';
 import 'package:bluebubbles/widgets/crm/recipient_selector_widget.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
@@ -26,6 +27,7 @@ class SurveyBuilderScreen extends StatefulWidget {
 
 class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
   final _repo = SurveyRepository();
+  final _messageService = CRMMessageService.instance;
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _step0FormKey = GlobalKey<FormState>();
@@ -40,6 +42,9 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
   List<_EditableQuestion> _questions = [];
   bool _saving = false;
   bool _sending = false;
+  int _sendProgress = 0;
+  int _sendTotal = 0;
+  String _sendStatus = '';
 
   // ── Standalone recipient selection (Step 3, no eventId) ───────────────────
   List<String> _selectedPhones = [];
@@ -188,34 +193,15 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
 
     if (confirm != true) return;
 
-    setState(() => _sending = true);
-
-    // Show a progress dialog that stays up while sending
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => PopScope(
-          canPop: false,
-          child: AlertDialog(
-            content: Row(
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Text(
-                    'Sending survey to $recipientLabel...\nThis may take a moment.',
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+    setState(() {
+      _sending = true;
+      _sendProgress = 0;
+      _sendTotal = 0;
+      _sendStatus = 'Preparing sessions...';
+    });
 
     try {
+      // Step 1: Save the survey
       final survey = _buildSurvey(status: 'active');
       final questions = _buildQuestions();
 
@@ -226,48 +212,88 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
         saved = await _repo.createSurvey(survey, questions);
       }
 
-      // Send — pass phoneList when standalone recipients are selected
-      final Map<String, dynamic> result;
+      // Step 2: Prepare sessions via edge function (fast — no BB API calls)
+      setState(() => _sendStatus = 'Creating sessions...');
+
+      final Map<String, dynamic> prepResult;
       if (!_hasEvent && _selectedPhones.isNotEmpty) {
-        result = await _repo.sendSurvey(saved.id!, phoneList: _selectedPhones);
+        prepResult = await _repo.prepareSurveySessions(saved.id!, phoneList: _selectedPhones);
       } else {
-        result = await _repo.sendSurvey(saved.id!);
+        prepResult = await _repo.prepareSurveySessions(saved.id!);
       }
 
-      final sent = result['sent'] ?? 0;
-      final total = result['total'] ?? 0;
-      final iMsg = result['iMessageCount'] ?? 0;
-      final sms = result['smsCount'] ?? 0;
-      final errors = result['errors'] as List<dynamic>?;
+      final phones = (prepResult['phones'] as List<dynamic>?)
+              ?.map((p) => p.toString())
+              .toList() ??
+          [];
+      final firstMessage = prepResult['firstMessage'] as String? ?? '';
+      final total = phones.length;
 
-      // Dismiss progress dialog
-      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (total == 0) {
+        final msg = prepResult['message'] as String? ?? 'No recipients to send to';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg)),
+          );
+          Navigator.of(context).pop(saved);
+        }
+        return;
+      }
+
+      // Step 3: Send messages client-side with real-time progress
+      setState(() {
+        _sendTotal = total;
+        _sendStatus = 'Sending 0 of $total...';
+      });
+
+      int successCount = 0;
+      int failCount = 0;
+
+      for (int i = 0; i < phones.length; i++) {
+        final phone = phones[i];
+        try {
+          final ok = await _messageService.sendSimpleMessage(
+            phoneNumber: phone,
+            message: firstMessage,
+          );
+          if (ok) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (e) {
+          failCount++;
+        }
+
+        if (mounted) {
+          setState(() {
+            _sendProgress = i + 1;
+            _sendStatus = 'Sending ${i + 1} of $total...';
+          });
+        }
+
+        // Rate limiting — same delay as bulk messages
+        if (i < phones.length - 1) {
+          await Future.delayed(CRMMessageService.delayBetweenMessages);
+        }
+      }
 
       if (mounted) {
-        // Build a detailed result message
-        final buf = StringBuffer('Sent to $sent of $total recipients');
-        if (iMsg > 0 || sms > 0) {
-          buf.write(' ($iMsg iMessage, $sms SMS)');
-        }
-        if (errors != null && errors.isNotEmpty) {
-          buf.write('\n${errors.length} failed');
+        final buf = StringBuffer('Survey sent to $successCount of $total recipients');
+        if (failCount > 0) {
+          buf.write(' ($failCount failed)');
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(buf.toString()),
             duration: const Duration(seconds: 5),
-            backgroundColor: (errors != null && errors.isNotEmpty)
-                ? Colors.orange.shade800
-                : null,
+            backgroundColor: failCount > 0 ? Colors.orange.shade800 : null,
           ),
         );
         Navigator.of(context).pop(saved);
       }
     } catch (e) {
-      // Dismiss progress dialog
-      if (mounted) Navigator.of(context, rootNavigator: true).pop();
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -278,7 +304,14 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _sending = false);
+      if (mounted) {
+        setState(() {
+          _sending = false;
+          _sendProgress = 0;
+          _sendTotal = 0;
+          _sendStatus = '';
+        });
+      }
     }
   }
 
@@ -554,88 +587,99 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
       ),
       child: SafeArea(
         top: false,
-        child: Row(
-          children: [
-            // Back button
-            if (_currentStep > 0)
-              OutlinedButton.icon(
-                onPressed: _goBack,
-                icon: const Icon(Icons.arrow_back, size: 18),
-                label: const Text('Back'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: BrandColors.unityBlue,
-                  side: const BorderSide(color: BrandColors.unityBlue),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+        child: _sending
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LinearProgressIndicator(
+                    value: _sendTotal > 0 ? _sendProgress / _sendTotal : null,
+                    backgroundColor: Colors.grey.shade200,
+                    valueColor: const AlwaysStoppedAnimation<Color>(BrandColors.momentumBlue),
                   ),
-                ),
-              ),
-
-            const Spacer(),
-
-            // Step-dependent action buttons
-            if (_currentStep < 2) ...[
-              // Next button
-              ElevatedButton.icon(
-                onPressed: _goNext,
-                icon: const Icon(Icons.arrow_forward, size: 18),
-                label: const Text('Next'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: BrandColors.momentumBlue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                  const SizedBox(height: 10),
+                  Text(
+                    _sendStatus,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ),
-            ] else ...[
-              // Final step: Save Draft + Send Now
-              OutlinedButton(
-                onPressed: (_saving || _sending) ? null : () => _save(status: 'draft'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: BrandColors.unityBlue,
-                  side: const BorderSide(color: BrandColors.unityBlue),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Save Draft'),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: (_saving || _sending) ? null : _sendNow,
-                icon: _sending
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                ],
+              )
+            : Row(
+                children: [
+                  // Back button
+                  if (_currentStep > 0)
+                    OutlinedButton.icon(
+                      onPressed: _goBack,
+                      icon: const Icon(Icons.arrow_back, size: 18),
+                      label: const Text('Back'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: BrandColors.unityBlue,
+                        side: const BorderSide(color: BrandColors.unityBlue),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      )
-                    : const Icon(Icons.send, size: 18),
-                label: const Text('Send Now'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: BrandColors.sunriseGold,
-                  foregroundColor: BrandColors.unityBlue,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
+                      ),
+                    ),
+
+                  const Spacer(),
+
+                  // Step-dependent action buttons
+                  if (_currentStep < 2) ...[
+                    // Next button
+                    ElevatedButton.icon(
+                      onPressed: _goNext,
+                      icon: const Icon(Icons.arrow_forward, size: 18),
+                      label: const Text('Next'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: BrandColors.momentumBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    // Final step: Save Draft + Send Now
+                    OutlinedButton(
+                      onPressed: _saving ? null : () => _save(status: 'draft'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: BrandColors.unityBlue,
+                        side: const BorderSide(color: BrandColors.unityBlue),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Save Draft'),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _saving ? null : _sendNow,
+                      icon: const Icon(Icons.send, size: 18),
+                      label: const Text('Send Now'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: BrandColors.sunriseGold,
+                        foregroundColor: BrandColors.unityBlue,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            ],
-          ],
-        ),
       ),
     );
   }
