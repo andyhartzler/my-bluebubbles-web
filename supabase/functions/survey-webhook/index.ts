@@ -263,9 +263,16 @@ serve(async (req) => {
       });
     }
 
-    // Extract service from chat identifier (e.g. "iMessage;-;+1234" or "SMS;-;+1234")
-    const chatIdentifier: string = data?.chats?.[0]?.chatIdentifier ?? "";
-    const incomingService = chatIdentifier.startsWith("SMS") ? "SMS" : "iMessage";
+    // Determine service: check handle.service, then chat guid prefix, then default SMS
+    // BB chatIdentifier is just the phone number — the service is on handle or chat guid
+    const handleService: string = data?.handle?.service ?? "";
+    const chatGuid: string = data?.chats?.[0]?.guid ?? "";
+    const incomingService =
+      handleService === "SMS" ? "SMS"
+      : handleService === "iMessage" ? "iMessage"
+      : chatGuid.startsWith("SMS;") ? "SMS"
+      : chatGuid.startsWith("iMessage;") ? "iMessage"
+      : "SMS"; // default to SMS — safer than failing silently with iMessage
 
     const phone = normalizePhone(senderRaw);
 
