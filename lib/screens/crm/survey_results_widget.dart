@@ -1,6 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:printing/printing.dart';
+import 'package:universal_html/html.dart' as html;
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -99,10 +99,17 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
         summary: _summary!,
         sessions: sessions,
       );
-      await Printing.sharePdf(
-        bytes: excelBytes,
-        filename: '${widget.surveyTitle.replaceAll(' ', '_')}_results.xlsx',
-      );
+      final filename = '${widget.surveyTitle.replaceAll(' ', '_')}_results.xlsx';
+      final blob = html.Blob([excelBytes],
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', filename)
+        ..style.display = 'none';
+      html.document.body?.append(anchor);
+      anchor.click();
+      anchor.remove();
+      html.Url.revokeObjectUrl(url);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -44,31 +44,41 @@ class SurveyRepository {
     final list =
         (data as List<dynamic>? ?? []).whereType<Map<String, dynamic>>().toList();
 
-    // Fetch session counts separately for accurate numbers
-    final surveys = <Survey>[];
-    for (final json in list) {
-      final surveyId = json['id'] as String?;
-      int sessionCount = 0;
-      int completedCount = 0;
+    // Batch-fetch session counts for all surveys in a single query
+    final surveyIds = list
+        .map((json) => json['id'] as String?)
+        .where((id) => id != null)
+        .cast<String>()
+        .toList();
 
-      if (surveyId != null) {
-        final sessionsData = await _readClient
-            .from('survey_sessions')
-            .select('id, status')
-            .eq('survey_id', surveyId);
-        final sessionsList =
-            (sessionsData as List<dynamic>? ?? []).whereType<Map<String, dynamic>>().toList();
-        sessionCount = sessionsList.length;
-        completedCount =
-            sessionsList.where((s) => s['status'] == 'completed').length;
+    Map<String, int> sessionCountMap = {};
+    Map<String, int> completedCountMap = {};
+
+    if (surveyIds.isNotEmpty) {
+      final sessionsData = await _readClient
+          .from('survey_sessions')
+          .select('survey_id, status')
+          .inFilter('survey_id', surveyIds);
+
+      for (final s in (sessionsData as List<dynamic>? ?? []).whereType<Map<String, dynamic>>()) {
+        final sid = s['survey_id'] as String?;
+        if (sid != null) {
+          sessionCountMap[sid] = (sessionCountMap[sid] ?? 0) + 1;
+          if (s['status'] == 'completed') {
+            completedCountMap[sid] = (completedCountMap[sid] ?? 0) + 1;
+          }
+        }
       }
-
-      surveys.add(Survey.fromJson({
-        ...json,
-        'session_count': sessionCount,
-        'completed_count': completedCount,
-      }));
     }
+
+    final surveys = list.map((json) {
+      final surveyId = json['id'] as String?;
+      return Survey.fromJson({
+        ...json,
+        'session_count': surveyId != null ? (sessionCountMap[surveyId] ?? 0) : 0,
+        'completed_count': surveyId != null ? (completedCountMap[surveyId] ?? 0) : 0,
+      });
+    }).toList();
 
     return surveys;
   }

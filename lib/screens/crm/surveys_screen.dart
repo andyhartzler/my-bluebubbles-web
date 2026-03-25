@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -25,6 +27,7 @@ class _SurveysScreenState extends State<SurveysScreen>
   String _searchQuery = '';
 
   final _searchController = TextEditingController();
+  Timer? _debounceTimer;
 
   // ---------------------------------------------------------------------------
   // Filtering
@@ -68,6 +71,7 @@ class _SurveysScreenState extends State<SurveysScreen>
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -324,7 +328,10 @@ class _SurveysScreenState extends State<SurveysScreen>
         ),
         onChanged: (v) {
           setState(() => _searchQuery = v);
-          _loadSurveys();
+          _debounceTimer?.cancel();
+          _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+            _loadSurveys();
+          });
         },
       ),
     );

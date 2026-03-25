@@ -43,6 +43,11 @@ class CRMMessageService {
       StreamController<String>.broadcast();
   Stream<String> get onSurveyResponse => _surveyResponseController.stream;
 
+  /// Call to release the broadcast stream controller.
+  void dispose() {
+    _surveyResponseController.close();
+  }
+
   // Rate limiting
   static const int messagesPerMinute = CRMConfig.messagesPerMinute;
   static const Duration delayBetweenMessages = CRMConfig.messageDelay;
@@ -471,13 +476,17 @@ class CRMMessageService {
       try {
         final response = await createChat([cleaned], message, service);
         sentViaCreate = true;
-        final body = response.data;
         Map<String, dynamic>? payload;
-        if (body is Map<String, dynamic>) {
-          final raw = body['data'];
-          if (raw is Map<String, dynamic>) {
-            payload = raw;
+        try {
+          final body = response?.data;
+          if (body is Map<String, dynamic>) {
+            final raw = body['data'];
+            if (raw is Map<String, dynamic>) {
+              payload = raw;
+            }
           }
+        } catch (e) {
+          Logger.warn('Failed to parse createChat response for $cleaned', error: e);
         }
         if (payload != null) {
           try {

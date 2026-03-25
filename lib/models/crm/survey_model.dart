@@ -32,6 +32,8 @@ int? _parseSurveyInt(dynamic value) {
 
 // ─── Survey ──────────────────────────────────────────────────────────────────
 
+const _undefined = Object();
+
 class Survey {
   final String? id;
   final String? eventId;
@@ -114,34 +116,34 @@ class Survey {
       };
 
   Survey copyWith({
-    String? id,
-    String? eventId,
-    String? title,
-    String? description,
-    String? status,
-    String? targetAudience,
-    bool? autoSend,
-    DateTime? createdAt,
-    DateTime? scheduledAt,
-    DateTime? completedAt,
-    List<SurveyQuestion>? questions,
-    int? sessionCount,
-    int? completedCount,
+    Object? id = _undefined,
+    Object? eventId = _undefined,
+    Object? title = _undefined,
+    Object? description = _undefined,
+    Object? status = _undefined,
+    Object? targetAudience = _undefined,
+    Object? autoSend = _undefined,
+    Object? createdAt = _undefined,
+    Object? scheduledAt = _undefined,
+    Object? completedAt = _undefined,
+    Object? questions = _undefined,
+    Object? sessionCount = _undefined,
+    Object? completedCount = _undefined,
   }) =>
       Survey(
-        id: id ?? this.id,
-        eventId: eventId ?? this.eventId,
-        title: title ?? this.title,
-        description: description ?? this.description,
-        status: status ?? this.status,
-        targetAudience: targetAudience ?? this.targetAudience,
-        autoSend: autoSend ?? this.autoSend,
-        createdAt: createdAt ?? this.createdAt,
-        scheduledAt: scheduledAt ?? this.scheduledAt,
-        completedAt: completedAt ?? this.completedAt,
-        questions: questions ?? this.questions,
-        sessionCount: sessionCount ?? this.sessionCount,
-        completedCount: completedCount ?? this.completedCount,
+        id: id == _undefined ? this.id : id as String?,
+        eventId: eventId == _undefined ? this.eventId : eventId as String?,
+        title: title == _undefined ? this.title : title as String,
+        description: description == _undefined ? this.description : description as String?,
+        status: status == _undefined ? this.status : status as String,
+        targetAudience: targetAudience == _undefined ? this.targetAudience : targetAudience as String,
+        autoSend: autoSend == _undefined ? this.autoSend : autoSend as bool,
+        createdAt: createdAt == _undefined ? this.createdAt : createdAt as DateTime?,
+        scheduledAt: scheduledAt == _undefined ? this.scheduledAt : scheduledAt as DateTime?,
+        completedAt: completedAt == _undefined ? this.completedAt : completedAt as DateTime?,
+        questions: questions == _undefined ? this.questions : questions as List<SurveyQuestion>,
+        sessionCount: sessionCount == _undefined ? this.sessionCount : sessionCount as int,
+        completedCount: completedCount == _undefined ? this.completedCount : completedCount as int,
       );
 }
 
