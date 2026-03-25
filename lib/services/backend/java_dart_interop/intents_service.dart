@@ -142,7 +142,9 @@ class IntentsService extends GetxService {
     try {
       final call = await http.answerFaceTime(callUuid);
       link = call.data?["data"]?["link"];
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('IntentsService.answerFaceTime error: $e');
+    }
     if (Get.context != null) {
       Navigator.of(Get.context!).pop();
     }

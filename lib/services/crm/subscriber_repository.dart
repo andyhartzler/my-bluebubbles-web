@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:postgrest/postgrest.dart' as postgrest;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -125,7 +127,7 @@ class SubscriberRepository {
         bySource: results[6] as Map<String, int>,
       );
     } catch (e) {
-      print('❌ Error fetching subscriber stats: $e');
+      debugPrint('❌ Error fetching subscriber stats: $e');
       return const SubscriberStats();
     }
   }
@@ -255,7 +257,7 @@ class SubscriberRepository {
       if (response == null) return null;
       return Subscriber.fromJson(response);
     } catch (e) {
-      print('Error fetching subscriber by ID: $e');
+      debugPrint('Error fetching subscriber by ID: $e');
       return null;
     }
   }
@@ -324,7 +326,7 @@ class SubscriberRepository {
           .map((s) => s.copyWith(eventAttendanceCount: counts[s.email] ?? 0))
           .toList();
     } catch (e) {
-      print('⚠️ Failed to load event attendance counts: $e');
+      debugPrint('⚠️ Failed to load event attendance counts: $e');
       return subscribers;
     }
   }

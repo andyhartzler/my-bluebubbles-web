@@ -505,7 +505,9 @@ class Chat {
         } else if (existing == null && participants.isEmpty) {
           cm.fetchChat(guid);
         }
-      } on UniqueViolationException catch (_) {}
+      } on UniqueViolationException catch (e) {
+        debugPrint('Chat.save UniqueViolation: $e');
+      }
     });
     return this;
   }
@@ -691,7 +693,9 @@ class Chat {
           http.markChatUnread(guid);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Chat.toggleHasUnread error: $e');
+    }
 
     return this;
   }

@@ -1789,7 +1789,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
             final mecId = c['mec_id'] as String? ?? '';
             String displayDate = date;
             if (date.isNotEmpty) {
-              try { displayDate = _dateFormat.format(DateTime.parse(date)); } catch (_) {}
+              try { displayDate = _dateFormat.format(DateTime.parse(date)); } catch (e) { debugPrint('MecResearchTab MEC date parse error: $e'); }
             }
             return Container(
               margin: const EdgeInsets.only(bottom: 2),
@@ -1888,7 +1888,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
             final cmteId = c['cmte_id'] as String? ?? '';
             String displayDate = date;
             if (date.isNotEmpty) {
-              try { displayDate = _dateFormat.format(DateTime.parse(date)); } catch (_) {}
+              try { displayDate = _dateFormat.format(DateTime.parse(date)); } catch (e) { debugPrint('MecResearchTab FEC date parse error: $e'); }
             }
             return Container(
               margin: const EdgeInsets.only(bottom: 2),

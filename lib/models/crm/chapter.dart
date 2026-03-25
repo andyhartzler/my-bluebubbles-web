@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 class Chapter {
   final String id;
   final DateTime? createdAt;
@@ -56,7 +58,9 @@ class Chapter {
         if (decoded is Map<String, dynamic>) {
           social = decoded;
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Chapter.fromJson social_media parse error: $e');
+      }
     }
 
     return Chapter(

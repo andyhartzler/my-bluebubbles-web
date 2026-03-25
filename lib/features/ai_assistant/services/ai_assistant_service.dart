@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:postgrest/postgrest.dart' show CountOption;
 import '../models/chat_session.dart';
@@ -151,7 +152,9 @@ class AIAssistantService {
     if (data['classification'] != null) {
       try {
         classification = TaskClassification.fromJson(data['classification'] as Map<String, dynamic>);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('AIAssistantService.query classification parse error: $e');
+      }
     }
 
     return EnhancedQueryResponse(
@@ -211,7 +214,7 @@ class AIAssistantService {
         'feedback_comment': comment,
       });
     } catch (e) {
-      print('Failed to submit feedback: $e');
+      debugPrint('Failed to submit feedback: $e');
       // Don't throw - feedback is non-critical
     }
   }
@@ -237,7 +240,7 @@ class AIAssistantService {
           .count(CountOption.exact);
       total = totalResponse.count ?? 0;
     } catch (e) {
-      print('Error fetching total count: $e');
+      debugPrint('Error fetching total count: $e');
     }
 
     // Get pending count
@@ -249,7 +252,7 @@ class AIAssistantService {
           .count(CountOption.exact);
       pending = pendingResponse.count ?? 0;
     } catch (e) {
-      print('Error fetching pending count: $e');
+      debugPrint('Error fetching pending count: $e');
     }
 
     // Get failed count
@@ -261,7 +264,7 @@ class AIAssistantService {
           .count(CountOption.exact);
       failed = failedResponse.count ?? 0;
     } catch (e) {
-      print('Error fetching failed count: $e');
+      debugPrint('Error fetching failed count: $e');
     }
 
     // Get documents by table - fetch in batches to avoid 1000 limit
@@ -296,7 +299,7 @@ class AIAssistantService {
         }
       }
     } catch (e) {
-      print('Error fetching document breakdown: $e');
+      debugPrint('Error fetching document breakdown: $e');
     }
 
     // Get usage for current month
@@ -315,7 +318,7 @@ class AIAssistantService {
         (sum, row) => sum + ((row['estimated_cost_cents'] as num?)?.toDouble() ?? 0),
       );
     } catch (e) {
-      print('Error fetching usage stats: $e');
+      debugPrint('Error fetching usage stats: $e');
     }
 
     // Get table configs
@@ -333,7 +336,7 @@ class AIAssistantService {
       configs.sort((a, b) => a.tableName.compareTo(b.tableName));
     } catch (e) {
       // Table might not exist yet, continue with empty configs
-      print('Error fetching table configs: $e');
+      debugPrint('Error fetching table configs: $e');
     }
 
     // Get query count
@@ -348,7 +351,7 @@ class AIAssistantService {
 
       totalQueries = queryCountResponse.count ?? 0;
     } catch (e) {
-      print('Error fetching query count: $e');
+      debugPrint('Error fetching query count: $e');
     }
 
     return KnowledgeStats(

@@ -208,7 +208,7 @@ class _ListmonkWebViewScreenState extends State<ListmonkWebViewScreen> {
       if (window.FlutterBridge) {
         FlutterBridge.postMessage(JSON.stringify({type: 'log', message: msg}));
       }
-    } catch(e) {}
+    } catch(e) { console.log('FlutterBridge.postMessage error: ' + e); }
   }
 
   function findElement(selectors) {

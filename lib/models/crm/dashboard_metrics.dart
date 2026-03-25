@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 /// Comprehensive model for all pre-calculated dashboard metrics from crm_dashboard_metrics table.
 class DashboardMetrics {
   final String id;
@@ -494,7 +496,9 @@ class DashboardMetrics {
         if (decoded is Map) {
           return _mapToNameCounts(decoded);
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('DashboardMetrics._parseNameCounts error: $e');
+      }
       return [];
     }
 
@@ -542,7 +546,9 @@ class DashboardMetrics {
               .map((e) => Map<String, dynamic>.from(e as Map))
               .toList();
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('DashboardMetrics._parseJsonList error: $e');
+      }
       return [];
     }
     if (value is List) {

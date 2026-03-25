@@ -202,7 +202,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
         _loadingPreview = false;
       });
     } catch (e) {
-      print('❌ Error updating preview: $e');
+      debugPrint('❌ Error updating preview: $e');
       if (!mounted) return;
       setState(() => _loadingPreview = false);
     }

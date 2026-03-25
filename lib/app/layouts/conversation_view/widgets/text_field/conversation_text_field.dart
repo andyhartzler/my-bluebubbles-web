@@ -622,7 +622,9 @@ class ConversationTextFieldState extends CustomState<ConversationTextField, void
                               bytes: data,
                             ));
                             return;
-                          } catch (_) {}
+                          } catch (e) {
+                            debugPrint('ConversationTextFieldState.pickGif error: $e');
+                          }
                         }
                       }
                     }),

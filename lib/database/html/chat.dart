@@ -294,7 +294,9 @@ class Chat {
           http.markChatUnread(guid);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Chat.toggleHasUnread error: $e');
+    }
 
     return this;
   }

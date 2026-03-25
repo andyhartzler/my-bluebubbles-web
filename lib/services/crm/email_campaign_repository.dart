@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:postgrest/postgrest.dart' as postgrest;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -79,7 +80,7 @@ class EmailCampaignRepository {
         totalCount: fetchTotalCount ? response.count : null,
       );
     } catch (e) {
-      print('❌ Error fetching email campaigns: $e');
+      debugPrint('❌ Error fetching email campaigns: $e');
       return const EmailCampaignFetchResult(campaigns: [], totalCount: 0);
     }
   }
@@ -98,7 +99,7 @@ class EmailCampaignRepository {
       if (response == null) return null;
       return EmailCampaign.fromJson(response);
     } catch (e) {
-      print('❌ Error fetching campaign by ID: $e');
+      debugPrint('❌ Error fetching campaign by ID: $e');
       return null;
     }
   }
@@ -133,7 +134,7 @@ class EmailCampaignRepository {
         bySource: bySource,
       );
     } catch (e) {
-      print('❌ Error fetching campaign stats: $e');
+      debugPrint('❌ Error fetching campaign stats: $e');
       return const EmailCampaignStats();
     }
   }
@@ -197,7 +198,7 @@ class EmailCampaignRepository {
       final data = await query;
       return _mapRecipients(data);
     } catch (e) {
-      print('❌ Error fetching campaign recipients: $e');
+      debugPrint('❌ Error fetching campaign recipients: $e');
       return [];
     }
   }
@@ -227,7 +228,7 @@ class EmailCampaignRepository {
         RecipientFilter.failed: results[6],
       };
     } catch (e) {
-      print('❌ Error fetching recipient counts: $e');
+      debugPrint('❌ Error fetching recipient counts: $e');
       return {};
     }
   }
@@ -245,7 +246,7 @@ class EmailCampaignRepository {
 
       return _mapLinks(data);
     } catch (e) {
-      print('❌ Error fetching campaign links: $e');
+      debugPrint('❌ Error fetching campaign links: $e');
       return [];
     }
   }
@@ -268,7 +269,7 @@ class EmailCampaignRepository {
 
       return _mapLinkClicks(data);
     } catch (e) {
-      print('❌ Error fetching link clicks: $e');
+      debugPrint('❌ Error fetching link clicks: $e');
       return [];
     }
   }
@@ -290,7 +291,7 @@ class EmailCampaignRepository {
 
       return _mapRecipients(data);
     } catch (e) {
-      print('❌ Error fetching subscriber campaigns: $e');
+      debugPrint('❌ Error fetching subscriber campaigns: $e');
       return [];
     }
   }
@@ -312,7 +313,7 @@ class EmailCampaignRepository {
 
       return _mapRecipients(data);
     } catch (e) {
-      print('❌ Error fetching subscriber campaigns by email: $e');
+      debugPrint('❌ Error fetching subscriber campaigns by email: $e');
       return [];
     }
   }
@@ -335,7 +336,7 @@ class EmailCampaignRepository {
           .toList()
         ..sort((a, b) => a.compareTo(b));
     } catch (e) {
-      print('❌ Error fetching distinct sources: $e');
+      debugPrint('❌ Error fetching distinct sources: $e');
       return [];
     }
   }
@@ -415,7 +416,7 @@ class EmailCampaignRepository {
         'avg_click_rate': rateCount > 0 ? sumClickRate / rateCount : 0.0,
       };
     } catch (e) {
-      print('❌ Error aggregating stats: $e');
+      debugPrint('❌ Error aggregating stats: $e');
       return {
         'total_recipients': 0,
         'total_opens': 0,
@@ -441,7 +442,7 @@ class EmailCampaignRepository {
       }
       return results;
     } catch (e) {
-      print('❌ Error fetching source breakdown: $e');
+      debugPrint('❌ Error fetching source breakdown: $e');
       return {};
     }
   }
@@ -461,7 +462,7 @@ class EmailCampaignRepository {
           await query.count(postgrest.CountOption.exact);
       return response.count;
     } catch (e) {
-      print('❌ Error counting recipients: $e');
+      debugPrint('❌ Error counting recipients: $e');
       return 0;
     }
   }

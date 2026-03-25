@@ -151,7 +151,9 @@ class Message {
       if (json["metadata"] is String) {
         try {
           metadata = jsonDecode(json["metadata"]);
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Message.fromMap metadata parse error: $e');
+        }
       } else {
         metadata = json["metadata"];
       }

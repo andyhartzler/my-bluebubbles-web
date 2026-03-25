@@ -46,7 +46,9 @@ class SettingsService extends GetxService {
         if (mode != DisplayMode.auto) {
           FlutterDisplayMode.setPreferredMode(mode);
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('SettingsService.init error: $e');
+      }
       // system appearance
       if (settings.immersiveMode.value) {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -63,7 +65,9 @@ class SettingsService extends GetxService {
       if (Platform.isWindows) {
         try {
           _canAuthenticate = await LocalAuthentication().isDeviceSupported();
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('SettingsService.init error: $e');
+        }
       }
       ss.settings.launchAtStartup.value = await setupLaunchAtStartup(ss.settings.launchAtStartup.value, ss.settings.launchAtStartupMinimized.value);
     }
@@ -129,7 +133,9 @@ class SettingsService extends GetxService {
       try {
         final mode = await settings.getDisplayMode();
         FlutterDisplayMode.setPreferredMode(mode);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('SettingsService.saveSettings error: $e');
+      }
     }
   }
 

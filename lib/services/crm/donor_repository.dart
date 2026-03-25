@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:postgrest/postgrest.dart' show CountOption, PostgrestFilterBuilder, PostgrestResponse;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -236,7 +237,7 @@ class DonorRepository {
         'totalRaised': totalRaised,
       };
     } catch (e) {
-      print('❌ Error fetching donor stats: $e');
+      debugPrint('❌ Error fetching donor stats: $e');
       return {
         'total': 0,
         'recurring': 0,

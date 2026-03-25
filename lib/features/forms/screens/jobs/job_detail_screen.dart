@@ -64,7 +64,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       if (mounted && job != null) {
         setState(() => _job = job);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('_JobDetailScreenState._loadJob error: $e');
+    }
   }
 
   Future<void> _loadAnalytics() async {

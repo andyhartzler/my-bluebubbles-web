@@ -432,6 +432,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         isPending: true,
       );
 
+      if (!mounted) return;
       setState(() {
         _updatingReportIds.add(entry.id);
         _member = _member.copyWith(
@@ -506,6 +507,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
     if (confirmed != true) return;
 
+    if (!mounted) return;
     final baseline = _member;
     setState(() {
       _deletingReportIds.add(entry.id);
@@ -881,6 +883,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       return;
     }
 
+    if (!mounted) return;
     setState(() {
       _uploadingPhoto = true;
       _reportComposerError = null;
@@ -1785,6 +1788,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
 
     if (confirmed != true) return;
+    if (!mounted) return;
 
     setState(() => _sendingIntro = true);
 
@@ -2791,7 +2795,9 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           return available;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('_MemberDetailScreenState._lookupServiceAvailability error: $e');
+    }
     return null;
   }
 

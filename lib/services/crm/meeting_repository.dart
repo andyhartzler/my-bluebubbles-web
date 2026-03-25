@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
@@ -57,7 +59,7 @@ class MeetingRepository {
           .map(MeetingAttendance.fromJson)
           .toList();
     } catch (e) {
-      print('❌ Error fetching meeting attendance: $e');
+      debugPrint('❌ Error fetching meeting attendance: $e');
       rethrow;
     }
   }
@@ -87,7 +89,7 @@ class MeetingRepository {
       final baseRows = _coerceJsonList(response);
 
       if (baseRows.isEmpty) {
-        print(
+        debugPrint(
             '⚠️ Supabase returned 0 meetings for ${meetingId != null ? 'id $meetingId' : 'the current query'}');
         return const [];
       }
@@ -111,10 +113,10 @@ class MeetingRepository {
           .map((meeting) => meetingMap[meeting.id] ?? meeting)
           .toList(growable: false);
       ordered.sort((a, b) => b.meetingDate.compareTo(a.meetingDate));
-      print('✅ Loaded ${ordered.length} meeting(s) from Supabase');
+      debugPrint('✅ Loaded ${ordered.length} meeting(s) from Supabase');
       return ordered;
     } catch (e) {
-      print('❌ Error fetching meetings: $e');
+      debugPrint('❌ Error fetching meetings: $e');
       rethrow;
     }
   }
@@ -153,7 +155,7 @@ class MeetingRepository {
         }
       }
     } catch (e) {
-      print('⚠️ Failed to hydrate meeting hosts: $e');
+      debugPrint('⚠️ Failed to hydrate meeting hosts: $e');
     }
   }
 
@@ -204,7 +206,7 @@ class MeetingRepository {
         meetingMap[key] = meeting.copyWith(attendance: records);
       }
     } catch (e) {
-      print('⚠️ Failed to hydrate meeting attendance: $e');
+      debugPrint('⚠️ Failed to hydrate meeting attendance: $e');
     }
   }
 
@@ -244,7 +246,7 @@ class MeetingRepository {
         meetingMap[key] = meeting.copyWith(nonMemberAttendees: guests);
       }
     } catch (e) {
-      print('⚠️ Failed to hydrate non-member attendees: $e');
+      debugPrint('⚠️ Failed to hydrate non-member attendees: $e');
     }
   }
 
@@ -275,7 +277,7 @@ class MeetingRepository {
 
       return attendance;
     } catch (e) {
-      print('❌ Error fetching member meeting attendance: $e');
+      debugPrint('❌ Error fetching member meeting attendance: $e');
       rethrow;
     }
   }
@@ -306,7 +308,7 @@ class MeetingRepository {
       }
       return Meeting.fromJson(json, includeAttendance: includeAttendance);
     } catch (e) {
-      print('❌ Error updating meeting: $e');
+      debugPrint('❌ Error updating meeting: $e');
       rethrow;
     }
   }
@@ -342,7 +344,7 @@ class MeetingRepository {
       }
       return MeetingAttendance.fromJson(json);
     } catch (e) {
-      print('❌ Error updating meeting attendance: $e');
+      debugPrint('❌ Error updating meeting attendance: $e');
       rethrow;
     }
   }
@@ -406,7 +408,7 @@ class MeetingRepository {
       }
       return MeetingAttendance.fromJson(json);
     } catch (e) {
-      print('❌ Error upserting meeting attendance: $e');
+      debugPrint('❌ Error upserting meeting attendance: $e');
       rethrow;
     }
   }
@@ -420,7 +422,7 @@ class MeetingRepository {
           .delete()
           .eq('id', attendanceId);
     } catch (e) {
-      print('❌ Error deleting meeting attendance: $e');
+      debugPrint('❌ Error deleting meeting attendance: $e');
       rethrow;
     }
   }
@@ -442,7 +444,7 @@ class MeetingRepository {
       if (json == null) return null;
       return Meeting.fromJson(json, includeAttendance: false);
     } catch (e) {
-      print('❌ Error updating meeting committee: $e');
+      debugPrint('❌ Error updating meeting committee: $e');
       rethrow;
     }
   }
@@ -462,7 +464,7 @@ class MeetingRepository {
           .map((row) => NonMemberAttendee.fromJson(row))
           .toList();
     } catch (e) {
-      print('❌ Error fetching non-member attendees: $e');
+      debugPrint('❌ Error fetching non-member attendees: $e');
       rethrow;
     }
   }
@@ -490,7 +492,7 @@ class MeetingRepository {
       }
       return NonMemberAttendee.fromJson(json);
     } catch (e) {
-      print('❌ Error updating non-member attendee: $e');
+      debugPrint('❌ Error updating non-member attendee: $e');
       rethrow;
     }
   }
@@ -504,7 +506,7 @@ class MeetingRepository {
           .delete()
           .eq('id', attendeeId);
     } catch (e) {
-      print('❌ Error deleting non-member attendee: $e');
+      debugPrint('❌ Error deleting non-member attendee: $e');
       rethrow;
     }
   }
@@ -563,7 +565,7 @@ class MeetingRepository {
       }
       return MeetingAttendance.fromJson(json);
     } catch (e) {
-      print('❌ Error linking non-member attendee: $e');
+      debugPrint('❌ Error linking non-member attendee: $e');
       rethrow;
     }
   }

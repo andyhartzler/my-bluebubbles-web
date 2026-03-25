@@ -87,9 +87,12 @@ class _IframeState extends State<Iframe> {
                   final reason = (jsData as dynamic).reason;
                   if (success != null) data['success'] = success;
                   if (reason != null) data['reason'] = reason.toString();
-                } catch (_) {}
+                } catch (e) {
+                  debugPrint('_IframeState._onMessage parse fields error: $e');
+                }
               }
-            } catch (_) {
+            } catch (e) {
+              debugPrint('_IframeState._onMessage error: $e');
               return;
             }
           }

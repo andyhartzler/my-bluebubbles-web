@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/form_template_db.dart';
 import '../../../services/crm/supabase_service.dart';
@@ -42,7 +43,7 @@ class FormTemplatesService {
       }
     } catch (e) {
       // On realtime subscription error, yield data from one-time fetch
-      print('FormTemplatesService.watchTemplates: Realtime subscription failed, using fallback: $e');
+      debugPrint('FormTemplatesService.watchTemplates: Realtime subscription failed, using fallback: $e');
       final fallbackData = await fetchTemplates(category: category);
       yield fallbackData;
     }

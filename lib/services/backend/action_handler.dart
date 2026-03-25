@@ -501,7 +501,9 @@ class ActionHandler extends GetxService {
         try {
           final item = IncomingItem.fromMap(QueueType.updatedMessage, data);
           ah.handleNewOrUpdatedChat(item.chat);
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('ActionHandler.handleEvent error: $e');
+        }
         return;
       case "chat-read-status-changed":
         Chat? chat = Chat.findOne(guid: data["chatGuid"]);

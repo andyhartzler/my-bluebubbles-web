@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/job.dart';
 import '../models/job_application.dart';
@@ -686,7 +687,7 @@ class JobsService {
       }
       return members;
     } catch (e) {
-      print('⚠️ Error fetching members by IDs: $e');
+      debugPrint('⚠️ Error fetching members by IDs: $e');
       return {};
     }
   }
@@ -1232,10 +1233,10 @@ class JobsService {
   Future<JobAnalyticsSummary> getJobAnalyticsSummary(String jobId) async {
     try {
       final interactions = await getJobMemberInteractions(jobId, limit: 1000);
-      print('📊 Loaded ${interactions.length} member interactions for job $jobId');
+      debugPrint('📊 Loaded ${interactions.length} member interactions for job $jobId');
       return JobAnalyticsSummary.fromInteractions(jobId, interactions);
     } catch (e) {
-      print('⚠️ Error fetching job analytics summary: $e');
+      debugPrint('⚠️ Error fetching job analytics summary: $e');
       return JobAnalyticsSummary(jobId: jobId);
     }
   }
@@ -1264,7 +1265,7 @@ class JobsService {
           .map((json) => JobAnalyticsEvent.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print('⚠️ Error fetching job analytics events: $e');
+      debugPrint('⚠️ Error fetching job analytics events: $e');
       return [];
     }
   }
@@ -1323,7 +1324,7 @@ class JobsService {
         return JobMemberInteraction.fromJson(data);
       }).toList();
     } catch (e) {
-      print('⚠️ Error fetching job member interactions: $e');
+      debugPrint('⚠️ Error fetching job member interactions: $e');
       return [];
     }
   }
@@ -1582,7 +1583,7 @@ class JobsService {
 
       return locations;
     } catch (e) {
-      print('⚠️ Error fetching job view locations: $e');
+      debugPrint('⚠️ Error fetching job view locations: $e');
       return [];
     }
   }

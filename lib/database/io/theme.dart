@@ -63,7 +63,9 @@ class ThemeStruct {
         } else if (id == null || existing == null) {
           id = Database.themes.put(this);
         }
-      } on UniqueViolationException catch (_) {}
+      } on UniqueViolationException catch (e) {
+        debugPrint('ThemeStruct.save UniqueViolation: $e');
+      }
     });
     return this;
   }

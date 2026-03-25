@@ -157,7 +157,7 @@ class LegislationService {
         offset += batchSize;
       } catch (e) {
         // If pagination fails, return what we have so far
-        print('Error fetching bills at offset $offset: $e');
+        debugPrint('Error fetching bills at offset $offset: $e');
         break;
       }
     }
@@ -839,7 +839,7 @@ class LegislationService {
         }
       } catch (e) {
         // Silently fail - author info is optional
-        print('Error fetching author info: $e');
+        debugPrint('Error fetching author info: $e');
       }
     }
 

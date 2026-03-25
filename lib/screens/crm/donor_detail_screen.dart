@@ -931,7 +931,9 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
           return available;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('_DonorDetailScreenState._lookupServiceAvailability error: $e');
+    }
     return null;
   }
 

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import '../models/tracked_bill.dart';
@@ -243,7 +244,7 @@ class AiAnalysisService {
 
       return true;
     } catch (e) {
-      print('Error applying AI recommendations: $e');
+      debugPrint('Error applying AI recommendations: $e');
       return false;
     }
   }
@@ -322,7 +323,7 @@ class AiAnalysisService {
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
     } catch (e) {
-      print('Error fetching analysis history: $e');
+      debugPrint('Error fetching analysis history: $e');
       return [];
     }
   }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:collection/collection.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -872,7 +873,9 @@ class MemberInternalInfo {
       for (final item in value) {
         try {
           entries.add(MemberInternalReportEntry.fromJson(item));
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Member._parseReports entry parse error: $e');
+        }
       }
       return entries;
     }
@@ -891,7 +894,9 @@ class MemberInternalInfo {
 
       try {
         return [MemberInternalReportEntry.fromJson(normalizedMap)];
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Member._parseReports map parse error: $e');
+      }
 
       final firstIterable =
           normalizedMap.values.whereType<Iterable>().firstOrNull;
@@ -913,10 +918,13 @@ class MemberInternalInfo {
         if (parsed.isNotEmpty) {
           return parsed;
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Member._parseReports string decode error: $e');
+      }
       try {
         return [MemberInternalReportEntry.fromJson(trimmed)];
-      } catch (_) {
+      } catch (e) {
+        debugPrint('Member._parseReports string fallback parse error: $e');
         return const [];
       }
     }
@@ -1018,7 +1026,9 @@ class _ParsedInternalInfo {
         if (parsed != null) {
           return parsed;
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('_ParsedInternalInfo.tryParse decode error: $e');
+      }
 
       final normalizedValue = MemberInternalInfo._normalizeValue(trimmed);
       if (normalizedValue == null) return null;
@@ -1078,10 +1088,13 @@ class MemberProfilePhoto {
           final decoded = jsonDecode(trimmed);
           pending.add(decoded);
           continue;
-        } catch (_) {
+        } catch (e) {
+          debugPrint('MemberProfilePhoto.parseList JSON decode error: $e');
           try {
             photos.add(MemberProfilePhoto.fromJson(trimmed));
-          } catch (_) {}
+          } catch (e2) {
+            debugPrint('MemberProfilePhoto.parseList fromJson fallback error: $e2');
+          }
           continue;
         }
       }
@@ -1100,7 +1113,9 @@ class MemberProfilePhoto {
         if (_looksLikePhotoEntry(normalizedMap)) {
           try {
             photos.add(MemberProfilePhoto.fromJson(normalizedMap));
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('MemberProfilePhoto.parseList fromJson map error: $e');
+          }
           continue;
         }
 
@@ -1162,7 +1177,9 @@ class MemberProfilePhoto {
 
       try {
         photos.add(MemberProfilePhoto.fromJson(current));
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('MemberProfilePhoto.parseList fromJson generic error: $e');
+      }
     }
 
     if (photos.isEmpty) return const [];
@@ -1545,7 +1562,9 @@ class MemberInternalReportEntry {
         for (final item in attachmentsValue) {
           try {
             attachments.add(MemberInternalReportAttachment.fromJson(item));
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('MemberInternalReportEntry.fromJson attachment parse error: $e');
+          }
         }
       }
 

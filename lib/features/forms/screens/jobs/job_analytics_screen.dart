@@ -88,7 +88,9 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
       if (mounted) {
         setState(() => _job = job);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('_JobAnalyticsScreenState._refreshJob error: $e');
+    }
   }
 
   Future<void> _loadAnalytics() async {
@@ -127,7 +129,9 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
       if (mounted) {
         setState(() => _applicationCount = count);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('_JobAnalyticsScreenState._loadApplicationCount error: $e');
+    }
   }
 
   Future<void> _loadNotificationLogs() async {
@@ -217,7 +221,9 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('_JobAnalyticsScreenState._openInBrowser error: $e');
+    }
   }
 
   Widget _buildOverviewTab(ThemeData theme) {
@@ -2487,7 +2493,9 @@ class _JobAnalyticsScreenState extends State<JobAnalyticsScreen>
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('_JobAnalyticsScreenState._launchUrl error: $e');
+    }
   }
 
   void _editJob() {

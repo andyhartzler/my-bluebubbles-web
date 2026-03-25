@@ -310,7 +310,9 @@ class QuickLinksRepository {
   Future<void> removeStorageReference(String bucket, String path) async {
     try {
       await _writeClient.storage.from(bucket).remove([path]);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('QuickLinksRepository.removeStorageReference error: $e');
+    }
   }
 
   Future<Map<String, dynamic>> _uploadQuickLinkFile(PlatformFile file) async {
@@ -519,7 +521,9 @@ class QuickLinksRepository {
       if (url.isNotEmpty) {
         return url;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('QuickLinksRepository._buildPublicUrl error: $e');
+    }
 
     final supabaseUrl = CRMConfig.supabaseUrl;
     if (supabaseUrl.isEmpty) {
