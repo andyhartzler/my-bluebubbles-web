@@ -17,7 +17,7 @@ import 'package:bluebubbles/features/committees/screens/committee_workspace_scre
 import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
 import 'package:bluebubbles/features/ai_assistant/screens/ai_assistant_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
-import 'package:bluebubbles/screens/crm/donors_screen.dart';
+import 'package:bluebubbles/screens/crm/donor_command_center.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
 import 'package:bluebubbles/screens/crm/subscribers_screen.dart';
@@ -1136,7 +1136,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _openDonorsScreen(BuildContext context) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
-        builder: (_) => TitleBarWrapper(child: DonorsScreen()),
+        builder: (_) => TitleBarWrapper(child: const DonorCommandCenter()),
       ),
     );
   }
