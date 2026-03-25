@@ -124,7 +124,7 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
       final schools = distribution.keys.toList()..sort();
       return schools;
     } catch (e) {
-      print('Error loading schools: $e');
+      debugPrint('Error loading schools: $e');
       return [];
     }
   }

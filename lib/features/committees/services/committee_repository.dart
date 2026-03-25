@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 
@@ -38,7 +39,7 @@ class CommitteeRepository {
       final data = await query;
       return _mapMembers(data as List<dynamic>);
     } catch (e) {
-      print('Error fetching committee members: $e');
+      debugPrint('Error fetching committee members: $e');
       return [];
     }
   }
@@ -55,7 +56,7 @@ class CommitteeRepository {
           .count(CountOption.exact);
       return response.count ?? 0;
     } catch (e) {
-      print('Error counting committee members: $e');
+      debugPrint('Error counting committee members: $e');
       return 0;
     }
   }
@@ -98,7 +99,7 @@ class CommitteeRepository {
 
       return true;
     } catch (e) {
-      print('Error adding member to committee: $e');
+      debugPrint('Error adding member to committee: $e');
       return false;
     }
   }
@@ -136,7 +137,7 @@ class CommitteeRepository {
 
       return true;
     } catch (e) {
-      print('Error removing member from committee: $e');
+      debugPrint('Error removing member from committee: $e');
       return false;
     }
   }
@@ -172,7 +173,7 @@ class CommitteeRepository {
 
       return filtered.take(50).toList(); // Limit results
     } catch (e) {
-      print('Error fetching non-committee members: $e');
+      debugPrint('Error fetching non-committee members: $e');
       return [];
     }
   }
@@ -205,7 +206,7 @@ class CommitteeRepository {
       }
       return leaders;
     } catch (e) {
-      print('Error fetching committee leadership: $e');
+      debugPrint('Error fetching committee leadership: $e');
       return [];
     }
   }
@@ -250,7 +251,7 @@ class CommitteeRepository {
         specificStats: specificStats,
       );
     } catch (e) {
-      print('Error getting committee stats: $e');
+      debugPrint('Error getting committee stats: $e');
       return const CommitteeStats();
     }
   }
@@ -284,7 +285,7 @@ class CommitteeRepository {
           break;
       }
     } catch (e) {
-      print('Error getting specific stats for ${committee.name}: $e');
+      debugPrint('Error getting specific stats for ${committee.name}: $e');
     }
 
     return stats;
@@ -337,7 +338,9 @@ class CommitteeRepository {
               if (decoded is Map) {
                 metrics = Map<String, dynamic>.from(decoded);
               }
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('CommitteeRepository.fetchSocialMediaMetrics parse error: $e');
+            }
           }
 
           if (metrics != null) {
@@ -375,7 +378,7 @@ class CommitteeRepository {
       stats['totalImpressions'] = totalImpressions;
       stats['totalFollowers'] = totalFollowers;
     } catch (e) {
-      print('Error getting communications stats: $e');
+      debugPrint('Error getting communications stats: $e');
       stats['totalImpressions'] = 0;
       stats['totalFollowers'] = 0;
     }
@@ -410,7 +413,7 @@ class CommitteeRepository {
           .count(CountOption.exact);
       stats['upcomingEvents'] = upcomingResponse.count ?? 0;
     } catch (e) {
-      print('Error getting political affairs stats: $e');
+      debugPrint('Error getting political affairs stats: $e');
       stats['totalEvents'] = 0;
       stats['upcomingEvents'] = 0;
     }
@@ -437,7 +440,7 @@ class CommitteeRepository {
           .maybeSingle();
       stats['totalBillsTracked'] = legislationStatsResponse?['total_bills'] ?? 0;
     } catch (e) {
-      print('Error getting policy & advocacy stats: $e');
+      debugPrint('Error getting policy & advocacy stats: $e');
       stats['totalAdvocacyEmailsGenerated'] = 0;
       stats['totalBillsTracked'] = 0;
     }
@@ -464,7 +467,7 @@ class CommitteeRepository {
           .count(CountOption.exact);
       stats['activeMembers'] = activeResponse.count ?? 0;
     } catch (e) {
-      print('Error getting membership & outreach stats: $e');
+      debugPrint('Error getting membership & outreach stats: $e');
       stats['totalMembers'] = 0;
       stats['activeMembers'] = 0;
     }
@@ -496,7 +499,7 @@ class CommitteeRepository {
       }
       stats['totalRaised'] = totalRaised;
     } catch (e) {
-      print('Error getting fundraising stats: $e');
+      debugPrint('Error getting fundraising stats: $e');
       stats['totalDonors'] = 0;
       stats['totalRaised'] = 0.0;
     }
@@ -543,7 +546,7 @@ class CommitteeRepository {
       }
       stats['uniqueColleges'] = uniqueColleges.length;
     } catch (e) {
-      print('Error getting college democrats stats: $e');
+      debugPrint('Error getting college democrats stats: $e');
       stats['totalCollegeChapters'] = 0;
       stats['charteredCollegeChapters'] = 0;
       stats['uniqueColleges'] = 0;
@@ -591,7 +594,7 @@ class CommitteeRepository {
       }
       stats['uniqueHighSchools'] = uniqueHS.length;
     } catch (e) {
-      print('Error getting high school democrats stats: $e');
+      debugPrint('Error getting high school democrats stats: $e');
       stats['totalHSChapters'] = 0;
       stats['charteredHSChapters'] = 0;
       stats['uniqueHighSchools'] = 0;
@@ -629,7 +632,7 @@ class CommitteeRepository {
       }
       return distribution;
     } catch (e) {
-      print('Error getting college distribution: $e');
+      debugPrint('Error getting college distribution: $e');
       return {};
     }
   }
@@ -663,7 +666,7 @@ class CommitteeRepository {
       }
       return distribution;
     } catch (e) {
-      print('Error getting high school distribution: $e');
+      debugPrint('Error getting high school distribution: $e');
       return {};
     }
   }
@@ -687,7 +690,7 @@ class CommitteeRepository {
       }
       return null;
     } catch (e) {
-      print('Error getting Slack channel ID: $e');
+      debugPrint('Error getting Slack channel ID: $e');
       return null;
     }
   }
@@ -719,7 +722,7 @@ class CommitteeRepository {
       }
       return mappings;
     } catch (e) {
-      print('Error getting Slack user mappings: $e');
+      debugPrint('Error getting Slack user mappings: $e');
       return {};
     }
   }
@@ -735,11 +738,11 @@ class CommitteeRepository {
     try {
       final channelId = await getSlackChannelId(committeeName);
       if (channelId == null) {
-        print('No channel ID found for committee: $committeeName');
+        debugPrint('No channel ID found for committee: $committeeName');
         return [];
       }
 
-      print('Fetching messages for channel: $channelId (committee: $committeeName)');
+      debugPrint('Fetching messages for channel: $channelId (committee: $committeeName)');
 
       // Query messages without join - user info will be matched via getSlackUserMappings
       final data = await _readClient
@@ -749,10 +752,10 @@ class CommitteeRepository {
           .order('posted_at', ascending: false)
           .range(offset, offset + limit - 1);
 
-      print('Found ${(data as List).length} messages');
+      debugPrint('Found ${(data as List).length} messages');
       return (data as List<dynamic>).cast<Map<String, dynamic>>();
     } catch (e) {
-      print('Error getting Slack messages: $e');
+      debugPrint('Error getting Slack messages: $e');
       return [];
     }
   }
@@ -775,7 +778,7 @@ class CommitteeRepository {
 
       return (data as List<dynamic>).cast<Map<String, dynamic>>();
     } catch (e) {
-      print('Error getting Slack messages by channel ID: $e');
+      debugPrint('Error getting Slack messages by channel ID: $e');
       return [];
     }
   }
@@ -839,7 +842,7 @@ class CommitteeRepository {
         'participants': records.take(100).toList(),
       };
     } catch (e) {
-      print('Error getting advocacy campaign data: $e');
+      debugPrint('Error getting advocacy campaign data: $e');
       return {
         'totalGenerated': 0,
         'totalSent': 0,
@@ -938,7 +941,7 @@ class CommitteeRepository {
         'participants': enrichedParticipants,
       };
     } catch (e) {
-      print('Error getting enriched campaign data: $e');
+      debugPrint('Error getting enriched campaign data: $e');
       return _emptyEnrichedData();
     }
   }
@@ -977,7 +980,7 @@ class CommitteeRepository {
       }
       return members;
     } catch (e) {
-      print('Error fetching members by email: $e');
+      debugPrint('Error fetching members by email: $e');
       return {};
     }
   }
@@ -1003,7 +1006,7 @@ class CommitteeRepository {
       }
       return subscribers;
     } catch (e) {
-      print('Error fetching subscribers by email: $e');
+      debugPrint('Error fetching subscribers by email: $e');
       return {};
     }
   }
@@ -1058,7 +1061,7 @@ class CommitteeRepository {
 
       return 0;
     } catch (e) {
-      print('Error getting Slack message count for committee: $e');
+      debugPrint('Error getting Slack message count for committee: $e');
       return 0;
     }
   }
@@ -1083,7 +1086,7 @@ class CommitteeRepository {
           .count(CountOption.exact);
       stats['slackMessages'] = slackResponse.count ?? 0;
     } catch (e) {
-      print('Error getting Slack messages count: $e');
+      debugPrint('Error getting Slack messages count: $e');
       stats['slackMessages'] = 0;
     }
 
@@ -1125,7 +1128,9 @@ class CommitteeRepository {
               if (decoded is Map) {
                 metrics = Map<String, dynamic>.from(decoded);
               }
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('CommitteeRepository.fetchSocialMediaDetails parse error: $e');
+            }
           }
 
           if (metrics != null) {
@@ -1149,7 +1154,7 @@ class CommitteeRepository {
 
       stats['totalImpressions'] = totalImpressions;
     } catch (e) {
-      print('Error getting impressions count: $e');
+      debugPrint('Error getting impressions count: $e');
       stats['totalImpressions'] = 0;
     }
 
@@ -1177,7 +1182,7 @@ class CommitteeRepository {
       }
       stats['countiesRepresented'] = uniqueCounties.length;
     } catch (e) {
-      print('Error getting counties count: $e');
+      debugPrint('Error getting counties count: $e');
       stats['countiesRepresented'] = 0;
     }
 
@@ -1214,7 +1219,7 @@ class CommitteeRepository {
 
       return _mapMembers(data as List<dynamic>);
     } catch (e) {
-      print('Error searching members: $e');
+      debugPrint('Error searching members: $e');
       return [];
     }
   }
@@ -1233,7 +1238,7 @@ class CommitteeRepository {
       if (data == null) return null;
       return Member.fromJson(data);
     } catch (e) {
-      print('Error fetching member by ID: $e');
+      debugPrint('Error fetching member by ID: $e');
       return null;
     }
   }
@@ -1251,7 +1256,7 @@ class CommitteeRepository {
 
       return data;
     } catch (e) {
-      print('Error fetching committee config: $e');
+      debugPrint('Error fetching committee config: $e');
       return null;
     }
   }
@@ -1278,7 +1283,7 @@ class CommitteeRepository {
       }
       return _defaultCommitteeTools;
     } catch (e) {
-      print('Error fetching committee tools: $e');
+      debugPrint('Error fetching committee tools: $e');
       return _defaultCommitteeTools;
     }
   }
@@ -1298,7 +1303,7 @@ class CommitteeRepository {
           .maybeSingle();
 
       if (existing == null) {
-        print('Committee not found: $committeeName');
+        debugPrint('Committee not found: $committeeName');
         return false;
       }
 
@@ -1309,7 +1314,7 @@ class CommitteeRepository {
 
       return true;
     } catch (e) {
-      print('Error updating committee tools: $e');
+      debugPrint('Error updating committee tools: $e');
       return false;
     }
   }
@@ -1328,7 +1333,7 @@ class CommitteeRepository {
       if (data == null) return false;
       return data['workspace_enabled'] == true;
     } catch (e) {
-      print('Error checking workspace enabled: $e');
+      debugPrint('Error checking workspace enabled: $e');
       return false;
     }
   }
@@ -1372,7 +1377,7 @@ class CommitteeRepository {
 
       return results;
     } catch (e) {
-      print('Error fetching workspace enabled status: $e');
+      debugPrint('Error fetching workspace enabled status: $e');
       return {for (final name in committeeNames) name: false};
     }
   }
@@ -1392,7 +1397,7 @@ class CommitteeRepository {
           .maybeSingle();
 
       if (existing == null) {
-        print('Committee not found: $committeeName');
+        debugPrint('Committee not found: $committeeName');
         return false;
       }
 
@@ -1403,7 +1408,7 @@ class CommitteeRepository {
 
       return true;
     } catch (e) {
-      print('Error updating workspace enabled: $e');
+      debugPrint('Error updating workspace enabled: $e');
       return false;
     }
   }
@@ -1427,7 +1432,7 @@ class CommitteeRepository {
         'mobile': data['legislation_dashboard_mobile_config'] as Map<String, dynamic>?,
       };
     } catch (e) {
-      print('Error fetching legislation dashboard layouts: $e');
+      debugPrint('Error fetching legislation dashboard layouts: $e');
       return {'desktop': null, 'mobile': null};
     }
   }
@@ -1446,7 +1451,7 @@ class CommitteeRepository {
           .maybeSingle();
 
       if (existing == null) {
-        print('Committee not found: $committeeName');
+        debugPrint('Committee not found: $committeeName');
         return false;
       }
 
@@ -1457,7 +1462,7 @@ class CommitteeRepository {
 
       return true;
     } catch (e) {
-      print('Error updating legislation dashboard desktop layout: $e');
+      debugPrint('Error updating legislation dashboard desktop layout: $e');
       return false;
     }
   }
@@ -1476,7 +1481,7 @@ class CommitteeRepository {
           .maybeSingle();
 
       if (existing == null) {
-        print('Committee not found: $committeeName');
+        debugPrint('Committee not found: $committeeName');
         return false;
       }
 
@@ -1487,7 +1492,7 @@ class CommitteeRepository {
 
       return true;
     } catch (e) {
-      print('Error updating legislation dashboard mobile layout: $e');
+      debugPrint('Error updating legislation dashboard mobile layout: $e');
       return false;
     }
   }

@@ -124,7 +124,9 @@ class Handle {
       }
       try {
         id = Database.handles.put(this);
-      } on UniqueViolationException catch (_) {}
+      } on UniqueViolationException catch (e) {
+        debugPrint('Handle.save UniqueViolation: $e');
+      }
     });
     return this;
   }

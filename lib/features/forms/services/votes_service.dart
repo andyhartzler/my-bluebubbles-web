@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/voting_form.dart';
 import '../models/vote_analytics.dart';
@@ -380,7 +381,7 @@ class VotesService {
       );
     } catch (e) {
       // Log but don't fail the vote if analytics fail
-      print('Warning: Failed to track vote analytics: $e');
+      debugPrint('Warning: Failed to track vote analytics: $e');
     }
 
     // Send confirmation messages and emails if enabled
@@ -396,7 +397,7 @@ class VotesService {
         );
       } catch (e) {
         // Log but don't fail the vote if confirmations fail
-        print('Warning: Failed to send vote confirmations: $e');
+        debugPrint('Warning: Failed to send vote confirmations: $e');
       }
     }
   }
@@ -613,7 +614,7 @@ class VotesService {
         dailyActivity: dailyActivity,
       );
     } catch (e) {
-      print('Error getting vote analytics: $e');
+      debugPrint('Error getting vote analytics: $e');
       return VoteAnalytics.empty(voteId);
     }
   }
@@ -834,7 +835,7 @@ class VotesService {
         return (response as List).length;
       }
     } catch (e) {
-      print('Error getting eligible voters count: $e');
+      debugPrint('Error getting eligible voters count: $e');
       return 0;
     }
   }

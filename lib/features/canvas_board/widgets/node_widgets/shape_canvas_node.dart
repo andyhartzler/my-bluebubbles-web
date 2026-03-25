@@ -26,7 +26,9 @@ class ShapeCanvasNode extends StatelessWidget {
       try {
         final hex = node.shapeColor!.replaceAll('#', '');
         return Color(int.parse('FF$hex', radix: 16));
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('ShapeCanvasNode.shapeColor parse error: $e');
+      }
     }
     return Colors.blue;
   }

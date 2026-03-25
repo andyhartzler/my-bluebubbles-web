@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/form_schema.dart';
 import '../models/form_submission.dart';
@@ -50,7 +51,7 @@ class FormsService {
       }
     } catch (e) {
       // On realtime subscription error, yield data from one-time fetch
-      print('FormsService.watchForms: Realtime subscription failed, using fallback: $e');
+      debugPrint('FormsService.watchForms: Realtime subscription failed, using fallback: $e');
       final fallbackData = await fetchForms(typeFilter);
       yield fallbackData;
     }
@@ -75,7 +76,7 @@ class FormsService {
       }
       return response.map((json) => FormSchema.fromJson(json as Map<String, dynamic>)).toList();
     } catch (e) {
-      print('FormsService.fetchForms: Error fetching forms: $e');
+      debugPrint('FormsService.fetchForms: Error fetching forms: $e');
       rethrow;
     }
   }
@@ -256,9 +257,9 @@ class FormsService {
           .delete()
           .eq('id', id);
 
-      print('FormsService.deleteForm: Successfully deleted form $id');
+      debugPrint('FormsService.deleteForm: Successfully deleted form $id');
     } catch (e) {
-      print('FormsService.deleteForm: Error deleting form $id: $e');
+      debugPrint('FormsService.deleteForm: Error deleting form $id: $e');
       rethrow;
     }
   }
@@ -289,7 +290,7 @@ class FormsService {
       if (response == null) return null;
       return FormSubmission.fromJson(response);
     } catch (e) {
-      print('FormsService.getSubmission: Error fetching submission: $e');
+      debugPrint('FormsService.getSubmission: Error fetching submission: $e');
       return null;
     }
   }
@@ -322,19 +323,19 @@ class FormsService {
           .order('created_at', ascending: false);
 
       final data = response as List;
-      print('FormsService.getSubmissions: Found ${data.length} submissions for form $formId (using ${_crmService.hasServiceRole ? "service role" : "anon"} client)');
+      debugPrint('FormsService.getSubmissions: Found ${data.length} submissions for form $formId (using ${_crmService.hasServiceRole ? "service role" : "anon"} client)');
 
       return data.map((json) {
         try {
           return FormSubmission.fromJson(json as Map<String, dynamic>);
         } catch (e) {
-          print('FormsService.getSubmissions: Error parsing submission: $e');
-          print('FormsService.getSubmissions: Raw JSON: $json');
+          debugPrint('FormsService.getSubmissions: Error parsing submission: $e');
+          debugPrint('FormsService.getSubmissions: Raw JSON: $json');
           rethrow;
         }
       }).toList();
     } catch (e) {
-      print('FormsService.getSubmissions: Error fetching submissions: $e');
+      debugPrint('FormsService.getSubmissions: Error fetching submissions: $e');
       rethrow;
     }
   }
@@ -353,7 +354,7 @@ class FormsService {
         return FormSubmission.fromJson(json as Map<String, dynamic>);
       }).toList();
     } catch (e) {
-      print('FormsService.getSubmissionsBySubscriberId: Error fetching submissions: $e');
+      debugPrint('FormsService.getSubmissionsBySubscriberId: Error fetching submissions: $e');
       return [];
     }
   }
@@ -372,7 +373,7 @@ class FormsService {
         return FormSubmission.fromJson(json as Map<String, dynamic>);
       }).toList();
     } catch (e) {
-      print('FormsService.getSubmissionsByMemberId: Error fetching submissions: $e');
+      debugPrint('FormsService.getSubmissionsByMemberId: Error fetching submissions: $e');
       return [];
     }
   }
@@ -414,7 +415,7 @@ class FormsService {
         );
       } catch (e) {
         // Log but don't fail the submission if confirmations fail
-        print('Warning: Failed to send form confirmations: $e');
+        debugPrint('Warning: Failed to send form confirmations: $e');
       }
     }
 

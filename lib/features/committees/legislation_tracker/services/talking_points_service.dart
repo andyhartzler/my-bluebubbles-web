@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 
@@ -131,7 +132,7 @@ class TalkingPointsService {
       });
     } catch (e) {
       // Silently fail - analytics shouldn't break UX
-      print('Failed to track copy: $e');
+      debugPrint('Failed to track copy: $e');
     }
   }
 
@@ -144,7 +145,7 @@ class TalkingPointsService {
       });
     } catch (e) {
       // Silently fail
-      print('Failed to track share: $e');
+      debugPrint('Failed to track share: $e');
     }
   }
 
@@ -161,7 +162,7 @@ class TalkingPointsService {
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
     } catch (e) {
-      print('Error fetching talking points history: $e');
+      debugPrint('Error fetching talking points history: $e');
       return [];
     }
   }

@@ -62,7 +62,9 @@ class Contact {
       }
       try {
         dbId = Database.contacts.put(this);
-      } on UniqueViolationException catch (_) {}
+      } on UniqueViolationException catch (e) {
+        debugPrint('Contact.save UniqueViolation: $e');
+      }
     });
     return this;
   }

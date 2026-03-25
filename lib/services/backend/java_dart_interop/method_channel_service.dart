@@ -38,7 +38,9 @@ class MethodChannelService extends GetxService {
           BackgroundIsolate.initialize();
         }
         // chromeOS = await mcs.invokeMethod("check-chromeos") ?? false;
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('MethodChannelService.init error: $e');
+      }
     }
 
     Logger.debug("MethodChannelService initialized");

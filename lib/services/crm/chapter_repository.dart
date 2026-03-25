@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:bluebubbles/models/crm/chapter.dart';
 import 'package:bluebubbles/models/crm/chapter_document.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
@@ -38,7 +40,7 @@ class ChapterRepository {
           .map((json) => Chapter.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print('❌ Error fetching chapters: $e');
+      debugPrint('❌ Error fetching chapters: $e');
       return [];
     }
   }
@@ -57,7 +59,7 @@ class ChapterRepository {
           .map((json) => ChapterDocument.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print('❌ Error fetching chapter documents: $e');
+      debugPrint('❌ Error fetching chapter documents: $e');
       return [];
     }
   }
@@ -185,7 +187,7 @@ class ChapterRepository {
       }
       throw const FormatException('Supabase returned an unexpected chapter payload');
     } catch (e) {
-      print('❌ Error updating chapter: $e');
+      debugPrint('❌ Error updating chapter: $e');
       rethrow;
     }
   }

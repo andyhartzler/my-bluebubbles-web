@@ -544,7 +544,9 @@ class _ServerManagementPanelState extends CustomState<ServerManagementPanel, voi
                                   builder: (context) => SyncDialog(manager: manager!),
                                 );
                                 await manager!.start();
-                              } catch (_) {}
+                              } catch (e) {
+                                debugPrint('_ServerManagementPanelState.incrementalSync error: $e');
+                              }
                               Get.back();
                               manager = null;
                               sync.isIncrementalSyncing.value = false;

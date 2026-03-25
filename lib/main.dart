@@ -195,7 +195,9 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
             tz.setLocalLocation(
               tz.getLocation(await FlutterTimezone.getLocalTimezone()),
             );
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('main.initTimezone error: $e');
+          }
 
           /* ----- MLKIT INITIALIZATION ----- */
           if (!await EntityExtractorModelManager().isModelDownloaded(

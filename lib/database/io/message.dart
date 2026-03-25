@@ -423,7 +423,9 @@ class Message {
       if (json["metadata"] is String) {
         try {
           metadata = jsonDecode(json["metadata"]);
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Message.fromMap metadata parse error: $e');
+        }
       } else {
         metadata = json["metadata"]?.cast<String, Object>();
       }
@@ -523,7 +525,9 @@ class Message {
       try {
         if (chat != null) this.chat.target = chat;
         id = Database.messages.put(this);
-      } on UniqueViolationException catch (_) {}
+      } on UniqueViolationException catch (e) {
+        debugPrint('Message.save UniqueViolation: $e');
+      }
     });
     return this;
   }
@@ -589,7 +593,9 @@ class Message {
         for (int i = 0; i < messages.length; i++) {
           messages[i].id = ids[i];
         }
-      } on UniqueViolationException catch (_) {}
+      } on UniqueViolationException catch (e) {
+        debugPrint('Message.bulkSaveNewMessages UniqueViolation: $e');
+      }
     });
     return messages;
   }

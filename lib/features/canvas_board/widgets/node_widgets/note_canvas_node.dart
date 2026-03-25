@@ -40,7 +40,9 @@ class NoteCanvasNode extends StatelessWidget {
       try {
         final hex = node.noteColor!.replaceAll('#', '');
         return Color(int.parse('FF$hex', radix: 16));
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('NoteCanvasNode.noteColor parse error: $e');
+      }
     }
     return defaultColors[0];
   }

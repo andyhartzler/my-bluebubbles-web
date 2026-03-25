@@ -81,7 +81,9 @@ class _FindMyPageState extends OptimizedState<FindMyPage> with SingleTickerProvi
           buildFriendMarker(friend);
           setState(() {});
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('_FindMyPageState.initState location update error: $e');
+      }
     });
 
     // Allow users to refresh after 30sec

@@ -183,7 +183,7 @@ class MemberRepository {
       }
       return MemberFetchResult(members: members);
     } catch (e) {
-      print('❌ Error fetching members: $e');
+      debugPrint('❌ Error fetching members: $e');
       rethrow;
     }
   }
@@ -390,7 +390,7 @@ class MemberRepository {
 
       return Member.fromJson(response as Map<String, dynamic>);
     } catch (e) {
-      print('❌ Error fetching member by ID: $e');
+      debugPrint('❌ Error fetching member by ID: $e');
       return null;
     }
   }
@@ -431,7 +431,7 @@ class MemberRepository {
 
       throw FormatException('Unexpected response type: ${response.runtimeType}');
     } catch (e) {
-      print('❌ Error fetching member by phone: $e');
+      debugPrint('❌ Error fetching member by phone: $e');
       return null;
     }
   }
@@ -493,7 +493,7 @@ class MemberRepository {
       debugPrint('[MemberRepository] Returning ${result.length} photo URLs');
       return result;
     } catch (e, stackTrace) {
-      print('❌ Error fetching member photos by emails: $e');
+      debugPrint('❌ Error fetching member photos by emails: $e');
       debugPrint('[MemberRepository] Stack trace: $stackTrace');
       return {};
     }
@@ -522,7 +522,7 @@ class MemberRepository {
       counties.sort();
       return counties;
     } catch (e) {
-      print('❌ Error fetching counties: $e');
+      debugPrint('❌ Error fetching counties: $e');
       return [];
     }
   }
@@ -573,7 +573,7 @@ class MemberRepository {
 
       return _sortCounts(counts);
     } catch (e) {
-      print('❌ Error aggregating committee counts: $e');
+      debugPrint('❌ Error aggregating committee counts: $e');
       return {};
     }
   }
@@ -601,7 +601,7 @@ class MemberRepository {
 
       return _sortCounts(counts);
     } catch (e) {
-      print('❌ Error aggregating leadership counts: $e');
+      debugPrint('❌ Error aggregating leadership counts: $e');
       return {};
     }
   }
@@ -636,7 +636,7 @@ class MemberRepository {
 
       return AgeBounds(min: minAge, max: maxAge);
     } catch (e) {
-      print('❌ Error computing age bounds: $e');
+      debugPrint('❌ Error computing age bounds: $e');
       return const AgeBounds();
     }
   }
@@ -741,7 +741,7 @@ class MemberRepository {
 
       return cleaned.isEmpty ? {} : cleaned;
     } catch (e) {
-      print('❌ Error computing age buckets: $e');
+      debugPrint('❌ Error computing age buckets: $e');
       return {};
     }
   }
@@ -777,7 +777,7 @@ class MemberRepository {
           .map((json) => Member.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print('❌ Error fetching recent members: $e');
+      debugPrint('❌ Error fetching recent members: $e');
       return [];
     }
   }
@@ -820,7 +820,7 @@ class MemberRepository {
     }
 
     if (lastError != null) {
-      print('⚠️ Falling back to local dashboard aggregation: $lastError');
+      debugPrint('⚠️ Falling back to local dashboard aggregation: $lastError');
     }
 
     return _buildFallbackDashboardMetrics();
@@ -850,7 +850,7 @@ class MemberRepository {
       districts.sort();
       return districts;
     } catch (e) {
-      print('❌ Error fetching congressional districts: $e');
+      debugPrint('❌ Error fetching congressional districts: $e');
       return [];
     }
   }
@@ -877,7 +877,7 @@ class MemberRepository {
       final sorted = allCommittees.toList()..sort();
       return sorted;
     } catch (e) {
-      print('❌ Error fetching committees: $e');
+      debugPrint('❌ Error fetching committees: $e');
       return [];
     }
   }
@@ -905,7 +905,7 @@ class MemberRepository {
       schools.sort();
       return schools;
     } catch (e) {
-      print('❌ Error fetching high schools: $e');
+      debugPrint('❌ Error fetching high schools: $e');
       return [];
     }
   }
@@ -933,7 +933,7 @@ class MemberRepository {
       colleges.sort();
       return colleges;
     } catch (e) {
-      print('❌ Error fetching colleges: $e');
+      debugPrint('❌ Error fetching colleges: $e');
       return [];
     }
   }
@@ -961,7 +961,7 @@ class MemberRepository {
       chapters.sort();
       return chapters;
     } catch (e) {
-      print('❌ Error fetching chapter names: $e');
+      debugPrint('❌ Error fetching chapter names: $e');
       return [];
     }
   }
@@ -976,7 +976,7 @@ class MemberRepository {
           .update({'last_contacted': DateTime.now().toIso8601String()})
           .eq('id', memberId);
     } catch (e) {
-      print('❌ Error updating last contacted: $e');
+      debugPrint('❌ Error updating last contacted: $e');
     }
   }
 
@@ -990,7 +990,7 @@ class MemberRepository {
           .update({'intro_sent_at': DateTime.now().toIso8601String()})
           .eq('id', memberId);
     } catch (e) {
-      print('❌ Error marking intro sent: $e');
+      debugPrint('❌ Error marking intro sent: $e');
     }
   }
 
@@ -1017,7 +1017,7 @@ class MemberRepository {
           .update(data)
           .eq('id', memberId);
     } catch (e) {
-      print('❌ Error updating opt-out status: $e');
+      debugPrint('❌ Error updating opt-out status: $e');
     }
   }
 
@@ -1031,7 +1031,7 @@ class MemberRepository {
           .update({'notes': notes})
           .eq('id', memberId);
     } catch (e) {
-      print('❌ Error updating notes: $e');
+      debugPrint('❌ Error updating notes: $e');
     }
   }
 
@@ -1087,7 +1087,7 @@ class MemberRepository {
       }
       return Member.fromJson(json);
     } catch (e) {
-      print('❌ Error updating member: $e');
+      debugPrint('❌ Error updating member: $e');
       rethrow;
     }
   }
@@ -1318,7 +1318,9 @@ class MemberRepository {
       await _writeClient.storage
           .from(attachment.bucket.isEmpty ? _documentsBucket : attachment.bucket)
           .remove([path]);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('MemberRepository._safeRemoveAttachment error: $e');
+    }
   }
 
   /// Search members by name or phone
@@ -1337,7 +1339,7 @@ class MemberRepository {
           .map((json) => Member.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print('❌ Error searching members: $e');
+      debugPrint('❌ Error searching members: $e');
       return [];
     }
   }
@@ -1371,7 +1373,7 @@ class MemberRepository {
 
       return _sortCounts(counts);
     } catch (e) {
-      print('❌ Error aggregating $column counts: $e');
+      debugPrint('❌ Error aggregating $column counts: $e');
       return {};
     }
   }
@@ -1416,7 +1418,7 @@ class MemberRepository {
 
       return _sortCounts(counts);
     } catch (e) {
-      print('❌ Error aggregating $column list counts: $e');
+      debugPrint('❌ Error aggregating $column list counts: $e');
       return {};
     }
   }
@@ -1453,7 +1455,7 @@ class MemberRepository {
       if (falseCount > 0) counts[falseLabel] = falseCount;
       return _sortCounts(counts);
     } catch (e) {
-      print('❌ Error aggregating $column boolean counts: $e');
+      debugPrint('❌ Error aggregating $column boolean counts: $e');
       return {};
     }
   }
@@ -1502,7 +1504,7 @@ class MemberRepository {
         'withPhone': withPhone,
       };
     } catch (e) {
-      print('❌ Error fetching member stats: $e');
+      debugPrint('❌ Error fetching member stats: $e');
       return {
         'total': 0,
         'optedOut': 0,
@@ -1569,7 +1571,7 @@ class MemberRepository {
         'weeklyMessages': null,
       };
     } catch (error) {
-      print('❌ Error building fallback dashboard metrics: $error');
+      debugPrint('❌ Error building fallback dashboard metrics: $error');
       return metrics;
     }
   }
@@ -1740,7 +1742,7 @@ List<Member>? _coerceMemberList(dynamic value) {
       try {
         members.add(Member.fromJson(json));
       } catch (error) {
-        print('⚠️ Skipping invalid member payload: $error');
+        debugPrint('⚠️ Skipping invalid member payload: $error');
       }
     }
     return members;

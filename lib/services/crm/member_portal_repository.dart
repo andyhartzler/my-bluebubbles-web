@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:postgrest/postgrest.dart'
     show CountOption, PostgrestException, PostgrestResponse;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -44,7 +46,7 @@ class MemberPortalRepository {
           .map(MemberPortalRecentSignIn.fromJson)
           .toList(growable: false);
     } catch (e) {
-      print('❌ Failed to load recent sign-ins: $e');
+      debugPrint('❌ Failed to load recent sign-ins: $e');
       rethrow;
     }
   }
@@ -88,7 +90,7 @@ class MemberPortalRepository {
         visibleResources: responses[4].count ?? 0,
       );
     } catch (e) {
-      print('❌ Failed to load member portal dashboard stats: $e');
+      debugPrint('❌ Failed to load member portal dashboard stats: $e');
       rethrow;
     }
   }
@@ -100,10 +102,10 @@ class MemberPortalRepository {
       final meetings = await _loadMeetingsWithoutJoin(isPublished: isPublished);
       return _hydrateMeetingMetadata(meetings);
     } on PostgrestException catch (e) {
-      print('❌ Error loading portal meetings: $e');
+      debugPrint('❌ Error loading portal meetings: $e');
       return const [];
     } catch (e) {
-      print('❌ Error loading portal meetings: $e');
+      debugPrint('❌ Error loading portal meetings: $e');
       return const [];
     }
   }
@@ -184,7 +186,7 @@ class MemberPortalRepository {
 
       return hydrated;
     } catch (e) {
-      print('⚠️ Failed to hydrate meeting metadata: $e');
+      debugPrint('⚠️ Failed to hydrate meeting metadata: $e');
       return meetings;
     }
   }
@@ -203,7 +205,7 @@ class MemberPortalRepository {
       if (json == null) return null;
       return MemberPortalMeeting.fromJson(json);
     } catch (e) {
-      print('❌ Failed to save portal meeting: $e');
+      debugPrint('❌ Failed to save portal meeting: $e');
       rethrow;
     }
   }
@@ -244,7 +246,7 @@ class MemberPortalRepository {
       if (json == null) return null;
       return MemberPortalMeeting.fromJson(json);
     } catch (e) {
-      print('❌ Failed to update meeting publication: $e');
+      debugPrint('❌ Failed to update meeting publication: $e');
       rethrow;
     }
   }
@@ -262,7 +264,7 @@ class MemberPortalRepository {
           .map(MemberSubmittedEvent.fromJson)
           .toList(growable: false);
     } catch (e) {
-      print('❌ Error loading submitted events: $e');
+      debugPrint('❌ Error loading submitted events: $e');
       rethrow;
     }
   }
@@ -303,7 +305,7 @@ class MemberPortalRepository {
       final json = _coerceJsonMap(response);
       return json == null ? null : MemberSubmittedEvent.fromJson(json);
     } catch (e) {
-      print('❌ Failed to approve submitted event: $e');
+      debugPrint('❌ Failed to approve submitted event: $e');
       rethrow;
     }
   }
@@ -331,7 +333,7 @@ class MemberPortalRepository {
       final json = _coerceJsonMap(response);
       return json == null ? null : MemberSubmittedEvent.fromJson(json);
     } catch (e) {
-      print('❌ Failed to reject submitted event: $e');
+      debugPrint('❌ Failed to reject submitted event: $e');
       rethrow;
     }
   }
@@ -350,7 +352,7 @@ class MemberPortalRepository {
       final json = _coerceJsonMap(response);
       return json == null ? null : MemberSubmittedEvent.fromJson(json);
     } catch (e) {
-      print('❌ Failed to reset submission status: $e');
+      debugPrint('❌ Failed to reset submission status: $e');
       rethrow;
     }
   }
@@ -372,7 +374,7 @@ class MemberPortalRepository {
           .map(MemberPortalResource.fromJson)
           .toList(growable: false);
     } catch (e) {
-      print('❌ Error loading portal resources: $e');
+      debugPrint('❌ Error loading portal resources: $e');
       rethrow;
     }
   }
@@ -390,7 +392,7 @@ class MemberPortalRepository {
       final json = _coerceJsonMap(response);
       return json == null ? null : MemberPortalResource.fromJson(json);
     } catch (e) {
-      print('❌ Failed to save portal resource: $e');
+      debugPrint('❌ Failed to save portal resource: $e');
       rethrow;
     }
   }
@@ -404,7 +406,7 @@ class MemberPortalRepository {
           .update({'is_visible': isVisible})
           .inFilter('id', ids);
     } catch (e) {
-      print('⚠️ Failed to update resource visibility: $e');
+      debugPrint('⚠️ Failed to update resource visibility: $e');
     }
   }
 
@@ -414,7 +416,7 @@ class MemberPortalRepository {
     try {
       await _writeClient.from('member_portal_resources').delete().eq('id', id);
     } catch (e) {
-      print('⚠️ Failed to delete resource $id: $e');
+      debugPrint('⚠️ Failed to delete resource $id: $e');
     }
   }
 
@@ -489,11 +491,11 @@ class MemberPortalRepository {
           );
         }).toList(growable: false);
       } catch (e) {
-        print('⚠️ Failed to hydrate member names for profile changes: $e');
+        debugPrint('⚠️ Failed to hydrate member names for profile changes: $e');
         return rawChanges;
       }
     } catch (e) {
-      print('❌ Error loading profile changes: $e');
+      debugPrint('❌ Error loading profile changes: $e');
       rethrow;
     }
   }
@@ -509,7 +511,7 @@ class MemberPortalRepository {
           .update({'reviewed_by': adminId})
           .eq('id', changeId);
     } catch (e) {
-      print('❌ Failed to approve profile change: $e');
+      debugPrint('❌ Failed to approve profile change: $e');
       rethrow;
     }
   }
@@ -528,7 +530,7 @@ class MemberPortalRepository {
           })
           .eq('id', changeId);
     } catch (e) {
-      print('❌ Failed to reject profile change: $e');
+      debugPrint('❌ Failed to reject profile change: $e');
       rethrow;
     }
   }
@@ -547,7 +549,7 @@ class MemberPortalRepository {
           .map(MemberPortalFieldVisibility.fromJson)
           .toList(growable: false);
     } catch (e) {
-      print('❌ Error loading field visibility: $e');
+      debugPrint('❌ Error loading field visibility: $e');
       rethrow;
     }
   }
@@ -567,7 +569,7 @@ class MemberPortalRepository {
       final json = _coerceJsonMap(response);
       return json == null ? null : MemberPortalFieldVisibility.fromJson(json);
     } catch (e) {
-      print('❌ Failed to save field visibility: $e');
+      debugPrint('❌ Failed to save field visibility: $e');
       rethrow;
     }
   }

@@ -192,6 +192,7 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
     );
 
     if (confirm != true) return;
+    if (!mounted) return;
 
     setState(() {
       _sending = true;
@@ -213,6 +214,7 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
       }
 
       // Step 2: Prepare sessions via edge function (fast — no BB API calls)
+      if (!mounted) return;
       setState(() => _sendStatus = 'Creating sessions...');
 
       final Map<String, dynamic> prepResult;
@@ -241,6 +243,7 @@ class _SurveyBuilderScreenState extends State<SurveyBuilderScreen> {
       }
 
       // Step 3: Send messages client-side with real-time progress
+      if (!mounted) return;
       setState(() {
         _sendTotal = total;
         _sendStatus = 'Sending 0 of $total...';

@@ -169,8 +169,8 @@ class WalletNotificationService {
       return const WalletNotificationResult(success: true);
     } catch (error, stackTrace) {
       if (kDebugMode) {
-        print('❌ Failed to send wallet notification: $error');
-        print(stackTrace);
+        debugPrint('❌ Failed to send wallet notification: $error');
+        debugPrint(stackTrace.toString());
       }
       return WalletNotificationResult.error(error.toString());
     }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../services/crm/supabase_service.dart';
 
@@ -63,7 +64,7 @@ class FormAnalyticsService {
       return token;
     } catch (e) {
       // Silently fail - analytics shouldn't break the app
-      print('Analytics tracking error: $e');
+      debugPrint('Analytics tracking error: $e');
       return null;
     }
   }
@@ -87,7 +88,7 @@ class FormAnalyticsService {
         'timestamp': DateTime.now().toIso8601String(),
       });
     } catch (e) {
-      print('Analytics tracking error: $e');
+      debugPrint('Analytics tracking error: $e');
     }
   }
 
@@ -114,7 +115,7 @@ class FormAnalyticsService {
         'metadata': {if (phoneE164 != null) 'phone_e164': phoneE164},
       });
     } catch (e) {
-      print('Analytics tracking error: $e');
+      debugPrint('Analytics tracking error: $e');
     }
   }
 
@@ -141,7 +142,7 @@ class FormAnalyticsService {
         'metadata': {if (source != null) 'source': source},
       });
     } catch (e) {
-      print('Analytics tracking error: $e');
+      debugPrint('Analytics tracking error: $e');
     }
   }
 
@@ -164,7 +165,7 @@ class FormAnalyticsService {
         'timestamp': DateTime.now().toIso8601String(),
       });
     } catch (e) {
-      print('Analytics tracking error: $e');
+      debugPrint('Analytics tracking error: $e');
     }
   }
 
@@ -196,7 +197,7 @@ class FormAnalyticsService {
         },
       });
     } catch (e) {
-      print('Analytics tracking error: $e');
+      debugPrint('Analytics tracking error: $e');
     }
   }
 
@@ -226,7 +227,7 @@ class FormAnalyticsService {
         },
       });
     } catch (e) {
-      print('Analytics tracking error: $e');
+      debugPrint('Analytics tracking error: $e');
     }
   }
 
@@ -257,7 +258,7 @@ class FormAnalyticsService {
         'metadata': {'is_identity_field': isIdentityField},
       });
     } catch (e) {
-      print('Analytics tracking error: $e');
+      debugPrint('Analytics tracking error: $e');
     }
   }
 
@@ -286,7 +287,7 @@ class FormAnalyticsService {
         'timestamp': DateTime.now().toIso8601String(),
       });
     } catch (e) {
-      print('Analytics tracking error: $e');
+      debugPrint('Analytics tracking error: $e');
     }
   }
 
@@ -315,7 +316,7 @@ class FormAnalyticsService {
         'metadata': {'error': errorMessage},
       });
     } catch (e) {
-      print('Analytics tracking error: $e');
+      debugPrint('Analytics tracking error: $e');
     }
   }
 
@@ -346,7 +347,7 @@ class FormAnalyticsService {
       });
       return token;
     } catch (e) {
-      print('Vote analytics tracking error: $e');
+      debugPrint('Vote analytics tracking error: $e');
       return null;
     }
   }
@@ -370,7 +371,7 @@ class FormAnalyticsService {
         'metadata': {'source': 'vote'},
       });
     } catch (e) {
-      print('Vote analytics tracking error: $e');
+      debugPrint('Vote analytics tracking error: $e');
     }
   }
 
@@ -400,7 +401,7 @@ class FormAnalyticsService {
         },
       });
     } catch (e) {
-      print('Vote analytics tracking error: $e');
+      debugPrint('Vote analytics tracking error: $e');
     }
   }
 
@@ -428,7 +429,7 @@ class FormAnalyticsService {
         },
       });
     } catch (e) {
-      print('Vote analytics tracking error: $e');
+      debugPrint('Vote analytics tracking error: $e');
     }
   }
 
@@ -455,7 +456,7 @@ class FormAnalyticsService {
         'metadata': {'source': 'vote'},
       });
     } catch (e) {
-      print('Vote field analytics tracking error: $e');
+      debugPrint('Vote field analytics tracking error: $e');
     }
   }
 
@@ -488,7 +489,7 @@ class FormAnalyticsService {
         },
       });
     } catch (e) {
-      print('Vote field analytics tracking error: $e');
+      debugPrint('Vote field analytics tracking error: $e');
     }
   }
 
@@ -583,7 +584,7 @@ class FormAnalyticsService {
         newUserRate: newUserRate.clamp(0, 100),
       );
     } catch (e) {
-      print('Error fetching analytics: $e');
+      debugPrint('Error fetching analytics: $e');
       // Try to get at least submission count (use privileged client)
       try {
         final submissionCountResponse = await _readClient
@@ -662,7 +663,7 @@ class FormAnalyticsService {
 
       return fieldMap.values.toList();
     } catch (e) {
-      print('Error fetching field analytics: $e');
+      debugPrint('Error fetching field analytics: $e');
       return [];
     }
   }
@@ -708,7 +709,7 @@ class FormAnalyticsService {
         return TimeSeriesData(date: DateTime.parse(e.key), count: e.value);
       }).toList()..sort((a, b) => a.date.compareTo(b.date));
     } catch (e) {
-      print('Error fetching time series: $e');
+      debugPrint('Error fetching time series: $e');
       return [];
     }
   }
@@ -732,7 +733,7 @@ class FormAnalyticsService {
 
       return statusMap;
     } catch (e) {
-      print('Error fetching submission stats: $e');
+      debugPrint('Error fetching submission stats: $e');
       return {};
     }
   }
@@ -764,7 +765,7 @@ class FormAnalyticsService {
           )
           .toList();
     } catch (e) {
-      print('Error fetching recent activity: $e');
+      debugPrint('Error fetching recent activity: $e');
       return [];
     }
   }

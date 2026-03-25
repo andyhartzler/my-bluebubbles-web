@@ -53,7 +53,9 @@ class Attachment {
     if (metadata is String && metadata.isNotEmpty) {
       try {
         metadata = jsonDecode(metadata);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Attachment.fromMap metadata parse error: $e');
+      }
     }
 
     return Attachment(

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/crm/dashboard_metrics.dart';
 import 'supabase_service.dart';
@@ -24,7 +25,7 @@ class DashboardMetricsService {
       // If we can access the client without throwing, it's initialized
       return client;
     } catch (e) {
-      print('[DashboardMetricsService] Supabase.instance.client not available: $e');
+      debugPrint('[DashboardMetricsService] Supabase.instance.client not available: $e');
     }
 
     return null;
@@ -34,17 +35,17 @@ class DashboardMetricsService {
   Future<DashboardMetrics?> fetchMetrics() async {
     final client = _client;
     if (client == null) {
-      print('[DashboardMetricsService] fetchMetrics: client is null');
-      print('[DashboardMetricsService] CRMSupabaseService.isInitialized: ${_crmService.isInitialized}');
-      print('[DashboardMetricsService] CRMSupabaseService.hasServiceRole: ${_crmService.hasServiceRole}');
-      print('[DashboardMetricsService] Neither CRM service nor Supabase.instance is available');
+      debugPrint('[DashboardMetricsService] fetchMetrics: client is null');
+      debugPrint('[DashboardMetricsService] CRMSupabaseService.isInitialized: ${_crmService.isInitialized}');
+      debugPrint('[DashboardMetricsService] CRMSupabaseService.hasServiceRole: ${_crmService.hasServiceRole}');
+      debugPrint('[DashboardMetricsService] Neither CRM service nor Supabase.instance is available');
       return null;
     }
 
-    print('[DashboardMetricsService] fetchMetrics: Using Supabase client');
+    debugPrint('[DashboardMetricsService] fetchMetrics: Using Supabase client');
 
     try {
-      print('[DashboardMetricsService] fetchMetrics: Querying crm_dashboard_metrics...');
+      debugPrint('[DashboardMetricsService] fetchMetrics: Querying crm_dashboard_metrics...');
       final response = await client
           .from('crm_dashboard_metrics')
           .select()
@@ -52,18 +53,18 @@ class DashboardMetricsService {
           .maybeSingle();
 
       if (response == null) {
-        print('[DashboardMetricsService] fetchMetrics: Response is null - no data in table');
+        debugPrint('[DashboardMetricsService] fetchMetrics: Response is null - no data in table');
         return null;
       }
 
-      print('[DashboardMetricsService] fetchMetrics: Got response with ${response.keys.length} keys');
-      print('[DashboardMetricsService] fetchMetrics: total_members = ${response['total_members']}');
-      print('[DashboardMetricsService] fetchMetrics: top_5_donors count = ${(response['top_5_donors'] as List?)?.length ?? 0}');
+      debugPrint('[DashboardMetricsService] fetchMetrics: Got response with ${response.keys.length} keys');
+      debugPrint('[DashboardMetricsService] fetchMetrics: total_members = ${response['total_members']}');
+      debugPrint('[DashboardMetricsService] fetchMetrics: top_5_donors count = ${(response['top_5_donors'] as List?)?.length ?? 0}');
 
       return DashboardMetrics.fromJson(response);
     } catch (e, stack) {
-      print('[DashboardMetricsService] Error fetching metrics: $e');
-      print('[DashboardMetricsService] Stack trace: ${stack.toString().split('\n').take(5).join('\n')}');
+      debugPrint('[DashboardMetricsService] Error fetching metrics: $e');
+      debugPrint('[DashboardMetricsService] Stack trace: ${stack.toString().split('\n').take(5).join('\n')}');
       return null;
     }
   }
@@ -85,7 +86,7 @@ class DashboardMetricsService {
       if (layout == null) return null;
       return layout is Map<String, dynamic> ? layout : null;
     } catch (e) {
-      print('[DashboardMetricsService] Error fetching dashboard layout: $e');
+      debugPrint('[DashboardMetricsService] Error fetching dashboard layout: $e');
       return null;
     }
   }
@@ -105,7 +106,7 @@ class DashboardMetricsService {
 
       if (existingRow == null) {
         // No row exists - this shouldn't happen but handle it
-        print(
+        debugPrint(
           '[DashboardMetricsService] No metrics row found to update layout',
         );
         return false;
@@ -119,7 +120,7 @@ class DashboardMetricsService {
 
       return true;
     } catch (e) {
-      print('[DashboardMetricsService] Error saving dashboard layout: $e');
+      debugPrint('[DashboardMetricsService] Error saving dashboard layout: $e');
       return false;
     }
   }
@@ -128,14 +129,14 @@ class DashboardMetricsService {
   Future<Map<String, dynamic>?> fetchDashboardLayoutMobile() async {
     final client = _client;
     if (client == null) {
-      print(
+      debugPrint(
         '[DashboardMetricsService] fetchDashboardLayoutMobile: client is null',
       );
       return null;
     }
 
     try {
-      print(
+      debugPrint(
         '[DashboardMetricsService] fetchDashboardLayoutMobile: Fetching from database...',
       );
 
@@ -146,7 +147,7 @@ class DashboardMetricsService {
           .maybeSingle();
 
       if (response == null) {
-        print(
+        debugPrint(
           '[DashboardMetricsService] fetchDashboardLayoutMobile: No row found',
         );
         return null;
@@ -154,7 +155,7 @@ class DashboardMetricsService {
 
       final layout = response['dashboard_layout_mobile'];
       if (layout == null) {
-        print(
+        debugPrint(
           '[DashboardMetricsService] fetchDashboardLayoutMobile: Layout is null (not set yet)',
         );
         return null;
@@ -163,13 +164,13 @@ class DashboardMetricsService {
       final widgetCount = (layout is Map)
           ? (layout['widgets'] as List?)?.length ?? 0
           : 0;
-      print(
+      debugPrint(
         '[DashboardMetricsService] fetchDashboardLayoutMobile: Loaded layout with $widgetCount widgets',
       );
 
       return layout is Map<String, dynamic> ? layout : null;
     } catch (e) {
-      print(
+      debugPrint(
         '[DashboardMetricsService] Error fetching mobile dashboard layout: $e',
       );
       return null;
@@ -180,14 +181,14 @@ class DashboardMetricsService {
   Future<bool> saveDashboardLayoutMobile(Map<String, dynamic> layout) async {
     final client = _client;
     if (client == null) {
-      print(
+      debugPrint(
         '[DashboardMetricsService] saveDashboardLayoutMobile: client is null',
       );
       return false;
     }
 
     try {
-      print(
+      debugPrint(
         '[DashboardMetricsService] saveDashboardLayoutMobile: Fetching existing row...',
       );
 
@@ -199,14 +200,14 @@ class DashboardMetricsService {
           .maybeSingle();
 
       if (existingRow == null) {
-        print(
+        debugPrint(
           '[DashboardMetricsService] No metrics row found to update mobile layout',
         );
         return false;
       }
 
       final rowId = existingRow['id'];
-      print(
+      debugPrint(
         '[DashboardMetricsService] saveDashboardLayoutMobile: Updating row $rowId with ${layout['widgets']?.length ?? 0} widgets',
       );
 
@@ -216,15 +217,15 @@ class DashboardMetricsService {
           .update({'dashboard_layout_mobile': layout})
           .eq('id', rowId);
 
-      print(
+      debugPrint(
         '[DashboardMetricsService] saveDashboardLayoutMobile: Update completed successfully',
       );
       return true;
     } catch (e, stackTrace) {
-      print(
+      debugPrint(
         '[DashboardMetricsService] Error saving mobile dashboard layout: $e',
       );
-      print('[DashboardMetricsService] Stack trace: $stackTrace');
+      debugPrint('[DashboardMetricsService] Stack trace: $stackTrace');
       return false;
     }
   }
@@ -258,7 +259,7 @@ class DashboardMetricsService {
 
       return response != null;
     } catch (e) {
-      print('[DashboardMetricsService] Error checking metrics table: $e');
+      debugPrint('[DashboardMetricsService] Error checking metrics table: $e');
       return false;
     }
   }
@@ -321,7 +322,7 @@ class DashboardMetricsService {
 
       return result;
     } catch (e) {
-      print('[DashboardMetricsService] Error fetching Slack analytics: $e');
+      debugPrint('[DashboardMetricsService] Error fetching Slack analytics: $e');
       return {};
     }
   }
@@ -385,7 +386,7 @@ class DashboardMetricsService {
         'followers_by_platform': platformFollowers,
       };
     } catch (e) {
-      print('[DashboardMetricsService] Error fetching social media stats: $e');
+      debugPrint('[DashboardMetricsService] Error fetching social media stats: $e');
       return {};
     }
   }
@@ -426,7 +427,7 @@ class DashboardMetricsService {
         ],
       };
     } catch (e) {
-      print('[DashboardMetricsService] Error fetching legislation stats: $e');
+      debugPrint('[DashboardMetricsService] Error fetching legislation stats: $e');
       return {};
     }
   }
@@ -462,7 +463,7 @@ class DashboardMetricsService {
             : 0.0,
       };
     } catch (e) {
-      print(
+      debugPrint(
         '[DashboardMetricsService] Error fetching email campaign stats: $e',
       );
       return {};

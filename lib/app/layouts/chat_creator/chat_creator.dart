@@ -107,7 +107,9 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         fakeController.value!.textController.value = empty;
         fakeController.value!.pickedAttachments.clear();
         fakeController.value!.subjectTextController.clear();
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('ChatCreatorState._clearComposer error: $e');
+      }
     }
     _composerAttachments.clear();
     _showEmojiPicker = false;
@@ -380,7 +382,9 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         if (bytes == null && !kIsWeb && entry.path != null) {
           try {
             bytes = await File(entry.path!).readAsBytes();
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('ChatCreatorState._pickFile readAsBytes error: $e');
+          }
         }
 
         if (bytes == null && (entry.path == null || kIsWeb)) {
@@ -549,7 +553,9 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
     if (!chats.loadedAllChats.isCompleted) {
       try {
         await chats.loadedAllChats.future;
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('ChatCreatorState.findExistingChat error: $e');
+      }
       existingChats = chats.chats;
       if (update && mounted) {
         setState(() {});
@@ -575,7 +581,9 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
         } else {
           existingChat = Chat.findOne(chatIdentifier: slugify(address, delimiter: ''));
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('ChatCreatorState.findExistingChat lookup error: $e');
+      }
     }
     // match each selected contact to a participant in a chat
     if (existingChat == null) {
@@ -1134,7 +1142,9 @@ class ChatCreatorState extends OptimizedState<ChatCreator> {
               chat = chat.save();
               try {
                 await chats.addChat(chat);
-              } catch (_) {}
+              } catch (e) {
+                debugPrint('ChatCreatorState._recoverChatAfterCreateFailure addChat error: $e');
+              }
               return chat;
             } catch (e, stack) {
               Logger.warn('Failed to hydrate recovered chat', error: e, trace: stack);

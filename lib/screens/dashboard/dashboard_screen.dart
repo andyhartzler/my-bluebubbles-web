@@ -795,7 +795,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           await prefs.setString(_prefsKey, _desktopConfig.toJsonString());
           debugPrint('[DashboardScreen] Desktop layout saved to local storage (error fallback)');
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('_DashboardScreenState._saveConfig error: $e');
+      }
     }
   }
 

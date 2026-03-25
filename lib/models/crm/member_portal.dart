@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 
 class PortalAttachment {
@@ -74,7 +75,9 @@ class MemberPortalMeeting {
       for (final item in attachmentsRaw) {
         try {
           attachments.add(PortalAttachment.fromJson(item));
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('MemberPortalMeeting.fromJson attachment parse error: $e');
+        }
       }
     } else if (attachmentsRaw is String && attachmentsRaw.isNotEmpty) {
       try {
@@ -82,7 +85,9 @@ class MemberPortalMeeting {
         if (parsed is List) {
           attachments.addAll(parsed.map(PortalAttachment.fromJson));
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('MemberPortalMeeting.fromJson attachments string parse error: $e');
+      }
     }
 
     final meeting = json['meetings'] as Map<String, dynamic>?;

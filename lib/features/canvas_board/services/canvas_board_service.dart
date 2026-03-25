@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:bluebubbles/services/crm/supabase_service.dart';
@@ -68,7 +69,7 @@ class CanvasBoardService {
 
       return CanvasBoard.fromJson(insertResponse);
     } catch (e) {
-      print('Error getting/creating board: $e');
+      debugPrint('Error getting/creating board: $e');
       rethrow;
     }
   }
@@ -90,7 +91,7 @@ class CanvasBoardService {
           })
           .eq('id', board.id);
     } catch (e) {
-      print('Error updating board: $e');
+      debugPrint('Error updating board: $e');
       rethrow;
     }
   }
@@ -110,7 +111,7 @@ class CanvasBoardService {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', boardId);
     } catch (e) {
-      print('Error saving viewport: $e');
+      debugPrint('Error saving viewport: $e');
       // Don't rethrow for viewport saves - they're non-critical
     }
   }
@@ -124,7 +125,7 @@ class CanvasBoardService {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', boardId);
     } catch (e) {
-      print('Error saving canvas state: $e');
+      debugPrint('Error saving canvas state: $e');
       rethrow;
     }
   }
@@ -156,7 +157,7 @@ class CanvasBoardService {
           .map((json) => CanvasNode.fromJson(json))
           .toList();
     } catch (e) {
-      print('Error getting nodes: $e');
+      debugPrint('Error getting nodes: $e');
       rethrow;
     }
   }
@@ -180,7 +181,7 @@ class CanvasBoardService {
 
       return CanvasNode.fromJson(response);
     } catch (e) {
-      print('Error creating node: $e');
+      debugPrint('Error creating node: $e');
       rethrow;
     }
   }
@@ -196,7 +197,7 @@ class CanvasBoardService {
           .update(nodeData)
           .eq('id', node.id);
     } catch (e) {
-      print('Error updating node: $e');
+      debugPrint('Error updating node: $e');
       rethrow;
     }
   }
@@ -211,7 +212,7 @@ class CanvasBoardService {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', nodeId);
     } catch (e) {
-      print('Error updating node position: $e');
+      debugPrint('Error updating node position: $e');
       // Don't rethrow for position updates during drag
     }
   }
@@ -226,7 +227,7 @@ class CanvasBoardService {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', nodeId);
     } catch (e) {
-      print('Error updating node size: $e');
+      debugPrint('Error updating node size: $e');
     }
   }
 
@@ -242,7 +243,7 @@ class CanvasBoardService {
       // Then delete the node
       await _supabase.client.from(_nodesTable).delete().eq('id', nodeId);
     } catch (e) {
-      print('Error deleting node: $e');
+      debugPrint('Error deleting node: $e');
       rethrow;
     }
   }
@@ -265,7 +266,7 @@ class CanvasBoardService {
           .delete()
           .inFilter('id', nodeIds);
     } catch (e) {
-      print('Error deleting nodes: $e');
+      debugPrint('Error deleting nodes: $e');
       rethrow;
     }
   }
@@ -290,7 +291,7 @@ class CanvasBoardService {
         }).eq('id', entry.key);
       }
     } catch (e) {
-      print('Error updating z-indices: $e');
+      debugPrint('Error updating z-indices: $e');
     }
   }
 
@@ -308,7 +309,7 @@ class CanvasBoardService {
           .map((json) => CanvasConnection.fromJson(json))
           .toList();
     } catch (e) {
-      print('Error getting connections: $e');
+      debugPrint('Error getting connections: $e');
       rethrow;
     }
   }
@@ -330,7 +331,7 @@ class CanvasBoardService {
 
       return CanvasConnection.fromJson(response);
     } catch (e) {
-      print('Error creating connection: $e');
+      debugPrint('Error creating connection: $e');
       rethrow;
     }
   }
@@ -343,7 +344,7 @@ class CanvasBoardService {
           .update(connection.toJson())
           .eq('id', connection.id);
     } catch (e) {
-      print('Error updating connection: $e');
+      debugPrint('Error updating connection: $e');
       rethrow;
     }
   }
@@ -356,7 +357,7 @@ class CanvasBoardService {
           .delete()
           .eq('id', connectionId);
     } catch (e) {
-      print('Error deleting connection: $e');
+      debugPrint('Error deleting connection: $e');
       rethrow;
     }
   }
@@ -398,7 +399,7 @@ class CanvasBoardService {
         await updateNode(node);
       }
     } catch (e) {
-      print('Error batch updating nodes: $e');
+      debugPrint('Error batch updating nodes: $e');
       rethrow;
     }
   }

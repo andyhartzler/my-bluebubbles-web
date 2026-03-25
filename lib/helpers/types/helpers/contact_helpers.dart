@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:dlibphonenumber/dlibphonenumber.dart';
@@ -25,7 +26,9 @@ Future<String> formatPhoneNumber(dynamic item) async {
   try {
     final parsed = PhoneNumberUtil.instance.parse(address, address.startsWith("+") ? null : cc);
     formatted = PhoneNumberUtil.instance.format(parsed, PhoneNumberFormat.international);
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('formatPhoneNumber error: $e');
+  }
 
   return formatted ?? address;
 }

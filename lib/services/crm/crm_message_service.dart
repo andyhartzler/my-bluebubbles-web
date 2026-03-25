@@ -96,7 +96,7 @@ class CRMMessageService {
 
       return members;
     } catch (e) {
-      print('❌ Error getting filtered members: $e');
+      debugPrint('❌ Error getting filtered members: $e');
       return [];
     }
   }
@@ -115,7 +115,7 @@ class CRMMessageService {
     final results = <String, bool>{};
 
     if (!_isReady) {
-      print('⚠️ CRM messaging not initialized');
+      debugPrint('⚠️ CRM messaging not initialized');
       return results;
     }
 
@@ -128,11 +128,11 @@ class CRMMessageService {
       final total = members.length;
 
       if (total == 0) {
-        print('⚠️ No members match the filter criteria');
+        debugPrint('⚠️ No members match the filter criteria');
         return results;
       }
 
-      print('📤 Sending messages to $total members...');
+      debugPrint('📤 Sending messages to $total members...');
 
       for (int i = 0; i < members.length; i++) {
         final member = members[i];
@@ -160,17 +160,17 @@ class CRMMessageService {
             await Future.delayed(delayBetweenMessages);
           }
         } catch (e) {
-          print('❌ Failed to send message to ${member.name}: $e');
+          debugPrint('❌ Failed to send message to ${member.name}: $e');
           results[member.id] = false;
         }
       }
 
       final successCount = results.values.where((v) => v).length;
-      print('✅ Successfully sent $successCount/$total messages');
+      debugPrint('✅ Successfully sent $successCount/$total messages');
 
       return results;
     } catch (e) {
-      print('❌ Error in bulk message sending: $e');
+      debugPrint('❌ Error in bulk message sending: $e');
       return results;
     }
   }
@@ -494,7 +494,9 @@ class CRMMessageService {
             created = created.save();
             try {
               await chats.addChat(created);
-            } catch (_) {}
+            } catch (e) {
+              debugPrint('CRMMessageService._sendSingleMessageImpl addChat error: $e');
+            }
             chat = created;
           } catch (e, stack) {
             Logger.warn('Unable to register created chat locally for $cleaned', error: e, trace: stack);
@@ -741,7 +743,9 @@ class CRMMessageService {
               chat = chat.save();
               try {
                 await chats.addChat(chat);
-              } catch (_) {}
+              } catch (e) {
+                debugPrint('CRMMessageService._pullChatForAddress addChat error: $e');
+              }
               return chat;
             } catch (e, stack) {
               Logger.warn('Failed to hydrate chat metadata for $cleaned', error: e, trace: stack);

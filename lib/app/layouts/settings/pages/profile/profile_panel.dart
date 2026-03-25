@@ -45,8 +45,8 @@ class _ProfilePanelState extends OptimizedState<ProfilePanel> with WidgetsBindin
           accountContact.addAll(result2.data['data']);
         }
       }
-    } catch (_) {
-
+    } catch (e) {
+      debugPrint('_ProfilePanelState.getDetails error: $e');
     }
     setState(() {});
   }

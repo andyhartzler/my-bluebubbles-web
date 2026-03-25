@@ -73,7 +73,9 @@ class Attachment {
     if (metadata is String && metadata.isNotEmpty) {
       try {
         metadata = jsonDecode(metadata);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Attachment.fromMap metadata parse error: $e');
+      }
     }
 
     return Attachment(
@@ -111,7 +113,9 @@ class Attachment {
         }
 
         id = Database.attachments.put(this);
-      } on UniqueViolationException catch (_) {}
+      } on UniqueViolationException catch (e) {
+        debugPrint('Attachment.save UniqueViolation: $e');
+      }
     });
     return this;
   }
@@ -138,7 +142,9 @@ class Attachment {
         for (int i = 0; i < attachments.length; i++) {
           attachments[i].id = ids[i];
         }
-      } on UniqueViolationException catch (_) {}
+      } on UniqueViolationException catch (e) {
+        debugPrint('Attachment.bulkSave UniqueViolation: $e');
+      }
     });
   }
 

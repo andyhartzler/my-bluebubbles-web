@@ -110,7 +110,7 @@ class CanvasFileService {
         fileName: originalFileName,
       );
     } catch (e) {
-      print('Error uploading image: $e');
+      debugPrint('Error uploading image: $e');
       rethrow;
     }
   }
@@ -160,7 +160,7 @@ class CanvasFileService {
         fileName: originalFileName ?? fileName,
       );
     } catch (e) {
-      print('Error uploading image from bytes: $e');
+      debugPrint('Error uploading image from bytes: $e');
       rethrow;
     }
   }
@@ -188,7 +188,7 @@ class CanvasFileService {
         originalFileName: pickedFile.name,
       );
     } catch (e) {
-      print('Error picking image from gallery: $e');
+      debugPrint('Error picking image from gallery: $e');
       rethrow;
     }
   }
@@ -216,7 +216,7 @@ class CanvasFileService {
         originalFileName: pickedFile.name,
       );
     } catch (e) {
-      print('Error picking image from camera: $e');
+      debugPrint('Error picking image from camera: $e');
       rethrow;
     }
   }
@@ -229,7 +229,7 @@ class CanvasFileService {
         await _supabase.client.storage.from(_bucketName).remove([path]);
       }
     } catch (e) {
-      print('Error deleting image: $e');
+      debugPrint('Error deleting image: $e');
       // Don't rethrow - deletion failures shouldn't block other operations
     }
   }
@@ -266,7 +266,7 @@ class CanvasFileService {
         fileSize: fileSize,
       );
     } catch (e) {
-      print('Error uploading file: $e');
+      debugPrint('Error uploading file: $e');
       rethrow;
     }
   }
@@ -311,7 +311,7 @@ class CanvasFileService {
         return uploadFileFromBytes(boardId, bytes, extension, originalFileName);
       }
     } catch (e) {
-      print('Error picking and uploading file: $e');
+      debugPrint('Error picking and uploading file: $e');
       rethrow;
     }
   }
@@ -347,7 +347,7 @@ class CanvasFileService {
         fileSize: bytes.length,
       );
     } catch (e) {
-      print('Error uploading file from bytes: $e');
+      debugPrint('Error uploading file from bytes: $e');
       rethrow;
     }
   }
@@ -360,7 +360,7 @@ class CanvasFileService {
         await _supabase.client.storage.from(_bucketName).remove([path]);
       }
     } catch (e) {
-      print('Error deleting file: $e');
+      debugPrint('Error deleting file: $e');
     }
   }
 

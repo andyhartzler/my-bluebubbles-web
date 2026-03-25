@@ -113,7 +113,9 @@ class NetworkTasks {
           http.originOverride = null;
         }
       });
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('NetworkTasks.detectLocalhost error: $e');
+    }
 
     if (http.originOverride != null) return;
 
