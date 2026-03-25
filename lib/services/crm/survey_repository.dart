@@ -489,4 +489,79 @@ class SurveyRepository {
       sessionDetails: sessionDetails,
     );
   }
+
+  // ── Close Survey ──────────────────────────────────────────────────────────
+
+  /// Close a survey: set all active sessions to completed and mark survey as completed.
+  Future<void> closeSurvey(String surveyId) async {
+    if (!isReady) throw Exception('CRM not configured');
+
+    // Set all active sessions to completed
+    await _writeClient
+        .from('survey_sessions')
+        .update({
+          'status': 'completed',
+          'completed_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('survey_id', surveyId)
+        .eq('status', 'active');
+
+    // Mark survey itself as completed
+    await updateSurveyStatus(surveyId, 'completed');
+  }
+
+  // ── Resend to Non-Responders ──────────────────────────────────────────────
+
+  /// Get phone numbers of sessions with status 'active' and 0 responses.
+  Future<List<String>> getNonResponderPhones(String surveyId) async {
+    if (!isReady) return [];
+
+    final sessionsData = await _readClient
+        .from('survey_sessions')
+        .select('id, phone_e164')
+        .eq('survey_id', surveyId)
+        .eq('status', 'active');
+
+    final sessions = (sessionsData as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+
+    if (sessions.isEmpty) return [];
+
+    final sessionIds = sessions.map((s) => s['id'] as String).toList();
+
+    // Find which sessions have responses
+    final responsesData = await _readClient
+        .from('survey_responses')
+        .select('session_id')
+        .inFilter('session_id', sessionIds);
+
+    final respondedSessionIds = (responsesData as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map((r) => r['session_id'] as String?)
+        .whereType<String>()
+        .toSet();
+
+    // Return phones for sessions with zero responses
+    return sessions
+        .where((s) => !respondedSessionIds.contains(s['id'] as String))
+        .map((s) => s['phone_e164'] as String)
+        .where((p) => p.isNotEmpty)
+        .toList();
+  }
+
+  // ── Event Name Resolution ─────────────────────────────────────────────────
+
+  /// Fetch event title by ID. Returns null if not found.
+  Future<String?> fetchEventTitle(String eventId) async {
+    if (!isReady) return null;
+
+    final data = await _readClient
+        .from('events')
+        .select('title')
+        .eq('id', eventId)
+        .maybeSingle();
+
+    return data?['title'] as String?;
+  }
 }
