@@ -32,6 +32,7 @@ import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
 import 'package:bluebubbles/screens/crm/events_screen.dart';
 import 'package:bluebubbles/screens/crm/donors_list_screen.dart';
+import 'package:bluebubbles/screens/crm/donor_command_center.dart';
 import 'package:bluebubbles/screens/crm/member_portal/member_portal_management_screen.dart';
 import 'package:bluebubbles/screens/crm/subscribers_screen.dart';
 import 'package:bluebubbles/screens/crm/wallet_notification_composer.dart';
@@ -394,7 +395,7 @@ class Main extends StatelessWidget {
           ),
           getPages: [
             GetPage(name: '/auth/callback', page: AuthCallbackScreen.new),
-            GetPage(name: '/crm/donors', page: () => const DonorsListScreen()),
+            GetPage(name: '/crm/donors', page: () => const DonorCommandCenter()),
             GetPage(
               name: '/ai-assistant',
               page: () => const AIAssistantScreen(),
@@ -1174,7 +1175,7 @@ class _HomeState extends OptimizedState<Home>
                         key: PageStorageKey('members-view'),
                         embed: true,
                       ),
-                      const DonorsListScreen(
+                      const DonorCommandCenter(
                         key: PageStorageKey('donors-view'),
                         embed: true,
                       ),
