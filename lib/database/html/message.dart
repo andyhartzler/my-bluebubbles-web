@@ -152,7 +152,7 @@ class Message {
         try {
           metadata = jsonDecode(json["metadata"]);
         } catch (e) {
-          debugPrint('Message.fromMap metadata parse error: $e');
+          print('Message.fromMap metadata parse error: $e');
         }
       } else {
         metadata = json["metadata"];

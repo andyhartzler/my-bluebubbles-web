@@ -172,10 +172,12 @@ class _SurveyResultsWidgetState extends State<SurveyResultsWidget> {
         summary: _summary!,
         sessions: sessions,
       );
-      await Printing.sharePdf(
-        bytes: pdfBytes,
-        filename: '${widget.surveyTitle.replaceAll(' ', '_')}_results.pdf',
-      );
+      final blob = html.Blob([pdfBytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      html.AnchorElement(href: url)
+        ..setAttribute('download', '${widget.surveyTitle.replaceAll(' ', '_')}_results.pdf')
+        ..click();
+      html.Url.revokeObjectUrl(url);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

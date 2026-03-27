@@ -16,6 +16,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   media_kit_video
   objectbox_flutter_libs
   pasteboard
+  permission_handler_windows
   printing
   record_windows
   screen_brightness_windows

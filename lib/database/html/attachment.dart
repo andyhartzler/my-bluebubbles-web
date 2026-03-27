@@ -54,7 +54,7 @@ class Attachment {
       try {
         metadata = jsonDecode(metadata);
       } catch (e) {
-        debugPrint('Attachment.fromMap metadata parse error: $e');
+        print('Attachment.fromMap metadata parse error: $e');
       }
     }
 
