@@ -1177,6 +1177,9 @@ class DonorProfileStats {
     this.prospectCount,
   });
 
+  /// Returns an empty stats object with all fields null.
+  factory DonorProfileStats.empty() => const DonorProfileStats();
+
   factory DonorProfileStats.fromJson(Map<String, dynamic> json) {
     return DonorProfileStats(
       totalProfiles: (json['total_profiles'] as num?)?.toInt(),
