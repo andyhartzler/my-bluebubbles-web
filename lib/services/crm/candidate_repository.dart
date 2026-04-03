@@ -684,6 +684,377 @@ class CandidateRepository {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  //  MEC CAMPAIGN FINANCE — Missouri Ethics Commission data
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Fetch MEC committee info for a candidate by mec_candidate_id or name
+  Future<List<Map<String, dynamic>>> getMECCommittees(String candidateName) async {
+    if (!isReady) return [];
+
+    try {
+      final response = await _client
+          .schema('listmonk')
+          .from('mec_committees')
+          .select()
+          .ilike('candidate_name', '%$candidateName%');
+
+      return (response as List<dynamic>).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECCommittees error: $e');
+      return [];
+    }
+  }
+
+  /// Fetch MEC contributions for a given mec_id (committee)
+  Future<List<MECContribution>> getMECContributions(String mecId, {int limit = 500}) async {
+    if (!isReady) return [];
+
+    try {
+      final response = await _client
+          .schema('listmonk')
+          .from('mec_contributions')
+          .select()
+          .eq('mec_id', mecId)
+          .order('contribution_date', ascending: false)
+          .limit(limit);
+
+      return (response as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(MECContribution.fromJson)
+          .toList();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECContributions error: $e');
+      return [];
+    }
+  }
+
+  /// Fetch top donors for a committee
+  Future<List<Map<String, dynamic>>> getMECTopDonors(String mecId, {int limit = 10}) async {
+    if (!isReady) return [];
+
+    try {
+      // Aggregate contributions by donor name
+      final response = await _client
+          .schema('listmonk')
+          .from('mec_contributions')
+          .select('contributor_last_name, contributor_first_name, contribution_amount')
+          .eq('mec_id', mecId);
+
+      final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
+
+      // Aggregate in Dart
+      final donorTotals = <String, double>{};
+      for (final r in rows) {
+        final last = r['contributor_last_name'] as String? ?? '';
+        final first = r['contributor_first_name'] as String? ?? '';
+        final name = '$first $last'.trim();
+        final amount = (r['contribution_amount'] as num?)?.toDouble() ?? 0;
+        donorTotals[name] = (donorTotals[name] ?? 0) + amount;
+      }
+
+      // Sort by total descending
+      final sorted = donorTotals.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+
+      return sorted.take(limit).map((e) => {
+        'donor_name': e.key,
+        'total_amount': e.value,
+      }).toList();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECTopDonors error: $e');
+      return [];
+    }
+  }
+
+  /// Fetch monthly contribution timeline for a committee
+  Future<List<Map<String, dynamic>>> getMECContributionTimeline(String mecId) async {
+    if (!isReady) return [];
+
+    try {
+      final response = await _client
+          .schema('listmonk')
+          .from('mec_contributions')
+          .select('contribution_date, contribution_amount')
+          .eq('mec_id', mecId)
+          .order('contribution_date');
+
+      final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
+
+      // Group by month
+      final monthlyTotals = <String, double>{};
+      int inKindCount = 0;
+      double inKindTotal = 0;
+      double monetaryTotal = 0;
+
+      for (final r in rows) {
+        final dateStr = r['contribution_date'] as String? ?? '';
+        final amount = (r['contribution_amount'] as num?)?.toDouble() ?? 0;
+
+        if (dateStr.length >= 7) {
+          final month = dateStr.substring(0, 7); // YYYY-MM
+          monthlyTotals[month] = (monthlyTotals[month] ?? 0) + amount;
+        }
+
+        // Categorize (simplified: amounts under $10 often in-kind items)
+        if (amount == 0) {
+          inKindCount++;
+        } else {
+          monetaryTotal += amount;
+        }
+      }
+
+      return monthlyTotals.entries.map((e) => {
+        'month': e.key,
+        'total': e.value,
+      }).toList();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECContributionTimeline error: $e');
+      return [];
+    }
+  }
+
+  /// Fetch MEC finance summary for a committee
+  Future<Map<String, dynamic>> getMECFinanceSummary(String mecId) async {
+    if (!isReady) return {};
+
+    try {
+      final response = await _client
+          .schema('listmonk')
+          .from('mec_contributions')
+          .select('contribution_amount, contribution_date')
+          .eq('mec_id', mecId);
+
+      final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
+
+      double totalRaised = 0;
+      int contributionCount = 0;
+      double inKindTotal = 0;
+      double monetaryTotal = 0;
+
+      for (final r in rows) {
+        final amount = (r['contribution_amount'] as num?)?.toDouble() ?? 0;
+        totalRaised += amount;
+        contributionCount++;
+        if (amount == 0) {
+          inKindTotal += 1; // Count in-kind
+        } else {
+          monetaryTotal += amount;
+        }
+      }
+
+      return {
+        'total_raised': totalRaised,
+        'contribution_count': contributionCount,
+        'monetary_total': monetaryTotal,
+        'in_kind_count': inKindTotal.toInt(),
+        'avg_contribution': contributionCount > 0 ? totalRaised / contributionCount : 0,
+      };
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECFinanceSummary error: $e');
+      return {};
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  DISTRICT CANDIDATES — same race lookup
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Get all candidates running for the same office in the same district
+  Future<List<Candidate>> getDistrictCandidates(String office, String district) async {
+    if (!isReady) return [];
+
+    try {
+      final response = await _client
+          .schema('listmonk')
+          .from('candidates')
+          .select()
+          .eq('office', office)
+          .eq('district', district)
+          .order('party');
+
+      return (response as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(Candidate.fromJson)
+          .toList();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getDistrictCandidates error: $e');
+      return [];
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  CONTACT LOG — full CRUD
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Add a contact log entry with all fields
+  Future<CandidateContact?> addContactLog(
+    String candidateId,
+    String contactType,
+    String? notes,
+    String? outcome, {
+    String? subject,
+    String? contactedBy,
+    String? followUpDate,
+  }) async {
+    return addContact({
+      'candidate_id': candidateId,
+      'contact_type': contactType,
+      'notes': notes,
+      'outcome': outcome,
+      'subject': subject,
+      'contacted_by': contactedBy,
+      'contact_date': DateTime.now().toIso8601String(),
+      'follow_up_date': followUpDate,
+    });
+  }
+
+  /// Delete a contact log entry
+  Future<void> deleteContactLog(String contactId) async {
+    if (!isReady) return;
+
+    try {
+      await _client
+          .schema('listmonk')
+          .from('candidate_contacts')
+          .delete()
+          .eq('id', contactId);
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.deleteContactLog error: $e');
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  ENDORSEMENTS — dedicated table operations
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Fetch endorsements from the dedicated table
+  Future<List<Map<String, dynamic>>> fetchCandidateEndorsements(String candidateId) async {
+    if (!isReady) return [];
+
+    try {
+      final response = await _client
+          .schema('listmonk')
+          .from('candidate_endorsements')
+          .select()
+          .eq('candidate_id', candidateId)
+          .order('created_at', ascending: false);
+
+      return (response as List<dynamic>).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.fetchCandidateEndorsements error: $e');
+      return [];
+    }
+  }
+
+  /// Add an endorsement for a candidate
+  Future<Map<String, dynamic>?> addEndorsement(
+    String candidateId,
+    String endorser,
+    String type, {
+    String? notes,
+    String? endorserUrl,
+  }) async {
+    if (!isReady) return null;
+
+    try {
+      final response = await _client
+          .schema('listmonk')
+          .from('candidate_endorsements')
+          .insert({
+            'candidate_id': candidateId,
+            'endorser_name': endorser,
+            'endorsement_type': type,
+            'notes': notes,
+            'endorser_url': endorserUrl,
+            'created_at': DateTime.now().toIso8601String(),
+          })
+          .select()
+          .single();
+
+      return response;
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.addEndorsement error: $e');
+      return null;
+    }
+  }
+
+  /// Remove an endorsement
+  Future<void> removeEndorsement(String endorsementId) async {
+    if (!isReady) return;
+
+    try {
+      await _client
+          .schema('listmonk')
+          .from('candidate_endorsements')
+          .delete()
+          .eq('id', endorsementId);
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.removeEndorsement error: $e');
+    }
+  }
+
+  /// Toggle the MOYD endorsed flag on the candidate record
+  Future<void> toggleMOYDEndorsed(String candidateId) async {
+    if (!isReady) return;
+
+    try {
+      final current = await fetchCandidate(candidateId);
+      if (current == null) return;
+      await updateCandidate(candidateId, {
+        'is_endorsed': !current.isEndorsed,
+        'endorsement_status': !current.isEndorsed ? 'endorsed' : 'not_endorsed',
+      });
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.toggleMOYDEndorsed error: $e');
+    }
+  }
+
+  /// Export candidates to CSV with applied filters
+  Future<String> exportCandidatesCSV({
+    String? party,
+    String? officeLevel,
+    bool? isYoungDem,
+    bool? isEndorsed,
+    bool? isContacted,
+    int? minAge,
+    int? maxAge,
+    List<String>? candidateIds,
+  }) async {
+    return exportCandidatesCsv(
+      candidateIds: candidateIds,
+      party: party,
+      isYoungDem: isYoungDem,
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  ADJACENT DISTRICTS — for District Intel tab
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Get candidates in adjacent districts (±3 from current)
+  Future<Map<String, List<Candidate>>> getAdjacentDistrictCandidates(String district) async {
+    if (!isReady) return {};
+
+    final distNum = int.tryParse(district);
+    if (distNum == null) return {};
+
+    try {
+      final result = <String, List<Candidate>>{};
+      for (int i = distNum - 3; i <= distNum + 3; i++) {
+        if (i < 1 || i > 163 || i == distNum) continue;
+        final candidates = await fetchCandidatesByDistrict(i.toString());
+        if (candidates.isNotEmpty) {
+          result[i.toString()] = candidates;
+        }
+      }
+      return result;
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getAdjacentDistrictCandidates error: $e');
+      return {};
+    }
+  }
+
   /// Get candidates with upcoming follow-ups
   Future<List<Candidate>> fetchUpcomingFollowUps() async {
     if (!isReady) return [];

@@ -639,6 +639,67 @@ class CandidateFinance {
   }
 }
 
+/// MEC (Missouri Ethics Commission) contribution record
+class MECContribution {
+  final String? id;
+  final String mecId;
+  final String? contributorLastName;
+  final String? contributorFirstName;
+  final double contributionAmount;
+  final String? contributionDate;
+  final String? contributionType;
+  final String? contributorEmployer;
+  final String? contributorOccupation;
+  final String? contributorAddress;
+  final String? contributorCity;
+  final String? contributorState;
+
+  const MECContribution({
+    this.id,
+    required this.mecId,
+    this.contributorLastName,
+    this.contributorFirstName,
+    this.contributionAmount = 0,
+    this.contributionDate,
+    this.contributionType,
+    this.contributorEmployer,
+    this.contributorOccupation,
+    this.contributorAddress,
+    this.contributorCity,
+    this.contributorState,
+  });
+
+  factory MECContribution.fromJson(Map<String, dynamic> json) {
+    return MECContribution(
+      id: json['id']?.toString(),
+      mecId: json['mec_id'] as String? ?? '',
+      contributorLastName: json['contributor_last_name'] as String?,
+      contributorFirstName: json['contributor_first_name'] as String?,
+      contributionAmount: (json['contribution_amount'] as num?)?.toDouble() ?? 0,
+      contributionDate: json['contribution_date'] as String?,
+      contributionType: json['contribution_type'] as String?,
+      contributorEmployer: json['contributor_employer'] as String?,
+      contributorOccupation: json['contributor_occupation'] as String?,
+      contributorAddress: json['contributor_address'] as String?,
+      contributorCity: json['contributor_city'] as String?,
+      contributorState: json['contributor_state'] as String?,
+    );
+  }
+
+  String get donorName {
+    final first = contributorFirstName ?? '';
+    final last = contributorLastName ?? '';
+    return '$first $last'.trim();
+  }
+
+  String get donorLocation {
+    final city = contributorCity ?? '';
+    final state = contributorState ?? '';
+    if (city.isEmpty && state.isEmpty) return '';
+    return '$city, $state'.trim();
+  }
+}
+
 /// District demographics data
 class DistrictDemographics {
   final String district;
