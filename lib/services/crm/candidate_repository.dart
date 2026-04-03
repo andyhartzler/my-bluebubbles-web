@@ -45,7 +45,7 @@ class CandidateRepository {
 
     try {
       var query = _client
-          .schema('listmonk')
+          
           .from('candidates')
           .select();
 
@@ -117,7 +117,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidates')
           .select()
           .eq('id', id)
@@ -138,7 +138,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidates')
           .select()
           .eq('is_young_dem', true)
@@ -185,7 +185,7 @@ class CandidateRepository {
 
     try {
       final all = await _client
-          .schema('listmonk')
+          
           .from('candidates')
           .select('party, is_young_dem, estimated_age, district, office_level, is_endorsed, is_contacted, campaign_website');
 
@@ -289,7 +289,7 @@ class CandidateRepository {
     try {
       updates['updated_at'] = DateTime.now().toIso8601String();
       await _client
-          .schema('listmonk')
+          
           .from('candidates')
           .update(updates)
           .eq('id', id);
@@ -339,7 +339,7 @@ class CandidateRepository {
       data['updated_at'] = DateTime.now().toIso8601String();
 
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidates')
           .insert(data)
           .select()
@@ -359,7 +359,7 @@ class CandidateRepository {
 
     try {
       await _client
-          .schema('listmonk')
+          
           .from('candidates')
           .delete()
           .eq('id', id);
@@ -375,7 +375,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidates')
           .select('district, party, is_young_dem')
           .eq('office_level', 'state')
@@ -407,7 +407,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidates')
           .select()
           .eq('district', district)
@@ -433,7 +433,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidate_contacts')
           .select()
           .eq('candidate_id', candidateId)
@@ -454,7 +454,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidate_contacts')
           .insert(data)
           .select()
@@ -482,7 +482,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidate_news')
           .select()
           .eq('candidate_id', candidateId)
@@ -507,7 +507,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('election_results')
           .select()
           .eq('district', district)
@@ -533,7 +533,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('district_demographics')
           .select()
           .eq('district', district)
@@ -607,7 +607,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidates')
           .select('party, office_level');
 
@@ -634,7 +634,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidates')
           .select('district, party')
           .eq('office_level', 'state');
@@ -854,7 +854,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidates')
           .select()
           .eq('office', office)
@@ -903,7 +903,7 @@ class CandidateRepository {
 
     try {
       await _client
-          .schema('listmonk')
+          
           .from('candidate_contacts')
           .delete()
           .eq('id', contactId);
@@ -922,7 +922,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidate_endorsements')
           .select()
           .eq('candidate_id', candidateId)
@@ -947,7 +947,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidate_endorsements')
           .insert({
             'candidate_id': candidateId,
@@ -973,7 +973,7 @@ class CandidateRepository {
 
     try {
       await _client
-          .schema('listmonk')
+          
           .from('candidate_endorsements')
           .delete()
           .eq('id', endorsementId);
@@ -1031,7 +1031,7 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
+          
           .from('candidate_contacts')
           .select('candidate_id, follow_up_date')
           .not('follow_up_date', 'is', null)

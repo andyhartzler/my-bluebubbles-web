@@ -115,7 +115,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   void _onTabChanged() {
-    if (!_tabController.indexIsChanging) return;
+    
     final idx = _tabController.index;
     switch (idx) {
       case 1:
@@ -265,6 +265,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   Future<void> _saveNotes() async {
     setState(() => _savingNotes = true);
     await _repo.updateNotes(c.id, _notesController.text);
+    if (!mounted) return;
     setState(() {
       _savingNotes = false;
       _editingNotes = false;
