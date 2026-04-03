@@ -6,7 +6,7 @@ import 'package:bluebubbles/models/crm/candidate.dart';
 
 import 'supabase_service.dart';
 
-/// Repository for querying the `listmonk.candidates_2026` table.
+/// Repository for querying the `listmonk.candidates` table.
 ///
 /// Uses the privileged (service-role) client because the table lives
 /// in the `listmonk` schema which is not exposed through the public
@@ -38,7 +38,7 @@ class CandidateRepository {
     try {
       var query = _client
           .schema('listmonk')
-          .from('candidates_2026')
+          .from('candidates')
           .select();
 
       if (searchQuery != null && searchQuery.isNotEmpty) {
@@ -85,7 +85,7 @@ class CandidateRepository {
     try {
       final response = await _client
           .schema('listmonk')
-          .from('candidates_2026')
+          .from('candidates')
           .select()
           .eq('id', id)
           .maybeSingle();
@@ -106,7 +106,7 @@ class CandidateRepository {
     try {
       final response = await _client
           .schema('listmonk')
-          .from('candidates_2026')
+          .from('candidates')
           .select()
           .eq('is_young_dem', true)
           .order('estimated_age', ascending: true);
@@ -129,7 +129,7 @@ class CandidateRepository {
     try {
       final all = await _client
           .schema('listmonk')
-          .from('candidates_2026')
+          .from('candidates')
           .select('party, is_young_dem, estimated_age, district, office_level');
 
       final rows = (all as List<dynamic>).cast<Map<String, dynamic>>();
@@ -193,7 +193,7 @@ class CandidateRepository {
     try {
       await _client
           .schema('listmonk')
-          .from('candidates_2026')
+          .from('candidates')
           .update({'notes': notes, 'updated_at': DateTime.now().toIso8601String()})
           .eq('id', id);
     } catch (e) {
@@ -209,7 +209,7 @@ class CandidateRepository {
     try {
       final response = await _client
           .schema('listmonk')
-          .from('candidates_2026')
+          .from('candidates')
           .select('district, party, is_young_dem')
           .eq('office_level', 'state')
           .not('district', 'is', null);
@@ -241,7 +241,7 @@ class CandidateRepository {
     try {
       final response = await _client
           .schema('listmonk')
-          .from('candidates_2026')
+          .from('candidates')
           .select()
           .eq('district', district)
           .eq('office_level', 'state')

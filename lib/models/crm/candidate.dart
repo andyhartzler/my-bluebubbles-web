@@ -1,4 +1,4 @@
-/// Candidate model — maps to Supabase `listmonk.candidates_2026` table
+/// Candidate model — maps to Supabase `listmonk.candidates` table
 class Candidate {
   final String id;
   final String name;
