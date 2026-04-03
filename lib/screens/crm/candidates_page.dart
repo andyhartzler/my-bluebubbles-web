@@ -133,6 +133,8 @@ class _CandidatesPageState extends State<CandidatesPage>
       }
     }
 
+    if (!mounted) return;
+
     setState(() {
       _allCandidates = allCandidates;
       _youngDems = youngDems;

@@ -251,7 +251,7 @@ Missouri Young Democrats''',
     try {
       // Send via Gmail API
       await _emailService.sendEmail(
-        from: _selectedFromEmail,
+        fromEmail: _selectedFromEmail,
         to: _toController.text
             .split(',')
             .map((e) => e.trim())
@@ -272,7 +272,7 @@ Missouri Young Democrats''',
                 .toList()
             : null,
         subject: _subjectController.text,
-        body: _bodyController.text,
+        textBody: _bodyController.text,
       );
 
       // Log the contact

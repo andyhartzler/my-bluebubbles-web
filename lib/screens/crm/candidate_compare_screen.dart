@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
-import 'package:bluebubbles/widgets/crm/candidate_score_card.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATE COMPARE SCREEN

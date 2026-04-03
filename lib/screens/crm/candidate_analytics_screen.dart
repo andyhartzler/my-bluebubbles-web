@@ -1,12 +1,10 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
-import 'package:bluebubbles/widgets/crm/election_history_chart.dart';
 import 'package:bluebubbles/widgets/crm/missouri_map_widget.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -757,7 +755,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
                     maxY: _maxAgeCount.toDouble() * 1.2,
                     barTouchData: BarTouchData(
                       touchTooltipData: BarTouchTooltipData(
-                        getTooltipColor: (_) => BrandColors.unityBlue,
+                        tooltipBgColor: BrandColors.unityBlue,
                         getTooltipItem: (group, gIdx, rod, rIdx) {
                           final labels = ['<25', '25-35', '36-50', '51-65', '65+', '?'];
                           return BarTooltipItem(

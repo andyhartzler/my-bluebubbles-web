@@ -203,7 +203,6 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   }
 
   Widget _buildLegendBar() {
-    final totalDistricts = widget.districtMap.length;
     int ydDistricts = 0;
     int demDistricts = 0;
     int repDistricts = 0;

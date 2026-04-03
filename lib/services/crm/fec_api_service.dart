@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
-import 'package:bluebubbles/config/crm_config.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  FEC API SERVICE

@@ -3,6 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 
+/// Shared helper — score → color mapping used by CandidateScoreCard & MiniScoreBadge
+Color scoreColor(int score) {
+  if (score >= 80) return BrandColors.success;
+  if (score >= 50) return BrandColors.sunriseGold;
+  if (score >= 30) return Colors.orange;
+  return Colors.white54;
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATE SCORE CARD
 //  Reusable widget to display Young Dem Score as a radar chart
@@ -74,19 +82,19 @@ class _CandidateScoreCardState extends State<CandidateScoreCard>
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: _scoreColor(score).withOpacity(0.15),
+            color: scoreColor(score).withOpacity(0.15),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: _scoreColor(score).withOpacity(0.3)),
+            border: Border.all(color: scoreColor(score).withOpacity(0.3)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.star, color: _scoreColor(score), size: 14),
+              Icon(Icons.star, color: scoreColor(score), size: 14),
               const SizedBox(width: 4),
               Text(
                 '$val',
                 style: TextStyle(
-                  color: _scoreColor(score),
+                  color: scoreColor(score),
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -144,7 +152,7 @@ class _CandidateScoreCardState extends State<CandidateScoreCard>
                   return Text(
                     '$val / 100',
                     style: TextStyle(
-                      color: _scoreColor(c.youngDemScore),
+                      color: scoreColor(c.youngDemScore),
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -174,7 +182,7 @@ class _CandidateScoreCardState extends State<CandidateScoreCard>
                       ],
                       labels: ['Party', 'Primary', 'Finance', 'VAN', 'Endorse'],
                       progress: _progress.value,
-                      fillColor: _scoreColor(c.youngDemScore),
+                      fillColor: scoreColor(c.youngDemScore),
                     ),
                   ),
                 );
@@ -188,7 +196,7 @@ class _CandidateScoreCardState extends State<CandidateScoreCard>
             child: Text(
               _scoreLabel(c.youngDemScore),
               style: TextStyle(
-                color: _scoreColor(c.youngDemScore),
+                color: scoreColor(c.youngDemScore),
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
@@ -252,13 +260,6 @@ class _CandidateScoreCardState extends State<CandidateScoreCard>
         },
       ),
     );
-  }
-
-  static Color _scoreColor(int score) {
-    if (score >= 80) return BrandColors.success;
-    if (score >= 50) return BrandColors.sunriseGold;
-    if (score >= 30) return Colors.orange;
-    return Colors.white54;
   }
 
   static String _scoreLabel(int score) {
@@ -444,7 +445,7 @@ class MiniScoreBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = CandidateScoreCard._scoreColor(score);
+    final color = scoreColor(score);
     return Container(
       width: size,
       height: size,
