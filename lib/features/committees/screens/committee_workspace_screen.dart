@@ -23,6 +23,7 @@ import 'package:bluebubbles/features/committees/legislation_tracker/providers/le
 import 'package:bluebubbles/features/committees/legislation_tracker/providers/bill_search_provider.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_settings_tab.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/screens/crm/candidates_page.dart';
 
 class CommitteeWorkspaceScreen extends StatefulWidget {
   final Committee committee;
@@ -205,6 +206,16 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
             ],
             child: LegislationTrackerScreen(committeeId: committee.id),
           ),
+        ),
+      );
+    }
+
+    if (committee.hasCandidatesTab) {
+      tabs.add(
+        _TabDefinition(
+          label: 'Candidates',
+          icon: Icons.how_to_vote,
+          builder: () => const CandidatesPage(),
         ),
       );
     }
