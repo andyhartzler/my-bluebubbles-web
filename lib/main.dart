@@ -513,9 +513,16 @@ class Main extends StatelessWidget {
                       }
                     }
                   }
-                  return TitleBarWrapper(
-                    child: SelectionArea(
-                      child: SecureGate(
+                  // CRITICAL: SelectionArea wrapping the entire app causes
+                  // gesture arena conflicts on iOS Safari PWA. The text
+                  // selection gesture detector intercepts the first tap,
+                  // making navigation buttons unresponsive until something
+                  // else (like a dashboard tile) receives focus first.
+                  // Only wrap in SelectionArea on desktop where text
+                  // selection is expected. On mobile web, skip it entirely.
+                  final bool isMobileWeb = kIsWeb &&
+                      MediaQuery.of(context).size.width < 600;
+                  Widget gateChild = SecureGate(
                         blurr: 5,
                         opacity: 0,
                         lockedBuilder: (context, controller) {
@@ -614,9 +621,15 @@ class Main extends StatelessWidget {
                           );
                         },
                         child: child ?? Container(),
-                      ),
-                    ),
                   );
+
+                  // Wrap in SelectionArea only on desktop/tablet
+                  // (not on mobile web where it causes iOS Safari PWA issues)
+                  final wrappedGate = isMobileWeb
+                      ? gateChild
+                      : SelectionArea(child: gateChild);
+
+                  return TitleBarWrapper(child: wrappedGate);
                 },
               ),
             ),
@@ -662,7 +675,6 @@ class _HomeState extends OptimizedState<Home>
     debugLabel: 'mobileMenuButton',
   );
   final PageStorageBucket _bucket = PageStorageBucket();
-  DateTime? _lastTouchTime;
 
   @override
   void initState() {
@@ -711,116 +723,21 @@ class _HomeState extends OptimizedState<Home>
           }
         });
 
-        /* ----- PWA LIFECYCLE FIX (for iOS Safari) ----- */
-        // iOS PWA has known issues where touch events stop working after:
-        // 1. Force-closing the app (swipe up to close)
-        // 2. Backgrounding and resuming
-        // 3. TextField interactions (keyboard focus issues)
+        /* ----- PWA LIFECYCLE: MINIMAL RESUME HANDLER ----- */
+        // The REAL fix for iOS Safari PWA touch unresponsiveness was removing
+        // the SelectionArea wrapper on mobile web (see Main.build).
+        // SelectionArea's gesture detector competed with tap events, causing
+        // the first touch to be swallowed by the text-selection gesture arena.
         //
-        // We use multiple event listeners as fallbacks since not all events
-        // fire reliably in all iOS PWA scenarios.
-
-        // Visibility change - fires when tab/app visibility changes
+        // We keep ONLY a lightweight visibility-change listener to handle
+        // legitimate background→foreground transitions. The previous approach
+        // of firing 15+ setState() calls, unfocus() calls, and resize events
+        // in the first 2.5 seconds was itself CAUSING the unresponsiveness by
+        // continuously resetting gesture recognizers and stealing focus.
         html.document.onVisibilityChange.listen((event) {
           if (html.document.visibilityState == 'visible' && mounted) {
-            _refreshPWAState(aggressive: true);
-          }
-        });
-
-        // Pageshow event - fires when page is loaded from back-forward cache
-        // This is more reliable for force-close/reopen scenarios
-        html.window.on['pageshow'].listen((event) {
-          if (mounted) {
-            _refreshPWAState(aggressive: true);
-          }
-        });
-
-        // Window focus - fires when window gains focus
-        html.window.onFocus.listen((event) {
-          if (mounted) {
-            _refreshPWAState(aggressive: false);
-          }
-        });
-
-        // Touchstart on document - helps detect if touch events are working
-        // and forces a refresh if the app was in a frozen state
-        html.document.on['touchstart'].listen((event) {
-          // Track that touch events are working
-          _lastTouchTime = DateTime.now();
-        });
-
-        // Touchend on document - check if UI is responding after touch completes
-        html.document.on['touchend'].listen((event) {
-          // If we get touchend without seeing UI updates, the app might be frozen
-          _lastTouchTime = DateTime.now();
-        });
-
-        // Focusin event - fires when any element receives focus
-        // This helps detect keyboard interactions that might freeze navigation
-        // BUT we skip refresh if focus is going to an input element to prevent
-        // the text input focus loss bug
-        html.document.on['focusin'].listen((event) {
-          if (mounted) {
-            // Check if the focused element is an input - if so, don't refresh
-            // This prevents focus loss when users click on text fields
-            final target = event.target;
-            if (target is html.Element) {
-              final tagName = target.tagName.toLowerCase();
-              // Skip refresh for input elements (text fields, textareas, etc.)
-              if (tagName == 'input' ||
-                  tagName == 'textarea' ||
-                  target.getAttribute('contenteditable') == 'true') {
-                return;
-              }
-            }
-            // Light refresh when focus changes (don't be too aggressive)
-            _refreshPWAState(aggressive: false);
-          }
-        });
-
-        // Periodic health check - detect frozen state even if no events fire
-        Timer.periodic(const Duration(seconds: 3), (timer) {
-          if (!mounted) {
-            timer.cancel();
-            return;
-          }
-          // If we haven't had a touch in a while and visibility is visible,
-          // do a light refresh to ensure responsiveness
-          if (html.document.visibilityState == 'visible') {
-            final now = DateTime.now();
-            if (_lastTouchTime != null &&
-                now.difference(_lastTouchTime!).inSeconds > 10) {
-              _refreshPWAState(aggressive: false);
-            }
-          }
-        });
-
-        // INITIAL PWA REFRESH - Critical fix for iOS Safari PWA standalone mode
-        // On initial PWA load, none of the event listeners above will fire immediately.
-        // This causes navigation to be unresponsive until the user interacts with
-        // something that triggers a focusin event (like tapping a dashboard stat tile).
-        // By calling _refreshPWAState on initial load, we ensure touch handling is
-        // properly initialized from the start.
-        //
-        // We use multiple delayed calls because iOS Safari PWA can take varying
-        // amounts of time to fully initialize touch handling after the initial render.
-        Future.delayed(const Duration(milliseconds: 100), () {
-          if (mounted) {
-            _refreshPWAState(aggressive: true);
-          }
-        });
-
-        // Additional delayed refresh to catch any late-initializing PWA scenarios
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            _refreshPWAState(aggressive: true);
-          }
-        });
-
-        // Final safety net refresh for the most stubborn iOS Safari PWA cases
-        Future.delayed(const Duration(milliseconds: 1500), () {
-          if (mounted && !_isTextInputFocused()) {
-            _refreshPWAState(aggressive: false);
+            // Single rebuild is sufficient to refresh stale UI after resume
+            setState(() {});
           }
         });
       }
@@ -953,115 +870,12 @@ class _HomeState extends OptimizedState<Home>
     }
   }
 
-  /// Refresh PWA state to fix iOS Safari touch event issues
-  /// This is called from multiple event listeners as fallbacks
-  /// [aggressive] - when true, performs more thorough refresh (e.g., after force close)
-  DateTime? _lastPWARefresh;
-  void _refreshPWAState({bool aggressive = false}) {
-    // Debounce to avoid multiple rapid refreshes
-    // Use shorter debounce for non-aggressive refreshes
-    final now = DateTime.now();
-    final debounceMs = aggressive ? 300 : 1000;
-    if (_lastPWARefresh != null &&
-        now.difference(_lastPWARefresh!).inMilliseconds < debounceMs) {
-      return;
-    }
-    _lastPWARefresh = now;
-
-    // Check if a text input is currently focused - if so, skip the refresh
-    // to prevent focus loss during typing (fixes app-wide text input focus bug)
-    if (_isTextInputFocused()) {
-      return;
-    }
-
-    // Force immediate rebuild
-    if (mounted) {
-      setState(() {});
-    }
-
-    // Dispatch resize event to force Flutter to recalculate layout
-    // This helps reset gesture recognizers and touch targets
-    if (kIsWeb) {
-      html.window.dispatchEvent(html.Event('resize'));
-    }
-
-    // Schedule a delayed rebuild to catch any race conditions
-    // iOS PWA sometimes needs a moment to fully restore touch handling
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted && !_isTextInputFocused()) {
-        setState(() {});
-      }
-    });
-
-    // Additional delayed rebuild for more stubborn cases
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted && !_isTextInputFocused()) {
-        setState(() {});
-        // Only unfocus if no text input is focused
-        FocusManager.instance.primaryFocus?.unfocus();
-      }
-    });
-
-    // For aggressive refresh (after force close), add even more delayed rebuilds
-    // iOS Safari PWA can take up to 500ms+ to fully restore touch handling
-    if (aggressive) {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted && !_isTextInputFocused()) {
-          setState(() {});
-          // Dispatch another resize to force layout recalculation
-          if (kIsWeb) {
-            html.window.dispatchEvent(html.Event('resize'));
-          }
-        }
-      });
-
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted && !_isTextInputFocused()) {
-          setState(() {});
-          // Only clear focus if no text input is active
-          FocusManager.instance.primaryFocus?.unfocus();
-        }
-      });
-
-      // Final rebuild at 1 second for the most stubborn cases
-      Future.delayed(const Duration(milliseconds: 1000), () {
-        if (mounted && !_isTextInputFocused()) {
-          setState(() {});
-        }
-      });
-    }
-  }
-
-  /// Check if a text input is currently focused by checking the HTML DOM
-  /// This is more reliable than checking Flutter widget types since it works
-  /// even in production builds where class names are minified
-  bool _isTextInputFocused() {
-    if (!kIsWeb) return false;
-
-    // Check the active HTML element directly - most reliable approach
-    final activeElement = html.document.activeElement;
-    if (activeElement != null) {
-      final tagName = activeElement.tagName.toLowerCase();
-      if (tagName == 'input' || tagName == 'textarea') {
-        return true;
-      }
-      // Check for contenteditable elements (used by some rich text editors)
-      if (activeElement.getAttribute('contenteditable') == 'true') {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /// Handle app lifecycle changes - force rebuild when resuming from background
-  /// This fixes iOS PWA issues where touch events don't work after reopening
+  /// Handle app lifecycle changes - rebuild when resuming from background
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.resumed) {
-      // Use aggressive mode when resuming as this is likely after force close
-      _refreshPWAState(aggressive: true);
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() {});
     }
   }
 
