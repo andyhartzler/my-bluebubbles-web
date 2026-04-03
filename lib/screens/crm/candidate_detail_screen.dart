@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
@@ -67,7 +68,6 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   bool _contactsLoading = true;
   List<CandidateContact> _contactLog = [];
   bool _showContactForm = false;
-  final _contactTypeController = TextEditingController();
   final _contactNotesController = TextEditingController();
   final _contactOutcomeController = TextEditingController();
   final _contactSubjectController = TextEditingController();
@@ -142,7 +142,6 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     _tabController.dispose();
     _notesController.dispose();
     _scrollController.dispose();
-    _contactTypeController.dispose();
     _contactNotesController.dispose();
     _contactOutcomeController.dispose();
     _contactSubjectController.dispose();
@@ -2179,7 +2178,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   Widget _buildAssignedMemberSelector() {
-    final teamMembers = ['Andrew Hartzler', 'Sarah Johnson', 'Mike Chen', 'Unassigned'];
+    // Team members for assignment — extend as team grows
+    final teamMembers = CRMConfig.teamMembers.isNotEmpty
+        ? [...CRMConfig.teamMembers, 'Unassigned']
+        : ['Andrew Hartzler', 'Unassigned'];
     final current = c.assignedTo ?? 'Unassigned';
 
     return _card(

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
@@ -640,20 +639,16 @@ Missouri Young Democrats''',
               _quickAction(Icons.attach_file, 'Attach', () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Attachments coming soon'),
+                    content: Text('File attachments are not yet supported'),
                     backgroundColor: BrandColors.momentumBlue,
                   ),
                 );
               }),
               const SizedBox(width: 8),
-              _quickAction(Icons.format_bold, 'Format', () {
-                // Toggle formatting toolbar
-              }),
-              const SizedBox(width: 8),
               _quickAction(Icons.schedule, 'Schedule', () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Scheduled sending coming soon'),
+                    content: Text('Scheduled sending is not yet supported'),
                     backgroundColor: BrandColors.momentumBlue,
                   ),
                 );

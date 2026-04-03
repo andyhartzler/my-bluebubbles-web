@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -694,7 +693,6 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
           .from('mec_committees')
           .select()
           .ilike('candidate_name', '%$candidateName%');
@@ -712,7 +710,6 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
           .from('mec_contributions')
           .select()
           .eq('mec_id', mecId)
@@ -734,12 +731,13 @@ class CandidateRepository {
     if (!isReady) return [];
 
     try {
-      // Aggregate contributions by donor name
+      // Aggregate contributions by donor name (limit to most recent 2000 to avoid loading millions of rows)
       final response = await _client
-          .schema('listmonk')
           .from('mec_contributions')
           .select('contributor_last_name, contributor_first_name, contribution_amount')
-          .eq('mec_id', mecId);
+          .eq('mec_id', mecId)
+          .order('contribution_date', ascending: false)
+          .limit(2000);
 
       final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
 
@@ -773,19 +771,16 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
           .from('mec_contributions')
           .select('contribution_date, contribution_amount')
           .eq('mec_id', mecId)
-          .order('contribution_date');
+          .order('contribution_date')
+          .limit(2000);
 
       final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
 
       // Group by month
       final monthlyTotals = <String, double>{};
-      int inKindCount = 0;
-      double inKindTotal = 0;
-      double monetaryTotal = 0;
 
       for (final r in rows) {
         final dateStr = r['contribution_date'] as String? ?? '';
@@ -794,13 +789,6 @@ class CandidateRepository {
         if (dateStr.length >= 7) {
           final month = dateStr.substring(0, 7); // YYYY-MM
           monthlyTotals[month] = (monthlyTotals[month] ?? 0) + amount;
-        }
-
-        // Categorize (simplified: amounts under $10 often in-kind items)
-        if (amount == 0) {
-          inKindCount++;
-        } else {
-          monetaryTotal += amount;
         }
       }
 
@@ -820,10 +808,10 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          .schema('listmonk')
           .from('mec_contributions')
           .select('contribution_amount, contribution_date')
-          .eq('mec_id', mecId);
+          .eq('mec_id', mecId)
+          .limit(5000);
 
       final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
 
@@ -1008,24 +996,6 @@ class CandidateRepository {
     } catch (e) {
       debugPrint('❌ CandidateRepository.toggleMOYDEndorsed error: $e');
     }
-  }
-
-  /// Export candidates to CSV with applied filters
-  Future<String> exportCandidatesCSV({
-    String? party,
-    String? officeLevel,
-    bool? isYoungDem,
-    bool? isEndorsed,
-    bool? isContacted,
-    int? minAge,
-    int? maxAge,
-    List<String>? candidateIds,
-  }) async {
-    return exportCandidatesCsv(
-      candidateIds: candidateIds,
-      party: party,
-      isYoungDem: isYoungDem,
-    );
   }
 
   // ═══════════════════════════════════════════════════════════════

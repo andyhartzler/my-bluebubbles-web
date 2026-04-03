@@ -143,4 +143,9 @@ class CRMConfig {
     final sorted = allowed.toList()..sort((a, b) => a.compareTo(b));
     return List<String>.unmodifiable(sorted);
   }
+
+  /// Team members available for candidate assignment
+  static const List<String> teamMembers = [
+    'Andrew Hartzler',
+  ];
 }

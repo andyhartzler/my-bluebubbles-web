@@ -15,8 +15,9 @@ class CivicApiService {
   factory CivicApiService() => _instance;
   CivicApiService._();
 
-  // NOTE: Replace with actual API key from Google Cloud Console
-  static const _apiKey = 'AIzaSyBExample'; // placeholder
+  // API key from environment; service is disabled when not configured
+  static const _apiKey = String.fromEnvironment('CIVIC_API_KEY', defaultValue: '');
+  bool get _isConfigured => _apiKey.isNotEmpty;
   static const _baseUrl = 'https://www.googleapis.com/civicinfo/v2';
 
   final Map<String, _CachedResult> _cache = {};
@@ -24,6 +25,8 @@ class CivicApiService {
   // ─── Lookup representatives by address ────────────────────────
 
   Future<RepresentativeResult?> lookupRepresentatives(String address) async {
+    if (!_isConfigured) return null;
+
     final cacheKey = 'rep:$address';
     if (_cache.containsKey(cacheKey) && !_cache[cacheKey]!.isExpired) {
       return _cache[cacheKey]!.data as RepresentativeResult;
@@ -62,6 +65,8 @@ class CivicApiService {
   // ─── Get election info ────────────────────────────────────────
 
   Future<List<ElectionInfo>> getUpcomingElections() async {
+    if (!_isConfigured) return [];
+
     const cacheKey = 'elections';
     if (_cache.containsKey(cacheKey) && !_cache[cacheKey]!.isExpired) {
       return _cache[cacheKey]!.data as List<ElectionInfo>;
@@ -94,6 +99,8 @@ class CivicApiService {
   // ─── Get voter info for an address ────────────────────────────
 
   Future<VoterInfo?> getVoterInfo(String address, {String? electionId}) async {
+    if (!_isConfigured) return null;
+
     final cacheKey = 'voter:$address:$electionId';
     if (_cache.containsKey(cacheKey) && !_cache[cacheKey]!.isExpired) {
       return _cache[cacheKey]!.data as VoterInfo;
@@ -132,6 +139,8 @@ class CivicApiService {
   // ─── Lookup divisions (districts) ─────────────────────────────
 
   Future<List<Division>> searchDivisions(String query) async {
+    if (!_isConfigured) return [];
+
     try {
       final uri = Uri.parse('$_baseUrl/divisions').replace(
         queryParameters: {

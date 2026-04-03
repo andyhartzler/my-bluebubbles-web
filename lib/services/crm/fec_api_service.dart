@@ -20,12 +20,12 @@ class FecApiService {
   FecApiService._();
 
   static const _baseUrl = 'https://api.open.fec.gov/v1';
-  static const _apiKey = 'DEMO_KEY'; // Replace with real key in production
+  // DEMO_KEY is FEC's official demo key (1000 req/hr). Get a production key at https://api.open.fec.gov/developers/
+  static const _apiKey = String.fromEnvironment('FEC_API_KEY', defaultValue: 'DEMO_KEY');
   static const _state = 'MO';
 
   final CRMSupabaseService _supabase = CRMSupabaseService();
   final Map<String, CandidateFinance> _cache = {};
-  DateTime? _lastFetch;
 
   // ─── Search FEC candidates by name or state ───────────────────
 
@@ -329,6 +329,5 @@ class FecApiService {
 
   void clearCache() {
     _cache.clear();
-    _lastFetch = null;
   }
 }

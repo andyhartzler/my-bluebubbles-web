@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
@@ -2319,9 +2320,7 @@ class _BulkAssignDialogState extends State<_BulkAssignDialog> {
   final _customController = TextEditingController();
 
   final _teamMembers = [
-    'Andrew Hartzler',
-    'Sarah Johnson',
-    'Mike Chen',
+    ...CRMConfig.teamMembers,
     'Custom…',
   ];
 
