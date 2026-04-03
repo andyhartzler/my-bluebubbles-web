@@ -8,6 +8,7 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
+import 'package:bluebubbles/widgets/crm/missouri_map_widget.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATES INTELLIGENCE PAGE
@@ -613,159 +614,28 @@ class _CandidatesPageState extends State<CandidatesPage>
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildMapSection() {
-    return Container(
-      margin: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            BrandColors.unityBlue.withOpacity(0.9),
-            BrandColors.unityBlue,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: BrandColors.momentumBlue.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: Row(
-              children: [
-                const Icon(Icons.map_outlined, color: BrandColors.sunriseGold, size: 24),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'Missouri 2026 — State House Districts',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                _buildMapLegend(),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 300,
-            child: ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(bottom: Radius.circular(20)),
-              child: AnimatedBuilder(
-                animation: _pulseAnimation,
-                builder: (context, child) {
-                  return CustomPaint(
-                    painter: MissouriMapPainter(
-                      districtMap: _districtMap,
-                      selectedDistrict: _selectedMapDistrict,
-                      pulseValue: _pulseAnimation.value,
-                    ),
-                    size: Size.infinite,
-                    child: GestureDetector(
-                      onTapDown: (details) =>
-                          _handleMapTap(details, context),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          // Selected district info
-          if (_selectedMapDistrict != null &&
-              _selectedDistrictCandidates != null)
-            _buildDistrictPopup(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMapLegend() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Column(
       children: [
-        _legendDot(BrandColors.momentumBlue, 'YD'),
-        const SizedBox(width: 8),
-        _legendDot(Colors.blueGrey, 'Dem'),
-        const SizedBox(width: 8),
-        _legendDot(BrandColors.republicanRed, 'GOP'),
+        MissouriMapWidget(
+          districtMap: _districtMap,
+          selectedDistrict: _selectedMapDistrict,
+          height: 340,
+          showLegend: true,
+          showLabels: true,
+          interactive: true,
+          onDistrictTap: (district) {
+            setState(() {
+              _selectedMapDistrict = district;
+              _selectedDistrictCandidates = _districtMap[district];
+            });
+          },
+        ),
+        // Selected district info popup below the map
+        if (_selectedMapDistrict != null &&
+            _selectedDistrictCandidates != null)
+          _buildDistrictPopup(),
       ],
     );
-  }
-
-  Widget _legendDot(Color color, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 3),
-        Text(label,
-            style: const TextStyle(color: Colors.white54, fontSize: 10)),
-      ],
-    );
-  }
-
-  void _handleMapTap(TapDownDetails details, BuildContext context) {
-    final box = context.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final size = box.size;
-    final pos = details.localPosition;
-
-    final cols = 16;
-    final rows = 11;
-    final cellW = size.width / cols;
-    final cellH = size.height / rows;
-    final col = (pos.dx / cellW).floor().clamp(0, cols - 1);
-    final row = (pos.dy / cellH).floor().clamp(0, rows - 1);
-
-    final districtNum = row * cols + col + 1;
-    final district = districtNum.toString();
-
-    if (_districtMap.containsKey(district)) {
-      setState(() {
-        _selectedMapDistrict = district;
-        _selectedDistrictCandidates = _districtMap[district];
-      });
-    } else {
-      final closest = _findClosestDistrict(districtNum);
-      if (closest != null) {
-        setState(() {
-          _selectedMapDistrict = closest;
-          _selectedDistrictCandidates = _districtMap[closest];
-        });
-      }
-    }
-  }
-
-  String? _findClosestDistrict(int target) {
-    String? best;
-    int bestDist = 999;
-    for (final d in _districtMap.keys) {
-      final n = int.tryParse(d) ?? 999;
-      final dist = (n - target).abs();
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = d;
-      }
-    }
-    return bestDist <= 5 ? best : null;
   }
 
   Widget _buildDistrictPopup() {
@@ -2489,214 +2359,4 @@ class _PieChartPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  MISSOURI MAP PAINTER
-//  Renders a stylized grid-based map of Missouri state house
-//  districts with color-coded dots for candidate status
-// ═══════════════════════════════════════════════════════════════
-
-class MissouriMapPainter extends CustomPainter {
-  final Map<String, List<Candidate>> districtMap;
-  final String? selectedDistrict;
-  final double pulseValue;
-
-  MissouriMapPainter({
-    required this.districtMap,
-    this.selectedDistrict,
-    this.pulseValue = 1.0,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    _drawMissouriOutline(canvas, size);
-    _drawDistrictDots(canvas, size);
-  }
-
-  void _drawMissouriOutline(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.08)
-      ..style = PaintingStyle.fill;
-
-    final borderPaint = Paint()
-      ..color = BrandColors.momentumBlue.withOpacity(0.4)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    final outline = [
-      Offset(0.05, 0.10),
-      Offset(0.40, 0.08),
-      Offset(0.55, 0.05),
-      Offset(0.70, 0.07),
-      Offset(0.88, 0.10),
-      Offset(0.90, 0.20),
-      Offset(0.92, 0.35),
-      Offset(0.95, 0.45),
-      Offset(0.92, 0.55),
-      Offset(0.88, 0.65),
-      Offset(0.90, 0.75),
-      Offset(0.92, 0.90),
-      Offset(0.80, 0.92),
-      Offset(0.75, 0.80),
-      Offset(0.70, 0.72),
-      Offset(0.55, 0.70),
-      Offset(0.40, 0.72),
-      Offset(0.25, 0.70),
-      Offset(0.10, 0.68),
-      Offset(0.05, 0.55),
-      Offset(0.03, 0.35),
-      Offset(0.05, 0.20),
-    ];
-
-    final path = Path();
-    final first = Offset(outline[0].dx * size.width, outline[0].dy * size.height);
-    path.moveTo(first.dx, first.dy);
-    for (int i = 1; i < outline.length; i++) {
-      final p = Offset(outline[i].dx * size.width, outline[i].dy * size.height);
-      path.lineTo(p.dx, p.dy);
-    }
-    path.close();
-
-    canvas.drawPath(path, paint);
-    canvas.drawPath(path, borderPaint);
-
-    final gridPaint = Paint()
-      ..color = Colors.white.withOpacity(0.03)
-      ..strokeWidth = 0.5;
-
-    for (double x = 0.1; x < 1.0; x += 0.05) {
-      canvas.drawLine(Offset(x * size.width, 0), Offset(x * size.width, size.height), gridPaint);
-    }
-    for (double y = 0.1; y < 1.0; y += 0.05) {
-      canvas.drawLine(Offset(0, y * size.height), Offset(size.width, y * size.height), gridPaint);
-    }
-  }
-
-  void _drawDistrictDots(Canvas canvas, Size size) {
-    final rng = math.Random(42);
-
-    for (final entry in districtMap.entries) {
-      final districtNum = int.tryParse(entry.key) ?? 0;
-      if (districtNum < 1 || districtNum > 163) continue;
-
-      final candidates = entry.value;
-
-      double x, y;
-      if (districtNum <= 30) {
-        x = 0.08 + (districtNum % 6) * 0.025 + rng.nextDouble() * 0.01;
-        y = 0.25 + (districtNum ~/ 6) * 0.04 + rng.nextDouble() * 0.01;
-      } else if (districtNum <= 40) {
-        x = 0.12 + ((districtNum - 30) % 5) * 0.03 + rng.nextDouble() * 0.015;
-        y = 0.20 + ((districtNum - 30) ~/ 5) * 0.05 + rng.nextDouble() * 0.015;
-      } else if (districtNum <= 80) {
-        final idx = districtNum - 41;
-        x = 0.78 + (idx % 7) * 0.022 + rng.nextDouble() * 0.01;
-        y = 0.28 + (idx ~/ 7) * 0.038 + rng.nextDouble() * 0.01;
-      } else if (districtNum <= 95) {
-        final idx = districtNum - 81;
-        x = 0.72 + (idx % 5) * 0.03 + rng.nextDouble() * 0.015;
-        y = 0.25 + (idx ~/ 5) * 0.06 + rng.nextDouble() * 0.015;
-      } else if (districtNum <= 105) {
-        final idx = districtNum - 96;
-        x = 0.42 + (idx % 4) * 0.035 + rng.nextDouble() * 0.02;
-        y = 0.28 + (idx ~/ 4) * 0.05 + rng.nextDouble() * 0.02;
-      } else if (districtNum <= 120) {
-        final idx = districtNum - 106;
-        x = 0.28 + (idx % 5) * 0.03 + rng.nextDouble() * 0.015;
-        y = 0.55 + (idx ~/ 5) * 0.045 + rng.nextDouble() * 0.015;
-      } else {
-        final idx = districtNum - 121;
-        x = 0.15 + (idx % 10) * 0.065 + rng.nextDouble() * 0.03;
-        y = 0.15 + (idx ~/ 10) * 0.08 + rng.nextDouble() * 0.03;
-      }
-
-      x = x.clamp(0.06, 0.93);
-      y = y.clamp(0.08, 0.88);
-
-      final hasYd = candidates.any((c) => c.isYoungDem);
-      final hasDem = candidates.any((c) => c.isDemocrat);
-      final hasRep = candidates.any((c) => c.isRepublican);
-
-      Color dotColor;
-      double dotRadius = 4.0;
-      if (hasYd) {
-        dotColor = BrandColors.momentumBlue;
-        dotRadius = 5.5;
-      } else if (hasDem && !hasRep) {
-        dotColor = Colors.blueGrey;
-        dotRadius = 4.0;
-      } else if (hasDem && hasRep) {
-        dotColor = Colors.amber.withOpacity(0.7);
-        dotRadius = 4.5;
-      } else {
-        dotColor = BrandColors.republicanRed.withOpacity(0.6);
-        dotRadius = 3.5;
-      }
-
-      final isSelected = selectedDistrict == entry.key;
-      if (isSelected) {
-        dotRadius *= 1.5 * pulseValue;
-      }
-
-      final pos = Offset(x * size.width, y * size.height);
-
-      if (hasYd || isSelected) {
-        final glowPaint = Paint()
-          ..color = dotColor.withOpacity(0.3 * pulseValue)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-        canvas.drawCircle(pos, dotRadius * 1.8, glowPaint);
-      }
-
-      final dotPaint = Paint()..color = dotColor;
-      canvas.drawCircle(pos, dotRadius, dotPaint);
-
-      if (isSelected) {
-        final textPainter = TextPainter(
-          text: TextSpan(
-            text: entry.key,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        textPainter.paint(
-          canvas,
-          Offset(pos.dx - textPainter.width / 2, pos.dy - dotRadius - 14),
-        );
-      }
-    }
-
-    _drawCityLabel(canvas, size, 'Kansas City', 0.10, 0.22);
-    _drawCityLabel(canvas, size, 'St. Louis', 0.82, 0.24);
-    _drawCityLabel(canvas, size, 'Springfield', 0.32, 0.52);
-    _drawCityLabel(canvas, size, 'Columbia', 0.47, 0.24);
-    _drawCityLabel(canvas, size, 'Jeff City', 0.45, 0.38);
-  }
-
-  void _drawCityLabel(Canvas canvas, Size size, String name, double x, double y) {
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: name,
-        style: TextStyle(
-          color: Colors.white.withOpacity(0.35),
-          fontSize: 9,
-          fontWeight: FontWeight.w500,
-          letterSpacing: 0.5,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    textPainter.paint(
-      canvas,
-      Offset(x * size.width - textPainter.width / 2, y * size.height),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant MissouriMapPainter oldDelegate) {
-    return selectedDistrict != oldDelegate.selectedDistrict ||
-        pulseValue != oldDelegate.pulseValue;
-  }
-}
+// MissouriMapPainter moved to widgets/crm/missouri_map_widget.dart
