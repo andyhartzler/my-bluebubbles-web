@@ -126,9 +126,31 @@ class _CandidatesPageState extends State<CandidatesPage>
     final youngDems = results[1] as List<Candidate>;
     final stats = results[2] as CandidateStats;
 
+    // Build a set of Young Dem candidate IDs for cross-referencing
+    final ydIds = <String>{};
+    for (final yd in youngDems) {
+      ydIds.add(yd.id);
+    }
+
+    // Merge isYoungDem flag: ensure any candidate in the YD list is flagged
+    final mergedCandidates = allCandidates.map((c) {
+      if (!c.isYoungDem && ydIds.contains(c.id)) {
+        return c.copyWith(isYoungDem: true);
+      }
+      return c;
+    }).toList();
+
+    // Also add any young dems that weren't in allCandidates (e.g. limit cutoff)
+    final allIds = <String>{...mergedCandidates.map((c) => c.id)};
+    for (final yd in youngDems) {
+      if (!allIds.contains(yd.id)) {
+        mergedCandidates.add(yd);
+      }
+    }
+
     // Build district map for state-level candidates
     final districtMap = <String, List<Candidate>>{};
-    for (final c in allCandidates) {
+    for (final c in mergedCandidates) {
       if (c.officeLevel == 'state' && c.district != null && c.district!.isNotEmpty) {
         districtMap.putIfAbsent(c.district!, () => []).add(c);
       }
@@ -137,7 +159,7 @@ class _CandidatesPageState extends State<CandidatesPage>
     if (!mounted) return;
 
     setState(() {
-      _allCandidates = allCandidates;
+      _allCandidates = mergedCandidates;
       _youngDems = youngDems;
       _stats = stats;
       _districtMap = districtMap;

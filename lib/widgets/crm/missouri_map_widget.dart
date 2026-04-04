@@ -170,8 +170,8 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
     for (final dp in _districtPolygons) {
       final candidates = widget.districtMap[dp.district];
       if (candidates == null || candidates.isEmpty) {
-        dp.fillColor = Colors.white.withOpacity(0.05);
-        dp.borderColor = Colors.white.withOpacity(0.15);
+        dp.fillColor = Colors.transparent;
+        dp.borderColor = Colors.grey.withOpacity(0.25);
         dp.status = _DistrictStatus.noData;
       } else {
         final hasYd = candidates.any((c) => c.isYoungDem);
@@ -179,20 +179,20 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
         final hasRep = candidates.any((c) => c.isRepublican);
 
         if (hasYd) {
-          dp.fillColor = const Color(0xFF0b4db8).withOpacity(0.55);
-          dp.borderColor = const Color(0xFF0b4db8).withOpacity(0.9);
+          dp.fillColor = const Color(0xFF0b4db8).withOpacity(0.50);
+          dp.borderColor = const Color(0xFF0b4db8).withOpacity(0.8);
           dp.status = _DistrictStatus.youngDem;
         } else if (hasDem && !hasRep) {
-          dp.fillColor = const Color(0xFF4682B4).withOpacity(0.30);
-          dp.borderColor = const Color(0xFF4682B4).withOpacity(0.6);
+          dp.fillColor = const Color(0xFF93c5fd).withOpacity(0.25);
+          dp.borderColor = const Color(0xFF93c5fd).withOpacity(0.5);
           dp.status = _DistrictStatus.dem;
         } else if (hasDem && hasRep) {
-          dp.fillColor = Colors.amber.withOpacity(0.25);
-          dp.borderColor = Colors.amber.withOpacity(0.6);
+          dp.fillColor = const Color(0xFFc4b5fd).withOpacity(0.15);
+          dp.borderColor = const Color(0xFFc4b5fd).withOpacity(0.35);
           dp.status = _DistrictStatus.contested;
         } else {
-          dp.fillColor = const Color(0xFFE53935).withOpacity(0.15);
-          dp.borderColor = const Color(0xFFE53935).withOpacity(0.4);
+          dp.fillColor = const Color(0xFFfecaca).withOpacity(0.10);
+          dp.borderColor = const Color(0xFFfecaca).withOpacity(0.30);
           dp.status = _DistrictStatus.republican;
         }
       }
@@ -217,25 +217,22 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
       child: Container(
         margin: widget.compactMode ? EdgeInsets.zero : const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              BrandColors.unityBlue.withOpacity(0.95),
-              BrandColors.unityBlue,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: Colors.white,
           borderRadius:
               BorderRadius.circular(widget.compactMode ? 12 : 20),
           boxShadow: widget.compactMode
               ? null
               : [
                   BoxShadow(
-                    color: BrandColors.momentumBlue.withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
                   ),
                 ],
+          border: Border.all(
+            color: Colors.grey.withOpacity(0.15),
+            width: 1,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,14 +252,14 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Row(
         children: [
-          const Icon(Icons.map_outlined,
-              color: BrandColors.sunriseGold, size: 22),
+          Icon(Icons.map_outlined,
+              color: const Color(0xFF0b4db8), size: 22),
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
               'Missouri 2026 — State House Districts',
               style: TextStyle(
-                color: Colors.white,
+                color: Color(0xFF1a1a2e),
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
               ),
@@ -277,18 +274,18 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
               padding:
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.grey.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.center_focus_strong,
-                      color: Colors.white54, size: 14),
-                  SizedBox(width: 4),
+                      color: Colors.grey.shade500, size: 14),
+                  const SizedBox(width: 4),
                   Text(
                     'Reset',
-                    style: TextStyle(color: Colors.white54, fontSize: 11),
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
                   ),
                 ],
               ),
@@ -303,18 +300,18 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
     if (!_geoJsonLoaded) {
       return SizedBox(
         height: widget.height,
-        child: const Center(
+        child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(
-                color: BrandColors.sunriseGold,
+              const CircularProgressIndicator(
+                color: Color(0xFF0b4db8),
                 strokeWidth: 2,
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Text(
                 'Loading district boundaries…',
-                style: TextStyle(color: Colors.white54, fontSize: 12),
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
               ),
             ],
           ),
@@ -335,40 +332,49 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
         points: outerRing,
         holePointsList: dp.rings.length > 1 ? dp.rings.sublist(1) : null,
         color: isSelected
-            ? BrandColors.sunriseGold.withOpacity(0.45)
+            ? const Color(0xFF0b4db8).withOpacity(0.35)
             : dp.fillColor,
         borderColor: isSelected
-            ? BrandColors.sunriseGold
+            ? const Color(0xFF0b4db8)
             : dp.borderColor,
-        borderStrokeWidth: isSelected ? 2.5 : 0.8,
+        borderStrokeWidth: isSelected ? 2.0 : 0.5,
         isFilled: true,
       ));
     }
 
-    // Build markers for Young Dem districts
+    // Build markers for Young Dem districts — clean blue circles with district number
     final markers = <Marker>[];
     for (final dp in _districtPolygons) {
       if (dp.status == _DistrictStatus.youngDem) {
         markers.add(Marker(
           point: dp.centroid,
-          width: 22,
-          height: 22,
+          width: 26,
+          height: 26,
           child: GestureDetector(
             onTap: () => _onDistrictTap(dp),
             child: Container(
               decoration: BoxDecoration(
-                color: BrandColors.sunriseGold,
+                color: const Color(0xFF0b4db8),
                 shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
                 boxShadow: [
                   BoxShadow(
-                    color: BrandColors.sunriseGold.withOpacity(0.5),
-                    blurRadius: 6,
-                    spreadRadius: 1,
+                    color: Colors.black.withOpacity(0.25),
+                    blurRadius: 4,
+                    spreadRadius: 0,
                   ),
                 ],
               ),
-              child: const Center(
-                child: Icon(Icons.star, color: Colors.white, size: 12),
+              child: Center(
+                child: Text(
+                  dp.district,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    height: 1,
+                  ),
+                ),
               ),
             ),
           ),
@@ -396,18 +402,17 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
                     ? InteractiveFlag.all
                     : InteractiveFlag.none,
               ),
-              // Dark background behind tiles
-              backgroundColor: const Color(0xFF0a1628),
+              // Light background behind tiles
+              backgroundColor: const Color(0xFFf0f0f0),
             ),
             children: [
-              // Dark-themed tile layer
+              // Light tile layer (CartoDB Positron)
               TileLayer(
                 urlTemplate:
-                    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
                 subdomains: const ['a', 'b', 'c', 'd'],
                 userAgentPackageName: 'org.moyoungdemocrats.crm',
                 maxZoom: 18,
-                tileBuilder: _darkTileBuilder,
               ),
               // District polygons
               PolygonLayer(
@@ -422,20 +427,6 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
           ),
         ),
       ),
-    );
-  }
-
-  // Darken/tint tiles to match our dark theme
-  Widget _darkTileBuilder(
-      BuildContext context, Widget tileWidget, TileImage tile) {
-    return ColorFiltered(
-      colorFilter: const ColorFilter.matrix(<double>[
-        0.7, 0, 0, 0, 0,    // R
-        0, 0.7, 0, 0, 0,    // G
-        0, 0, 0.8, 0, 0,    // B
-        0, 0, 0, 1, 0,      // A
-      ]),
-      child: tileWidget,
     );
   }
 
@@ -512,9 +503,9 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
           _legendChip(
               const Color(0xFF0b4db8), 'Young Dem', ydDistricts),
           _legendChip(
-              const Color(0xFF4682B4), 'Dem', demDistricts),
-          _legendChip(Colors.amber, 'Contested', contested),
-          _legendChip(const Color(0xFFE53935).withOpacity(0.7), 'GOP',
+              const Color(0xFF93c5fd), 'Democrat', demDistricts),
+          _legendChip(const Color(0xFF8b5cf6), 'Contested', contested),
+          _legendChip(const Color(0xFFef4444), 'Republican',
               repDistricts),
         ],
       ),
@@ -559,7 +550,7 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
               Text(
                 label,
                 style:
-                    const TextStyle(color: Colors.white38, fontSize: 9),
+                    TextStyle(color: Colors.grey.shade500, fontSize: 9),
               ),
             ],
           ),
