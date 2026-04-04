@@ -806,12 +806,12 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       message: tooltip,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.all(9),
+          padding: const EdgeInsets.all(11), // 44px touch target (11*2 + 17 icon + 5 border)
           decoration: BoxDecoration(
             color: accent.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: accent.withOpacity(0.2)),
           ),
           child: Icon(icon, color: accent.withOpacity(0.8), size: 17),
@@ -1051,9 +1051,75 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   //  TAB 2: CAMPAIGN FINANCE (MEC Data)
   // ═══════════════════════════════════════════════════════════════
 
+  // ── Shimmer Loading Skeleton ──
+  Widget _buildShimmerSkeleton({int cardCount = 3}) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+      physics: const NeverScrollableScrollPhysics(),
+      children: List.generate(cardCount, (i) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          height: i == 0 ? 100 : 160,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.white.withOpacity(0.04),
+                Colors.white.withOpacity(0.08),
+                Colors.white.withOpacity(0.04),
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            children: [
+              if (i == 0) ...[
+                const SizedBox(width: 16),
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 14,
+                        width: 140,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 10,
+                        width: 90,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
   Widget _buildMoneyTab() {
     if (_financeLoading) {
-      return const Center(child: CircularProgressIndicator(color: BrandColors.sunriseGold));
+      return _buildShimmerSkeleton(cardCount: 4);
     }
 
     final hasFinanceData = _mecCommittees.isNotEmpty;
@@ -1321,6 +1387,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   Widget _buildTopDonors() {
+    final maxAmount = _topDonors.isNotEmpty
+        ? (_topDonors.first['total_amount'] as num?)?.toDouble() ?? 1
+        : 1.0;
+
     return _card(
       'Top Donors',
       Icons.star,
@@ -1330,51 +1400,83 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           const SizedBox(height: 8),
           ...List.generate(math.min(_topDonors.length, 10), (i) {
             final donor = _topDonors[i];
-            final name = donor['donor_name'] as String? ?? 'Unknown';
+            final name = (donor['donor_name'] as String? ?? '').trim();
+            final company = donor['company'] as String? ?? '';
+            final city = donor['city'] as String? ?? '';
+            final state = donor['state'] as String? ?? '';
             final amount = (donor['total_amount'] as num?)?.toDouble() ?? 0;
+            final count = (donor['contribution_count'] as num?)?.toInt() ?? 0;
+            final displayName = name.isNotEmpty ? name : company.isNotEmpty ? company : 'Anonymous';
+            final location = [city, state].where((s) => s.isNotEmpty).join(', ');
+            final barWidth = maxAmount > 0 ? amount / maxAmount : 0.0;
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(10),
+                color: Colors.white.withOpacity(i == 0 ? 0.07 : 0.04),
+                borderRadius: BorderRadius.circular(12),
+                border: i == 0 ? Border.all(color: BrandColors.sunriseGold.withOpacity(0.2)) : null,
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: _donorRankColor(i).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '#${i + 1}',
-                        style: TextStyle(
-                          color: _donorRankColor(i),
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
+                  Row(
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [_donorRankColor(i).withOpacity(0.3), _donorRankColor(i).withOpacity(0.1)],
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '#${i + 1}',
+                            style: TextStyle(color: _donorRankColor(i), fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayName,
+                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (location.isNotEmpty)
+                              Text(location, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '\$${_formatMoney(amount)}',
+                            style: TextStyle(color: _donorRankColor(i), fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                          if (count > 1)
+                            Text('$count gifts', style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10)),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      name,
-                      style: const TextStyle(color: Colors.white, fontSize: 13),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Text(
-                    '\$${_formatMoney(amount)}',
-                    style: TextStyle(
-                      color: _donorRankColor(i),
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+                  const SizedBox(height: 6),
+                  // Mini bar chart
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: LinearProgressIndicator(
+                      value: barWidth,
+                      minHeight: 3,
+                      backgroundColor: Colors.white.withOpacity(0.04),
+                      valueColor: AlwaysStoppedAnimation<Color>(_donorRankColor(i).withOpacity(0.4)),
                     ),
                   ),
                 ],
@@ -1762,7 +1864,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
   Widget _buildRaceTab() {
     if (_raceLoading) {
-      return const Center(child: CircularProgressIndicator(color: BrandColors.sunriseGold));
+      return _buildShimmerSkeleton(cardCount: 5);
     }
 
     if (c.district == null || c.district!.isEmpty) {
@@ -2159,7 +2261,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
   Widget _buildIntelTab() {
     if (_intelLoading) {
-      return const Center(child: CircularProgressIndicator(color: BrandColors.sunriseGold));
+      return _buildShimmerSkeleton(cardCount: 3);
     }
 
     return ListView(
@@ -3335,74 +3437,93 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isCurrent ? BrandColors.sunriseGold.withOpacity(0.08) : Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(10),
-        border: isCurrent ? Border.all(color: BrandColors.sunriseGold.withOpacity(0.3)) : null,
+        gradient: LinearGradient(
+          colors: isCurrent
+              ? [BrandColors.sunriseGold.withOpacity(0.1), BrandColors.sunriseGold.withOpacity(0.03)]
+              : [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.02)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isCurrent ? BrandColors.sunriseGold.withOpacity(0.3) : partyColor.withOpacity(0.1),
+        ),
       ),
       child: InkWell(
         onTap: isCurrent ? null : () => _openCandidate(cand),
         child: Row(
           children: [
-            // Party badge
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: partyColor.withOpacity(0.25),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: partyColor.withOpacity(0.5)),
-              ),
-              child: Center(
-                child: Text(cand.partyShort, style: TextStyle(color: partyColor, fontSize: 13, fontWeight: FontWeight.bold)),
-              ),
+            // Photo + party overlay
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: partyColor.withOpacity(0.15),
+                  backgroundImage: cand.photoUrl != null && cand.photoUrl!.isNotEmpty
+                      ? NetworkImage(cand.photoUrl!)
+                      : null,
+                  child: cand.photoUrl == null || cand.photoUrl!.isEmpty
+                      ? Text(cand.initials, style: TextStyle(color: partyColor, fontSize: 14, fontWeight: FontWeight.bold))
+                      : null,
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: partyColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF0b1e37), width: 2),
+                    ),
+                    child: Center(
+                      child: Text(cand.partyShort, style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Text(
-                        cand.name,
-                        style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500),
+                      Flexible(
+                        child: Text(
+                          cand.name,
+                          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       if (isCurrent) ...[
                         const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: BrandColors.sunriseGold.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text('Current', style: TextStyle(color: BrandColors.sunriseGold, fontSize: 9, fontWeight: FontWeight.bold)),
-                        ),
+                        _badge('You', BrandColors.sunriseGold, textColor: Colors.black87),
                       ],
-                      if (cand.isYoungDem) ...[
+                      if (cand.isYoungDem && !isCurrent) ...[
                         const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: BrandColors.sunriseGold.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text('YD', style: TextStyle(color: BrandColors.sunriseGold, fontSize: 9, fontWeight: FontWeight.bold)),
-                        ),
+                        _badge('YD', BrandColors.sunriseGold, textColor: Colors.black87),
                       ],
                     ],
                   ),
+                  const SizedBox(height: 2),
                   Text(
-                    '${cand.party}${cand.estimatedAge != null ? ' • Age ${cand.estimatedAge}' : ''}',
-                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                    '${cand.party}${cand.estimatedAge != null ? ' · Age ${cand.estimatedAge}' : ''}${cand.occupation != null && cand.occupation!.isNotEmpty ? ' · ${cand.occupation}' : ''}',
+                    style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
             if (!isCurrent)
-              const Icon(Icons.chevron_right, color: Colors.white24, size: 18),
+              Icon(Icons.chevron_right, color: Colors.white.withOpacity(0.2), size: 18),
           ],
         ),
       ),
@@ -3978,18 +4099,26 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
   Widget _infoRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.white38, size: 18),
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: Colors.white38, size: 15),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                Text(value, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                Text(label, style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 11, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 1),
+                Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.3)),
               ],
             ),
           ),
