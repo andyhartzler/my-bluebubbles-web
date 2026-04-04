@@ -46,7 +46,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   bool _savingNotes = false;
   late Candidate _candidate;
 
-  // ── State: Campaign Finance (Tab 2) ──
+  // ── State: Money Tab (contributions + expenditures) ──
   bool _financeLoading = true;
   List<Map<String, dynamic>> _mecCommittees = [];
   List<MECContribution> _mecContributions = [];
@@ -54,18 +54,24 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   List<Map<String, dynamic>> _contributionTimeline = [];
   Map<String, dynamic> _financeSummary = {};
   String? _selectedMecId;
+  // Expenditures (NEW)
+  Map<String, dynamic> _expenditureSummary = {};
+  List<Map<String, dynamic>> _topPayees = [];
+  List<Map<String, dynamic>> _recentExpenditures = [];
+  List<Map<String, dynamic>> _raceComparison = [];
 
-  // ── State: Election History (Tab 3) ──
-  bool _historyLoading = true;
+  // ── State: Race Tab (history + district merged) ──
+  bool _raceLoading = true;
   List<ElectionResult> _electionResults = [];
+  List<Candidate> _districtCandidates = [];
+  DistrictDemographics? _districtDemographics;
+  Map<String, List<Candidate>> _adjacentDistricts = {};
 
-  // ── State: News & Endorsements (Tab 4) ──
-  bool _newsLoading = true;
+  // ── State: Intel Tab (news + endorsements + MOYD engagement) ──
+  bool _intelLoading = true;
+  int _intelSegment = 0; // 0=News, 1=Endorsements, 2=MOYD
   List<CandidateNews> _newsArticles = [];
   List<Map<String, dynamic>> _endorsementRecords = [];
-
-  // ── State: MOYD Engagement (Tab 5) ──
-  bool _contactsLoading = true;
   List<CandidateContact> _contactLog = [];
   bool _showContactForm = false;
   final _contactNotesController = TextEditingController();
@@ -73,12 +79,6 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   final _contactSubjectController = TextEditingController();
   String _selectedContactType = 'phone';
   DateTime? _followUpDate;
-
-  // ── State: District Intel (Tab 6) ──
-  bool _districtLoading = true;
-  List<Candidate> _districtCandidates = [];
-  DistrictDemographics? _districtDemographics;
-  Map<String, List<Candidate>> _adjacentDistricts = {};
 
   // ── State: Endorsement Dialog ──
   final _endorserNameController = TextEditingController();
@@ -105,7 +105,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       parent: _animController,
       curve: const Interval(0.2, 1.0, curve: Curves.easeOut),
     ));
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(_onTabChanged);
     _notesController.text = c.notes ?? '';
     _animController.forward();
@@ -115,23 +115,16 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   void _onTabChanged() {
-    
     final idx = _tabController.index;
     switch (idx) {
       case 1:
         if (_financeLoading) _loadFinanceData();
         break;
       case 2:
-        if (_historyLoading) _loadHistoryData();
+        if (_raceLoading) _loadRaceData();
         break;
       case 3:
-        if (_newsLoading) _loadNewsData();
-        break;
-      case 4:
-        if (_contactsLoading) _loadEngagementData();
-        break;
-      case 5:
-        if (_districtLoading) _loadDistrictData();
+        if (_intelLoading) _loadIntelData();
         break;
     }
   }
@@ -155,15 +148,13 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
   Future<void> _loadOverviewData() async {
     // Overview data is already on the candidate object
-    // Pre-load contacts count for the badge
-    _loadEngagementData();
   }
 
   Future<void> _loadFinanceData() async {
     setState(() => _financeLoading = true);
 
     try {
-      // First find MEC committees for this candidate
+      // Load MEC committees
       final committees = await _repo.getMECCommittees(c.mecCommitteeIds);
       _mecCommittees = committees;
 
@@ -172,18 +163,33 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         _selectedMecId = mecId;
 
         if (mecId.isNotEmpty) {
+          // Load contributions + expenditures + race comparison in parallel
           final results = await Future.wait([
             _repo.getMECContributions(mecId),
             _repo.getMECTopDonors(mecId),
             _repo.getMECContributionTimeline(mecId),
             _repo.getMECFinanceSummary(mecId),
+            _repo.getMECExpenditureSummary(mecId),
+            _repo.getMECTopPayees(mecId),
+            _repo.getMECRecentExpenditures(mecId),
+            if (c.district != null && c.district!.isNotEmpty)
+              _repo.getRaceFinanceComparison(c.office, c.district!)
+            else
+              Future.value(<Map<String, dynamic>>[]),
           ]);
 
           _mecContributions = results[0] as List<MECContribution>;
           _topDonors = results[1] as List<Map<String, dynamic>>;
           _contributionTimeline = results[2] as List<Map<String, dynamic>>;
           _financeSummary = results[3] as Map<String, dynamic>;
+          _expenditureSummary = results[4] as Map<String, dynamic>;
+          _topPayees = results[5] as List<Map<String, dynamic>>;
+          _recentExpenditures = results[6] as List<Map<String, dynamic>>;
+          _raceComparison = results[7] as List<Map<String, dynamic>>;
         }
+      } else if (c.district != null && c.district!.isNotEmpty) {
+        // No MEC data but still load race comparison
+        _raceComparison = await _repo.getRaceFinanceComparison(c.office, c.district!);
       }
     } catch (e) {
       debugPrint('❌ Error loading finance data: $e');
@@ -192,70 +198,48 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     if (mounted) setState(() => _financeLoading = false);
   }
 
-  Future<void> _loadHistoryData() async {
-    setState(() => _historyLoading = true);
-
-    try {
-      if (c.district != null && c.district!.isNotEmpty) {
-        _electionResults = await _repo.fetchElectionHistory(c.district!);
-      }
-    } catch (e) {
-      debugPrint('❌ Error loading history data: $e');
-    }
-
-    if (mounted) setState(() => _historyLoading = false);
-  }
-
-  Future<void> _loadNewsData() async {
-    setState(() => _newsLoading = true);
-
-    try {
-      final results = await Future.wait([
-        _repo.fetchNews(c.id),
-        _repo.fetchCandidateEndorsements(c.id),
-      ]);
-
-      _newsArticles = results[0] as List<CandidateNews>;
-      _endorsementRecords = results[1] as List<Map<String, dynamic>>;
-    } catch (e) {
-      debugPrint('❌ Error loading news data: $e');
-    }
-
-    if (mounted) setState(() => _newsLoading = false);
-  }
-
-  Future<void> _loadEngagementData() async {
-    setState(() => _contactsLoading = true);
-
-    try {
-      _contactLog = await _repo.fetchContacts(c.id);
-    } catch (e) {
-      debugPrint('❌ Error loading engagement data: $e');
-    }
-
-    if (mounted) setState(() => _contactsLoading = false);
-  }
-
-  Future<void> _loadDistrictData() async {
-    setState(() => _districtLoading = true);
+  Future<void> _loadRaceData() async {
+    setState(() => _raceLoading = true);
 
     try {
       if (c.district != null && c.district!.isNotEmpty) {
         final results = await Future.wait([
+          _repo.fetchElectionHistory(c.district!),
           _repo.getDistrictCandidates(c.office, c.district!),
           _repo.fetchDistrictDemographics(c.district!),
           _repo.getAdjacentDistrictCandidates(c.district!),
         ]);
 
-        _districtCandidates = results[0] as List<Candidate>;
-        _districtDemographics = results[1] as DistrictDemographics?;
-        _adjacentDistricts = results[2] as Map<String, List<Candidate>>;
+        _electionResults = results[0] as List<ElectionResult>;
+        _districtCandidates = results[1] as List<Candidate>;
+        _districtDemographics = results[2] as DistrictDemographics?;
+        _adjacentDistricts = results[3] as Map<String, List<Candidate>>;
       }
     } catch (e) {
-      debugPrint('❌ Error loading district data: $e');
+      debugPrint('❌ Error loading race data: $e');
     }
 
-    if (mounted) setState(() => _districtLoading = false);
+    if (mounted) setState(() => _raceLoading = false);
+  }
+
+  Future<void> _loadIntelData() async {
+    setState(() => _intelLoading = true);
+
+    try {
+      final results = await Future.wait([
+        _repo.fetchNews(c.id),
+        _repo.fetchCandidateEndorsements(c.id),
+        _repo.fetchContacts(c.id),
+      ]);
+
+      _newsArticles = results[0] as List<CandidateNews>;
+      _endorsementRecords = results[1] as List<Map<String, dynamic>>;
+      _contactLog = results[2] as List<CandidateContact>;
+    } catch (e) {
+      debugPrint('❌ Error loading intel data: $e');
+    }
+
+    if (mounted) setState(() => _intelLoading = false);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -331,7 +315,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         _showContactForm = false;
         _followUpDate = null;
       });
-      await _loadEngagementData();
+      await _loadIntelData();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Contact logged successfully'),
@@ -348,7 +332,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
     await _repo.addEndorsement(c.id, name, _endorsementType);
     _endorserNameController.clear();
-    await _loadNewsData();
+    await _loadIntelData();
 
     if (mounted) {
       Navigator.of(context).pop();
@@ -598,12 +582,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                         labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                         unselectedLabelStyle: const TextStyle(fontSize: 13),
                         tabs: const [
-                          Tab(text: 'Overview'),
-                          Tab(text: 'Finance'),
-                          Tab(text: 'History'),
-                          Tab(text: 'News'),
-                          Tab(text: 'MOYD'),
-                          Tab(text: 'District'),
+                          Tab(text: 'Profile'),
+                          Tab(text: 'Money'),
+                          Tab(text: 'Race'),
+                          Tab(text: 'Intel'),
                         ],
                       ),
                     ),
@@ -613,11 +595,9 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   controller: _tabController,
                   children: [
                     _buildOverviewTab(),
-                    _buildFinanceTab(),
-                    _buildHistoryTab(),
-                    _buildNewsTab(),
-                    _buildEngagementTab(),
-                    _buildDistrictTab(),
+                    _buildMoneyTab(),
+                    _buildRaceTab(),
+                    _buildIntelTab(),
                   ],
                 ),
               ),
@@ -740,8 +720,11 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               _quickActionIcon(Icons.phone, 'Call', _launchPhone),
               const SizedBox(height: 8),
               _quickActionIcon(Icons.note_add, 'Note', () {
-                _tabController.animateTo(4);
-                setState(() => _editingNotes = true);
+                _tabController.animateTo(3);
+                setState(() {
+                  _intelSegment = 2;
+                  _editingNotes = true;
+                });
               }),
             ],
           ),
@@ -999,16 +982,20 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   //  TAB 2: CAMPAIGN FINANCE (MEC Data)
   // ═══════════════════════════════════════════════════════════════
 
-  Widget _buildFinanceTab() {
+  Widget _buildMoneyTab() {
     if (_financeLoading) {
       return const Center(child: CircularProgressIndicator(color: BrandColors.sunriseGold));
     }
 
-    if (_mecCommittees.isEmpty) {
+    final hasFinanceData = _mecCommittees.isNotEmpty;
+    final hasExpenditures = (_expenditureSummary['total_spent'] as num?)?.toDouble() != null &&
+        ((_expenditureSummary['total_spent'] as num?)?.toDouble() ?? 0) > 0;
+
+    if (!hasFinanceData && _raceComparison.isEmpty) {
       return _buildEmptyState(
         Icons.monetization_on,
-        'No MEC Campaign Finance Data',
-        'No Missouri Ethics Commission committee records found for ${c.name}.\n\nThis candidate may not have filed a committee yet, or the name may not match exactly.',
+        'No Campaign Finance Data',
+        'No Missouri Ethics Commission committee records found for ${c.name}.\n\nThis candidate may not have filed a committee yet.',
       );
     }
 
@@ -1022,13 +1009,27 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         ],
 
         // ── Finance Summary Cards ──
-        _buildFinanceSummaryCards(),
-        const SizedBox(height: 16),
+        if (hasFinanceData) ...[
+          _buildFinanceSummaryCards(),
+          const SizedBox(height: 16),
+        ],
 
         // ── Contribution Timeline Chart ──
         if (_contributionTimeline.isNotEmpty) ...[
           _buildContributionTimeline(),
           const SizedBox(height: 16),
+        ],
+
+        // ── Expenditure Section (NEW) ──
+        if (hasExpenditures) ...[
+          _buildExpenditureSummaryCards(),
+          const SizedBox(height: 16),
+          _buildSpendingByPurpose(),
+          const SizedBox(height: 16),
+          if (_topPayees.isNotEmpty) ...[
+            _buildTopPayees(),
+            const SizedBox(height: 16),
+          ],
         ],
 
         // ── Top 10 Donors ──
@@ -1043,8 +1044,11 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           const SizedBox(height: 16),
         ],
 
-        // ── Opponent Fundraising Comparison ──
-        _buildOpponentComparison(),
+        // ── Race Fundraising Comparison (REAL DATA) ──
+        if (_raceComparison.isNotEmpty) ...[
+          _buildRaceFundraisingComparison(),
+          const SizedBox(height: 16),
+        ],
       ],
     );
   }
@@ -1379,35 +1383,283 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
-  Widget _buildOpponentComparison() {
+  // ── Expenditure Summary Cards ──
+  Widget _buildExpenditureSummaryCards() {
+    final totalSpent = (_expenditureSummary['total_spent'] as num?)?.toDouble() ?? 0;
+    final expCount = (_expenditureSummary['expenditure_count'] as num?)?.toInt() ?? 0;
+    final avgExp = (_expenditureSummary['avg_expenditure'] as num?)?.toDouble() ?? 0;
+    final uniquePayees = (_expenditureSummary['unique_payees'] as num?)?.toInt() ?? 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Row(
+            children: [
+              Icon(Icons.trending_down, color: Colors.redAccent.withOpacity(0.7), size: 18),
+              const SizedBox(width: 6),
+              const Text('Spending', style: TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(child: _financeStatCard('Total Spent', '\$${_formatMoney(totalSpent)}', Icons.payment, Colors.redAccent)),
+            const SizedBox(width: 10),
+            Expanded(child: _financeStatCard('Expenditures', '$expCount', Icons.receipt, Colors.orange)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(child: _financeStatCard('Avg Spend', '\$${_formatMoney(avgExp)}', Icons.show_chart, Colors.deepOrange)),
+            const SizedBox(width: 10),
+            Expanded(child: _financeStatCard('Payees', '$uniquePayees', Icons.store, Colors.amber)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── Spending by Purpose ──
+  Widget _buildSpendingByPurpose() {
+    final byPurpose = (_expenditureSummary['by_purpose'] as List<dynamic>?) ?? [];
+    if (byPurpose.isEmpty) return const SizedBox.shrink();
+
+    final totalSpent = (_expenditureSummary['total_spent'] as num?)?.toDouble() ?? 1;
+
     return _card(
-      'Fundraising vs Opponents',
+      'Spending by Purpose',
+      Icons.pie_chart,
+      Colors.deepOrange,
+      child: Column(
+        children: [
+          const SizedBox(height: 8),
+          ...byPurpose.take(8).map((item) {
+            final purpose = item['purpose'] as String? ?? 'Unknown';
+            final total = (item['total'] as num?)?.toDouble() ?? 0;
+            final count = (item['count'] as num?)?.toInt() ?? 0;
+            final pct = totalSpent > 0 ? total / totalSpent : 0.0;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          purpose,
+                          style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        '\$${_formatMoney(total)} ($count)',
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: pct,
+                      minHeight: 6,
+                      backgroundColor: Colors.white.withOpacity(0.08),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.deepOrange.withOpacity(0.7),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  // ── Top Payees ──
+  Widget _buildTopPayees() {
+    return _card(
+      'Top Payees',
+      Icons.store,
+      Colors.amber,
+      child: Column(
+        children: [
+          const SizedBox(height: 8),
+          ...List.generate(math.min(_topPayees.length, 10), (i) {
+            final payee = _topPayees[i];
+            final name = payee['payee_name'] as String? ?? 'Unknown';
+            final amount = (payee['total_amount'] as num?)?.toDouble() ?? 0;
+            final count = (payee['payment_count'] as num?)?.toInt() ?? 0;
+            final city = payee['city'] as String? ?? '';
+            final state = payee['state'] as String? ?? '';
+            final location = [city, state].where((s) => s.isNotEmpty).join(', ');
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '#${i + 1}',
+                        style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: const TextStyle(color: Colors.white, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        if (location.isNotEmpty)
+                          Text(location, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('\$${_formatMoney(amount)}', style: const TextStyle(color: Colors.amber, fontSize: 14, fontWeight: FontWeight.bold)),
+                      Text('$count payments', style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  // ── Race Fundraising Comparison (REAL DATA) ──
+  Widget _buildRaceFundraisingComparison() {
+    final maxRaised = _raceComparison.fold<double>(
+      0,
+      (max, r) => math.max(max, (r['total_raised'] as num?)?.toDouble() ?? 0),
+    );
+
+    return _card(
+      'Race Fundraising',
       Icons.compare_arrows,
       Colors.purpleAccent,
       child: Column(
         children: [
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.white.withOpacity(0.3), size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    c.district != null
-                        ? 'Opponent fundraising comparison for District ${c.district} will show here once opponent committee data is linked.'
-                        : 'Link opponent committee data to see fundraising comparisons.',
-                    style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
+          ..._raceComparison.map((candidate) {
+            final name = candidate['name'] as String? ?? '';
+            final party = (candidate['party'] as String? ?? '').toLowerCase();
+            final raised = (candidate['total_raised'] as num?)?.toDouble() ?? 0;
+            final spent = (candidate['total_spent'] as num?)?.toDouble() ?? 0;
+            final contribs = (candidate['contribution_count'] as num?)?.toInt() ?? 0;
+            final isCurrent = candidate['candidate_id'] == c.id;
+
+            Color partyColor;
+            if (party.contains('democrat')) {
+              partyColor = BrandColors.democratBlue;
+            } else if (party.contains('republican')) {
+              partyColor = BrandColors.republicanRed;
+            } else {
+              partyColor = Colors.amber;
+            }
+
+            final barWidth = maxRaised > 0 ? raised / maxRaised : 0.0;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isCurrent ? BrandColors.sunriseGold.withOpacity(0.08) : Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: isCurrent ? Border.all(color: BrandColors.sunriseGold.withOpacity(0.3)) : null,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: partyColor.withOpacity(0.25),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Center(
+                          child: Text(
+                            party.contains('democrat') ? 'D' : party.contains('republican') ? 'R' : '?',
+                            style: TextStyle(color: partyColor, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      if (isCurrent)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: BrandColors.sunriseGold.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('You', style: TextStyle(color: BrandColors.sunriseGold, fontSize: 9, fontWeight: FontWeight.bold)),
+                        ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-          ),
+                  const SizedBox(height: 8),
+                  // Fundraising bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: barWidth,
+                      minHeight: 14,
+                      backgroundColor: Colors.white.withOpacity(0.08),
+                      valueColor: AlwaysStoppedAnimation<Color>(partyColor.withOpacity(0.7)),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Text('\$${_formatMoney(raised)} raised', style: TextStyle(color: partyColor, fontSize: 12, fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 12),
+                      Text('$contribs donors', style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                      const Spacer(),
+                      if (spent > 0)
+                        Text('\$${_formatMoney(spent)} spent', style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -1417,15 +1669,39 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   //  TAB 3: ELECTION HISTORY
   // ═══════════════════════════════════════════════════════════════
 
-  Widget _buildHistoryTab() {
-    if (_historyLoading) {
+  // ═══════════════════════════════════════════════════════════════
+  //  TAB 3: RACE (merged History + District Intel)
+  // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildRaceTab() {
+    if (_raceLoading) {
       return const Center(child: CircularProgressIndicator(color: BrandColors.sunriseGold));
+    }
+
+    if (c.district == null || c.district!.isEmpty) {
+      return _buildEmptyState(
+        Icons.map,
+        'No District Data',
+        'This candidate does not have a district assignment.\nRace data is available for state-level races only.',
+      );
     }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       children: [
-        // ── Historical Results Bar Chart ──
+        // ── District Header ──
+        _buildDistrictHeader(),
+        const SizedBox(height: 16),
+
+        // ── Candidates in This Race ──
+        _buildRaceCandidates(),
+        const SizedBox(height: 16),
+
+        // ── Partisan Lean ──
+        _buildPartisanLean(),
+        const SizedBox(height: 16),
+
+        // ── Election History Charts ──
         if (_electionResults.isNotEmpty) ...[
           _buildElectionBarChart(),
           const SizedBox(height: 16),
@@ -1433,12 +1709,28 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           const SizedBox(height: 16),
           _buildVoterTurnoutChart(),
           const SizedBox(height: 16),
-          _buildPreviousCandidatesList(),
-          const SizedBox(height: 16),
           _buildHistoryDetailList(),
+          const SizedBox(height: 16),
         ] else ...[
           _buildElectionHistoryPlaceholder(),
+          const SizedBox(height: 16),
         ],
+
+        // ── Demographics ──
+        if (_districtDemographics != null) ...[
+          _buildVoterRegistration(),
+          const SizedBox(height: 16),
+          _buildDemographicProfile(),
+          const SizedBox(height: 16),
+        ],
+
+        // ── Geographic Context ──
+        _buildGeographicContext(),
+        const SizedBox(height: 16),
+
+        // ── Adjacent Districts ──
+        if (_adjacentDistricts.isNotEmpty)
+          _buildAdjacentDistricts(),
       ],
     );
   }
@@ -1774,25 +2066,126 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   //  TAB 4: NEWS & ENDORSEMENTS
   // ═══════════════════════════════════════════════════════════════
 
-  Widget _buildNewsTab() {
-    if (_newsLoading) {
+  // ═══════════════════════════════════════════════════════════════
+  //  TAB 4: INTEL (merged News + Endorsements + MOYD Engagement)
+  // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildIntelTab() {
+    if (_intelLoading) {
       return const Center(child: CircularProgressIndicator(color: BrandColors.sunriseGold));
     }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       children: [
-        // ── News Articles ──
-        _buildNewsSection(),
+        // ── Segmented Control ──
+        _buildIntelSegments(),
         const SizedBox(height: 16),
 
-        // ── Endorsements from dedicated table ──
-        _buildEndorsementSection(),
-        const SizedBox(height: 16),
-
-        // ── Add Endorsement Button ──
-        _buildAddEndorsementButton(),
+        // ── Content based on selected segment ──
+        if (_intelSegment == 0) ...[
+          _buildNewsSection(),
+        ] else if (_intelSegment == 1) ...[
+          _buildEndorsementSection(),
+          const SizedBox(height: 12),
+          // Ballotpedia endorsements from profile
+          if (c.endorsements != null && c.endorsements!.isNotEmpty) ...[
+            _buildEndorsements(),
+            const SizedBox(height: 12),
+          ],
+          _buildAddEndorsementButton(),
+        ] else ...[
+          _buildEngagementStatusCard(),
+          const SizedBox(height: 12),
+          _buildEndorsementToggle(),
+          const SizedBox(height: 12),
+          _buildAssignedMemberSelector(),
+          const SizedBox(height: 12),
+          _buildFollowUpReminder(),
+          const SizedBox(height: 12),
+          _buildLogContactButton(),
+          const SizedBox(height: 8),
+          if (_showContactForm) ...[
+            _buildContactForm(),
+            const SizedBox(height: 12),
+          ],
+          _buildContactTimeline(),
+          const SizedBox(height: 12),
+          _buildNotesSection(),
+          const SizedBox(height: 12),
+          _buildMoydMemberLink(),
+        ],
       ],
+    );
+  }
+
+  Widget _buildIntelSegments() {
+    final segments = [
+      ('📰', 'News', _newsArticles.length),
+      ('👍', 'Endorsements', _endorsementRecords.length),
+      ('🤝', 'MOYD', _contactLog.length),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: List.generate(segments.length, (i) {
+          final isSelected = _intelSegment == i;
+          final (emoji, label, count) = segments[i];
+
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _intelSegment = i),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? BrandColors.sunriseGold.withOpacity(0.2) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  border: isSelected ? Border.all(color: BrandColors.sunriseGold.withOpacity(0.4)) : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(emoji, style: const TextStyle(fontSize: 14)),
+                    const SizedBox(width: 4),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: isSelected ? BrandColors.sunriseGold : Colors.white54,
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                    if (count > 0) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: isSelected ? BrandColors.sunriseGold.withOpacity(0.3) : Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: TextStyle(
+                            color: isSelected ? BrandColors.sunriseGold : Colors.white38,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
     );
   }
 
@@ -2029,53 +2422,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   //  TAB 5: MOYD ENGAGEMENT
   // ═══════════════════════════════════════════════════════════════
 
-  Widget _buildEngagementTab() {
-    if (_contactsLoading) {
-      return const Center(child: CircularProgressIndicator(color: BrandColors.sunriseGold));
-    }
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-      children: [
-        // ── Engagement Status Overview ──
-        _buildEngagementStatusCard(),
-        const SizedBox(height: 16),
-
-        // ── MOYD Endorsement Toggle ──
-        _buildEndorsementToggle(),
-        const SizedBox(height: 16),
-
-        // ── Assigned Team Member Selector ──
-        _buildAssignedMemberSelector(),
-        const SizedBox(height: 16),
-
-        // ── Follow-up Reminder ──
-        _buildFollowUpReminder(),
-        const SizedBox(height: 16),
-
-        // ── Log Contact Button ──
-        _buildLogContactButton(),
-        const SizedBox(height: 8),
-
-        // ── Contact Log Form (expandable) ──
-        if (_showContactForm) ...[
-          _buildContactForm(),
-          const SizedBox(height: 16),
-        ],
-
-        // ── Contact Log Timeline ──
-        _buildContactTimeline(),
-        const SizedBox(height: 16),
-
-        // ── Internal Notes ──
-        _buildNotesSection(),
-        const SizedBox(height: 16),
-
-        // ── MOYD Member Link ──
-        _buildMoydMemberLink(),
-      ],
-    );
-  }
+  // _buildEngagementTab removed — content now in Intel tab MOYD segment
 
   Widget _buildEngagementStatusCard() {
     return Container(
@@ -2753,52 +3100,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   //  TAB 6: DISTRICT INTEL
   // ═══════════════════════════════════════════════════════════════
 
-  Widget _buildDistrictTab() {
-    if (_districtLoading) {
-      return const Center(child: CircularProgressIndicator(color: BrandColors.sunriseGold));
-    }
-
-    if (c.district == null || c.district!.isEmpty) {
-      return _buildEmptyState(
-        Icons.map,
-        'No District Data',
-        'This candidate does not have a district assignment.\nDistrict intel is available for state-level races only.',
-      );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-      children: [
-        // ── District Header ──
-        _buildDistrictHeader(),
-        const SizedBox(height: 16),
-
-        // ── Candidates in This Race ──
-        _buildRaceCandidates(),
-        const SizedBox(height: 16),
-
-        // ── Partisan Lean Estimate ──
-        _buildPartisanLean(),
-        const SizedBox(height: 16),
-
-        // ── Voter Registration Stats ──
-        if (_districtDemographics != null) ...[
-          _buildVoterRegistration(),
-          const SizedBox(height: 16),
-          _buildDemographicProfile(),
-          const SizedBox(height: 16),
-        ],
-
-        // ── Geographic Context ──
-        _buildGeographicContext(),
-        const SizedBox(height: 16),
-
-        // ── Adjacent Districts ──
-        if (_adjacentDistricts.isNotEmpty)
-          _buildAdjacentDistricts(),
-      ],
-    );
-  }
+  // _buildDistrictTab removed — content now in Race tab
 
   Widget _buildDistrictHeader() {
     return Container(
@@ -3671,8 +3973,11 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         const SizedBox(width: 10),
         Expanded(
           child: _actionButton(Icons.note_add, 'Add Note', BrandColors.sunriseGold, () {
-            _tabController.animateTo(4);
-            setState(() => _editingNotes = true);
+            _tabController.animateTo(3);
+            setState(() {
+              _intelSegment = 2;
+              _editingNotes = true;
+            });
           }),
         ),
       ],

@@ -784,125 +784,143 @@ class CandidateRepository {
     }
   }
 
-  /// Fetch top donors for a committee
+  /// Fetch top donors for a committee (via Postgres function)
   Future<List<Map<String, dynamic>>> getMECTopDonors(String mecId, {int limit = 10}) async {
     if (!isReady) return [];
 
     try {
-      // Aggregate contributions by donor name (limit to most recent 2000 to avoid loading millions of rows)
-      final response = await _client
-          .from('mec_contributions')
-          .select('contributor_last_name, contributor_first_name, contribution_amount')
-          .eq('mec_id', mecId)
-          .order('contribution_date', ascending: false)
-          .limit(2000);
+      final response = await _client.rpc('get_mec_top_donors', params: {
+        'p_mec_id': mecId,
+        'p_limit': limit,
+      });
 
-      final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
-
-      // Aggregate in Dart
-      final donorTotals = <String, double>{};
-      for (final r in rows) {
-        final last = r['contributor_last_name'] as String? ?? '';
-        final first = r['contributor_first_name'] as String? ?? '';
-        final name = '$first $last'.trim();
-        final amount = (r['contribution_amount'] as num?)?.toDouble() ?? 0;
-        donorTotals[name] = (donorTotals[name] ?? 0) + amount;
+      if (response is List) {
+        return response.cast<Map<String, dynamic>>();
       }
-
-      // Sort by total descending
-      final sorted = donorTotals.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
-
-      return sorted.take(limit).map((e) => {
-        'donor_name': e.key,
-        'total_amount': e.value,
-      }).toList();
+      return [];
     } catch (e) {
       debugPrint('❌ CandidateRepository.getMECTopDonors error: $e');
       return [];
     }
   }
 
-  /// Fetch monthly contribution timeline for a committee
+  /// Fetch monthly contribution timeline for a committee (via Postgres function)
   Future<List<Map<String, dynamic>>> getMECContributionTimeline(String mecId) async {
     if (!isReady) return [];
 
     try {
-      final response = await _client
-          .from('mec_contributions')
-          .select('contribution_date, contribution_amount')
-          .eq('mec_id', mecId)
-          .order('contribution_date')
-          .limit(2000);
+      final response = await _client.rpc('get_mec_contribution_timeline', params: {
+        'p_mec_id': mecId,
+      });
 
-      final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
-
-      // Group by month
-      final monthlyTotals = <String, double>{};
-
-      for (final r in rows) {
-        final dateStr = r['contribution_date'] as String? ?? '';
-        final amount = (r['contribution_amount'] as num?)?.toDouble() ?? 0;
-
-        if (dateStr.length >= 7) {
-          final month = dateStr.substring(0, 7); // YYYY-MM
-          monthlyTotals[month] = (monthlyTotals[month] ?? 0) + amount;
-        }
+      if (response is List) {
+        return response.cast<Map<String, dynamic>>();
       }
-
-      return monthlyTotals.entries.map((e) => {
-        'month': e.key,
-        'total': e.value,
-      }).toList();
+      return [];
     } catch (e) {
       debugPrint('❌ CandidateRepository.getMECContributionTimeline error: $e');
       return [];
     }
   }
 
-  /// Fetch MEC finance summary for a committee
+  /// Fetch MEC finance summary for a committee (via Postgres function)
   Future<Map<String, dynamic>> getMECFinanceSummary(String mecId) async {
     if (!isReady) return {};
 
     try {
-      final response = await _client
-          .from('mec_contributions')
-          .select('contribution_amount, contribution_date, monetary_or_inkind')
-          .eq('mec_id', mecId)
-          .limit(5000);
+      final response = await _client.rpc('get_mec_finance_summary', params: {
+        'p_mec_id': mecId,
+      });
 
-      final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
-
-      double totalRaised = 0;
-      int contributionCount = 0;
-      double inKindTotal = 0;
-      double monetaryTotal = 0;
-      int inKindCount = 0;
-
-      for (final r in rows) {
-        final amount = (r['contribution_amount'] as num?)?.toDouble() ?? 0;
-        final type = (r['monetary_or_inkind'] as String?)?.toLowerCase() ?? '';
-        totalRaised += amount;
-        contributionCount++;
-        if (type.contains('in-kind') || type.contains('inkind') || type == 'in kind') {
-          inKindTotal += amount;
-          inKindCount++;
-        } else {
-          monetaryTotal += amount;
-        }
+      if (response is Map<String, dynamic>) {
+        return response;
       }
-
-      return {
-        'total_raised': totalRaised,
-        'contribution_count': contributionCount,
-        'monetary_total': monetaryTotal,
-        'in_kind_total': inKindTotal,
-        'in_kind_count': inKindCount,
-        'avg_contribution': contributionCount > 0 ? totalRaised / contributionCount : 0,
-      };
+      return {};
     } catch (e) {
       debugPrint('❌ CandidateRepository.getMECFinanceSummary error: $e');
       return {};
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  MEC EXPENDITURES — Spending data
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Fetch expenditure summary with breakdowns (via Postgres function)
+  Future<Map<String, dynamic>> getMECExpenditureSummary(String mecId) async {
+    if (!isReady) return {};
+
+    try {
+      final response = await _client.rpc('get_mec_expenditure_summary', params: {
+        'p_mec_id': mecId,
+      });
+
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+      return {};
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECExpenditureSummary error: $e');
+      return {};
+    }
+  }
+
+  /// Fetch top expenditure payees (via Postgres function)
+  Future<List<Map<String, dynamic>>> getMECTopPayees(String mecId, {int limit = 10}) async {
+    if (!isReady) return [];
+
+    try {
+      final response = await _client.rpc('get_mec_top_payees', params: {
+        'p_mec_id': mecId,
+        'p_limit': limit,
+      });
+
+      if (response is List) {
+        return response.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECTopPayees error: $e');
+      return [];
+    }
+  }
+
+  /// Fetch recent expenditures for a committee
+  Future<List<Map<String, dynamic>>> getMECRecentExpenditures(String mecId, {int limit = 20}) async {
+    if (!isReady) return [];
+
+    try {
+      final response = await _client
+          .from('mec_expenditures')
+          .select()
+          .eq('mec_id', mecId)
+          .order('expenditure_date', ascending: false)
+          .limit(limit);
+
+      return (response as List<dynamic>).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECRecentExpenditures error: $e');
+      return [];
+    }
+  }
+
+  /// Fetch race-wide finance comparison (via Postgres function)
+  Future<List<Map<String, dynamic>>> getRaceFinanceComparison(String office, String district) async {
+    if (!isReady) return [];
+
+    try {
+      final response = await _client.rpc('get_race_finance_comparison', params: {
+        'p_office': office,
+        'p_district': district,
+      });
+
+      if (response is List) {
+        return response.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getRaceFinanceComparison error: $e');
+      return [];
     }
   }
 
