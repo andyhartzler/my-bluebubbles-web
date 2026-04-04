@@ -65,10 +65,10 @@ class CandidateRepository {
         query = query.eq('is_young_dem', true);
       }
       if (isEndorsed == true) {
-        query = query.eq('is_endorsed', true);
+        query = query.eq('moyd_endorsed', true);
       }
       if (isContacted == true) {
-        query = query.eq('is_contacted', true);
+        query = query.eq('moyd_contacted', true);
       }
       if (hasCampaignSite == true) {
         query = query.not('campaign_website', 'is', null);
@@ -187,7 +187,7 @@ class CandidateRepository {
       final all = await _client
           
           .from('candidates')
-          .select('party, is_young_dem, estimated_age, district, office_level, is_endorsed, is_contacted, campaign_website');
+          .select('party, is_young_dem, estimated_age, district, office_level, moyd_endorsed, moyd_contacted, campaign_website');
 
       final rows = (all as List<dynamic>).cast<Map<String, dynamic>>();
 
@@ -217,8 +217,8 @@ class CandidateRepository {
         final age = (r['estimated_age'] as num?)?.toInt();
         final dist = r['district'] as String? ?? '';
         final level = r['office_level'] as String? ?? '';
-        final isEnd = r['is_endorsed'] as bool? ?? false;
-        final isCon = r['is_contacted'] as bool? ?? false;
+        final isEnd = r['moyd_endorsed'] as bool? ?? false;
+        final isCon = r['moyd_contacted'] as bool? ?? false;
         final hasWeb = r['campaign_website'] as String?;
 
         if (party == 'democratic') {
@@ -308,7 +308,7 @@ class CandidateRepository {
 
   Future<void> toggleEndorsement(String id, bool endorsed) async {
     await updateCandidate(id, {
-      'is_endorsed': endorsed,
+      'moyd_endorsed': endorsed,
       'endorsement_status': endorsed ? 'endorsed' : 'not_endorsed',
     });
   }
@@ -317,7 +317,7 @@ class CandidateRepository {
 
   Future<void> markContacted(String id, String method) async {
     await updateCandidate(id, {
-      'is_contacted': true,
+      'moyd_contacted': true,
       'last_contact_date': DateTime.now().toIso8601String(),
       'contact_method': method,
     });
@@ -990,7 +990,7 @@ class CandidateRepository {
       final current = await fetchCandidate(candidateId);
       if (current == null) return;
       await updateCandidate(candidateId, {
-        'is_endorsed': !current.isEndorsed,
+        'moyd_endorsed': !current.isEndorsed,
         'endorsement_status': !current.isEndorsed ? 'endorsed' : 'not_endorsed',
       });
     } catch (e) {
