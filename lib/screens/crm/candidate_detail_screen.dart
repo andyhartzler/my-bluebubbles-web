@@ -11,14 +11,12 @@ import 'package:bluebubbles/services/crm/candidate_repository.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATE DETAIL SCREEN
-//  Full 6-tab profile view for any candidate in the 2026 cycle
+//  4-tab profile view for any candidate in the 2026 cycle
 //
-//  TAB 1: Overview — Bio, social links, score radar, quick actions
-//  TAB 2: Campaign Finance — MEC contributions, top donors, timeline
-//  TAB 3: Election History — Historical results, charts, trends
-//  TAB 4: News & Endorsements — News cards, endorsement list
-//  TAB 5: MOYD Engagement — Contact log, notes, endorsement toggle
-//  TAB 6: District Intel — Race opponents, partisan lean, context
+//  TAB 1: Profile — Bio, social links, score radar, quick actions
+//  TAB 2: Money — MEC contributions, expenditures, opponent comparison
+//  TAB 3: Race — Election history + district intel merged
+//  TAB 4: Intel — News, endorsements, MOYD engagement (segmented)
 // ═══════════════════════════════════════════════════════════════
 
 class CandidateDetailScreen extends StatefulWidget {
@@ -248,21 +246,30 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
   Future<void> _saveNotes() async {
     setState(() => _savingNotes = true);
-    await _repo.updateNotes(c.id, _notesController.text);
+    try {
+      await _repo.updateNotes(c.id, _notesController.text);
+    } catch (e) {
+      debugPrint('❌ Error saving notes: $e');
+      if (mounted) {
+        setState(() => _savingNotes = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to save notes'), backgroundColor: BrandColors.error),
+        );
+      }
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _savingNotes = false;
       _editingNotes = false;
     });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Notes saved'),
-          backgroundColor: BrandColors.success,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Notes saved'),
+        backgroundColor: BrandColors.success,
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _launchUrl(String url) async {
@@ -274,7 +281,18 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   Future<void> _toggleMOYDEndorsed() async {
-    await _repo.toggleMOYDEndorsed(c.id);
+    try {
+      await _repo.toggleMOYDEndorsed(c.id);
+    } catch (e) {
+      debugPrint('❌ Error toggling endorsement: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update endorsement'), backgroundColor: BrandColors.error),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
     final updated = await _repo.fetchCandidate(c.id);
     if (updated != null && mounted) {
       setState(() => _candidate = updated);
@@ -291,21 +309,32 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   Future<void> _submitContactLog() async {
-    final result = await _repo.addContactLog(
-      c.id,
-      _selectedContactType,
-      _contactNotesController.text.trim().isNotEmpty
-          ? _contactNotesController.text.trim()
-          : null,
-      _contactOutcomeController.text.trim().isNotEmpty
-          ? _contactOutcomeController.text.trim()
-          : null,
-      subject: _contactSubjectController.text.trim().isNotEmpty
-          ? _contactSubjectController.text.trim()
-          : null,
-      contactedBy: 'MOYD Team',
-      followUpDate: _followUpDate?.toIso8601String(),
-    );
+    CandidateContact? result;
+    try {
+      result = await _repo.addContactLog(
+        c.id,
+        _selectedContactType,
+        _contactNotesController.text.trim().isNotEmpty
+            ? _contactNotesController.text.trim()
+            : null,
+        _contactOutcomeController.text.trim().isNotEmpty
+            ? _contactOutcomeController.text.trim()
+            : null,
+        subject: _contactSubjectController.text.trim().isNotEmpty
+            ? _contactSubjectController.text.trim()
+            : null,
+        contactedBy: 'MOYD Team',
+        followUpDate: _followUpDate?.toIso8601String(),
+      );
+    } catch (e) {
+      debugPrint('❌ Error logging contact: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to log contact'), backgroundColor: BrandColors.error),
+        );
+      }
+      return;
+    }
 
     if (result != null && mounted) {
       _contactNotesController.clear();
@@ -316,13 +345,15 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         _followUpDate = null;
       });
       await _loadIntelData();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Contact logged successfully'),
-          backgroundColor: BrandColors.success,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Contact logged successfully'),
+            backgroundColor: BrandColors.success,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -330,8 +361,20 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     final name = _endorserNameController.text.trim();
     if (name.isEmpty) return;
 
-    await _repo.addEndorsement(c.id, name, _endorsementType);
+    try {
+      await _repo.addEndorsement(c.id, name, _endorsementType);
+    } catch (e) {
+      debugPrint('❌ Error adding endorsement: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to add endorsement'), backgroundColor: BrandColors.error),
+        );
+      }
+      return;
+    }
+
     _endorserNameController.clear();
+    if (!mounted) return;
     await _loadIntelData();
 
     if (mounted) {
@@ -2095,61 +2138,6 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
-  Widget _buildPreviousCandidatesList() {
-    final demCandidates = <String>{};
-    final repCandidates = <String>{};
-
-    for (final r in _electionResults) {
-      if (r.demCandidate != null && r.demCandidate!.isNotEmpty) {
-        demCandidates.add('${r.demCandidate} (${r.year})');
-      }
-      if (r.repCandidate != null && r.repCandidate!.isNotEmpty) {
-        repCandidates.add('${r.repCandidate} (${r.year})');
-      }
-    }
-
-    return _card(
-      'Previous Candidates',
-      Icons.history,
-      Colors.purpleAccent,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 8),
-          if (demCandidates.isNotEmpty) ...[
-            const Text('Democrats', style: TextStyle(color: BrandColors.democratBlue, fontSize: 12, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            ...demCandidates.map((name) => Padding(
-              padding: const EdgeInsets.only(bottom: 4, left: 8),
-              child: Row(
-                children: [
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: BrandColors.democratBlue, shape: BoxShape.circle)),
-                  const SizedBox(width: 8),
-                  Text(name, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                ],
-              ),
-            )),
-            const SizedBox(height: 8),
-          ],
-          if (repCandidates.isNotEmpty) ...[
-            const Text('Republicans', style: TextStyle(color: BrandColors.republicanRed, fontSize: 12, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            ...repCandidates.map((name) => Padding(
-              padding: const EdgeInsets.only(bottom: 4, left: 8),
-              child: Row(
-                children: [
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: BrandColors.republicanRed, shape: BoxShape.circle)),
-                  const SizedBox(width: 8),
-                  Text(name, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                ],
-              ),
-            )),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _buildHistoryDetailList() {
     return _card(
       'Detailed Results',
@@ -2616,7 +2604,6 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   //  TAB 5: MOYD ENGAGEMENT
   // ═══════════════════════════════════════════════════════════════
 
-  // _buildEngagementTab removed — content now in Intel tab MOYD segment
 
   Widget _buildEngagementStatusCard() {
     return Container(
@@ -3294,7 +3281,6 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   //  TAB 6: DISTRICT INTEL
   // ═══════════════════════════════════════════════════════════════
 
-  // _buildDistrictTab removed — content now in Race tab
 
   Widget _buildDistrictHeader() {
     return Container(
