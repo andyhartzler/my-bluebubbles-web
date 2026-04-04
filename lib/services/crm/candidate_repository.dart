@@ -687,17 +687,15 @@ class CandidateRepository {
   //  MEC CAMPAIGN FINANCE — Missouri Ethics Commission data
   // ═══════════════════════════════════════════════════════════════
 
-  /// Fetch MEC committee info for a candidate by mec_candidate_id or name
-  Future<List<Map<String, dynamic>>> getMECCommittees(String candidateName) async {
-    if (!isReady) return [];
-
+  /// Fetch MEC committee info using the candidate's linked committee IDs
+  Future<List<Map<String, dynamic>>> getMECCommittees(List<String> mecIds) async {
+    if (!isReady || mecIds.isEmpty) return [];
     try {
       final response = await _client
           .from('mec_committees')
           .select()
-          .ilike('candidate_name', '%$candidateName%');
-
-      return (response as List<dynamic>).cast<Map<String, dynamic>>();
+          .inFilter('mec_id', mecIds);
+      return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('❌ CandidateRepository.getMECCommittees error: $e');
       return [];

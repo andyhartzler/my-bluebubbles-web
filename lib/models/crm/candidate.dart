@@ -35,7 +35,7 @@ class Candidate {
   final String? email;
   final String? phone;
   final String? fecCandidateId;
-  final String? mecCandidateId;
+  final List<String> mecCommitteeIds;
   final bool isEndorsed;
   final bool isContacted;
   final String? assignedTo;
@@ -84,7 +84,7 @@ class Candidate {
     this.email,
     this.phone,
     this.fecCandidateId,
-    this.mecCandidateId,
+    this.mecCommitteeIds = const [],
     this.isEndorsed = false,
     this.isContacted = false,
     this.assignedTo,
@@ -137,7 +137,7 @@ class Candidate {
       email: json['email'] as String?,
       phone: json['phone'] as String?,
       fecCandidateId: json['fec_candidate_id'] as String?,
-      mecCandidateId: json['mec_candidate_id'] as String?,
+      mecCommitteeIds: (json['mec_committee_ids'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
       isEndorsed: json['moyd_endorsed'] as bool? ?? false,
       isContacted: json['moyd_contacted'] as bool? ?? false,
       assignedTo: json['assigned_to'] as String?,
@@ -186,7 +186,7 @@ class Candidate {
         'email': email,
         'phone': phone,
         'fec_candidate_id': fecCandidateId,
-        'mec_candidate_id': mecCandidateId,
+        'mec_committee_ids': mecCommitteeIds,
         'moyd_endorsed': isEndorsed,
         'moyd_contacted': isContacted,
         'assigned_to': assignedTo,
@@ -290,7 +290,7 @@ class Candidate {
   /// Whether this candidate has campaign finance data
   bool get hasCampaignFinance =>
       (fecCandidateId?.isNotEmpty ?? false) ||
-      (mecCandidateId?.isNotEmpty ?? false) ||
+      mecCommitteeIds.isNotEmpty ||
       (mecDonorId != null);
 
   /// Whether this candidate has profile info
@@ -364,7 +364,7 @@ class Candidate {
     String? email,
     String? phone,
     String? fecCandidateId,
-    String? mecCandidateId,
+    List<String>? mecCommitteeIds,
     bool? isEndorsed,
     bool? isContacted,
     String? assignedTo,
@@ -411,7 +411,7 @@ class Candidate {
       email: email ?? this.email,
       phone: phone ?? this.phone,
       fecCandidateId: fecCandidateId ?? this.fecCandidateId,
-      mecCandidateId: mecCandidateId ?? this.mecCandidateId,
+      mecCommitteeIds: mecCommitteeIds ?? this.mecCommitteeIds,
       isEndorsed: isEndorsed ?? this.isEndorsed,
       isContacted: isContacted ?? this.isContacted,
       assignedTo: assignedTo ?? this.assignedTo,

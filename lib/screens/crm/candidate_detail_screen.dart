@@ -164,7 +164,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
     try {
       // First find MEC committees for this candidate
-      final committees = await _repo.getMECCommittees(c.name);
+      final committees = await _repo.getMECCommittees(c.mecCommitteeIds);
       _mecCommittees = committees;
 
       if (committees.isNotEmpty) {
@@ -986,8 +986,8 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             _infoRow(Icons.layers, 'Level', c.officeLevel!.substring(0, 1).toUpperCase() + c.officeLevel!.substring(1)),
           if (c.fecCandidateId != null && c.fecCandidateId!.isNotEmpty)
             _infoRow(Icons.account_balance_wallet, 'FEC ID', c.fecCandidateId!),
-          if (c.mecCandidateId != null && c.mecCandidateId!.isNotEmpty)
-            _infoRow(Icons.account_balance_wallet, 'MEC ID', c.mecCandidateId!),
+          if (c.mecCommitteeIds.isNotEmpty)
+            _infoRow(Icons.account_balance_wallet, 'MEC ID', c.mecCommitteeIds.first),
           if (c.voterMatchId != null && c.voterMatchId!.isNotEmpty)
             _infoRow(Icons.how_to_reg, 'Voter Match', c.voterMatchId!),
         ],
