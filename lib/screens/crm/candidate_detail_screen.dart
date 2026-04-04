@@ -626,49 +626,108 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       partyLabel = c.party;
     }
 
+    // Data completeness calculation
+    int filled = 0;
+    int total = 10;
+    if (c.photoUrl != null && c.photoUrl!.isNotEmpty) filled++;
+    if (c.bio != null && c.bio!.isNotEmpty) filled++;
+    if (c.education != null && c.education!.isNotEmpty) filled++;
+    if (c.occupation != null && c.occupation!.isNotEmpty) filled++;
+    if (c.hasSocialLinks) filled++;
+    if (c.hasContactInfo) filled++;
+    if (c.hasCampaignFinance) filled++;
+    if (c.endorsements != null && c.endorsements!.isNotEmpty) filled++;
+    if (c.estimatedAge != null) filled++;
+    if (c.ballotpediaUrl != null && c.ballotpediaUrl!.isNotEmpty) filled++;
+    final completeness = filled / total;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
+            BrandColors.navyBlue,
             BrandColors.unityBlue,
-            BrandColors.unityBlue.withOpacity(0.85),
-            partyColor.withOpacity(0.15),
+            partyColor.withOpacity(0.12),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          stops: const [0.0, 0.6, 1.0],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: partyColor.withOpacity(0.15)),
         boxShadow: [
           BoxShadow(
-            color: partyColor.withOpacity(0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
+            color: partyColor.withOpacity(0.15),
+            blurRadius: 30,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
-          // Avatar
+          // Avatar with glow ring + completeness
           Hero(
             tag: 'candidate-${c.id}',
-            child: CircleAvatar(
-              radius: 36,
-              backgroundColor: partyColor.withOpacity(0.2),
-              backgroundImage:
-                  c.photoUrl != null && c.photoUrl!.isNotEmpty
-                      ? NetworkImage(c.photoUrl!)
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Glow ring
+                Container(
+                  width: 82,
+                  height: 82,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: SweepGradient(
+                      colors: [
+                        partyColor.withOpacity(0.6),
+                        partyColor.withOpacity(0.1),
+                        partyColor.withOpacity(0.6),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: partyColor.withOpacity(0.3), blurRadius: 12),
+                    ],
+                  ),
+                ),
+                // Completeness ring
+                SizedBox(
+                  width: 80,
+                  height: 80,
+                  child: CircularProgressIndicator(
+                    value: completeness,
+                    strokeWidth: 2.5,
+                    backgroundColor: Colors.white.withOpacity(0.05),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      completeness >= 0.7 ? BrandColors.success : BrandColors.sunriseGold,
+                    ),
+                  ),
+                ),
+                // Photo
+                CircleAvatar(
+                  radius: 34,
+                  backgroundColor: BrandColors.navyBlue,
+                  backgroundImage:
+                      c.photoUrl != null && c.photoUrl!.isNotEmpty
+                          ? NetworkImage(c.photoUrl!)
+                          : null,
+                  child: c.photoUrl == null || c.photoUrl!.isEmpty
+                      ? Text(
+                          c.initials,
+                          style: TextStyle(
+                            color: partyColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 22,
+                          ),
+                        )
                       : null,
-              child: c.photoUrl == null || c.photoUrl!.isEmpty
-                  ? Text(
-                      c.initials,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 24,
-                      ),
-                    )
-                  : null,
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 16),
@@ -689,24 +748,33 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  c.officeDisplay,
-                  style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Icon(Icons.location_on, color: Colors.white38, size: 13),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        c.officeDisplay,
+                        style: const TextStyle(color: Colors.white60, fontSize: 13),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Wrap(
                   spacing: 6,
                   runSpacing: 4,
                   children: [
                     _badge(partyLabel, partyColor),
                     if (c.estimatedAge != null)
-                      _badge('Age ${c.estimatedAge}', Colors.white54),
+                      _badge('Age ${c.estimatedAge}', Colors.white30),
                     if (c.isYoungDem)
                       _badge('⭐ YD', BrandColors.sunriseGold, textColor: Colors.black87),
                     if (c.isEndorsed)
                       _badge('✅ Endorsed', BrandColors.success),
+                    _badge('${(completeness * 100).toInt()}%', completeness >= 0.7 ? BrandColors.success : Colors.white30),
                   ],
                 ),
               ],
@@ -715,17 +783,17 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           // Quick actions column
           Column(
             children: [
-              _quickActionIcon(Icons.email, 'Email', _launchEmail),
-              const SizedBox(height: 8),
-              _quickActionIcon(Icons.phone, 'Call', _launchPhone),
-              const SizedBox(height: 8),
+              _quickActionIcon(Icons.email, 'Email', _launchEmail, BrandColors.momentumBlue),
+              const SizedBox(height: 6),
+              _quickActionIcon(Icons.phone, 'Call', _launchPhone, BrandColors.success),
+              const SizedBox(height: 6),
               _quickActionIcon(Icons.note_add, 'Note', () {
                 _tabController.animateTo(3);
                 setState(() {
                   _intelSegment = 2;
                   _editingNotes = true;
                 });
-              }),
+              }, BrandColors.sunriseGold),
             ],
           ),
         ],
@@ -733,19 +801,20 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
-  Widget _quickActionIcon(IconData icon, String tooltip, VoidCallback onTap) {
+  Widget _quickActionIcon(IconData icon, String tooltip, VoidCallback onTap, Color accent) {
     return Tooltip(
       message: tooltip,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(9),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(8),
+            color: accent.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: accent.withOpacity(0.2)),
           ),
-          child: Icon(icon, color: Colors.white70, size: 18),
+          child: Icon(icon, color: accent.withOpacity(0.8), size: 17),
         ),
       ),
     );
@@ -1148,24 +1217,39 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
   Widget _financeStatCard(String label, String value, IconData icon, Color accent) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [BrandColors.unityBlue, BrandColors.unityBlue.withOpacity(0.85)],
+          colors: [
+            accent.withOpacity(0.12),
+            accent.withOpacity(0.04),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: accent.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(color: accent.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 3)),
+        ],
       ),
       child: Column(
         children: [
-          Icon(icon, color: accent, size: 24),
-          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: accent.withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: accent, size: 20),
+          ),
+          const SizedBox(height: 10),
           Text(
             value,
-            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold, letterSpacing: -0.5),
           ),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11), textAlign: TextAlign.center),
+          const SizedBox(height: 3),
+          Text(label, style: TextStyle(color: accent.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
         ],
       ),
     );
@@ -1209,11 +1293,14 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                           height: height.clamp(4.0, 130.0),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [BrandColors.momentumBlue, BrandColors.sunriseGold],
+                              colors: [BrandColors.momentumBlue.withOpacity(0.8), BrandColors.sunriseGold],
                               begin: Alignment.bottomCenter,
                               end: Alignment.topCenter,
                             ),
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                            boxShadow: [
+                              BoxShadow(color: BrandColors.sunriseGold.withOpacity(0.15), blurRadius: 6, offset: const Offset(0, -2)),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -2227,86 +2314,91 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   Widget _buildNewsCard(CandidateNews news) {
-    // Simple sentiment detection from headline
-    String sentimentLabel = 'Neutral';
+    // Sentiment detection
+    String sentimentEmoji = '⚪';
     Color sentimentColor = Colors.grey;
     final headline = news.headline.toLowerCase();
-    if (headline.contains('wins') || headline.contains('endorsed') || headline.contains('support') || headline.contains('victory')) {
-      sentimentLabel = 'Positive';
+    if (headline.contains('wins') || headline.contains('endorsed') || headline.contains('support') || headline.contains('victory') || headline.contains('leads')) {
+      sentimentEmoji = '🟢';
       sentimentColor = BrandColors.success;
-    } else if (headline.contains('loses') || headline.contains('scandal') || headline.contains('contro') || headline.contains('defeat')) {
-      sentimentLabel = 'Negative';
+    } else if (headline.contains('loses') || headline.contains('scandal') || headline.contains('contro') || headline.contains('defeat') || headline.contains('accused')) {
+      sentimentEmoji = '🔴';
       sentimentColor = BrandColors.republicanRed;
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: InkWell(
-        onTap: news.url != null ? () => _launchUrl(news.url!) : null,
+    return GestureDetector(
+      onTap: news.url != null ? () => _launchUrl(news.url!) : null,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.white.withOpacity(0.06), Colors.white.withOpacity(0.02)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border(
+            left: BorderSide(color: sentimentColor.withOpacity(0.5), width: 3),
+          ),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(sentimentEmoji, style: const TextStyle(fontSize: 12)),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     news.headline,
-                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600, height: 1.3),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Sentiment badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: sentimentColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: sentimentColor.withOpacity(0.3)),
-                  ),
-                  child: Text(
-                    sentimentLabel,
-                    style: TextStyle(color: sentimentColor, fontSize: 10, fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
             ),
             if (news.summary != null && news.summary!.isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text(
-                news.summary!,
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              Padding(
+                padding: const EdgeInsets.only(left: 20),
+                child: Text(
+                  news.summary!,
+                  style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 12, height: 1.4),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
             const SizedBox(height: 8),
-            Row(
-              children: [
-                if (news.source != null) ...[
-                  Icon(Icons.source, color: Colors.white38, size: 12),
-                  const SizedBox(width: 4),
-                  Text(news.source!, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+            Padding(
+              padding: const EdgeInsets.only(left: 20),
+              child: Row(
+                children: [
+                  if (news.source != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(news.source!, style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.w500)),
+                    ),
+                  ],
+                  const Spacer(),
+                  if (news.publishedAt != null)
+                    Text(
+                      _formatDate(news.publishedAt!),
+                      style: const TextStyle(color: Colors.white30, fontSize: 10),
+                    ),
+                  if (news.url != null) ...[
+                    const SizedBox(width: 6),
+                    Icon(Icons.arrow_outward, color: BrandColors.momentumBlue.withOpacity(0.5), size: 12),
+                  ],
                 ],
-                const Spacer(),
-                if (news.publishedAt != null)
-                  Text(
-                    _formatDate(news.publishedAt!),
-                    style: const TextStyle(color: Colors.white38, fontSize: 11),
-                  ),
-                if (news.url != null) ...[
-                  const SizedBox(width: 8),
-                  Icon(Icons.open_in_new, color: BrandColors.momentumBlue, size: 14),
-                ],
-              ],
+              ),
             ),
           ],
         ),
@@ -3827,16 +3919,25 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          gradient: LinearGradient(
+            colors: [color.withOpacity(0.18), color.withOpacity(0.06)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.25)),
+          boxShadow: [
+            BoxShadow(color: color.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2)),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 18),
+            Icon(icon, color: color, size: 17),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w500)),
+            Text(label, style: TextStyle(color: color.withOpacity(0.9), fontSize: 13, fontWeight: FontWeight.w500)),
+            const SizedBox(width: 3),
+            Icon(Icons.arrow_outward, color: color.withOpacity(0.4), size: 11),
           ],
         ),
       ),
@@ -3990,15 +4091,29 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.4)),
+          gradient: LinearGradient(
+            colors: [color.withOpacity(0.2), color.withOpacity(0.08)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.25)),
+          boxShadow: [
+            BoxShadow(color: color.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2)),
+          ],
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(height: 6),
+            Text(label, style: TextStyle(color: color.withOpacity(0.9), fontSize: 12, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -4014,16 +4129,25 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [BrandColors.unityBlue, BrandColors.unityBlue.withOpacity(0.85)],
+          colors: [
+            Colors.white.withOpacity(0.07),
+            Colors.white.withOpacity(0.02),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: accent.withOpacity(0.12)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: accent.withOpacity(0.05),
+            blurRadius: 30,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -4032,9 +4156,18 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         children: [
           Row(
             children: [
-              Icon(icon, color: accent, size: 20),
-              const SizedBox(width: 8),
-              Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: accent, size: 16),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+              ),
             ],
           ),
           child,
@@ -4047,11 +4180,15 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(color == Colors.white54 || color == Colors.white30 ? 0.15 : 0.25),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.4)),
+        gradient: LinearGradient(
+          colors: [color.withOpacity(0.25), color.withOpacity(0.12)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3), width: 0.5),
       ),
-      child: Text(text, style: TextStyle(color: textColor, fontSize: 11, fontWeight: FontWeight.w600)),
+      child: Text(text, style: TextStyle(color: textColor, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
     );
   }
 
@@ -4069,15 +4206,23 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   Widget _buildEmptyState(IconData icon, String title, String subtitle) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(40),
+        padding: const EdgeInsets.all(48),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white.withOpacity(0.12), size: 64),
-            const SizedBox(height: 16),
-            Text(title, style: const TextStyle(color: Colors.white54, fontSize: 18, fontWeight: FontWeight.bold)),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.04),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withOpacity(0.06)),
+              ),
+              child: Icon(icon, color: Colors.white.withOpacity(0.15), size: 48),
+            ),
+            const SizedBox(height: 20),
+            Text(title, style: const TextStyle(color: Colors.white60, fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
             const SizedBox(height: 8),
-            Text(subtitle, style: const TextStyle(color: Colors.white38, fontSize: 13), textAlign: TextAlign.center),
+            Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13, height: 1.4), textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -4129,7 +4274,10 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      color: const Color(0xFF0b1e37),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0b1e37),
+        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.06))),
+      ),
       child: tabBar,
     );
   }
