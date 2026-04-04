@@ -807,7 +807,7 @@ class CandidateRepository {
     try {
       final response = await _client
           .from('mec_contributions')
-          .select('contribution_amount, contribution_date')
+          .select('contribution_amount, contribution_date, monetary_or_inkind')
           .eq('mec_id', mecId)
           .limit(5000);
 
@@ -817,13 +817,16 @@ class CandidateRepository {
       int contributionCount = 0;
       double inKindTotal = 0;
       double monetaryTotal = 0;
+      int inKindCount = 0;
 
       for (final r in rows) {
         final amount = (r['contribution_amount'] as num?)?.toDouble() ?? 0;
+        final type = (r['monetary_or_inkind'] as String?)?.toLowerCase() ?? '';
         totalRaised += amount;
         contributionCount++;
-        if (amount == 0) {
-          inKindTotal += 1; // Count in-kind
+        if (type.contains('in-kind') || type.contains('inkind') || type == 'in kind') {
+          inKindTotal += amount;
+          inKindCount++;
         } else {
           monetaryTotal += amount;
         }
@@ -833,7 +836,8 @@ class CandidateRepository {
         'total_raised': totalRaised,
         'contribution_count': contributionCount,
         'monetary_total': monetaryTotal,
-        'in_kind_count': inKindTotal.toInt(),
+        'in_kind_total': inKindTotal,
+        'in_kind_count': inKindCount,
         'avg_contribution': contributionCount > 0 ? totalRaised / contributionCount : 0,
       };
     } catch (e) {

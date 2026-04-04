@@ -1109,6 +1109,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     final totalRaised = _financeSummary['total_raised'] as double? ?? 0;
     final contributionCount = _financeSummary['contribution_count'] as int? ?? 0;
     final monetaryTotal = _financeSummary['monetary_total'] as double? ?? 0;
+    final inKindTotal = _financeSummary['in_kind_total'] as double? ?? 0;
     final inKindCount = _financeSummary['in_kind_count'] as int? ?? 0;
     final avgContribution = _financeSummary['avg_contribution'] as double? ?? 0;
 
@@ -1132,7 +1133,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         const SizedBox(height: 10),
         Row(
           children: [
-            Expanded(child: _financeStatCard('In-Kind Items', '$inKindCount', Icons.card_giftcard, Colors.purpleAccent)),
+            Expanded(child: _financeStatCard('In-Kind', inKindTotal > 0 ? '\$${_formatMoney(inKindTotal)} ($inKindCount)' : '$inKindCount items', Icons.card_giftcard, Colors.purpleAccent)),
             const SizedBox(width: 10),
             Expanded(child: _financeStatCard('Donors', '${_topDonors.length}+', Icons.people, Colors.tealAccent)),
           ],
