@@ -507,16 +507,76 @@ class CandidateRepository {
 
     try {
       final response = await _client
-          
-          .from('election_results')
+          .from('election_history')
           .select()
           .eq('district', district)
-          .order('year', ascending: false);
+          .order('election_year', ascending: false);
 
-      return (response as List<dynamic>)
-          .whereType<Map<String, dynamic>>()
-          .map(ElectionResult.fromJson)
-          .toList();
+      // The election_history table stores one row per candidate per race.
+      // We need to aggregate into ElectionResult (Dem vs Rep per year).
+      final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
+
+      // Group by (election_year, election_type)
+      final grouped = <String, List<Map<String, dynamic>>>{};
+      for (final row in rows) {
+        final year = row['election_year']?.toString() ?? '';
+        final type = row['election_type'] as String? ?? 'general';
+        final key = '$year-$type';
+        grouped.putIfAbsent(key, () => []).add(row);
+      }
+
+      final results = <ElectionResult>[];
+      for (final entry in grouped.entries) {
+        final candidates = entry.value;
+        final year = (candidates.first['election_year'] as num?)?.toInt() ?? 0;
+        final type = candidates.first['election_type'] as String? ?? 'general';
+
+        String? demCandidate, repCandidate;
+        int? demVotes, repVotes;
+        double? demPercent, repPercent;
+        String? winner;
+        int totalVotes = 0;
+
+        for (final c in candidates) {
+          final party = (c['party'] as String? ?? '').toLowerCase();
+          final name = c['candidate_name'] as String?;
+          final votes = (c['votes'] as num?)?.toInt();
+          final pct = (c['vote_percentage'] as num?)?.toDouble();
+          final isWinner = c['winner'] as bool? ?? false;
+
+          if (votes != null) totalVotes += votes;
+
+          if (party.contains('democrat')) {
+            demCandidate = name;
+            demVotes = votes;
+            demPercent = pct;
+            if (isWinner) winner = 'Democratic';
+          } else if (party.contains('republican')) {
+            repCandidate = name;
+            repVotes = votes;
+            repPercent = pct;
+            if (isWinner) winner = 'Republican';
+          }
+        }
+
+        results.add(ElectionResult(
+          id: '${district}_${year}_$type',
+          district: district,
+          year: year,
+          demCandidate: demCandidate,
+          repCandidate: repCandidate,
+          demVotes: demVotes,
+          repVotes: repVotes,
+          totalVotes: totalVotes > 0 ? totalVotes : null,
+          winner: winner,
+          demPercent: demPercent,
+          repPercent: repPercent,
+        ));
+      }
+
+      // Sort descending by year
+      results.sort((a, b) => b.year.compareTo(a.year));
+      return results;
     } catch (e) {
       debugPrint('❌ CandidateRepository.fetchElectionHistory error: $e');
       return [];
