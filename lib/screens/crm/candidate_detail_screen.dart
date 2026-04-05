@@ -159,66 +159,68 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   Future<void> _loadFinanceData() async {
     setState(() => _financeLoading = true);
 
+    const loadTimeout = Duration(seconds: 20);
+    final fecId = c.fecCandidateId;
+    final hasFec = fecId != null && fecId.isNotEmpty;
+    final hasDistrict = c.district != null && c.district!.isNotEmpty;
+
     try {
-      // Load MEC committees
-      final committees = await _repo.getMECCommittees(c.mecCommitteeIds);
+      // Load MEC committees first (needed to know the mec_id for subsequent calls)
+      final committees = await _repo
+          .getMECCommittees(c.mecCommitteeIds)
+          .timeout(loadTimeout, onTimeout: () => const <Map<String, dynamic>>[]);
+      if (!mounted) return;
+
+      // Build a single parallel batch for EVERYTHING that doesn't depend on the
+      // committees list — FEC calls and race comparison — plus the per-committee
+      // MEC calls once we know the first mec_id. This lets MEC + FEC load
+      // simultaneously instead of sequentially (review feedback #4+5).
+      final mecId = committees.isNotEmpty
+          ? (committees.first['mec_id']?.toString() ?? '')
+          : '';
+      _selectedMecId = mecId.isNotEmpty ? mecId : null;
+
+      final futures = <Future<dynamic>>[
+        // MEC data (only if we have a committee)
+        mecId.isNotEmpty ? _repo.getMECContributions(mecId) : Future.value(const <MECContribution>[]),
+        mecId.isNotEmpty ? _repo.getMECTopDonors(mecId) : Future.value(const <Map<String, dynamic>>[]),
+        mecId.isNotEmpty ? _repo.getMECContributionTimeline(mecId) : Future.value(const <Map<String, dynamic>>[]),
+        mecId.isNotEmpty ? _repo.getMECFinanceSummary(mecId) : Future.value(const <String, dynamic>{}),
+        mecId.isNotEmpty ? _repo.getMECExpenditureSummary(mecId) : Future.value(const <String, dynamic>{}),
+        mecId.isNotEmpty ? _repo.getMECTopPayees(mecId) : Future.value(const <Map<String, dynamic>>[]),
+        mecId.isNotEmpty ? _repo.getMECRecentExpenditures(mecId) : Future.value(const <Map<String, dynamic>>[]),
+        // Race comparison
+        hasDistrict ? _repo.getRaceFinanceComparison(c.office, c.district!) : Future.value(const <Map<String, dynamic>>[]),
+        // FEC data (only if federal candidate)
+        hasFec ? _repo.getFECFinanceSummary(fecId) : Future.value(const <String, dynamic>{}),
+        hasFec ? _repo.getFECTopDonors(fecId) : Future.value(const <Map<String, dynamic>>[]),
+        hasFec ? _repo.getFECContributionTimeline(fecId) : Future.value(const <Map<String, dynamic>>[]),
+        hasFec ? _repo.getFECRecentContributions(fecId) : Future.value(const <Map<String, dynamic>>[]),
+        hasFec ? _repo.getFECCommittees(fecId) : Future.value(const <Map<String, dynamic>>[]),
+      ];
+
+      final results = await Future.wait(futures).timeout(loadTimeout, onTimeout: () => List.filled(futures.length, null));
+      if (!mounted) return;
+
       _mecCommittees = committees;
-
-      if (committees.isNotEmpty) {
-        final mecId = committees.first['mec_id']?.toString() ?? '';
-        _selectedMecId = mecId;
-
-        if (mecId.isNotEmpty) {
-          // Load contributions + expenditures + race comparison in parallel
-          final results = await Future.wait([
-            _repo.getMECContributions(mecId),
-            _repo.getMECTopDonors(mecId),
-            _repo.getMECContributionTimeline(mecId),
-            _repo.getMECFinanceSummary(mecId),
-            _repo.getMECExpenditureSummary(mecId),
-            _repo.getMECTopPayees(mecId),
-            _repo.getMECRecentExpenditures(mecId),
-            if (c.district != null && c.district!.isNotEmpty)
-              _repo.getRaceFinanceComparison(c.office, c.district!)
-            else
-              Future.value(<Map<String, dynamic>>[]),
-          ]);
-
-          _mecContributions = results[0] as List<MECContribution>;
-          _topDonors = results[1] as List<Map<String, dynamic>>;
-          _contributionTimeline = results[2] as List<Map<String, dynamic>>;
-          _financeSummary = results[3] as Map<String, dynamic>;
-          _expenditureSummary = results[4] as Map<String, dynamic>;
-          _topPayees = results[5] as List<Map<String, dynamic>>;
-          _recentExpenditures = results[6] as List<Map<String, dynamic>>;
-          _raceComparison = results[7] as List<Map<String, dynamic>>;
-        }
-      } else if (c.district != null && c.district!.isNotEmpty) {
-        // No MEC data but still load race comparison
-        _raceComparison = await _repo.getRaceFinanceComparison(c.office, c.district!);
-      }
-
-      // Load FEC finance data if this candidate is a federal candidate
-      final fecId = c.fecCandidateId;
-      if (fecId != null && fecId.isNotEmpty) {
-        final fecResults = await Future.wait([
-          _repo.getFECFinanceSummary(fecId),
-          _repo.getFECTopDonors(fecId),
-          _repo.getFECContributionTimeline(fecId),
-          _repo.getFECRecentContributions(fecId),
-          _repo.getFECCommittees(fecId),
-        ]);
-        _fecSummary = fecResults[0] as Map<String, dynamic>;
-        _fecTopDonors = fecResults[1] as List<Map<String, dynamic>>;
-        _fecTimeline = fecResults[2] as List<Map<String, dynamic>>;
-        _fecRecentContributions = fecResults[3] as List<Map<String, dynamic>>;
-        _fecCommittees = fecResults[4] as List<Map<String, dynamic>>;
-      }
+      _mecContributions = (results[0] as List?)?.cast<MECContribution>() ?? const [];
+      _topDonors = (results[1] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      _contributionTimeline = (results[2] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      _financeSummary = (results[3] as Map<String, dynamic>?) ?? const {};
+      _expenditureSummary = (results[4] as Map<String, dynamic>?) ?? const {};
+      _topPayees = (results[5] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      _recentExpenditures = (results[6] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      _raceComparison = (results[7] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      _fecSummary = (results[8] as Map<String, dynamic>?) ?? const {};
+      _fecTopDonors = (results[9] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      _fecTimeline = (results[10] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      _fecRecentContributions = (results[11] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      _fecCommittees = (results[12] as List?)?.cast<Map<String, dynamic>>() ?? const [];
     } catch (e) {
       debugPrint('❌ Error loading finance data: $e');
     }
-
-    if (mounted) setState(() => _financeLoading = false);
+    if (!mounted) return;
+    setState(() => _financeLoading = false);
   }
 
   Future<void> _loadRaceData() async {
@@ -1131,7 +1133,8 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     final hasFinanceData = _mecCommittees.isNotEmpty;
     final hasExpenditures = (_expenditureSummary['total_spent'] as num?)?.toDouble() != null &&
         ((_expenditureSummary['total_spent'] as num?)?.toDouble() ?? 0) > 0;
-    final hasFecData = ((_fecSummary['total_raised'] as num?)?.toDouble() ?? 0) > 0;
+    final hasFecData = ((_fecSummary['total_raised'] as num?)?.toDouble() ?? 0) > 0 ||
+        _fecCommittees.isNotEmpty;
 
     if (!hasFinanceData && !hasFecData && _raceComparison.isEmpty) {
       return _buildEmptyState(
@@ -1324,7 +1327,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: const Color(0xFF0B3D91).withOpacity(0.3)),
                 ),
-                child: Text('${cm['cmte_name'] ?? cm['cmte_id']} · ${cm['cycle']}',
+                child: Text(
+                  cm['cycle'] != null
+                    ? '${cm['cmte_name'] ?? cm['cmte_id']} · ${cm['cycle']}'
+                    : '${cm['cmte_name'] ?? cm['cmte_id']}',
                   style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500)),
               )).toList(),
             ),
@@ -4284,4 +4290,3 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   String _formatDate(DateTime date) => CandidateUI.formatDate(date);
 }
 
-}
