@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
+import 'package:bluebubbles/screens/crm/candidate_detail_painters.dart';
+import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -57,6 +59,12 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   List<Map<String, dynamic>> _topPayees = [];
   List<Map<String, dynamic>> _recentExpenditures = [];
   List<Map<String, dynamic>> _raceComparison = [];
+  // FEC federal finance (for federal candidates)
+  Map<String, dynamic> _fecSummary = {};
+  List<Map<String, dynamic>> _fecTopDonors = [];
+  List<Map<String, dynamic>> _fecTimeline = [];
+  List<Map<String, dynamic>> _fecRecentContributions = [];
+  List<Map<String, dynamic>> _fecCommittees = [];
 
   // ── State: Race Tab (history + district merged) ──
   bool _raceLoading = true;
@@ -188,6 +196,23 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       } else if (c.district != null && c.district!.isNotEmpty) {
         // No MEC data but still load race comparison
         _raceComparison = await _repo.getRaceFinanceComparison(c.office, c.district!);
+      }
+
+      // Load FEC finance data if this candidate is a federal candidate
+      final fecId = c.fecCandidateId;
+      if (fecId != null && fecId.isNotEmpty) {
+        final fecResults = await Future.wait([
+          _repo.getFECFinanceSummary(fecId),
+          _repo.getFECTopDonors(fecId),
+          _repo.getFECContributionTimeline(fecId),
+          _repo.getFECRecentContributions(fecId),
+          _repo.getFECCommittees(fecId),
+        ]);
+        _fecSummary = fecResults[0] as Map<String, dynamic>;
+        _fecTopDonors = fecResults[1] as List<Map<String, dynamic>>;
+        _fecTimeline = fecResults[2] as List<Map<String, dynamic>>;
+        _fecRecentContributions = fecResults[3] as List<Map<String, dynamic>>;
+        _fecCommittees = fecResults[4] as List<Map<String, dynamic>>;
       }
     } catch (e) {
       debugPrint('❌ Error loading finance data: $e');
@@ -613,7 +638,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   // ── Tab Bar ──
                   SliverPersistentHeader(
                     pinned: true,
-                    delegate: _TabBarDelegate(
+                    delegate: CandidateTabBarDelegate(
                       tabBar: TabBar(
                         controller: _tabController,
                         isScrollable: true,
@@ -933,7 +958,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           SizedBox(
             height: 220,
             child: CustomPaint(
-              painter: _ScoreRadarPainter(
+              painter: ScoreRadarPainter(
                 scores: {
                   'Party': c.scoreParty.toDouble(),
                   'Primary': c.scorePrimary.toDouble(),
@@ -1095,70 +1120,8 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   // ═══════════════════════════════════════════════════════════════
 
   // ── Shimmer Loading Skeleton ──
-  Widget _buildShimmerSkeleton({int cardCount = 3}) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-      physics: const NeverScrollableScrollPhysics(),
-      children: List.generate(cardCount, (i) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          height: i == 0 ? 100 : 160,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.white.withOpacity(0.04),
-                Colors.white.withOpacity(0.08),
-                Colors.white.withOpacity(0.04),
-              ],
-              stops: const [0.0, 0.5, 1.0],
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: [
-              if (i == 0) ...[
-                const SizedBox(width: 16),
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        height: 14,
-                        width: 140,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.06),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        height: 10,
-                        width: 90,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.04),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-        );
-      }),
-    );
-  }
+  Widget _buildShimmerSkeleton({int cardCount = 3}) =>
+      CandidateUI.shimmerSkeleton(cardCount: cardCount);
 
   Widget _buildMoneyTab() {
     if (_financeLoading) {
@@ -1168,18 +1131,25 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     final hasFinanceData = _mecCommittees.isNotEmpty;
     final hasExpenditures = (_expenditureSummary['total_spent'] as num?)?.toDouble() != null &&
         ((_expenditureSummary['total_spent'] as num?)?.toDouble() ?? 0) > 0;
+    final hasFecData = ((_fecSummary['total_raised'] as num?)?.toDouble() ?? 0) > 0;
 
-    if (!hasFinanceData && _raceComparison.isEmpty) {
+    if (!hasFinanceData && !hasFecData && _raceComparison.isEmpty) {
       return _buildEmptyState(
         Icons.monetization_on,
         'No Campaign Finance Data',
-        'No Missouri Ethics Commission committee records found for ${c.name}.\n\nThis candidate may not have filed a committee yet.',
+        'No Missouri Ethics Commission or FEC records found for ${c.name}.\n\nThis candidate may not have filed a committee yet.',
       );
     }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       children: [
+        // ── FEC Federal Finance Summary (for federal candidates) ──
+        if (hasFecData) ...[
+          _buildFECSummarySection(),
+          const SizedBox(height: 24),
+        ],
+
         // ── Committee Selector (if multiple) ──
         if (_mecCommittees.length > 1) ...[
           _buildCommitteeSelector(),
@@ -1324,41 +1294,101 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
-  Widget _financeStatCard(String label, String value, IconData icon, Color accent) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            accent.withOpacity(0.12),
-            accent.withOpacity(0.04),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: accent.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(color: accent.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 3)),
-        ],
-      ),
+  Widget _financeStatCard(String label, String value, IconData icon, Color accent) =>
+      CandidateUI.financeStatCard(label, value, icon, accent);
+
+  Widget _buildFECSummarySection() {
+    final totalRaised = (_fecSummary['total_raised'] as num?)?.toDouble() ?? 0;
+    final contribCount = (_fecSummary['contribution_count'] as num?)?.toInt() ?? 0;
+    final avgContribution = (_fecSummary['avg_contribution'] as num?)?.toDouble() ?? 0;
+    final uniqueDonors = (_fecSummary['unique_donors'] as num?)?.toInt() ?? 0;
+    final indivTotal = (_fecSummary['individual_total'] as num?)?.toDouble() ?? 0;
+    final pacTotal = (_fecSummary['pac_total'] as num?)?.toDouble() ?? 0;
+    final cyclesActive = (_fecSummary['cycles_active'] as num?)?.toInt() ?? 0;
+
+    return _card(
+      'FEC Federal Fundraising',
+      Icons.flag,
+      const Color(0xFF0B3D91), // federal blue
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: accent.withOpacity(0.15),
-              shape: BoxShape.circle,
+          // Committee chips
+          if (_fecCommittees.isNotEmpty) ...[
+            Wrap(
+              spacing: 8, runSpacing: 8,
+              children: _fecCommittees.take(4).map((cm) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0B3D91).withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF0B3D91).withOpacity(0.3)),
+                ),
+                child: Text('${cm['cmte_name'] ?? cm['cmte_id']} · ${cm['cycle']}',
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500)),
+              )).toList(),
             ),
-            child: Icon(icon, color: accent, size: 20),
+            const SizedBox(height: 12),
+          ],
+          // Summary stat cards row 1
+          Row(
+            children: [
+              Expanded(child: _financeStatCard('Total Raised', '\$${_formatMoney(totalRaised)}', Icons.attach_money, BrandColors.success)),
+              const SizedBox(width: 8),
+              Expanded(child: _financeStatCard('Contributions', '$contribCount', Icons.receipt_long, BrandColors.steelBlue)),
+              const SizedBox(width: 8),
+              Expanded(child: _financeStatCard('Unique Donors', '$uniqueDonors', Icons.people, BrandColors.sunriseGold)),
+            ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+          const SizedBox(height: 8),
+          // Row 2
+          Row(
+            children: [
+              Expanded(child: _financeStatCard('Avg Contrib', '\$${_formatMoney(avgContribution)}', Icons.trending_up, BrandColors.momentumBlue)),
+              const SizedBox(width: 8),
+              Expanded(child: _financeStatCard('Individual', '\$${_formatMoney(indivTotal)}', Icons.person, Colors.lightBlueAccent)),
+              const SizedBox(width: 8),
+              Expanded(child: _financeStatCard('PAC', '\$${_formatMoney(pacTotal)}', Icons.business, Colors.purpleAccent)),
+            ],
           ),
-          const SizedBox(height: 3),
-          Text(label, style: TextStyle(color: accent.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+          if (cyclesActive > 0) ...[
+            const SizedBox(height: 12),
+            Text('Active across $cyclesActive election cycle${cyclesActive > 1 ? 's' : ''}',
+              style: const TextStyle(color: Colors.white60, fontSize: 11, fontStyle: FontStyle.italic)),
+          ],
+          // Monthly timeline (line count only — compact)
+          if (_fecTimeline.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text('${_fecTimeline.length} active months · ${_fecRecentContributions.length} recent contributions tracked',
+              style: const TextStyle(color: Colors.white54, fontSize: 11)),
+          ],
+          // Top FEC donors
+          if (_fecTopDonors.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text('Top Federal Donors', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            ..._fecTopDonors.take(5).map((d) {
+              final name = d['donor_name']?.toString() ?? '—';
+              final city = d['city']?.toString() ?? '';
+              final state = d['state']?.toString() ?? '';
+              final total = (d['total_amount'] as num?)?.toDouble() ?? 0;
+              final cnt = (d['contribution_count'] as num?)?.toInt() ?? 0;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(name, style: const TextStyle(color: Colors.white, fontSize: 12))),
+                    if (city.isNotEmpty || state.isNotEmpty)
+                      Text('$city${city.isNotEmpty && state.isNotEmpty ? ", " : ""}$state',
+                        style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                    const SizedBox(width: 10),
+                    Text('\$${_formatMoney(total)} ($cnt)',
+                      style: const TextStyle(color: Colors.lightGreenAccent, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              );
+            }),
+          ],
         ],
       ),
     );
@@ -2063,7 +2093,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           SizedBox(
             height: 120,
             child: CustomPaint(
-              painter: _MarginTrendPainter(
+              painter: MarginTrendPainter(
                 results: results,
               ),
               size: const Size(double.infinity, 120),
@@ -4239,374 +4269,19 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   //  SHARED UTILITIES
   // ═══════════════════════════════════════════════════════════════
 
-  Widget _card(String title, IconData icon, Color accent, {required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.07),
-            Colors.white.withOpacity(0.02),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: accent.withOpacity(0.12)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.25),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-          BoxShadow(
-            color: accent.withOpacity(0.05),
-            blurRadius: 30,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: accent.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: accent, size: 16),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
-              ),
-            ],
-          ),
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _badge(String text, Color color, {Color textColor = Colors.white}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color.withOpacity(0.25), color.withOpacity(0.12)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3), width: 0.5),
-      ),
-      child: Text(text, style: TextStyle(color: textColor, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
-    );
-  }
-
-  Widget _legendDot(Color color, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
-      ],
-    );
-  }
-
-  Widget _buildEmptyState(IconData icon, String title, String subtitle) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(48),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.04),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withOpacity(0.06)),
-              ),
-              child: Icon(icon, color: Colors.white.withOpacity(0.15), size: 48),
-            ),
-            const SizedBox(height: 20),
-            Text(title, style: const TextStyle(color: Colors.white60, fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
-            const SizedBox(height: 8),
-            Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13, height: 1.4), textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Formatting helpers ──
-  String _formatMoney(double amount) {
-    if (amount >= 1000000) return '${(amount / 1000000).toStringAsFixed(1)}M';
-    if (amount >= 1000) return '${(amount / 1000).toStringAsFixed(1)}K';
-    return amount.toStringAsFixed(amount == amount.truncateToDouble() ? 0 : 2);
-  }
-
-  String _formatMoneyShort(double amount) {
-    if (amount >= 1000000) return '${(amount / 1000000).toStringAsFixed(0)}M';
-    if (amount >= 1000) return '${(amount / 1000).toStringAsFixed(0)}K';
-    return amount.toStringAsFixed(0);
-  }
-
-  String _formatNumber(int number) {
-    if (number >= 1000000) return '${(number / 1000000).toStringAsFixed(1)}M';
-    if (number >= 1000) {
-      return '${(number / 1000).toStringAsFixed(number >= 10000 ? 0 : 1)}K';
-    }
-    return number.toString();
-  }
-
-  String _formatDate(DateTime date) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
-  }
+  // Thin delegates to shared helpers in candidate_ui_helpers.dart.
+  // (Moved to reduce this file's size; preserves existing call sites.)
+  Widget _card(String title, IconData icon, Color accent, {required Widget child}) =>
+      CandidateUI.card(title, icon, accent, child: child);
+  Widget _badge(String text, Color color, {Color textColor = Colors.white}) =>
+      CandidateUI.badge(text, color, textColor: textColor);
+  Widget _legendDot(Color color, String label) => CandidateUI.legendDot(color, label);
+  Widget _buildEmptyState(IconData icon, String title, String subtitle) =>
+      CandidateUI.emptyState(icon, title, subtitle);
+  String _formatMoney(double amount) => CandidateUI.formatMoney(amount);
+  String _formatMoneyShort(double amount) => CandidateUI.formatMoneyShort(amount);
+  String _formatNumber(int number) => CandidateUI.formatNumber(number);
+  String _formatDate(DateTime date) => CandidateUI.formatDate(date);
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  TAB BAR DELEGATE — Pinned tab bar in NestedScrollView
-// ═══════════════════════════════════════════════════════════════
-
-class _TabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
-
-  const _TabBarDelegate({required this.tabBar});
-
-  @override
-  double get minExtent => tabBar.preferredSize.height;
-
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0b1e37),
-        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.06))),
-      ),
-      child: tabBar,
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _TabBarDelegate oldDelegate) => false;
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  SCORE RADAR PAINTER — 5-axis radar/spider chart
-// ═══════════════════════════════════════════════════════════════
-
-class _ScoreRadarPainter extends CustomPainter {
-  final Map<String, double> scores;
-  final double maxValue;
-  final Color accentColor;
-
-  _ScoreRadarPainter({
-    required this.scores,
-    required this.maxValue,
-    required this.accentColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2 - 20;
-    final axes = scores.keys.toList();
-    final n = axes.length;
-    if (n == 0) return;
-
-    final angleStep = 2 * math.pi / n;
-    final startAngle = -math.pi / 2; // Top
-
-    // Draw grid circles
-    final gridPaint = Paint()
-      ..color = Colors.white.withOpacity(0.08)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    for (int ring = 1; ring <= 4; ring++) {
-      final r = radius * ring / 4;
-      canvas.drawCircle(center, r, gridPaint);
-    }
-
-    // Draw axis lines
-    final axisPaint = Paint()
-      ..color = Colors.white.withOpacity(0.12)
-      ..strokeWidth = 1;
-
-    for (int i = 0; i < n; i++) {
-      final angle = startAngle + angleStep * i;
-      final end = Offset(
-        center.dx + radius * math.cos(angle),
-        center.dy + radius * math.sin(angle),
-      );
-      canvas.drawLine(center, end, axisPaint);
-    }
-
-    // Draw data polygon
-    final dataPath = Path();
-    final fillPaint = Paint()
-      ..color = accentColor.withOpacity(0.2)
-      ..style = PaintingStyle.fill;
-    final strokePaint = Paint()
-      ..color = accentColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-
-    for (int i = 0; i < n; i++) {
-      final value = scores[axes[i]] ?? 0;
-      final normalizedValue = (value / maxValue).clamp(0.0, 1.0);
-      final angle = startAngle + angleStep * i;
-      final point = Offset(
-        center.dx + radius * normalizedValue * math.cos(angle),
-        center.dy + radius * normalizedValue * math.sin(angle),
-      );
-
-      if (i == 0) {
-        dataPath.moveTo(point.dx, point.dy);
-      } else {
-        dataPath.lineTo(point.dx, point.dy);
-      }
-    }
-    dataPath.close();
-
-    canvas.drawPath(dataPath, fillPaint);
-    canvas.drawPath(dataPath, strokePaint);
-
-    // Draw data points
-    final dotPaint = Paint()..color = accentColor;
-    for (int i = 0; i < n; i++) {
-      final value = scores[axes[i]] ?? 0;
-      final normalizedValue = (value / maxValue).clamp(0.0, 1.0);
-      final angle = startAngle + angleStep * i;
-      final point = Offset(
-        center.dx + radius * normalizedValue * math.cos(angle),
-        center.dy + radius * normalizedValue * math.sin(angle),
-      );
-      canvas.drawCircle(point, 4, dotPaint);
-    }
-
-    // Draw labels
-    for (int i = 0; i < n; i++) {
-      final angle = startAngle + angleStep * i;
-      final labelOffset = Offset(
-        center.dx + (radius + 16) * math.cos(angle),
-        center.dy + (radius + 16) * math.sin(angle),
-      );
-
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: axes[i],
-          style: const TextStyle(color: Colors.white54, fontSize: 10),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      textPainter.paint(
-        canvas,
-        Offset(
-          labelOffset.dx - textPainter.width / 2,
-          labelOffset.dy - textPainter.height / 2,
-        ),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  MARGIN TREND PAINTER — Win margin line chart
-// ═══════════════════════════════════════════════════════════════
-
-class _MarginTrendPainter extends CustomPainter {
-  final List<ElectionResult> results;
-
-  _MarginTrendPainter({required this.results});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (results.isEmpty) return;
-
-    final n = results.length;
-    final stepX = n > 1 ? size.width / (n - 1) : size.width / 2;
-    final midY = size.height / 2;
-
-    // Draw center line (50-50)
-    final centerPaint = Paint()
-      ..color = Colors.white.withOpacity(0.15)
-      ..strokeWidth = 1;
-    canvas.drawLine(Offset(0, midY), Offset(size.width, midY), centerPaint);
-
-    // Draw margin line
-    final linePaint = Paint()
-      ..color = BrandColors.sunriseGold
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
-
-    final fillPaint = Paint()
-      ..shader = LinearGradient(
-        colors: [BrandColors.sunriseGold.withOpacity(0.3), Colors.transparent],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-
-    final linePath = Path();
-    final fillPath = Path();
-
-    for (int i = 0; i < n; i++) {
-      final r = results[i];
-      final demPct = r.demPercent ?? 50;
-      final margin = demPct - 50; // Positive = Dem win, Negative = Rep win
-      final x = n > 1 ? stepX * i : size.width / 2;
-      final y = midY - (margin / 50) * midY; // Scale margin to chart height
-
-      if (i == 0) {
-        linePath.moveTo(x, y);
-        fillPath.moveTo(x, midY);
-        fillPath.lineTo(x, y);
-      } else {
-        linePath.lineTo(x, y);
-        fillPath.lineTo(x, y);
-      }
-
-      // Draw dot
-      final dotColor = margin >= 0 ? BrandColors.democratBlue : BrandColors.republicanRed;
-      canvas.drawCircle(Offset(x, y), 4, Paint()..color = dotColor);
-
-      // Year label
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: '${r.year}',
-          style: const TextStyle(color: Colors.white38, fontSize: 9),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      textPainter.paint(canvas, Offset(x - textPainter.width / 2, size.height - 12));
-    }
-
-    // Close fill path
-    if (n > 1) {
-      fillPath.lineTo(stepX * (n - 1), midY);
-    } else {
-      fillPath.lineTo(size.width / 2, midY);
-    }
-    fillPath.close();
-
-    canvas.drawPath(fillPath, fillPaint);
-    canvas.drawPath(linePath, linePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

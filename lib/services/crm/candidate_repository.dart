@@ -185,9 +185,9 @@ class CandidateRepository {
 
     try {
       final all = await _client
-          
+
           .from('candidates')
-          .select('party, is_young_dem, estimated_age, district, office_level, moyd_endorsed, moyd_contacted, campaign_website');
+          .select('party, is_young_dem, estimated_age, district, office_level, moyd_endorsed, moyd_contacted, campaign_website, mec_committee_ids, fec_candidate_id');
 
       final rows = (all as List<dynamic>).cast<Map<String, dynamic>>();
 
@@ -198,6 +198,9 @@ class CandidateRepository {
       int endorsed = 0;
       int contacted = 0;
       int withWebsite = 0;
+      int withMecCommittee = 0;
+      int withFecCandidate = 0;
+      int withAnyFinance = 0;
       double ydAgeSum = 0;
       int ydAgeCount = 0;
       final demDistricts = <String>{};
@@ -241,6 +244,14 @@ class CandidateRepository {
         if (isCon) contacted++;
         if (hasWeb != null && hasWeb.isNotEmpty) withWebsite++;
 
+        final mecArr = r['mec_committee_ids'];
+        final fecId = r['fec_candidate_id'] as String?;
+        final hasMec = mecArr is List && mecArr.isNotEmpty;
+        final hasFec = fecId != null && fecId.isNotEmpty;
+        if (hasMec) withMecCommittee++;
+        if (hasFec) withFecCandidate++;
+        if (hasMec || hasFec) withAnyFinance++;
+
         // Age distribution
         if (age == null) {
           ageDistribution['unknown'] = (ageDistribution['unknown'] ?? 0) + 1;
@@ -273,6 +284,9 @@ class CandidateRepository {
         endorsed: endorsed,
         contacted: contacted,
         withWebsite: withWebsite,
+        withMecCommittee: withMecCommittee,
+        withFecCandidate: withFecCandidate,
+        withAnyFinance: withAnyFinance,
         ageDistribution: ageDistribution,
       );
     } catch (e) {
@@ -925,6 +939,87 @@ class CandidateRepository {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  //  FEC FINANCE — federal candidate contributions
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Fetch FEC finance summary for a federal candidate
+  Future<Map<String, dynamic>> getFECFinanceSummary(String fecCandId) async {
+    if (!isReady) return {};
+    try {
+      final response = await _client.rpc('get_fec_finance_summary', params: {
+        'p_fec_cand_id': fecCandId,
+      });
+      if (response is Map<String, dynamic>) return response;
+      return {};
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getFECFinanceSummary error: $e');
+      return {};
+    }
+  }
+
+  /// Fetch top FEC donors for a federal candidate
+  Future<List<Map<String, dynamic>>> getFECTopDonors(String fecCandId, {int limit = 10}) async {
+    if (!isReady) return [];
+    try {
+      final response = await _client.rpc('get_fec_top_donors', params: {
+        'p_fec_cand_id': fecCandId,
+        'p_limit': limit,
+      });
+      if (response is List) return response.cast<Map<String, dynamic>>();
+      return [];
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getFECTopDonors error: $e');
+      return [];
+    }
+  }
+
+  /// Fetch FEC contribution timeline (monthly) for a federal candidate
+  Future<List<Map<String, dynamic>>> getFECContributionTimeline(String fecCandId) async {
+    if (!isReady) return [];
+    try {
+      final response = await _client.rpc('get_fec_contribution_timeline', params: {
+        'p_fec_cand_id': fecCandId,
+      });
+      if (response is List) return response.cast<Map<String, dynamic>>();
+      return [];
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getFECContributionTimeline error: $e');
+      return [];
+    }
+  }
+
+  /// Fetch recent FEC contributions for a federal candidate
+  Future<List<Map<String, dynamic>>> getFECRecentContributions(String fecCandId, {int limit = 50}) async {
+    if (!isReady) return [];
+    try {
+      final response = await _client.rpc('get_fec_recent_contributions', params: {
+        'p_fec_cand_id': fecCandId,
+        'p_limit': limit,
+      });
+      if (response is List) return response.cast<Map<String, dynamic>>();
+      return [];
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getFECRecentContributions error: $e');
+      return [];
+    }
+  }
+
+  /// Fetch committees linked to a federal candidate
+  Future<List<Map<String, dynamic>>> getFECCommittees(String fecCandId) async {
+    if (!isReady) return [];
+    try {
+      final response = await _client.rpc('get_fec_committees_for_candidate', params: {
+        'p_fec_cand_id': fecCandId,
+      });
+      if (response is List) return response.cast<Map<String, dynamic>>();
+      return [];
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getFECCommittees error: $e');
+      return [];
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   //  DISTRICT CANDIDATES — same race lookup
   // ═══════════════════════════════════════════════════════════════
 
@@ -1150,6 +1245,9 @@ class CandidateStats {
   final int endorsed;
   final int contacted;
   final int withWebsite;
+  final int withMecCommittee;
+  final int withFecCandidate;
+  final int withAnyFinance;
   final Map<String, int> ageDistribution;
 
   const CandidateStats({
@@ -1163,6 +1261,9 @@ class CandidateStats {
     this.endorsed = 0,
     this.contacted = 0,
     this.withWebsite = 0,
+    this.withMecCommittee = 0,
+    this.withFecCandidate = 0,
+    this.withAnyFinance = 0,
     this.ageDistribution = const {},
   });
 
@@ -1175,4 +1276,13 @@ class CandidateStats {
 
   double get contactedPercent =>
       totalCandidates > 0 ? contacted / totalCandidates * 100 : 0;
+
+  double get mecFiledPercent =>
+      totalCandidates > 0 ? withMecCommittee / totalCandidates * 100 : 0;
+
+  double get fecFiledPercent =>
+      totalCandidates > 0 ? withFecCandidate / totalCandidates * 100 : 0;
+
+  double get anyFinancePercent =>
+      totalCandidates > 0 ? withAnyFinance / totalCandidates * 100 : 0;
 }

@@ -1,0 +1,211 @@
+import 'package:flutter/material.dart';
+
+/// Shared UI helpers used across candidate detail tabs.
+/// Extracted from candidate_detail_screen.dart to reduce file size.
+class CandidateUI {
+  CandidateUI._();
+
+  /// Gradient-bordered card with title+icon header and arbitrary child content.
+  static Widget card(String title, IconData icon, Color accent, {required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.white.withOpacity(0.07),
+            Colors.white.withOpacity(0.02),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: accent.withOpacity(0.12)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 20, offset: const Offset(0, 6)),
+          BoxShadow(color: accent.withOpacity(0.05), blurRadius: 30, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(color: accent.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                child: Icon(icon, color: accent, size: 16),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+              ),
+            ],
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+
+  /// Small pill badge with gradient background.
+  static Widget badge(String text, Color color, {Color textColor = Colors.white}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color.withOpacity(0.25), color.withOpacity(0.12)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3), width: 0.5),
+      ),
+      child: Text(text, style: TextStyle(color: textColor, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
+    );
+  }
+
+  /// Legend color-dot + label, used in chart legends.
+  static Widget legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+      ],
+    );
+  }
+
+  /// Centered empty-state placeholder with big icon, title, and subtitle.
+  static Widget emptyState(IconData icon, String title, String subtitle) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(48),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.04),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withOpacity(0.06)),
+              ),
+              child: Icon(icon, color: Colors.white.withOpacity(0.15), size: 48),
+            ),
+            const SizedBox(height: 20),
+            Text(title, style: const TextStyle(color: Colors.white60, fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+            const SizedBox(height: 8),
+            Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13, height: 1.4), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Compact money formatter: $1.2M, $5.3K, $420.
+  static String formatMoney(double amount) {
+    if (amount >= 1000000) return '${(amount / 1000000).toStringAsFixed(1)}M';
+    if (amount >= 1000) return '${(amount / 1000).toStringAsFixed(1)}K';
+    return amount.toStringAsFixed(amount == amount.truncateToDouble() ? 0 : 2);
+  }
+
+  /// Shortest-possible money formatter: rounds to integer when truncated.
+  static String formatMoneyShort(double amount) {
+    if (amount >= 1000000) return '${(amount / 1000000).toStringAsFixed(0)}M';
+    if (amount >= 1000) return '${(amount / 1000).toStringAsFixed(0)}K';
+    return amount.toStringAsFixed(0);
+  }
+
+  /// Compact number formatter: 1.2M, 5.3K, 420.
+  static String formatNumber(int number) {
+    if (number >= 1000000) return '${(number / 1000000).toStringAsFixed(1)}M';
+    if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(number >= 10000 ? 0 : 1)}K';
+    }
+    return number.toString();
+  }
+
+  /// "Mar 15, 2026" date formatter.
+  static String formatDate(DateTime date) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  /// Loading shimmer placeholder (used while tab data fetches).
+  static Widget shimmerSkeleton({int cardCount = 3}) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+      physics: const NeverScrollableScrollPhysics(),
+      children: List.generate(cardCount, (i) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          height: i == 0 ? 100 : 160,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.white.withOpacity(0.04),
+                Colors.white.withOpacity(0.08),
+                Colors.white.withOpacity(0.04),
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            children: [
+              if (i == 0) ...[
+                const SizedBox(width: 16),
+                Container(
+                  width: 48, height: 48,
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.06), borderRadius: BorderRadius.circular(12)),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(height: 14, width: 140, decoration: BoxDecoration(color: Colors.white.withOpacity(0.06), borderRadius: BorderRadius.circular(4))),
+                      const SizedBox(height: 8),
+                      Container(height: 10, width: 90, decoration: BoxDecoration(color: Colors.white.withOpacity(0.04), borderRadius: BorderRadius.circular(4))),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
+  /// Stat card used on finance summary rows (money / count / metric).
+  static Widget financeStatCard(String label, String value, IconData icon, Color accent) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [accent.withOpacity(0.12), accent.withOpacity(0.04)],
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withOpacity(0.2)),
+        boxShadow: [BoxShadow(color: accent.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 3))],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: accent.withOpacity(0.15), shape: BoxShape.circle),
+            child: Icon(icon, color: accent, size: 20),
+          ),
+          const SizedBox(height: 10),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+          const SizedBox(height: 3),
+          Text(label, style: TextStyle(color: accent.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+        ],
+      ),
+    );
+  }
+}

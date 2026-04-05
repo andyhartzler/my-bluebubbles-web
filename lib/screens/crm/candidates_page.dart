@@ -62,6 +62,7 @@ class _CandidatesPageState extends State<CandidatesPage>
   bool _hasSocialMedia = false;
   bool _moydContacted = false;
   bool _moydEndorsed = false;
+  bool _hasFinanceFiled = false;
   RangeValues _fundraisingRange = const RangeValues(0, 500000);
 
   // ── Bulk Selection ──
@@ -270,6 +271,12 @@ class _CandidatesPageState extends State<CandidatesPage>
     if (_moydEndorsed) {
       candidates = candidates.where((c) => c.isEndorsed).toList();
     }
+    if (_hasFinanceFiled) {
+      candidates = candidates.where((c) =>
+        c.mecCommitteeIds.isNotEmpty ||
+        (c.fecCandidateId != null && c.fecCandidateId!.isNotEmpty)
+      ).toList();
+    }
 
     // Sort
     candidates.sort((a, b) {
@@ -311,6 +318,7 @@ class _CandidatesPageState extends State<CandidatesPage>
       _hasSocialMedia = false;
       _moydContacted = false;
       _moydEndorsed = false;
+      _hasFinanceFiled = false;
       _fundraisingRange = const RangeValues(0, 500000);
     });
     _applyFilters();
@@ -326,6 +334,7 @@ class _CandidatesPageState extends State<CandidatesPage>
     if (_hasSocialMedia) count++;
     if (_moydContacted) count++;
     if (_moydEndorsed) count++;
+    if (_hasFinanceFiled) count++;
     return count;
   }
 
@@ -796,6 +805,24 @@ class _CandidatesPageState extends State<CandidatesPage>
                   '${(_stats.withWebsite * progress).round()}',
                   'Has Website',
                   BrandColors.steelBlue,
+                ),
+                _statCard(
+                  Icons.account_balance,
+                  '${(_stats.withMecCommittee * progress).round()}',
+                  'MEC Filed',
+                  BrandColors.steelBlue,
+                ),
+                _statCard(
+                  Icons.flag,
+                  '${(_stats.withFecCandidate * progress).round()}',
+                  'FEC Filed',
+                  const Color(0xFF0B3D91),
+                ),
+                _statCard(
+                  Icons.monetization_on,
+                  '${(_stats.withAnyFinance * progress).round()}',
+                  'Any Finance',
+                  BrandColors.success,
                 ),
               ],
             ),
@@ -1867,6 +1894,10 @@ class _CandidatesPageState extends State<CandidatesPage>
                 setState(() => _moydEndorsed = val);
                 _applyFilters();
               }),
+              _toggleFilterChip('Finance Filed (MEC/FEC)', Icons.account_balance, _hasFinanceFiled, (val) {
+                setState(() => _hasFinanceFiled = val);
+                _applyFilters();
+              }),
             ],
           ),
         ],
@@ -2054,6 +2085,14 @@ class _CandidatesPageState extends State<CandidatesPage>
                         if (c.isContacted) ...[
                           const SizedBox(width: 4),
                           const Icon(Icons.check_circle, color: BrandColors.success, size: 12),
+                        ],
+                        if (c.mecCommitteeIds.isNotEmpty) ...[
+                          const SizedBox(width: 4),
+                          const Tooltip(message: 'MEC committee filed', child: Icon(Icons.account_balance, color: BrandColors.steelBlue, size: 12)),
+                        ],
+                        if (c.fecCandidateId != null && c.fecCandidateId!.isNotEmpty) ...[
+                          const SizedBox(width: 4),
+                          const Tooltip(message: 'FEC candidate filed', child: Icon(Icons.flag, color: Color(0xFF0B3D91), size: 12)),
                         ],
                       ],
                     ),
