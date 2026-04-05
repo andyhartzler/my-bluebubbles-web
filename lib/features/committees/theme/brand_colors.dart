@@ -32,6 +32,7 @@ class BrandColors {
 
   static const Color democratBlue = Color(0xFF3B82F6);
   static const Color republicanRed = Color(0xFFEF4444);
+  static const Color federalBlue = Color(0xFF0B3D91);
 
   // ==================== SEMANTIC COLORS ====================
 

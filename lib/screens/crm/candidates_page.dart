@@ -272,10 +272,7 @@ class _CandidatesPageState extends State<CandidatesPage>
       candidates = candidates.where((c) => c.isEndorsed).toList();
     }
     if (_hasFinanceFiled) {
-      candidates = candidates.where((c) =>
-        c.mecCommitteeIds.isNotEmpty ||
-        (c.fecCandidateId != null && c.fecCandidateId!.isNotEmpty)
-      ).toList();
+      candidates = candidates.where((c) => c.hasMecFiled || c.hasFecFiled).toList();
     }
 
     // Sort
@@ -816,7 +813,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                   Icons.flag,
                   '${(_stats.withFecCandidate * progress).round()}',
                   'FEC Filed',
-                  const Color(0xFF0B3D91),
+                  BrandColors.federalBlue,
                 ),
                 _statCard(
                   Icons.monetization_on,
@@ -2086,13 +2083,13 @@ class _CandidatesPageState extends State<CandidatesPage>
                           const SizedBox(width: 4),
                           const Icon(Icons.check_circle, color: BrandColors.success, size: 12),
                         ],
-                        if (c.mecCommitteeIds.isNotEmpty) ...[
+                        if (c.hasMecFiled) ...[
                           const SizedBox(width: 4),
                           const Tooltip(message: 'MEC committee filed', child: Icon(Icons.account_balance, color: BrandColors.steelBlue, size: 12)),
                         ],
-                        if (c.fecCandidateId != null && c.fecCandidateId!.isNotEmpty) ...[
+                        if (c.hasFecFiled) ...[
                           const SizedBox(width: 4),
-                          const Tooltip(message: 'FEC candidate filed', child: Icon(Icons.flag, color: Color(0xFF0B3D91), size: 12)),
+                          const Tooltip(message: 'FEC candidate filed', child: Icon(Icons.flag, color: BrandColors.federalBlue, size: 12)),
                         ],
                       ],
                     ),

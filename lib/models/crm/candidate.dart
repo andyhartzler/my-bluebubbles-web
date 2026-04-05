@@ -287,11 +287,14 @@ class Candidate {
   bool get hasContactInfo =>
       (email?.isNotEmpty ?? false) || (phone?.isNotEmpty ?? false);
 
+  /// Whether this candidate has a linked MEC committee
+  bool get hasMecFiled => mecCommitteeIds.isNotEmpty;
+
+  /// Whether this candidate has a linked FEC candidate record
+  bool get hasFecFiled => fecCandidateId?.isNotEmpty ?? false;
+
   /// Whether this candidate has campaign finance data
-  bool get hasCampaignFinance =>
-      (fecCandidateId?.isNotEmpty ?? false) ||
-      mecCommitteeIds.isNotEmpty ||
-      (mecDonorId != null);
+  bool get hasCampaignFinance => hasMecFiled || hasFecFiled || (mecDonorId != null);
 
   /// Whether this candidate has profile info
   bool get hasProfileInfo =>

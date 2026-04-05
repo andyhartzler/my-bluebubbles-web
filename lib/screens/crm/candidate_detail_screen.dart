@@ -1312,7 +1312,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     return _card(
       'FEC Federal Fundraising',
       Icons.flag,
-      const Color(0xFF0B3D91), // federal blue
+      BrandColors.federalBlue, // federal blue
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1323,9 +1323,9 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               children: _fecCommittees.take(4).map((cm) => Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0B3D91).withOpacity(0.18),
+                  color: BrandColors.federalBlue.withOpacity(0.18),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF0B3D91).withOpacity(0.3)),
+                  border: Border.all(color: BrandColors.federalBlue.withOpacity(0.3)),
                 ),
                 child: Text(
                   cm['cycle'] != null
