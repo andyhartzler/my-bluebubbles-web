@@ -283,7 +283,6 @@ class FecApiService {
 
     try {
       final response = await _supabase.privilegedClient
-          .schema('listmonk')
           .from('fec_finance_cache')
           .select()
           .eq('fec_id', fecId)
@@ -304,7 +303,6 @@ class FecApiService {
 
     try {
       await _supabase.privilegedClient
-          .schema('listmonk')
           .from('fec_finance_cache')
           .upsert({
         'fec_id': finance.fecId,

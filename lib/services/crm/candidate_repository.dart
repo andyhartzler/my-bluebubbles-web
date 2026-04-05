@@ -8,7 +8,7 @@ import 'supabase_service.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATE REPOSITORY
-//  Full CRUD + analytics for the `listmonk.candidates` table,
+//  Full CRUD + analytics for the `public.candidates` table,
 //  plus contact logs, news mentions, election history, and
 //  district demographics from related tables.
 // ═══════════════════════════════════════════════════════════════
@@ -82,26 +82,23 @@ class CandidateRepository {
       if (assignedTo != null) {
         query = query.eq('assigned_to', assignedTo);
       }
+      // District range — use the `district_num` generated column (integer) so
+      // the DB does the filtering with an index instead of parsing text client-side.
+      if (minDistrict != null) {
+        query = query.gte('district_num', minDistrict);
+      }
+      if (maxDistrict != null) {
+        query = query.lte('district_num', maxDistrict);
+      }
 
       final response = await query
           .order(sortBy, ascending: ascending)
           .range(offset, offset + limit - 1);
 
-      var results = (response as List<dynamic>)
+      final results = (response as List<dynamic>)
           .whereType<Map<String, dynamic>>()
           .map(Candidate.fromJson)
           .toList();
-
-      // Post-filter for district range (needs int parsing)
-      if (minDistrict != null || maxDistrict != null) {
-        results = results.where((c) {
-          final d = int.tryParse(c.district ?? '');
-          if (d == null) return false;
-          if (minDistrict != null && d < minDistrict) return false;
-          if (maxDistrict != null && d > maxDistrict) return false;
-          return true;
-        }).toList();
-      }
 
       return results;
     } catch (e) {

@@ -48,6 +48,8 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
   // ── State: Money Tab (contributions + expenditures) ──
   bool _financeLoading = true;
+  String? _financeError;
+  bool _financeTimedOut = false;
   List<Map<String, dynamic>> _mecCommittees = [];
   List<MECContribution> _mecContributions = [];
   List<Map<String, dynamic>> _topDonors = [];
@@ -157,19 +159,33 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   Future<void> _loadFinanceData() async {
-    setState(() => _financeLoading = true);
+    setState(() {
+      _financeLoading = true;
+      _financeError = null;
+      _financeTimedOut = false;
+    });
 
     const loadTimeout = Duration(seconds: 20);
     final fecId = c.fecCandidateId;
     final hasFec = fecId != null && fecId.isNotEmpty;
     final hasDistrict = c.district != null && c.district!.isNotEmpty;
+    final hasMecIds = c.mecCommitteeIds.isNotEmpty;
 
     try {
-      // Load MEC committees first (needed to know the mec_id for subsequent calls)
-      final committees = await _repo
-          .getMECCommittees(c.mecCommitteeIds)
-          .timeout(loadTimeout, onTimeout: () => const <Map<String, dynamic>>[]);
+      // Load MEC committees first (needed to know the mec_id for subsequent calls).
+      // Skip the call entirely when the candidate has no known committee IDs.
+      bool committeesTimedOut = false;
+      final committees = hasMecIds
+          ? await _repo.getMECCommittees(c.mecCommitteeIds).timeout(
+              loadTimeout,
+              onTimeout: () {
+                committeesTimedOut = true;
+                return const <Map<String, dynamic>>[];
+              },
+            )
+          : const <Map<String, dynamic>>[];
       if (!mounted) return;
+      if (committeesTimedOut) _financeTimedOut = true;
 
       // Build a single parallel batch for EVERYTHING that doesn't depend on the
       // committees list — FEC calls and race comparison — plus the per-committee
@@ -199,8 +215,16 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         hasFec ? _repo.getFECCommittees(fecId) : Future.value(const <Map<String, dynamic>>[]),
       ];
 
-      final results = await Future.wait(futures).timeout(loadTimeout, onTimeout: () => List.filled(futures.length, null));
+      bool batchTimedOut = false;
+      final results = await Future.wait(futures).timeout(
+        loadTimeout,
+        onTimeout: () {
+          batchTimedOut = true;
+          return List.filled(futures.length, null);
+        },
+      );
       if (!mounted) return;
+      if (batchTimedOut) _financeTimedOut = true;
 
       _mecCommittees = committees;
       _mecContributions = (results[0] as List?)?.cast<MECContribution>() ?? const [];
@@ -218,9 +242,15 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       _fecCommittees = (results[12] as List?)?.cast<Map<String, dynamic>>() ?? const [];
     } catch (e) {
       debugPrint('❌ Error loading finance data: $e');
+      _financeError = e.toString();
     }
     if (!mounted) return;
-    setState(() => _financeLoading = false);
+    setState(() {
+      _financeLoading = false;
+      if (_financeError == null && _financeTimedOut) {
+        _financeError = 'Finance data timed out after 20s. Tap Retry to try again.';
+      }
+    });
   }
 
   Future<void> _loadRaceData() async {
@@ -1130,6 +1160,37 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       return _buildShimmerSkeleton(cardCount: 4);
     }
 
+    // Error/timeout banner — rendered above whatever data we did manage to load
+    Widget? errorBanner;
+    if (_financeError != null) {
+      errorBanner = Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.orange.withOpacity(0.35)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _financeError!,
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _financeLoading ? null : _loadFinanceData,
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
     final hasFinanceData = _mecCommittees.isNotEmpty;
     final hasExpenditures = (_expenditureSummary['total_spent'] as num?)?.toDouble() != null &&
         ((_expenditureSummary['total_spent'] as num?)?.toDouble() ?? 0) > 0;
@@ -1137,6 +1198,20 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         _fecCommittees.isNotEmpty;
 
     if (!hasFinanceData && !hasFecData && _raceComparison.isEmpty) {
+      if (errorBanner != null) {
+        return Column(
+          children: [
+            errorBanner,
+            Expanded(
+              child: _buildEmptyState(
+                Icons.monetization_on,
+                'No Campaign Finance Data',
+                'No Missouri Ethics Commission or FEC records found for ${c.name}.\n\nThis candidate may not have filed a committee yet.',
+              ),
+            ),
+          ],
+        );
+      }
       return _buildEmptyState(
         Icons.monetization_on,
         'No Campaign Finance Data',
@@ -1147,6 +1222,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       children: [
+        if (errorBanner != null) ...[
+          errorBanner,
+          const SizedBox(height: 16),
+        ],
         // ── FEC Federal Finance Summary (for federal candidates) ──
         if (hasFecData) ...[
           _buildFECSummarySection(),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Candidate model — maps to Supabase `listmonk.candidates` table
+/// Candidate model — maps to Supabase `public.candidates` table
 class Candidate {
   final String id;
   final String name;
