@@ -62,7 +62,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
       _repo.fetchStats(),
       _repo.fetchPartyBreakdown(),
       _repo.fetchContestationBreakdown(),
-      _repo.fetchCandidates(limit: 700),
+      _repo.fetchCandidatesForAnalytics(),
     ]);
 
     final stats = results[0] as CandidateStats;

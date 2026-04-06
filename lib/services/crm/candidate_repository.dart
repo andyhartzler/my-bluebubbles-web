@@ -128,6 +128,31 @@ class CandidateRepository {
     }
   }
 
+  // ─── Lightweight fetch for analytics (fewer columns → smaller payload) ──
+
+  static const _analyticsColumns =
+      'id,name,party,district,office,office_level,is_young_dem,estimated_age,'
+      'campaign_website,social_twitter,social_facebook,social_instagram,'
+      'moyd_endorsed,moyd_contacted,young_dem_score,photo_url,'
+      'mec_committee_ids,fec_candidate_id';
+
+  Future<List<Candidate>> fetchCandidatesForAnalytics() async {
+    if (!isReady) return [];
+    try {
+      final response = await _client
+          .from('candidates')
+          .select(_analyticsColumns)
+          .order('name');
+      return (response as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(Candidate.fromJson)
+          .toList();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.fetchCandidatesForAnalytics error: $e');
+      return [];
+    }
+  }
+
   // ─── Fetch only Young Democrats ────────────────────────────────
 
   Future<List<Candidate>> fetchYoungDemocrats() async {
@@ -481,6 +506,18 @@ class CandidateRepository {
     } catch (e) {
       debugPrint('❌ CandidateRepository.addContact error: $e');
       return null;
+    }
+  }
+
+  Future<void> updateContactOutcome(String contactId, String outcome) async {
+    if (!isReady) return;
+    try {
+      await _client
+          .from('candidate_contacts')
+          .update({'outcome': outcome})
+          .eq('id', contactId);
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.updateContactOutcome error: $e');
     }
   }
 

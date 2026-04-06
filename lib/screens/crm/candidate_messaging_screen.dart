@@ -248,7 +248,20 @@ Missouri Young Democrats''',
       _error = null;
     });
 
+    CandidateContact? contact;
     try {
+      // Log the contact BEFORE sending so the attempt is captured even if
+      // the send fails (prevents lost contact records).
+      contact = await _repo.addContact({
+        'candidate_id': widget.candidate.id,
+        'contact_type': 'email',
+        'subject': _subjectController.text,
+        'body': _bodyController.text,
+        'contacted_by': _selectedFromEmail,
+        'contact_date': DateTime.now().toIso8601String(),
+        'outcome': 'pending',
+      });
+
       // Send via Gmail API
       await _emailService.sendEmail(
         fromEmail: _selectedFromEmail,
@@ -275,16 +288,10 @@ Missouri Young Democrats''',
         textBody: _bodyController.text,
       );
 
-      // Log the contact
-      await _repo.addContact({
-        'candidate_id': widget.candidate.id,
-        'contact_type': 'email',
-        'subject': _subjectController.text,
-        'body': _bodyController.text,
-        'contacted_by': _selectedFromEmail,
-        'contact_date': DateTime.now().toIso8601String(),
-        'outcome': 'sent',
-      });
+      // Mark contact as successfully sent
+      if (contact != null) {
+        _repo.updateContactOutcome(contact.id, 'sent');
+      }
 
       setState(() {
         _sending = false;
@@ -313,6 +320,10 @@ Missouri Young Democrats''',
         });
       }
     } catch (e) {
+      // Update contact log to reflect failure (contact was already logged as 'pending')
+      if (contact != null) {
+        _repo.updateContactOutcome(contact.id, 'failed');
+      }
       setState(() {
         _sending = false;
         _error = 'Failed to send: $e';
