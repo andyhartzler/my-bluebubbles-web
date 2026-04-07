@@ -380,22 +380,24 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   Widget _buildDistrictTypeToggle() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: SegmentedButton<DistrictType>(
-        segments: const [
+      child: LayoutBuilder(builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 340;
+        return SegmentedButton<DistrictType>(
+        segments: [
           ButtonSegment(
             value: DistrictType.house,
-            label: Text('House'),
-            icon: Icon(Icons.house_outlined, size: 16),
+            label: const Text('House'),
+            icon: narrow ? null : const Icon(Icons.house_outlined, size: 16),
           ),
           ButtonSegment(
             value: DistrictType.senate,
-            label: Text('Senate'),
-            icon: Icon(Icons.account_balance_outlined, size: 16),
+            label: const Text('Senate'),
+            icon: narrow ? null : const Icon(Icons.account_balance_outlined, size: 16),
           ),
           ButtonSegment(
             value: DistrictType.congressional,
-            label: Text('Congress'),
-            icon: Icon(Icons.flag_outlined, size: 16),
+            label: Text(narrow ? 'Cong.' : 'Congress'),
+            icon: narrow ? null : const Icon(Icons.flag_outlined, size: 16),
           ),
         ],
         selected: {_activeType},
@@ -431,7 +433,8 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),
-      ),
+      );
+      }),
     );
   }
 

@@ -600,11 +600,13 @@ class _CandidatesPageState extends State<CandidatesPage>
               style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
             ),
             const Spacer(),
-            // Action buttons
-            _bulkActionBtn(Icons.email, 'Email', _bulkEmail),
-            _bulkActionBtn(Icons.download, 'CSV', _bulkExportCSV),
-            _bulkActionBtn(Icons.person_add, 'Assign', _bulkAssignTo),
-            _bulkActionBtn(Icons.check_circle_outline, 'Contacted', _bulkMarkContacted),
+            // Action buttons — icon-only on narrow screens
+            ...[
+              (Icons.email, 'Email', _bulkEmail),
+              (Icons.download, 'CSV', _bulkExportCSV),
+              (Icons.person_add, 'Assign', _bulkAssignTo),
+              (Icons.check_circle_outline, 'Contacted', _bulkMarkContacted),
+            ].map((t) => _bulkActionBtn(t.$1, t.$2, t.$3)),
             const SizedBox(width: 4),
             // Close bulk mode
             GestureDetector(
@@ -625,12 +627,15 @@ class _CandidatesPageState extends State<CandidatesPage>
   }
 
   Widget _bulkActionBtn(IconData icon, String label, VoidCallback onTap) {
+    final narrow = MediaQuery.of(context).size.width < 380;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: GestureDetector(
         onTap: _selectedIds.isEmpty ? null : onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Tooltip(
+          message: label,
+          child: Container(
+          padding: EdgeInsets.symmetric(horizontal: narrow ? 6 : 10, vertical: 6),
           decoration: BoxDecoration(
             color: _selectedIds.isEmpty
                 ? Colors.white.withOpacity(0.05)
@@ -642,7 +647,9 @@ class _CandidatesPageState extends State<CandidatesPage>
                   : BrandColors.sunriseGold.withOpacity(0.4),
             ),
           ),
-          child: Row(
+          child: narrow
+              ? Icon(icon, size: 16, color: _selectedIds.isEmpty ? Colors.white30 : BrandColors.sunriseGold)
+              : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: 14, color: _selectedIds.isEmpty ? Colors.white30 : BrandColors.sunriseGold),
@@ -657,6 +664,7 @@ class _CandidatesPageState extends State<CandidatesPage>
               ),
             ],
           ),
+        ),
         ),
       ),
     );
