@@ -12,6 +12,7 @@ import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/screens/crm/donor_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/donor_profile_screen.dart';
+import 'package:bluebubbles/screens/crm/mec_donor_screen.dart';
 import 'package:bluebubbles/screens/crm/historical_candidate_screen.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
@@ -347,20 +348,17 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
-  /// Navigate to the appropriate donor screen based on donor_id type.
-  /// MEC donor_ids are integers → look up donor_profile → DonorProfileScreen.
-  /// If no profile found, fall back to DonorDetailScreen.
+  /// Navigate to MEC donor screen showing full contribution history.
+  /// The donor_id from mec_contributions maps to mec_donors.id (integer).
   void _openDonorProfile(dynamic donorId) {
     if (donorId == null) return;
-    final idStr = donorId.toString();
+    final id = donorId is int ? donorId : int.tryParse(donorId.toString());
+    if (id == null) return;
 
-    // Try DonorProfileScreen first (has MEC/FEC data)
-    // The donor_id from mec_contributions maps to mec_donors.id
-    // which links to donor_profiles.mec_donor_id
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
         builder: (_) => TitleBarWrapper(
-          child: DonorProfileScreen(profileId: idStr),
+          child: MECDonorScreen(donorId: id),
         ),
       ),
     );
