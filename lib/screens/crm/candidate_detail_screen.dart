@@ -329,7 +329,12 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   Future<void> _launchUrl(String url) async {
-    if (!url.startsWith('http')) url = 'https://$url';
+    // Handle social media handles stored as @username
+    if (url.startsWith('@')) {
+      url = 'https://x.com/${url.substring(1)}';
+    } else if (!url.startsWith('http')) {
+      url = 'https://$url';
+    }
     final uri = Uri.tryParse(url);
     if (uri != null) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
