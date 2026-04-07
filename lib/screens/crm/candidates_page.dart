@@ -694,12 +694,14 @@ class _CandidatesPageState extends State<CandidatesPage>
           onDistrictTap: (district) {
             setState(() {
               _selectedMapDistrict = district;
-              // Look up candidates from all maps for the popup
-              _selectedDistrictCandidates =
-                  _houseDistrictMap[district] ??
-                  _senateDistrictMap[district] ??
-                  _congressionalDistrictMap[district] ??
-                  _districtMap[district];
+              // Merge candidates from ALL map types for this district
+              // (same district number can appear in House + Senate + Congressional)
+              final merged = <Candidate>[
+                ...?_houseDistrictMap[district],
+                ...?_senateDistrictMap[district],
+                ...?_congressionalDistrictMap[district],
+              ];
+              _selectedDistrictCandidates = merged.isNotEmpty ? merged : _districtMap[district];
             });
           },
         ),

@@ -11,6 +11,7 @@ import 'package:bluebubbles/screens/crm/candidate_detail_painters.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/screens/crm/donor_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/donor_profile_screen.dart';
 import 'package:bluebubbles/screens/crm/historical_candidate_screen.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
@@ -342,6 +343,25 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         content: Text('Notes saved'),
         backgroundColor: BrandColors.success,
         duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  /// Navigate to the appropriate donor screen based on donor_id type.
+  /// MEC donor_ids are integers → look up donor_profile → DonorProfileScreen.
+  /// If no profile found, fall back to DonorDetailScreen.
+  void _openDonorProfile(dynamic donorId) {
+    if (donorId == null) return;
+    final idStr = donorId.toString();
+
+    // Try DonorProfileScreen first (has MEC/FEC data)
+    // The donor_id from mec_contributions maps to mec_donors.id
+    // which links to donor_profiles.mec_donor_id
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (_) => TitleBarWrapper(
+          child: DonorProfileScreen(profileId: idStr),
+        ),
       ),
     );
   }
@@ -1599,15 +1619,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             final donorId = donor['donor_id'] as int?;
 
             return GestureDetector(
-              onTap: donorId != null
-                  ? () => Navigator.of(context).push(
-                        ThemeSwitcher.buildPageRoute(
-                          builder: (_) => TitleBarWrapper(
-                            child: DonorDetailScreen(donorId: donorId.toString()),
-                          ),
-                        ),
-                      )
-                  : null,
+              onTap: donorId != null ? () => _openDonorProfile(donorId) : null,
               child: Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
@@ -1710,15 +1722,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           ...List.generate(showCount, (i) {
             final contrib = _mecContributions[i];
             return GestureDetector(
-              onTap: contrib.donorId != null
-                  ? () => Navigator.of(context).push(
-                        ThemeSwitcher.buildPageRoute(
-                          builder: (_) => TitleBarWrapper(
-                            child: DonorDetailScreen(donorId: contrib.donorId.toString()),
-                          ),
-                        ),
-                      )
-                  : null,
+              onTap: contrib.donorId != null ? () => _openDonorProfile(contrib.donorId) : null,
               child: Container(
               margin: const EdgeInsets.only(bottom: 4),
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
