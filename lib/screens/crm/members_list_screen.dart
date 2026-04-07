@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1395,7 +1396,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
     return RefreshIndicator(
       onRefresh: _refreshAll,
-      child: SelectionArea(
+      child: MobileAwareSelectionArea(
         child: CustomScrollView(
           controller: _scrollController,
           key: const PageStorageKey<String>('members-scroll-view'),

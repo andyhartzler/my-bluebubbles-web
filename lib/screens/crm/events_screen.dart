@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -375,7 +376,7 @@ class _EventsScreenState extends State<EventsScreen> {
     return Container(
       color: Colors.black,
       child: SafeArea(
-        child: SelectionArea(
+        child: MobileAwareSelectionArea(
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(
               parent: AlwaysScrollableScrollPhysics(),

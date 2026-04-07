@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -259,7 +260,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
         final topPadding = 24.0;
         final bottomPadding = isCompact ? 16.0 : 32.0;
 
-        return SelectionArea(
+        return MobileAwareSelectionArea(
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             slivers: [

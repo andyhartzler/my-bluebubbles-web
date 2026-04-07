@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
@@ -72,7 +73,7 @@ class CupertinoConversationListState extends OptimizedState<CupertinoConversatio
           ScrollbarWrapper(
             showScrollbar: true,
             controller: controller.iosScrollController,
-            child: Obx(() => SelectionArea(
+            child: Obx(() => MobileAwareSelectionArea(
                   child: CustomScrollView(
                     controller: controller.iosScrollController,
                     physics: ts.scrollPhysics,

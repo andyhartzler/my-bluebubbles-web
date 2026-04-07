@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -234,7 +235,7 @@ class _CommitteesDashboardScreenState extends State<CommitteesDashboardScreen> {
         ),
         // Content
         Positioned.fill(
-          child: SelectionArea(
+          child: MobileAwareSelectionArea(
             child: ListView(
               physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
               padding: const EdgeInsets.all(24),

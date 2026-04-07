@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 import 'dart:math';
 
 import 'package:audio_waveforms/audio_waveforms.dart';
@@ -431,7 +432,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
                       reverse: true,
                       controller: scrollController,
                       showScrollbar: true,
-                      child: SelectionArea(
+                      child: MobileAwareSelectionArea(
                         child: CustomScrollView(
                           controller: scrollController,
                           reverse: true,

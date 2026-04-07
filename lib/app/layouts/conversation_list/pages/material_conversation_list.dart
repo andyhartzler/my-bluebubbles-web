@@ -1,4 +1,5 @@
 import 'package:bluebubbles/helpers/helpers.dart';
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/widgets/conversation_list_fab.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/widgets/header/material_header.dart';
@@ -118,7 +119,7 @@ class _MaterialConversationListState extends OptimizedState<MaterialConversation
               child: ScrollbarWrapper(
                 showScrollbar: true,
                 controller: controller.materialScrollController,
-                child: Obx(() => SelectionArea(
+                child: Obx(() => MobileAwareSelectionArea(
                       child: ListView.builder(
                         controller: controller.materialScrollController,
                         physics: ThemeSwitcher.getScrollPhysics(),

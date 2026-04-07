@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 import 'package:flutter/services.dart';
 
 import 'package:flutter/material.dart';
@@ -1347,7 +1348,7 @@ class _FundraisingTabState extends State<FundraisingTab> {
     final currency = NumberFormat.compactSimpleCurrency();
     final averageGift = _totalDonors == 0 ? 0 : _totalRaised / _totalDonors;
 
-    return SelectionArea(
+    return MobileAwareSelectionArea(
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [

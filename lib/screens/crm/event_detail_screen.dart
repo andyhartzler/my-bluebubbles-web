@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:flutter/foundation.dart';
@@ -2326,7 +2327,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
     final mapCard = _buildMapCard();
     final hasMap = mapCard is! SizedBox;
 
-    return SelectionArea(
+    return MobileAwareSelectionArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(

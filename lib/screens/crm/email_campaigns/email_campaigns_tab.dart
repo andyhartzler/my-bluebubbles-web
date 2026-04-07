@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -213,7 +214,7 @@ class _EmailCampaignsTabState extends State<EmailCampaignsTab> {
         final horizontalPadding = isCompact ? 12.0 : 28.0;
         final bottomPadding = isCompact ? 16.0 : 32.0;
 
-        return SelectionArea(
+        return MobileAwareSelectionArea(
           child: CustomScrollView(
             controller: _scrollController,
             physics: const BouncingScrollPhysics(

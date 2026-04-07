@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 import 'member_portal_text_utils.dart';
@@ -38,7 +39,7 @@ class MemberPortalContentTile extends StatelessWidget {
               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
-            SelectionArea(
+            MobileAwareSelectionArea(
               child: MarkdownBody(
                 data: markdown,
                 softLineBreak: true,

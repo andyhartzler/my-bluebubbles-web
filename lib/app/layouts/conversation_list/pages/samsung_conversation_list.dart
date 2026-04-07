@@ -1,4 +1,5 @@
 import 'package:bluebubbles/app/components/sliver_decoration.dart';
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/pages/conversation_list.dart';
 import 'package:bluebubbles/app/layouts/conversation_list/widgets/conversation_list_fab.dart';
@@ -93,7 +94,7 @@ class _SamsungConversationListState extends OptimizedState<SamsungConversationLi
                     .unknownSendersHelper(controller.showUnknownSenders)
                     .phoneNumbersHelper(filterPhoneNumbers);
 
-                return SelectionArea(
+                return MobileAwareSelectionArea(
                   child: CustomScrollView(
                     physics: ThemeSwitcher.getScrollPhysics(),
                     controller: controller.samsungScrollController,

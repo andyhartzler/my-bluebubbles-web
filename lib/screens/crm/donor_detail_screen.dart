@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 
 import 'package:bluebubbles/app/layouts/chat_creator/chat_creator.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
@@ -151,7 +152,7 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     final eventsCount = donations.where((d) => (d.eventId ?? d.eventName) != null).length;
     final isRecurring = donor.isRecurringDonor ?? false;
 
-    return SelectionArea(
+    return MobileAwareSelectionArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

@@ -1,4 +1,5 @@
 import 'package:bluebubbles/helpers/helpers.dart';
+import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 import 'package:bluebubbles/app/wrappers/scrollbar_wrapper.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/services/services.dart';
@@ -92,7 +93,7 @@ class SettingsScaffold extends StatelessWidget {
               children: [
                 stickyPrefix ?? const SizedBox.shrink(),
                 Expanded(
-                  child: Obx(() => SelectionArea(
+                  child: Obx(() => MobileAwareSelectionArea(
                     child: CustomScrollView(
                       controller: controller,
                       shrinkWrap: true,
