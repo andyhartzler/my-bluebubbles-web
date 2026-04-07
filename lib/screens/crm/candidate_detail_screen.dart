@@ -2095,11 +2095,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  TAB 3: ELECTION HISTORY
-  // ═══════════════════════════════════════════════════════════════
-
-  // ═══════════════════════════════════════════════════════════════
-  //  TAB 3: RACE (merged History + District Intel)
+  //  TAB 3: DISTRICT (Election History + District Intel)
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildRaceTab() {
@@ -2850,7 +2846,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  TAB 5: MOYD ENGAGEMENT
+  //  MOYD ENGAGEMENT SEGMENT (within Intel tab)
   // ═══════════════════════════════════════════════════════════════
 
 
