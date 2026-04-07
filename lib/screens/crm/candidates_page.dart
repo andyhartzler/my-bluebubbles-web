@@ -863,7 +863,7 @@ class _CandidatesPageState extends State<CandidatesPage>
 
   Widget _statCard(IconData icon, String value, String label, Color accent) {
     return Container(
-      width: 120,
+      constraints: const BoxConstraints(minWidth: 100, maxWidth: 140),
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
       decoration: BoxDecoration(
@@ -1129,7 +1129,7 @@ class _CandidatesPageState extends State<CandidatesPage>
           ),
           const SizedBox(height: 8),
 
-          // ── Fundraising Leaderboard ──
+          // ── Candidate Leaderboard (by Young Dem Score) ──
           _buildFundraisingLeaderboard(),
           const SizedBox(height: 8),
 
@@ -1416,7 +1416,7 @@ class _CandidatesPageState extends State<CandidatesPage>
             children: [
               const Icon(Icons.leaderboard, color: BrandColors.sunriseGold, size: 16),
               const SizedBox(width: 6),
-              const Text('Top Scored Candidates', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+              const Text('Top Ranked Candidates', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 10),
