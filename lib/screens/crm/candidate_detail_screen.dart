@@ -118,11 +118,11 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     _notesController.text = c.notes ?? '';
     _animController.forward();
 
-    // Load initial data
-    _loadOverviewData();
   }
 
   void _onTabChanged() {
+    // Only fire on committed tab changes, not animation frames during swipe.
+    if (_tabController.indexIsChanging) return;
     final idx = _tabController.index;
     switch (idx) {
       case 1:
@@ -153,10 +153,6 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   // ═══════════════════════════════════════════════════════════════
   //  DATA LOADING
   // ═══════════════════════════════════════════════════════════════
-
-  Future<void> _loadOverviewData() async {
-    // Overview data is already on the candidate object
-  }
 
   Future<void> _loadFinanceData() async {
     setState(() {
@@ -2026,11 +2022,23 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     }
 
     if (c.district == null || c.district!.isEmpty) {
-      return _buildEmptyState(
-        Icons.map,
-        'No District Data',
-        'This candidate does not have a district assignment.\nRace data is available for state-level races only.',
-      );
+      // Tailor the empty-state message to the office level
+      final level = c.officeLevel ?? '';
+      String title, message;
+      if (level == 'federal') {
+        title = 'Federal Race';
+        message = 'District-level race data is not yet available for federal candidates.';
+      } else if (level == 'statewide') {
+        title = 'Statewide Race';
+        message = 'This is a statewide race — no district breakdown available.';
+      } else if (level == 'judicial') {
+        title = 'Judicial Race';
+        message = 'Circuit-level race data is not yet available.';
+      } else {
+        title = 'No District Data';
+        message = 'This candidate does not have a district assignment.';
+      }
+      return _buildEmptyState(Icons.map, title, message);
     }
 
     return ListView(

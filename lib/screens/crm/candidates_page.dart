@@ -63,7 +63,7 @@ class _CandidatesPageState extends State<CandidatesPage>
   bool _moydContacted = false;
   bool _moydEndorsed = false;
   bool _hasFinanceFiled = false;
-  RangeValues _fundraisingRange = const RangeValues(0, 500000);
+  bool _analyticsLoading = true;
 
   // ── Bulk Selection ──
   bool _bulkMode = false;
@@ -184,10 +184,12 @@ class _CandidatesPageState extends State<CandidatesPage>
         setState(() {
           _partyBreakdown = results[0] as Map<String, Map<String, int>>;
           _contestationBreakdown = results[1] as Map<String, int>;
+          _analyticsLoading = false;
         });
       }
     } catch (e) {
       debugPrint('❌ Analytics load error: $e');
+      if (mounted) setState(() => _analyticsLoading = false);
     }
   }
 
@@ -211,24 +213,17 @@ class _CandidatesPageState extends State<CandidatesPage>
           .toList();
     }
 
-    // Basic party filter (single select from chips)
-    if (_partyFilter != null) {
-      candidates = candidates.where((c) => c.party == _partyFilter).toList();
+    // Party filter: chips write into multi-select, so one unified filter.
+    // If basic chip is set, it takes priority over multi-select.
+    final effectiveParty = _partyFilter != null ? {_partyFilter!} : _partyMultiSelect;
+    if (effectiveParty.isNotEmpty) {
+      candidates = candidates.where((c) => effectiveParty.contains(c.party)).toList();
     }
 
-    // Advanced: party multi-select
-    if (_partyMultiSelect.isNotEmpty) {
-      candidates = candidates.where((c) => _partyMultiSelect.contains(c.party)).toList();
-    }
-
-    // Basic office level
-    if (_officeLevelFilter != null) {
-      candidates = candidates.where((c) => c.officeLevel == _officeLevelFilter).toList();
-    }
-
-    // Advanced: office level multi-select
-    if (_officeLevelMultiSelect.isNotEmpty) {
-      candidates = candidates.where((c) => _officeLevelMultiSelect.contains(c.officeLevel)).toList();
+    // Office level: same unified approach.
+    final effectiveOffice = _officeLevelFilter != null ? {_officeLevelFilter!} : _officeLevelMultiSelect;
+    if (effectiveOffice.isNotEmpty) {
+      candidates = candidates.where((c) => effectiveOffice.contains(c.officeLevel)).toList();
     }
 
     // District filter
@@ -316,15 +311,22 @@ class _CandidatesPageState extends State<CandidatesPage>
       _moydContacted = false;
       _moydEndorsed = false;
       _hasFinanceFiled = false;
-      _fundraisingRange = const RangeValues(0, 500000);
+      // Also clear basic chip filters on full reset
+      _partyFilter = null;
+      _officeLevelFilter = null;
+      _districtFilter = null;
+      _ydOnly = false;
     });
     _applyFilters();
   }
 
   int get _activeFilterCount {
     int count = 0;
-    if (_partyMultiSelect.isNotEmpty) count++;
-    if (_officeLevelMultiSelect.isNotEmpty) count++;
+    // Count ALL active filters, including basic chips
+    if (_partyFilter != null || _partyMultiSelect.isNotEmpty) count++;
+    if (_officeLevelFilter != null || _officeLevelMultiSelect.isNotEmpty) count++;
+    if (_districtFilter != null) count++;
+    if (_ydOnly) count++;
     if (_districtRange.start > 1 || _districtRange.end < 163) count++;
     if (_ageRange.start > 18 || _ageRange.end < 90) count++;
     if (_hasCampaignWebsite) count++;
