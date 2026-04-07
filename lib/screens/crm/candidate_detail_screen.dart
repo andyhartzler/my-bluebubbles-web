@@ -11,6 +11,7 @@ import 'package:bluebubbles/screens/crm/candidate_detail_painters.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/screens/crm/donor_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/historical_candidate_screen.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 
@@ -4066,7 +4067,15 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             else if (party.contains('Lib')) partyColor = Colors.amber;
             else partyColor = Colors.grey;
 
-            return Container(
+            return GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                ThemeSwitcher.buildPageRoute(
+                  builder: (_) => TitleBarWrapper(
+                    child: HistoricalCandidateScreen(candidateName: name),
+                  ),
+                ),
+              ),
+              child: Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -4111,6 +4120,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   ),
                 ],
               ),
+            ),
             );
           }),
           if (_historicalCandidates.length > 20)

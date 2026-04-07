@@ -1070,6 +1070,19 @@ class CandidateRepository {
     }
   }
 
+  Future<Map<String, dynamic>?> getHistoricalCandidateProfile(String name) async {
+    if (!isReady) return null;
+    try {
+      final response = await _client.rpc('get_historical_candidate_profile', params: {
+        'p_name': name,
+      });
+      return response as Map<String, dynamic>?;
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getHistoricalCandidateProfile error: $e');
+      return null;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getDistrictHistoricalCandidates(String district) async {
     if (!isReady) return [];
     try {
