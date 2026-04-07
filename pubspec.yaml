@@ -324,6 +324,9 @@ flutter:
     - assets/icon/icon.png
     - assets/icon/contact-photo.png
     - assets/mo_house_districts.json
+    - assets/geojson/mo_house_districts.geojson
+    - assets/geojson/mo_senate_districts.geojson
+    - assets/geojson/mo_congressional_districts.geojson
     - assets/icon/facebook-icon.png
     - assets/icon/instagram-icon.png
     - assets/icon/threads-icon.png
