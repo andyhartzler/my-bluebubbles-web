@@ -22,7 +22,7 @@ class CandidateRepository {
 
   // ── Finance data cache (1hr TTL) ──────────────────────────────
   // Avoids re-firing 11 RPCs every time the Money tab is opened.
-  final Map<String, _CachedFinance> _financeCache = {};
+  static final Map<String, _CachedFinance> _financeCache = {};
 
   Map<String, dynamic>? getCachedFinanceSummary(String mecId) {
     final c = _financeCache[mecId];
@@ -629,10 +629,20 @@ class CandidateRepository {
   }) async {
     List<Candidate> candidates;
     if (candidateIds != null && candidateIds.isNotEmpty) {
-      final futures =
-          candidateIds.map((id) => fetchCandidate(id)).toList();
-      final results = await Future.wait(futures);
-      candidates = results.whereType<Candidate>().toList();
+      // Single query with inFilter instead of N+1 individual fetches
+      try {
+        final response = await _client
+            .from('candidates')
+            .select()
+            .inFilter('id', candidateIds);
+        candidates = (response as List<dynamic>)
+            .whereType<Map<String, dynamic>>()
+            .map(Candidate.fromJson)
+            .toList();
+      } catch (e) {
+        debugPrint('❌ CSV export fetch error: $e');
+        candidates = [];
+      }
     } else {
       candidates = await fetchCandidates(
         party: party,
@@ -641,29 +651,47 @@ class CandidateRepository {
       );
     }
 
+    String esc(String? s) => '"${(s ?? '').replaceAll('"', '""')}"';
+
     final buffer = StringBuffer();
     buffer.writeln(
         'Name,Party,Office,District,Age,Young Dem,Score,Email,Phone,Campaign Website,Endorsed,Contacted,Assigned To');
     for (final c in candidates) {
       buffer.writeln(
-        '"${c.name}","${c.party}","${c.office}","${c.district ?? ''}",${c.estimatedAge ?? ''},${c.isYoungDem},${c.youngDemScore},"${c.email ?? ''}","${c.phone ?? ''}","${c.campaignWebsite ?? ''}",${c.isEndorsed},${c.isContacted},"${c.assignedTo ?? ''}"',
+        '${esc(c.name)},${esc(c.party)},${esc(c.office)},${esc(c.district)},${c.estimatedAge ?? ''},${c.isYoungDem},${c.youngDemScore},${esc(c.email)},${esc(c.phone)},${esc(c.campaignWebsite)},${c.isEndorsed},${c.isContacted},${esc(c.assignedTo)}',
       );
     }
     return buffer.toString();
   }
 
-  /// Bulk assign candidates to a team member
+  /// Bulk assign candidates to a team member (single query)
   Future<void> bulkAssign(List<String> candidateIds, String assignee) async {
-    for (final id in candidateIds) {
-      await assignTeamMember(id, assignee);
+    if (!isReady || candidateIds.isEmpty) return;
+    try {
+      await _client
+          .from('candidates')
+          .update({'moyd_assigned_to': assignee, 'updated_at': DateTime.now().toIso8601String()})
+          .inFilter('id', candidateIds);
+    } catch (e) {
+      debugPrint('❌ bulkAssign error: $e');
     }
   }
 
-  /// Bulk mark as contacted
+  /// Bulk mark as contacted (single query)
   Future<void> bulkMarkContacted(
       List<String> candidateIds, String method) async {
-    for (final id in candidateIds) {
-      await markContacted(id, method);
+    if (!isReady || candidateIds.isEmpty) return;
+    try {
+      await _client
+          .from('candidates')
+          .update({
+            'moyd_contacted': true,
+            'moyd_contact_date': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .inFilter('id', candidateIds);
+    } catch (e) {
+      debugPrint('❌ bulkMarkContacted error: $e');
     }
   }
 

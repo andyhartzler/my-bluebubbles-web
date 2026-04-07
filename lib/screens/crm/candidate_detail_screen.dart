@@ -1367,12 +1367,12 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   Widget _buildFinanceSummaryCards() {
-    final totalRaised = _financeSummary['total_raised'] as double? ?? 0;
+    final totalRaised = (_financeSummary['total_raised'] as num?)?.toDouble() ?? 0;
     final contributionCount = _financeSummary['contribution_count'] as int? ?? 0;
-    final monetaryTotal = _financeSummary['monetary_total'] as double? ?? 0;
-    final inKindTotal = _financeSummary['in_kind_total'] as double? ?? 0;
+    final monetaryTotal = (_financeSummary['monetary_total'] as num?)?.toDouble() ?? 0;
+    final inKindTotal = (_financeSummary['in_kind_total'] as num?)?.toDouble() ?? 0;
     final inKindCount = _financeSummary['in_kind_count'] as int? ?? 0;
-    final avgContribution = _financeSummary['avg_contribution'] as double? ?? 0;
+    final avgContribution = (_financeSummary['avg_contribution'] as num?)?.toDouble() ?? 0;
 
     return Column(
       children: [
