@@ -148,11 +148,14 @@ class _HistoricalCandidateScreenState extends State<HistoricalCandidateScreen> {
         const SizedBox(height: 12),
 
         // Quick links
-        if (bpUrl != null)
+        if (bpUrl != null && bpUrl.startsWith('http'))
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: GestureDetector(
-              onTap: () => launchUrl(Uri.parse(bpUrl), mode: LaunchMode.externalApplication),
+              onTap: () {
+                final uri = Uri.tryParse(bpUrl);
+                if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+              },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
@@ -219,7 +222,7 @@ class _HistoricalCandidateScreenState extends State<HistoricalCandidateScreen> {
                           children: [
                             Text('$raceOffice${raceDist.isNotEmpty ? " d.$raceDist" : ""}',
                                 style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
-                            Text(type.substring(0, 1).toUpperCase() + type.substring(1),
+                            Text(type.isNotEmpty ? type.substring(0, 1).toUpperCase() + type.substring(1) : 'General',
                                 style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
                           ],
                         ),

@@ -113,6 +113,7 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
         oldWidget.congressionalDistrictMap !=
             widget.congressionalDistrictMap) {
       _rebuildPolygonColors();
+      setState(() {}); // trigger rebuild after color mutation
     }
   }
 
@@ -144,10 +145,8 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   Future<void> _loadGeoJson(DistrictType type) async {
     if (_loadedTypes.contains(type)) {
       // Already loaded — just re-color and return.
-      setState(() {
-        _geoJsonLoaded = true;
-        _rebuildPolygonColors();
-      });
+      _rebuildPolygonColors();
+      if (mounted) setState(() {});
       return;
     }
 
@@ -443,8 +442,8 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   // ── Map ───────────────────────────────────────────────────
 
   Widget _buildMap() {
-    final isLoading =
-        !_loadedTypes.contains(_activeType) && !_geoJsonLoaded;
+    // Show spinner when the active district type hasn't loaded yet
+    final isLoading = !_loadedTypes.contains(_activeType);
 
     if (isLoading) {
       return SizedBox(

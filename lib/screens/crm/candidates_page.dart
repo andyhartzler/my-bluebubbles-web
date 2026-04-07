@@ -8,6 +8,7 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/widgets/crm/missouri_map_widget.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -530,7 +531,11 @@ class _CandidatesPageState extends State<CandidatesPage>
               // ── Analytics Section (collapsible) ──
               SliverToBoxAdapter(child: _buildAnalyticsToggle()),
               if (_showAnalytics)
-                SliverToBoxAdapter(child: _buildAnalyticsSection()),
+                SliverToBoxAdapter(
+                  child: _analyticsLoading
+                      ? CandidateUI.shimmerSkeleton(cardCount: 2)
+                      : _buildAnalyticsSection(),
+                ),
 
               // ── Filters + Search ──
               SliverToBoxAdapter(child: _buildFiltersSection()),

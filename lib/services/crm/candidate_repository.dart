@@ -670,7 +670,7 @@ class CandidateRepository {
     try {
       await _client
           .from('candidates')
-          .update({'moyd_assigned_to': assignee, 'updated_at': DateTime.now().toIso8601String()})
+          .update({'assigned_to': assignee, 'updated_at': DateTime.now().toIso8601String()})
           .inFilter('id', candidateIds);
     } catch (e) {
       debugPrint('❌ bulkAssign error: $e');
@@ -687,6 +687,7 @@ class CandidateRepository {
           .update({
             'moyd_contacted': true,
             'moyd_contact_date': DateTime.now().toIso8601String(),
+            'contact_method': method,
             'updated_at': DateTime.now().toIso8601String(),
           })
           .inFilter('id', candidateIds);
@@ -1076,7 +1077,7 @@ class CandidateRepository {
       final response = await _client.rpc('get_historical_candidate_profile', params: {
         'p_name': name,
       });
-      return response as Map<String, dynamic>?;
+      return response is Map<String, dynamic> ? response : null;
     } catch (e) {
       debugPrint('❌ CandidateRepository.getHistoricalCandidateProfile error: $e');
       return null;
