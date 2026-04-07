@@ -161,7 +161,9 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
 
       for (final feature in features) {
         final props = feature['properties'] as Map<String, dynamic>;
-        final districtNum = props['district']?.toString() ?? '';
+        // Strip leading zeros so GeoJSON '041' matches candidate district '41'
+        final rawDistrict = props['district']?.toString() ?? '';
+        final districtNum = rawDistrict.replaceFirst(RegExp(r'^0+'), '');
         if (districtNum.isEmpty) continue;
 
         final geometry = feature['geometry'] as Map<String, dynamic>;
