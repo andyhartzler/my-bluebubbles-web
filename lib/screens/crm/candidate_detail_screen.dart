@@ -2332,86 +2332,120 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
   Widget _buildHistoryDetailList() {
     return _card(
-      'Detailed Results',
-      Icons.list_alt,
+      'Election History (${_electionResults.length} races)',
+      Icons.how_to_vote,
       BrandColors.steelBlue,
       child: Column(
         children: [
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           ..._electionResults.map((r) {
             final demPct = r.demPercent ?? 0;
             final repPct = r.repPercent ?? 0;
+            final totalPct = demPct + repPct;
+            final demBar = totalPct > 0 ? demPct / totalPct : 0.5;
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: r.demWon
-                      ? BrandColors.democratBlue.withOpacity(0.3)
-                      : BrandColors.republicanRed.withOpacity(0.3),
-                ),
-              ),
+              margin: const EdgeInsets.only(bottom: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Year + winner badge
                   Row(
                     children: [
-                      Text(
-                        '${r.year}',
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      const Spacer(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: r.demWon ? BrandColors.democratBlue.withOpacity(0.2) : BrandColors.republicanRed.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(6),
+                          color: r.demWon
+                              ? BrandColors.democratBlue.withOpacity(0.25)
+                              : BrandColors.republicanRed.withOpacity(0.25),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          r.demWon ? 'Dem Win' : 'Rep Win',
+                          '${r.year}',
                           style: TextStyle(
                             color: r.demWon ? BrandColors.democratBlue : BrandColors.republicanRed,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          r.demWon
+                              ? (r.demCandidate ?? 'Democrat')
+                              : (r.repCandidate ?? 'Republican'),
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (r.totalVotes != null)
+                        Text(
+                          '${_formatNumber(r.totalVotes!)} votes',
+                          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+                        ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  // Dem line
-                  if (r.demCandidate != null) ...[
-                    Row(
-                      children: [
-                        Container(width: 6, height: 6, decoration: BoxDecoration(color: BrandColors.democratBlue, shape: BoxShape.circle)),
-                        const SizedBox(width: 6),
-                        Expanded(child: Text(r.demCandidate!, style: const TextStyle(color: Colors.white70, fontSize: 13))),
-                        Text('${_formatNumber(r.demVotes ?? 0)} (${demPct.toStringAsFixed(1)}%)',
-                          style: const TextStyle(color: BrandColors.democratBlue, fontSize: 12, fontWeight: FontWeight.w500)),
-                      ],
+                  const SizedBox(height: 6),
+                  // Visual vote share bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: SizedBox(
+                      height: 20,
+                      child: Row(
+                        children: [
+                          Flexible(
+                            flex: (demBar * 100).round().clamp(1, 99),
+                            child: Container(
+                              color: BrandColors.democratBlue.withOpacity(0.7),
+                              alignment: Alignment.center,
+                              child: demPct >= 15
+                                  ? Text('${demPct.toStringAsFixed(0)}%',
+                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))
+                                  : null,
+                            ),
+                          ),
+                          Flexible(
+                            flex: ((1 - demBar) * 100).round().clamp(1, 99),
+                            child: Container(
+                              color: BrandColors.republicanRed.withOpacity(0.7),
+                              alignment: Alignment.center,
+                              child: repPct >= 15
+                                  ? Text('${repPct.toStringAsFixed(0)}%',
+                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                  ],
-                  // Rep line
-                  if (r.repCandidate != null) ...[
-                    Row(
-                      children: [
-                        Container(width: 6, height: 6, decoration: BoxDecoration(color: BrandColors.republicanRed, shape: BoxShape.circle)),
-                        const SizedBox(width: 6),
-                        Expanded(child: Text(r.repCandidate!, style: const TextStyle(color: Colors.white70, fontSize: 13))),
-                        Text('${_formatNumber(r.repVotes ?? 0)} (${repPct.toStringAsFixed(1)}%)',
-                          style: const TextStyle(color: BrandColors.republicanRed, fontSize: 12, fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  ],
-                  // Turnout
-                  if (r.totalVotes != null) ...[
-                    const SizedBox(height: 6),
-                    Text('Total votes: ${_formatNumber(r.totalVotes!)}', style: const TextStyle(color: Colors.white60, fontSize: 11)),
-                  ],
+                  ),
+                  const SizedBox(height: 4),
+                  // Candidate names below bar
+                  Row(
+                    children: [
+                      if (r.demCandidate != null)
+                        Expanded(
+                          child: Text(
+                            'D: ${r.demCandidate!.replaceAll(' Incumbent', '')}',
+                            style: TextStyle(color: BrandColors.democratBlue.withOpacity(0.8), fontSize: 11),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      if (r.repCandidate != null)
+                        Expanded(
+                          child: Text(
+                            'R: ${r.repCandidate!.replaceAll(' Incumbent', '')}',
+                            style: TextStyle(color: BrandColors.republicanRed.withOpacity(0.8), fontSize: 11),
+                            textAlign: TextAlign.right,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             );
