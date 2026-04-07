@@ -680,7 +680,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                         tabs: const [
                           Tab(text: 'Profile'),
                           Tab(text: 'Money'),
-                          Tab(text: 'Race'),
+                          Tab(text: 'District'),
                           Tab(text: 'Intel'),
                         ],
                       ),
@@ -1655,17 +1655,20 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     return BrandColors.momentumBlue;
   }
 
+  bool _showAllContributions = false;
+
   Widget _buildRecentContributions() {
-    final recentCount = math.min(_mecContributions.length, 20);
+    final total = _mecContributions.length;
+    final showCount = _showAllContributions ? total : math.min(total, 20);
 
     return _card(
-      'Recent Contributions (${_mecContributions.length} total)',
+      'Recent Contributions ($total total)',
       Icons.receipt_long,
       BrandColors.steelBlue,
       child: Column(
         children: [
           const SizedBox(height: 8),
-          ...List.generate(recentCount, (i) {
+          ...List.generate(showCount, (i) {
             final contrib = _mecContributions[i];
             return Container(
               margin: const EdgeInsets.only(bottom: 4),
@@ -1720,11 +1723,39 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               ),
             );
           }),
-          if (_mecContributions.length > 20) ...[
+          if (total > 20 && !_showAllContributions) ...[
             const SizedBox(height: 8),
-            Text(
-              '+ ${_mecContributions.length - 20} more contributions',
-              style: const TextStyle(color: Colors.white38, fontSize: 12),
+            GestureDetector(
+              onTap: () => setState(() => _showAllContributions = true),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: BrandColors.steelBlue.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: BrandColors.steelBlue.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.expand_more, color: BrandColors.steelBlue, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Show all ${total - 20} remaining contributions',
+                      style: const TextStyle(color: BrandColors.steelBlue, fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (_showAllContributions && total > 20) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => setState(() => _showAllContributions = false),
+              child: Text(
+                'Show less',
+                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+              ),
             ),
           ],
         ],
