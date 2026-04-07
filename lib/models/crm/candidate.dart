@@ -662,6 +662,7 @@ class CandidateFinance {
 class MECContribution {
   final String? id;
   final String mecId;
+  final int? donorId;
   final String? contributorLastName;
   final String? contributorFirstName;
   final double contributionAmount;
@@ -676,6 +677,7 @@ class MECContribution {
   const MECContribution({
     this.id,
     required this.mecId,
+    this.donorId,
     this.contributorLastName,
     this.contributorFirstName,
     this.contributionAmount = 0,
@@ -692,6 +694,7 @@ class MECContribution {
     return MECContribution(
       id: json['id']?.toString(),
       mecId: json['mec_id'] as String? ?? '',
+      donorId: (json['donor_id'] as num?)?.toInt(),
       contributorLastName: json['contributor_last_name'] as String?,
       contributorFirstName: json['contributor_first_name'] as String?,
       contributionAmount: (json['contribution_amount'] as num?)?.toDouble() ?? 0,

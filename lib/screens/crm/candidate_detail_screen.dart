@@ -1691,7 +1691,17 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           const SizedBox(height: 8),
           ...List.generate(showCount, (i) {
             final contrib = _mecContributions[i];
-            return Container(
+            return GestureDetector(
+              onTap: contrib.donorId != null
+                  ? () => Navigator.of(context).push(
+                        ThemeSwitcher.buildPageRoute(
+                          builder: (_) => TitleBarWrapper(
+                            child: DonorDetailScreen(donorId: contrib.donorId.toString()),
+                          ),
+                        ),
+                      )
+                  : null,
+              child: Container(
               margin: const EdgeInsets.only(bottom: 4),
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
               decoration: BoxDecoration(
@@ -1742,6 +1752,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   ),
                 ],
               ),
+            ),
             );
           }),
           if (total > 20 && !_showAllContributions) ...[
