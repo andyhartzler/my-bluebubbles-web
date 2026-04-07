@@ -170,6 +170,14 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     final hasDistrict = c.district != null && c.district!.isNotEmpty;
     final hasMecIds = c.mecCommitteeIds.isNotEmpty;
 
+    // Check cache first (1hr TTL)
+    final cachedMecId = hasMecIds ? c.mecCommitteeIds.first : '';
+    final cached = _repo.getCachedFinanceSummary(cachedMecId);
+    if (cached != null && !_financeTimedOut) {
+      _financeSummary = cached;
+      // Still load fresh data in background but show cached immediately
+    }
+
     try {
       // Load MEC committees first (needed to know the mec_id for subsequent calls).
       // Skip the call entirely when the candidate has no known committee IDs.
@@ -230,6 +238,9 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       _topDonors = (results[1] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       _contributionTimeline = (results[2] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       _financeSummary = (results[3] as Map<String, dynamic>?) ?? const {};
+      if (_financeSummary.isNotEmpty && cachedMecId.isNotEmpty) {
+        _repo.cacheFinanceSummary(cachedMecId, _financeSummary);
+      }
       _expenditureSummary = (results[4] as Map<String, dynamic>?) ?? const {};
       _topPayees = (results[5] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       _recentExpenditures = (results[6] as List?)?.cast<Map<String, dynamic>>() ?? const [];

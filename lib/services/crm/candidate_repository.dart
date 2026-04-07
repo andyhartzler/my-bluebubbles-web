@@ -20,6 +20,26 @@ class CandidateRepository {
 
   SupabaseClient get _client => _supabase.privilegedClient;
 
+  // ── Finance data cache (1hr TTL) ──────────────────────────────
+  // Avoids re-firing 11 RPCs every time the Money tab is opened.
+  final Map<String, _CachedFinance> _financeCache = {};
+
+  Map<String, dynamic>? getCachedFinanceSummary(String mecId) {
+    final c = _financeCache[mecId];
+    if (c == null) return null;
+    if (DateTime.now().difference(c.fetchedAt).inMinutes > 60) {
+      _financeCache.remove(mecId);
+      return null;
+    }
+    return c.summary;
+  }
+
+  void cacheFinanceSummary(String mecId, Map<String, dynamic> summary) {
+    _financeCache[mecId] = _CachedFinance(summary: summary, fetchedAt: DateTime.now());
+  }
+
+  void clearFinanceCache() => _financeCache.clear();
+
   // ─── Fetch all candidates (with optional filters) ──────────────
 
   Future<List<Candidate>> fetchCandidates({
@@ -1261,4 +1281,11 @@ class CandidateStats {
 
   double get anyFinancePercent =>
       totalCandidates > 0 ? withAnyFinance / totalCandidates * 100 : 0;
+}
+
+/// Cached finance summary with expiry.
+class _CachedFinance {
+  final Map<String, dynamic> summary;
+  final DateTime fetchedAt;
+  const _CachedFinance({required this.summary, required this.fetchedAt});
 }
