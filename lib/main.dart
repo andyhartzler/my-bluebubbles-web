@@ -671,9 +671,6 @@ class _HomeState extends OptimizedState<Home>
   bool serverCompatible = true;
   bool fullyLoaded = false;
   _HomeSection _currentSection = _HomeSection.dashboard;
-  final FocusNode _mobileMenuButtonFocusNode = FocusNode(
-    debugLabel: 'mobileMenuButton',
-  );
   final PageStorageBucket _bucket = PageStorageBucket();
 
   @override
@@ -851,7 +848,6 @@ class _HomeState extends OptimizedState<Home>
     if (Platform.isLinux) {
       trayManager.removeListener(this);
     }
-    _mobileMenuButtonFocusNode.dispose();
     super.dispose();
   }
 
@@ -1341,87 +1337,65 @@ class _HomeState extends OptimizedState<Home>
     ThemeData theme,
     bool crmReady,
   ) {
-    final shortcuts = <ShortcutActivator, Intent>{
-      LogicalKeySet(LogicalKeyboardKey.enter): const ActivateIntent(),
-      LogicalKeySet(LogicalKeyboardKey.space): const ActivateIntent(),
-    };
-
     return Material(
       elevation: 4,
       color: theme.colorScheme.surface,
       child: SafeArea(
         bottom: false,
-        child: FocusTraversalGroup(
-          policy: OrderedTraversalPolicy(),
-          child: SizedBox(
+        child: SizedBox(
             height: kToolbarHeight,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
                 children: [
-                  FocusTraversalOrder(
-                    order: const NumericFocusOrder(0),
-                    child: Semantics(
-                      label: 'Open navigation menu',
-                      button: true,
-                      focusable: true,
-                      child: FocusableActionDetector(
-                        focusNode: _mobileMenuButtonFocusNode,
-                        shortcuts: shortcuts,
-                        actions: <Type, Action<Intent>>{
-                          ActivateIntent: CallbackAction<ActivateIntent>(
-                            onInvoke: (intent) {
-                              _showMobileMenu(context, crmReady);
-                              return null;
-                            },
-                          ),
-                        },
-                        child: IconButton(
-                          icon: const Icon(Icons.menu),
-                          tooltip: 'Open navigation menu',
-                          onPressed: () => _showMobileMenu(context, crmReady),
-                        ),
-                      ),
+                  // FIX: Removed FocusableActionDetector + FocusTraversalGroup that
+                  // consumed the first tap on iOS Safari PWA. The detector's focus
+                  // management intercepted pointer-down before IconButton.onPressed
+                  // could fire, causing the hamburger to be unresponsive on first load.
+                  // IconButton handles touch natively; keyboard a11y is not needed
+                  // on a touch-first mobile PWA.
+                  Semantics(
+                    label: 'Open navigation menu',
+                    button: true,
+                    child: IconButton(
+                      icon: const Icon(Icons.menu),
+                      tooltip: 'Open navigation menu',
+                      onPressed: () => _showMobileMenu(context, crmReady),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: FocusTraversalOrder(
-                      order: const NumericFocusOrder(1),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: _buildBranding(theme, mobile: true),
-                      ),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: _buildBranding(theme, mobile: true),
                     ),
                   ),
                   const SizedBox(width: 4),
-                  FocusTraversalOrder(
-                    order: const NumericFocusOrder(2),
-                    child: Semantics(
-                      label: crmReady
-                          ? 'Open CRM search'
-                          : 'CRM search unavailable',
-                      button: true,
-                      enabled: crmReady,
-                      child: IconButton(
-                        tooltip: crmReady
-                            ? 'Search CRM'
-                            : 'Search available when CRM is connected',
-                        icon: const Icon(Icons.search),
-                        onPressed: crmReady
-                            ? () => _openGlobalSearch(context)
-                            : null,
-                      ),
+                  Semantics(
+                    label: crmReady
+                        ? 'Open CRM search'
+                        : 'CRM search unavailable',
+                    button: true,
+                    enabled: crmReady,
+                    child: IconButton(
+                      tooltip: crmReady
+                          ? 'Search CRM'
+                          : 'Search available when CRM is connected',
+                      icon: const Icon(Icons.search),
+                      onPressed: crmReady
+                          ? () => _openGlobalSearch(context)
+                          : null,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
         ),
       ),
     );
   }
+
+
 
   Future<void> _showMobileMenu(BuildContext context, bool crmReady) async {
     final BuildContext parentContext = context;
