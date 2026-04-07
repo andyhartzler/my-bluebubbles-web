@@ -6,18 +6,23 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
-import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  MISSOURI MAP WIDGET — flutter_map + real GeoJSON districts
 //  Interactive tile-based map with OpenStreetMap tiles,
-//  163 state house district polygons from Census TIGER/Line,
-//  color-coded by candidate status. Supports tap, zoom, pan.
+//  House / Senate / Congressional district polygons from
+//  Census TIGER/Line, color-coded by candidate status.
+//  Supports toggle between district types, tap, zoom, pan.
 // ═══════════════════════════════════════════════════════════════
 
+/// Which set of district boundaries to display.
+enum DistrictType { house, senate, congressional }
+
 class MissouriMapWidget extends StatefulWidget {
-  final Map<String, List<Candidate>> districtMap;
+  final Map<String, List<Candidate>> houseDistrictMap;
+  final Map<String, List<Candidate>> senateDistrictMap;
+  final Map<String, List<Candidate>> congressionalDistrictMap;
   final ValueChanged<String>? onDistrictTap;
   final String? selectedDistrict;
   final double height;
@@ -26,9 +31,13 @@ class MissouriMapWidget extends StatefulWidget {
   final bool interactive;
   final bool compactMode;
 
-  const MissouriMapWidget({
+  MissouriMapWidget({
     super.key,
-    required this.districtMap,
+    @Deprecated('Use houseDistrictMap instead')
+    Map<String, List<Candidate>>? districtMap,
+    Map<String, List<Candidate>>? houseDistrictMap,
+    Map<String, List<Candidate>>? senateDistrictMap,
+    Map<String, List<Candidate>>? congressionalDistrictMap,
     this.onDistrictTap,
     this.selectedDistrict,
     this.height = 320,
@@ -36,7 +45,9 @@ class MissouriMapWidget extends StatefulWidget {
     this.showLegend = true,
     this.interactive = true,
     this.compactMode = false,
-  });
+  }) : houseDistrictMap = houseDistrictMap ?? districtMap ?? {},
+       senateDistrictMap = senateDistrictMap ?? {},
+       congressionalDistrictMap = congressionalDistrictMap ?? {};
 
   @override
   State<MissouriMapWidget> createState() => _MissouriMapWidgetState();
@@ -48,14 +59,34 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   late AnimationController _entranceController;
   late Animation<double> _entranceAnimation;
 
-  // Parsed GeoJSON polygons
-  List<_DistrictPolygon> _districtPolygons = [];
-  bool _geoJsonLoaded = false;
+  // Current district type selection
+  DistrictType _activeType = DistrictType.house;
+
+  // Parsed GeoJSON polygons per type
+  final Map<DistrictType, List<_DistrictPolygon>> _polygonsByType = {};
+  final Set<DistrictType> _loadedTypes = {};
+  bool _geoJsonLoaded = false; // true once the initial (house) load finishes
   String? _hoveredDistrict;
 
   // Missouri bounds
-  static const _moCenter = LatLng(38.35, -92.45);
+  static final _moCenter = LatLng(38.35, -92.45);
   static const _initialZoom = 6.5;
+
+  // ── Asset paths ──────────────────────────────────────────
+  static final _geoJsonPaths = {
+    DistrictType.house: 'assets/geojson/mo_house_districts.geojson',
+    DistrictType.senate: 'assets/geojson/mo_senate_districts.geojson',
+    DistrictType.congressional:
+        'assets/geojson/mo_congressional_districts.geojson',
+  };
+
+  static final _typeLabels = {
+    DistrictType.house: 'House',
+    DistrictType.senate: 'Senate',
+    DistrictType.congressional: 'Congressional',
+  };
+
+  // ── Lifecycle ────────────────────────────────────────────
 
   @override
   void initState() {
@@ -71,13 +102,16 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
       curve: Curves.easeOutCubic,
     );
 
-    _loadGeoJson();
+    _loadGeoJson(_activeType);
   }
 
   @override
   void didUpdateWidget(MissouriMapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.districtMap != widget.districtMap && _geoJsonLoaded) {
+    if (oldWidget.houseDistrictMap != widget.houseDistrictMap ||
+        oldWidget.senateDistrictMap != widget.senateDistrictMap ||
+        oldWidget.congressionalDistrictMap !=
+            widget.congressionalDistrictMap) {
       _rebuildPolygonColors();
     }
   }
@@ -89,12 +123,37 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
     super.dispose();
   }
 
+  // ── District map for active type ─────────────────────────
+
+  Map<String, List<Candidate>> get _activeDistrictMap {
+    switch (_activeType) {
+      case DistrictType.house:
+        return widget.houseDistrictMap;
+      case DistrictType.senate:
+        return widget.senateDistrictMap;
+      case DistrictType.congressional:
+        return widget.congressionalDistrictMap;
+    }
+  }
+
+  List<_DistrictPolygon> get _activePolygons =>
+      _polygonsByType[_activeType] ?? [];
+
   // ── Load & parse GeoJSON ──────────────────────────────────
 
-  Future<void> _loadGeoJson() async {
+  Future<void> _loadGeoJson(DistrictType type) async {
+    if (_loadedTypes.contains(type)) {
+      // Already loaded — just re-color and return.
+      setState(() {
+        _geoJsonLoaded = true;
+        _rebuildPolygonColors();
+      });
+      return;
+    }
+
     try {
-      final jsonStr =
-          await rootBundle.loadString('assets/mo_house_districts.json');
+      final path = _geoJsonPaths[type]!;
+      final jsonStr = await rootBundle.loadString(path);
       final geoJson = json.decode(jsonStr) as Map<String, dynamic>;
       final features = geoJson['features'] as List<dynamic>;
 
@@ -106,16 +165,16 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
         if (districtNum.isEmpty) continue;
 
         final geometry = feature['geometry'] as Map<String, dynamic>;
-        final type = geometry['type'] as String;
+        final geoType = geometry['type'] as String;
         final coordinates = geometry['coordinates'];
 
         List<List<LatLng>> rings = [];
 
-        if (type == 'Polygon') {
+        if (geoType == 'Polygon') {
           for (final ring in coordinates as List) {
             rings.add(_parseRing(ring as List));
           }
-        } else if (type == 'MultiPolygon') {
+        } else if (geoType == 'MultiPolygon') {
           for (final polygon in coordinates as List) {
             for (final ring in polygon as List) {
               rings.add(_parseRing(ring as List));
@@ -124,7 +183,6 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
         }
 
         if (rings.isNotEmpty) {
-          // Calculate centroid from the outer ring
           final outerRing = rings.first;
           double cx = 0, cy = 0;
           for (final p in outerRing) {
@@ -145,14 +203,17 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
       if (!mounted) return;
 
       setState(() {
-        _districtPolygons = polygons;
+        _polygonsByType[type] = polygons;
+        _loadedTypes.add(type);
         _geoJsonLoaded = true;
         _rebuildPolygonColors();
       });
 
-      _entranceController.forward();
+      if (!_entranceController.isCompleted) {
+        _entranceController.forward();
+      }
     } catch (e) {
-      debugPrint('❌ Failed to load GeoJSON: $e');
+      debugPrint('Failed to load GeoJSON for $type: $e');
     }
   }
 
@@ -167,11 +228,15 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   }
 
   void _rebuildPolygonColors() {
-    for (final dp in _districtPolygons) {
-      final candidates = widget.districtMap[dp.district];
+    final districtMap = _activeDistrictMap;
+    final polygons = _activePolygons;
+
+    for (final dp in polygons) {
+      final candidates = districtMap[dp.district];
       if (candidates == null || candidates.isEmpty) {
-        dp.fillColor = Colors.transparent;
-        dp.borderColor = Colors.grey.withOpacity(0.25);
+        // Gray with solid 0.30 opacity — visible, not invisible
+        dp.fillColor = Colors.grey.withOpacity(0.30);
+        dp.borderColor = Colors.grey.withOpacity(0.50);
         dp.status = _DistrictStatus.noData;
       } else {
         final hasYd = candidates.any((c) => c.isYoungDem);
@@ -179,24 +244,35 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
         final hasRep = candidates.any((c) => c.isRepublican);
 
         if (hasYd) {
-          dp.fillColor = const Color(0xFF0b4db8).withOpacity(0.50);
-          dp.borderColor = const Color(0xFF0b4db8).withOpacity(0.8);
+          dp.fillColor = const Color(0xFF0b4db8).withOpacity(0.55);
+          dp.borderColor = const Color(0xFF0b4db8).withOpacity(0.85);
           dp.status = _DistrictStatus.youngDem;
-        } else if (hasDem && !hasRep) {
-          dp.fillColor = const Color(0xFF93c5fd).withOpacity(0.25);
-          dp.borderColor = const Color(0xFF93c5fd).withOpacity(0.5);
-          dp.status = _DistrictStatus.dem;
         } else if (hasDem && hasRep) {
-          dp.fillColor = const Color(0xFFc4b5fd).withOpacity(0.15);
-          dp.borderColor = const Color(0xFFc4b5fd).withOpacity(0.35);
+          dp.fillColor = const Color(0xFF8b5cf6).withOpacity(0.40);
+          dp.borderColor = const Color(0xFF8b5cf6).withOpacity(0.65);
           dp.status = _DistrictStatus.contested;
+        } else if (hasDem) {
+          dp.fillColor = const Color(0xFF3b82f6).withOpacity(0.45);
+          dp.borderColor = const Color(0xFF3b82f6).withOpacity(0.70);
+          dp.status = _DistrictStatus.dem;
         } else {
-          dp.fillColor = const Color(0xFFfecaca).withOpacity(0.10);
-          dp.borderColor = const Color(0xFFfecaca).withOpacity(0.30);
+          dp.fillColor = const Color(0xFFef4444).withOpacity(0.40);
+          dp.borderColor = const Color(0xFFef4444).withOpacity(0.65);
           dp.status = _DistrictStatus.republican;
         }
       }
     }
+  }
+
+  // ── Toggle handler ───────────────────────────────────────
+
+  void _onTypeChanged(DistrictType type) {
+    if (type == _activeType) return;
+    setState(() {
+      _activeType = type;
+      _hoveredDistrict = null;
+    });
+    _loadGeoJson(type);
   }
 
   // ── Tap handler ──────────────────────────────────────────
@@ -239,6 +315,7 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
           mainAxisSize: MainAxisSize.min,
           children: [
             if (!widget.compactMode) _buildTitle(),
+            if (!widget.compactMode) _buildDistrictTypeToggle(),
             _buildMap(),
             if (widget.showLegend && !widget.compactMode) _buildLegendBar(),
           ],
@@ -248,6 +325,7 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   }
 
   Widget _buildTitle() {
+    final label = _typeLabels[_activeType] ?? 'House';
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Row(
@@ -255,10 +333,10 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
           Icon(Icons.map_outlined,
               color: const Color(0xFF0b4db8), size: 22),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Missouri 2026 — State House Districts',
-              style: TextStyle(
+              'Missouri 2026 — $label Districts',
+              style: const TextStyle(
                 color: Color(0xFF1a1a2e),
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
@@ -285,7 +363,8 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
                   const SizedBox(width: 4),
                   Text(
                     'Reset',
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                    style:
+                        TextStyle(color: Colors.grey.shade500, fontSize: 11),
                   ),
                 ],
               ),
@@ -296,8 +375,73 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
     );
   }
 
+  // ── District type toggle ──────────────────────────────────
+
+  Widget _buildDistrictTypeToggle() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: SegmentedButton<DistrictType>(
+        segments: const [
+          ButtonSegment(
+            value: DistrictType.house,
+            label: Text('House'),
+            icon: Icon(Icons.house_outlined, size: 16),
+          ),
+          ButtonSegment(
+            value: DistrictType.senate,
+            label: Text('Senate'),
+            icon: Icon(Icons.account_balance_outlined, size: 16),
+          ),
+          ButtonSegment(
+            value: DistrictType.congressional,
+            label: Text('Congress'),
+            icon: Icon(Icons.flag_outlined, size: 16),
+          ),
+        ],
+        selected: {_activeType},
+        onSelectionChanged: (selected) {
+          _onTypeChanged(selected.first);
+        },
+        showSelectedIcon: false,
+        style: ButtonStyle(
+          textStyle: WidgetStateProperty.all(
+            const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+          visualDensity: VisualDensity.compact,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          padding: WidgetStateProperty.all(
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          ),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const Color(0xFF0b4db8).withOpacity(0.12);
+            }
+            return Colors.transparent;
+          }),
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const Color(0xFF0b4db8);
+            }
+            return Colors.grey.shade600;
+          }),
+          side: WidgetStateProperty.all(
+            BorderSide(color: Colors.grey.withOpacity(0.25)),
+          ),
+          shape: WidgetStateProperty.all(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Map ───────────────────────────────────────────────────
+
   Widget _buildMap() {
-    if (!_geoJsonLoaded) {
+    final isLoading =
+        !_loadedTypes.contains(_activeType) && !_geoJsonLoaded;
+
+    if (isLoading) {
       return SizedBox(
         height: widget.height,
         child: Center(
@@ -310,8 +454,9 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
               ),
               const SizedBox(height: 12),
               Text(
-                'Loading district boundaries…',
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                'Loading district boundaries...',
+                style:
+                    TextStyle(color: Colors.grey.shade500, fontSize: 12),
               ),
             ],
           ),
@@ -319,37 +464,43 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
       );
     }
 
-    final selectedDist =
-        widget.selectedDistrict ?? _hoveredDistrict;
+    final selectedDist = widget.selectedDistrict ?? _hoveredDistrict;
+    final polygons = _activePolygons;
+    final districtMap = _activeDistrictMap;
 
     // Build flutter_map polygon list
-    final polygons = <Polygon>[];
-    for (final dp in _districtPolygons) {
+    final mapPolygons = <Polygon>[];
+    for (final dp in polygons) {
       final isSelected = dp.district == selectedDist;
       final outerRing = dp.rings.first;
 
-      polygons.add(Polygon(
+      mapPolygons.add(Polygon(
         points: outerRing,
         holePointsList: dp.rings.length > 1 ? dp.rings.sublist(1) : null,
         color: isSelected
-            ? const Color(0xFF0b4db8).withOpacity(0.35)
+            ? const Color(0xFF0b4db8).withOpacity(0.40)
             : dp.fillColor,
         borderColor: isSelected
             ? const Color(0xFF0b4db8)
             : dp.borderColor,
-        borderStrokeWidth: isSelected ? 2.0 : 0.5,
+        borderStrokeWidth: isSelected ? 2.5 : 0.8,
         isFilled: true,
       ));
     }
 
-    // Build markers for Young Dem districts — clean blue circles with district number
+    // Build markers — show labels on districts with candidates
     final markers = <Marker>[];
-    for (final dp in _districtPolygons) {
+    for (final dp in polygons) {
+      final hasCandidates =
+          districtMap.containsKey(dp.district) &&
+          districtMap[dp.district]!.isNotEmpty;
+
       if (dp.status == _DistrictStatus.youngDem) {
+        // Young Dem districts get a prominent blue circle marker
         markers.add(Marker(
           point: dp.centroid,
-          width: 26,
-          height: 26,
+          width: 28,
+          height: 28,
           child: GestureDetector(
             onTap: () => _onDistrictTap(dp),
             child: Container(
@@ -361,7 +512,6 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
                   BoxShadow(
                     color: Colors.black.withOpacity(0.25),
                     blurRadius: 4,
-                    spreadRadius: 0,
                   ),
                 ],
               ),
@@ -372,6 +522,37 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
                     color: Colors.white,
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ));
+      } else if (widget.showLabels && hasCandidates) {
+        // Other districts with candidates get a subtle label
+        markers.add(Marker(
+          point: dp.centroid,
+          width: 32,
+          height: 18,
+          child: GestureDetector(
+            onTap: () => _onDistrictTap(dp),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: dp.borderColor.withOpacity(0.5),
+                  width: 0.5,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  dp.district,
+                  style: TextStyle(
+                    color: Colors.grey.shade800,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w600,
                     height: 1,
                   ),
                 ),
@@ -402,7 +583,6 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
                     ? InteractiveFlag.all
                     : InteractiveFlag.none,
               ),
-              // Light background behind tiles
               backgroundColor: const Color(0xFFf0f0f0),
             ),
             children: [
@@ -416,10 +596,10 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
               ),
               // District polygons
               PolygonLayer(
-                polygons: polygons,
+                polygons: mapPolygons,
                 polygonCulling: true,
               ),
-              // Young Dem star markers
+              // Markers / labels
               MarkerLayer(
                 markers: markers,
               ),
@@ -431,18 +611,14 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   }
 
   void _handleMapTapGesture(TapUpDetails details) {
-    if (!widget.interactive || !_geoJsonLoaded) return;
+    if (!widget.interactive) return;
+    final polygons = _activePolygons;
+    if (polygons.isEmpty) return;
 
-    // Convert screen position to lat/lng
-    final renderBox = context.findRenderObject() as RenderBox?;
-    if (renderBox == null) return;
+    final tapLatLng = _mapController.camera.pointToLatLng(
+        math.Point(details.localPosition.dx, details.localPosition.dy));
 
-    // The tap position is relative to the GestureDetector
-    final tapLatLng = _mapController.camera
-        .pointToLatLng(math.Point(details.localPosition.dx, details.localPosition.dy));
-
-    // Find which district polygon contains this point
-    for (final dp in _districtPolygons) {
+    for (final dp in polygons) {
       if (_isPointInPolygon(tapLatLng, dp.rings.first)) {
         _onDistrictTap(dp);
         return;
@@ -471,13 +647,16 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
     return inside;
   }
 
+  // ── Legend ─────────────────────────────────────────────────
+
   Widget _buildLegendBar() {
     int ydDistricts = 0;
     int demDistricts = 0;
     int repDistricts = 0;
     int contested = 0;
+    int noData = 0;
 
-    for (final dp in _districtPolygons) {
+    for (final dp in _activePolygons) {
       switch (dp.status) {
         case _DistrictStatus.youngDem:
           ydDistricts++;
@@ -492,6 +671,7 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
           repDistricts++;
           break;
         case _DistrictStatus.noData:
+          noData++;
           break;
       }
     }
@@ -503,10 +683,11 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
           _legendChip(
               const Color(0xFF0b4db8), 'Young Dem', ydDistricts),
           _legendChip(
-              const Color(0xFF93c5fd), 'Democrat', demDistricts),
+              const Color(0xFF3b82f6), 'Democrat', demDistricts),
           _legendChip(const Color(0xFF8b5cf6), 'Contested', contested),
-          _legendChip(const Color(0xFFef4444), 'Republican',
-              repDistricts),
+          _legendChip(
+              const Color(0xFFef4444), 'Republican', repDistricts),
+          _legendChip(Colors.grey, 'No Cand.', noData),
         ],
       ),
     );

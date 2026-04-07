@@ -43,6 +43,9 @@ class _CandidatesPageState extends State<CandidatesPage>
   List<Candidate> _youngDems = [];
   CandidateStats _stats = const CandidateStats();
   Map<String, List<Candidate>> _districtMap = {};
+  Map<String, List<Candidate>> _houseDistrictMap = {};
+  Map<String, List<Candidate>> _senateDistrictMap = {};
+  Map<String, List<Candidate>> _congressionalDistrictMap = {};
 
   // ── Basic Filters ──
   String? _partyFilter;
@@ -149,11 +152,28 @@ class _CandidatesPageState extends State<CandidatesPage>
       }
     }
 
-    // Build district map for state-level candidates
+    // Build district maps for each level
     final districtMap = <String, List<Candidate>>{};
+    final houseMap = <String, List<Candidate>>{};
+    final senateMap = <String, List<Candidate>>{};
+    final congressionalMap = <String, List<Candidate>>{};
     for (final c in mergedCandidates) {
-      if (c.officeLevel == 'state' && c.district != null && c.district!.isNotEmpty) {
-        districtMap.putIfAbsent(c.district!, () => []).add(c);
+      if (c.district == null || c.district!.isEmpty) continue;
+      final d = c.district!;
+      // Legacy combined map (state-level only, for backward compat)
+      if (c.officeLevel == 'state') {
+        districtMap.putIfAbsent(d, () => []).add(c);
+      }
+      // Per-level maps
+      final level = c.officeLevel?.toLowerCase() ?? '';
+      final office = c.office.toLowerCase();
+      if (level == 'federal' || office.contains('congress') || office.contains('u.s. rep')) {
+        congressionalMap.putIfAbsent(d, () => []).add(c);
+      } else if (office.contains('senate') || office.contains('senator')) {
+        senateMap.putIfAbsent(d, () => []).add(c);
+      } else {
+        // Default: house / state rep / state-level
+        houseMap.putIfAbsent(d, () => []).add(c);
       }
     }
 
@@ -164,6 +184,9 @@ class _CandidatesPageState extends State<CandidatesPage>
       _youngDems = youngDems;
       _stats = stats;
       _districtMap = districtMap;
+      _houseDistrictMap = houseMap;
+      _senateDistrictMap = senateMap;
+      _congressionalDistrictMap = congressionalMap;
       _loading = false;
       _applyFilters();
     });
@@ -647,7 +670,9 @@ class _CandidatesPageState extends State<CandidatesPage>
     return Column(
       children: [
         MissouriMapWidget(
-          districtMap: _districtMap,
+          houseDistrictMap: _houseDistrictMap,
+          senateDistrictMap: _senateDistrictMap,
+          congressionalDistrictMap: _congressionalDistrictMap,
           selectedDistrict: _selectedMapDistrict,
           height: 340,
           showLegend: true,
@@ -656,7 +681,12 @@ class _CandidatesPageState extends State<CandidatesPage>
           onDistrictTap: (district) {
             setState(() {
               _selectedMapDistrict = district;
-              _selectedDistrictCandidates = _districtMap[district];
+              // Look up candidates from all maps for the popup
+              _selectedDistrictCandidates =
+                  _houseDistrictMap[district] ??
+                  _senateDistrictMap[district] ??
+                  _congressionalDistrictMap[district] ??
+                  _districtMap[district];
             });
           },
         ),
