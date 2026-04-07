@@ -229,17 +229,35 @@ Missouri Young Democrats''',
     });
   }
 
+  static final _emailRegex = RegExp(r'^[\w.+-]+@[\w.-]+\.\w{2,}$');
+  DateTime? _lastSentAt;
+
   Future<void> _sendEmail() async {
     if (_toController.text.isEmpty) {
       setState(() => _error = 'Recipient email is required');
       return;
     }
+
+    // Validate email format
+    final emails = _toController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty);
+    final invalidEmails = emails.where((e) => !_emailRegex.hasMatch(e)).toList();
+    if (invalidEmails.isNotEmpty) {
+      setState(() => _error = 'Invalid email: ${invalidEmails.first}');
+      return;
+    }
+
     if (_subjectController.text.isEmpty) {
       setState(() => _error = 'Subject is required');
       return;
     }
     if (_bodyController.text.isEmpty) {
       setState(() => _error = 'Message body is required');
+      return;
+    }
+
+    // Rate-limit: prevent duplicate sends within 5 minutes
+    if (_lastSentAt != null && DateTime.now().difference(_lastSentAt!).inMinutes < 5) {
+      setState(() => _error = 'Please wait ${5 - DateTime.now().difference(_lastSentAt!).inMinutes} minutes before sending again');
       return;
     }
 
@@ -293,6 +311,7 @@ Missouri Young Democrats''',
         _repo.updateContactOutcome(contact.id, 'sent');
       }
 
+      _lastSentAt = DateTime.now();
       setState(() {
         _sending = false;
         _sent = true;

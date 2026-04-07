@@ -134,7 +134,7 @@ class CandidateRepository {
       'id,name,party,district,office,office_level,is_young_dem,estimated_age,'
       'campaign_website,social_twitter,social_facebook,social_instagram,'
       'moyd_endorsed,moyd_contacted,young_dem_score,photo_url,'
-      'mec_committee_ids,fec_candidate_id';
+      'mec_committee_ids,fec_candidate_id,member_id,date_of_birth';
 
   Future<List<Candidate>> fetchCandidatesForAnalytics() async {
     if (!isReady) return [];

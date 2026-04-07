@@ -924,6 +924,12 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       children: [
+        // ── MOYD Member Badge ──
+        if (c.memberId != null) ...[
+          _buildMemberBadge(),
+          const SizedBox(height: 16),
+        ],
+
         // ── Score Radar ──
         if (c.isYoungDem) ...[
           _buildYoungDemScore(),
@@ -4029,6 +4035,56 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   // ═══════════════════════════════════════════════════════════════
   //  REUSABLE WIDGETS FROM ORIGINAL
   // ═══════════════════════════════════════════════════════════════
+
+  Widget _buildMemberBadge() {
+    return CandidateUI.card('MOYD Member', Icons.badge, Colors.amber, child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.amber.withOpacity(0.3), Colors.orange.withOpacity(0.15)],
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.star, color: Colors.amber, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Active MOYD Member', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(
+                    'This candidate is a registered Missouri Young Democrats member.',
+                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (c.dateOfBirth != null) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(Icons.cake, color: Colors.amber.withOpacity(0.6), size: 14),
+              const SizedBox(width: 6),
+              Text(
+                'DOB: ${c.dateOfBirth!.month}/${c.dateOfBirth!.day}/${c.dateOfBirth!.year}',
+                style: TextStyle(color: Colors.amber.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ],
+      ],
+    ));
+  }
 
   Widget _buildYoungDemScore() {
     final score = c.youngDemScore;

@@ -132,55 +132,14 @@ class CandidateUI {
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
-  /// Loading shimmer placeholder (used while tab data fetches).
+  /// Animated shimmer placeholder (used while tab data fetches).
+  /// Uses a sweeping gradient to visually distinguish loading from empty.
   static Widget shimmerSkeleton({int cardCount = 3}) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-      physics: const NeverScrollableScrollPhysics(),
-      children: List.generate(cardCount, (i) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          height: i == 0 ? 100 : 160,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.white.withOpacity(0.04),
-                Colors.white.withOpacity(0.08),
-                Colors.white.withOpacity(0.04),
-              ],
-              stops: const [0.0, 0.5, 1.0],
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: [
-              if (i == 0) ...[
-                const SizedBox(width: 16),
-                Container(
-                  width: 48, height: 48,
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.06), borderRadius: BorderRadius.circular(12)),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(height: 14, width: 140, decoration: BoxDecoration(color: Colors.white.withOpacity(0.06), borderRadius: BorderRadius.circular(4))),
-                      const SizedBox(height: 8),
-                      Container(height: 10, width: 90, decoration: BoxDecoration(color: Colors.white.withOpacity(0.04), borderRadius: BorderRadius.circular(4))),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-        );
-      }),
-    );
+    return _ShimmerSkeletonWidget(cardCount: cardCount);
   }
 
   /// Stat card used on finance summary rows (money / count / metric).
+  /// Wraps value text in FittedBox to prevent overflow on small screens.
   static Widget financeStatCard(String label, String value, IconData icon, Color accent) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
@@ -201,11 +160,121 @@ class CandidateUI {
             child: Icon(icon, color: accent, size: 20),
           ),
           const SizedBox(height: 10),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(value, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+          ),
           const SizedBox(height: 3),
           Text(label, style: TextStyle(color: accent.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
         ],
       ),
+    );
+  }
+}
+
+/// Animated shimmer skeleton with sweeping gradient.
+class _ShimmerSkeletonWidget extends StatefulWidget {
+  final int cardCount;
+  const _ShimmerSkeletonWidget({required this.cardCount});
+
+  @override
+  State<_ShimmerSkeletonWidget> createState() => _ShimmerSkeletonWidgetState();
+}
+
+class _ShimmerSkeletonWidgetState extends State<_ShimmerSkeletonWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final value = _controller.value;
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+          physics: const NeverScrollableScrollPhysics(),
+          children: List.generate(widget.cardCount, (i) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              height: i == 0 ? 100 : 160,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.03),
+                    Colors.white.withOpacity(0.09),
+                    Colors.white.withOpacity(0.03),
+                  ],
+                  stops: [
+                    (value - 0.3).clamp(0.0, 1.0),
+                    value,
+                    (value + 0.3).clamp(0.0, 1.0),
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: i == 0
+                  ? Row(
+                      children: [
+                        const SizedBox(width: 16),
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                height: 14,
+                                width: 140,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.06),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                height: 10,
+                                width: 90,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.04),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : null,
+            );
+          }),
+        );
+      },
     );
   }
 }

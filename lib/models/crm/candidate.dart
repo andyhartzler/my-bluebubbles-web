@@ -43,6 +43,10 @@ class Candidate {
   final DateTime? lastContactDate;
   final String? contactMethod;
 
+  // Member + DOB linkage
+  final String? memberId;
+  final DateTime? dateOfBirth;
+
   // Score breakdown fields
   final int scoreParty;
   final int scorePrimary;
@@ -91,6 +95,8 @@ class Candidate {
     this.endorsementStatus,
     this.lastContactDate,
     this.contactMethod,
+    this.memberId,
+    this.dateOfBirth,
     this.scoreParty = 0,
     this.scorePrimary = 0,
     this.scoreContributions = 0,
@@ -146,6 +152,10 @@ class Candidate {
           ? DateTime.tryParse(json['last_contact_date'] as String)
           : null,
       contactMethod: json['contact_method'] as String?,
+      memberId: json['member_id'] as String?,
+      dateOfBirth: json['date_of_birth'] != null
+          ? DateTime.tryParse(json['date_of_birth'] as String)
+          : null,
       scoreParty: (json['score_party'] as num?)?.toInt() ?? 0,
       scorePrimary: (json['score_primary'] as num?)?.toInt() ?? 0,
       scoreContributions: (json['score_contributions'] as num?)?.toInt() ?? 0,
@@ -193,6 +203,8 @@ class Candidate {
         'endorsement_status': endorsementStatus,
         'last_contact_date': lastContactDate?.toIso8601String(),
         'contact_method': contactMethod,
+        'member_id': memberId,
+        'date_of_birth': dateOfBirth?.toIso8601String().split('T').first,
         'score_party': scoreParty,
         'score_primary': scorePrimary,
         'score_contributions': scoreContributions,
@@ -374,6 +386,8 @@ class Candidate {
     String? endorsementStatus,
     DateTime? lastContactDate,
     String? contactMethod,
+    String? memberId,
+    DateTime? dateOfBirth,
     int? scoreParty,
     int? scorePrimary,
     int? scoreContributions,
@@ -421,6 +435,8 @@ class Candidate {
       endorsementStatus: endorsementStatus ?? this.endorsementStatus,
       lastContactDate: lastContactDate ?? this.lastContactDate,
       contactMethod: contactMethod ?? this.contactMethod,
+      memberId: memberId ?? this.memberId,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       scoreParty: scoreParty ?? this.scoreParty,
       scorePrimary: scorePrimary ?? this.scorePrimary,
       scoreContributions: scoreContributions ?? this.scoreContributions,
