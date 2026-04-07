@@ -1498,7 +1498,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             const SizedBox(height: 16),
             const Text('Top Federal Donors', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            ..._fecTopDonors.take(5).map((d) {
+            ..._fecTopDonors.map((d) {
               final name = d['donor_name']?.toString() ?? '—';
               final city = d['city']?.toString() ?? '';
               final state = d['state']?.toString() ?? '';
@@ -1602,7 +1602,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       child: Column(
         children: [
           const SizedBox(height: 8),
-          ...List.generate(math.min(_topDonors.length, 10), (i) {
+          ...List.generate(_topDonors.length, (i) {
             final donor = _topDonors[i];
             final name = (donor['donor_name'] as String? ?? '').trim();
             final company = donor['company'] as String? ?? '';
@@ -1925,7 +1925,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       child: Column(
         children: [
           const SizedBox(height: 8),
-          ...List.generate(math.min(_topPayees.length, 10), (i) {
+          ...List.generate(_topPayees.length, (i) {
             final payee = _topPayees[i];
             final name = payee['payee_name'] as String? ?? 'Unknown';
             final amount = (payee['total_amount'] as num?)?.toDouble() ?? 0;

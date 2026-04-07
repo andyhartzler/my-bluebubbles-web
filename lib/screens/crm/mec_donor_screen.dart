@@ -50,7 +50,7 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
           .select('mec_id, committee_name, contribution_amount, contribution_date, monetary_or_inkind')
           .eq('donor_id', widget.donorId)
           .order('contribution_date', ascending: false)
-          .limit(200);
+          .limit(1000);
 
       // Fetch candidates they donated to
       final candidatesResp = await _supabase.privilegedClient.rpc(

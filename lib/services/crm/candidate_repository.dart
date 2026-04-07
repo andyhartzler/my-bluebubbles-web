@@ -802,7 +802,7 @@ class CandidateRepository {
   }
 
   /// Fetch MEC contributions for a given mec_id (committee)
-  Future<List<MECContribution>> getMECContributions(String mecId, {int limit = 500}) async {
+  Future<List<MECContribution>> getMECContributions(String mecId, {int limit = 5000}) async {
     if (!isReady) return [];
 
     try {
@@ -824,7 +824,7 @@ class CandidateRepository {
   }
 
   /// Fetch top donors for a committee (via Postgres function)
-  Future<List<Map<String, dynamic>>> getMECTopDonors(String mecId, {int limit = 10}) async {
+  Future<List<Map<String, dynamic>>> getMECTopDonors(String mecId, {int limit = 50}) async {
     if (!isReady) return [];
 
     try {
@@ -905,7 +905,7 @@ class CandidateRepository {
   }
 
   /// Fetch top expenditure payees (via Postgres function)
-  Future<List<Map<String, dynamic>>> getMECTopPayees(String mecId, {int limit = 10}) async {
+  Future<List<Map<String, dynamic>>> getMECTopPayees(String mecId, {int limit = 50}) async {
     if (!isReady) return [];
 
     try {
@@ -983,7 +983,7 @@ class CandidateRepository {
   }
 
   /// Fetch top FEC donors for a federal candidate
-  Future<List<Map<String, dynamic>>> getFECTopDonors(String fecCandId, {int limit = 10}) async {
+  Future<List<Map<String, dynamic>>> getFECTopDonors(String fecCandId, {int limit = 50}) async {
     if (!isReady) return [];
     try {
       final response = await _client.rpc('get_fec_top_donors', params: {
