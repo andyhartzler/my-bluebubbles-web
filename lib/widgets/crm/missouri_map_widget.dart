@@ -23,7 +23,9 @@ class MissouriMapWidget extends StatefulWidget {
   final Map<String, List<Candidate>> houseDistrictMap;
   final Map<String, List<Candidate>> senateDistrictMap;
   final Map<String, List<Candidate>> congressionalDistrictMap;
-  final ValueChanged<String>? onDistrictTap;
+  /// Called when a district polygon is tapped.
+  /// Passes (districtNumber, activeDistrictType) so the caller can scope the lookup.
+  final void Function(String district, DistrictType type)? onDistrictTap;
   final String? selectedDistrict;
   final double height;
   final bool showLabels;
@@ -282,7 +284,7 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
     setState(() {
       _hoveredDistrict = dp.district;
     });
-    widget.onDistrictTap?.call(dp.district);
+    widget.onDistrictTap?.call(dp.district, _activeType);
   }
 
   // ── Build ─────────────────────────────────────────────────

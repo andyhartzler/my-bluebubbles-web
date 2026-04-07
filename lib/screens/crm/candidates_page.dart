@@ -691,17 +691,24 @@ class _CandidatesPageState extends State<CandidatesPage>
           showLegend: true,
           showLabels: true,
           interactive: true,
-          onDistrictTap: (district) {
+          onDistrictTap: (district, type) {
             setState(() {
               _selectedMapDistrict = district;
-              // Merge candidates from ALL map types for this district
-              // (same district number can appear in House + Senate + Congressional)
-              final merged = <Candidate>[
-                ...?_houseDistrictMap[district],
-                ...?_senateDistrictMap[district],
-                ...?_congressionalDistrictMap[district],
-              ];
-              _selectedDistrictCandidates = merged.isNotEmpty ? merged : _districtMap[district];
+              // Look up candidates ONLY from the active district type
+              // (prevents mixing House d.1 with Congressional d.1)
+              switch (type) {
+                case DistrictType.house:
+                  _selectedDistrictCandidates = _houseDistrictMap[district];
+                  break;
+                case DistrictType.senate:
+                  _selectedDistrictCandidates = _senateDistrictMap[district];
+                  break;
+                case DistrictType.congressional:
+                  _selectedDistrictCandidates = _congressionalDistrictMap[district];
+                  break;
+              }
+              // Fallback to legacy map if no match
+              _selectedDistrictCandidates ??= _districtMap[district];
             });
           },
         ),
