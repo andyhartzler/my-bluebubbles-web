@@ -1042,6 +1042,20 @@ class CandidateRepository {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getDistrictHistoricalCandidates(String district) async {
+    if (!isReady) return [];
+    try {
+      final response = await _client.rpc('get_district_historical_candidates', params: {
+        'p_district': district,
+      });
+      if (response == null) return [];
+      return (response as List<dynamic>).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getDistrictHistoricalCandidates error: $e');
+      return [];
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   //  CONTACT LOG — full CRUD
   // ═══════════════════════════════════════════════════════════════

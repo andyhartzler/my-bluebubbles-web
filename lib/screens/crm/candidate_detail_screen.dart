@@ -77,6 +77,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   List<Candidate> _districtCandidates = [];
   DistrictDemographics? _districtDemographics;
   Map<String, List<Candidate>> _adjacentDistricts = {};
+  List<Map<String, dynamic>> _historicalCandidates = [];
 
   // ── State: Intel Tab (news + endorsements + MOYD engagement) ──
   bool _intelLoading = true;
@@ -279,6 +280,11 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         _districtCandidates = results[1] as List<Candidate>;
         _districtDemographics = results[2] as DistrictDemographics?;
         _adjacentDistricts = results[3] as Map<String, List<Candidate>>;
+
+        // Load historical candidates for this district (non-blocking)
+        _repo.getDistrictHistoricalCandidates(c.district!).then((hc) {
+          if (mounted) setState(() => _historicalCandidates = hc);
+        });
       }
     } catch (e) {
       debugPrint('❌ Error loading race data: $e');
@@ -2159,6 +2165,12 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           const SizedBox(height: 16),
         ],
 
+        // ── Past Candidates in This District ──
+        if (_historicalCandidates.isNotEmpty) ...[
+          _buildHistoricalCandidates(),
+          const SizedBox(height: 16),
+        ],
+
         // ── Geographic Context ──
         _buildGeographicContext(),
         const SizedBox(height: 16),
@@ -4032,6 +4044,87 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             child: Text(label, style: const TextStyle(color: Colors.white60, fontSize: 12)),
           ),
           Expanded(child: Text(value, style: const TextStyle(color: Colors.white70, fontSize: 12))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoricalCandidates() {
+    return _card(
+      'Past Candidates (${_historicalCandidates.length})',
+      Icons.people_outline,
+      BrandColors.momentumBlue,
+      child: Column(
+        children: [
+          const SizedBox(height: 8),
+          ..._historicalCandidates.take(20).map((hc) {
+            final name = hc['name'] as String? ?? '';
+            final party = hc['party'] as String? ?? '';
+            final photo = hc['photo_url'] as String?;
+            final years = (hc['years_ran'] as List?)?.cast<int>() ?? [];
+            final races = hc['total_races'] as int? ?? 0;
+
+            Color partyColor;
+            if (party.contains('Dem')) partyColor = BrandColors.democratBlue;
+            else if (party.contains('Rep')) partyColor = BrandColors.republicanRed;
+            else if (party.contains('Lib')) partyColor = Colors.amber;
+            else partyColor = Colors.grey;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: partyColor.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  // Photo
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: partyColor.withOpacity(0.2),
+                    backgroundImage: photo != null && photo.isNotEmpty ? NetworkImage(photo) : null,
+                    child: photo == null || photo.isEmpty
+                        ? Text(name.isNotEmpty ? name[0] : '?', style: TextStyle(color: partyColor, fontWeight: FontWeight.bold))
+                        : null,
+                  ),
+                  const SizedBox(width: 10),
+                  // Name + party + years
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$party • $races race${races != 1 ? "s" : ""}',
+                          style: TextStyle(color: partyColor.withOpacity(0.8), fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Years
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      ...years.take(3).map((y) => Text('$y', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10))),
+                      if (years.length > 3)
+                        Text('+${years.length - 3}', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10)),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (_historicalCandidates.length > 20)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '${_historicalCandidates.length - 20} more past candidates',
+                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+              ),
+            ),
         ],
       ),
     );
