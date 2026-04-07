@@ -444,7 +444,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
                     const Spacer(),
                     Text(
                       'D: $dems  R: $reps',
-                      style: const TextStyle(color: Colors.white38, fontSize: 11),
+                      style: const TextStyle(color: Colors.white60, fontSize: 11),
                     ),
                   ],
                 ),
@@ -545,7 +545,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
               const SizedBox(height: 8),
               Text(
                 '$total districts with filings',
-                style: const TextStyle(color: Colors.white38, fontSize: 11),
+                style: const TextStyle(color: Colors.white60, fontSize: 11),
               ),
             ],
           ),
@@ -562,7 +562,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
             children: [
               const Text(
                 'Districts where a Democrat filed but no Republican — guaranteed wins.',
-                style: TextStyle(color: Colors.white38, fontSize: 12),
+                style: TextStyle(color: Colors.white60, fontSize: 12),
               ),
               const SizedBox(height: 12),
               ..._districtMap.entries
@@ -588,7 +588,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
             children: [
               const Text(
                 'Districts where only a Republican filed — recruit opportunities!',
-                style: TextStyle(color: Colors.white38, fontSize: 12),
+                style: TextStyle(color: Colors.white60, fontSize: 12),
               ),
               const SizedBox(height: 12),
               ..._districtMap.entries
@@ -615,7 +615,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
             children: [
               const Text(
                 'Districts with identified Young Democrat candidates.',
-                style: TextStyle(color: Colors.white38, fontSize: 12),
+                style: TextStyle(color: Colors.white60, fontSize: 12),
               ),
               const SizedBox(height: 12),
               ..._districtMap.entries
@@ -777,7 +777,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
                                 child: Text(
                                   labels[value.toInt()],
                                   style: const TextStyle(
-                                      color: Colors.white38, fontSize: 10),
+                                      color: Colors.white60, fontSize: 10),
                                 ),
                               );
                             }
@@ -915,7 +915,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
-          Icon(icon, color: Colors.white38, size: 16),
+          Icon(icon, color: Colors.white60, size: 16),
           const SizedBox(width: 10),
           Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13)),
           const Spacer(),
@@ -960,7 +960,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
                   ),
                   Text(
                     '${entry.value} (${(pct * 100).toStringAsFixed(0)}%)',
-                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                    style: const TextStyle(color: Colors.white60, fontSize: 12),
                   ),
                 ],
               ),
@@ -1018,7 +1018,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
                   _engagementStat(
                     'Not Yet',
                     '${_stats.totalCandidates - _stats.contacted}',
-                    Colors.white38,
+                    Colors.white60,
                   ),
                   _engagementStat(
                     'Endorsed',
@@ -1145,7 +1145,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
           ),
           Text(
             label,
-            style: const TextStyle(color: Colors.white38, fontSize: 10),
+            style: const TextStyle(color: Colors.white60, fontSize: 10),
           ),
         ],
       ),

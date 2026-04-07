@@ -472,7 +472,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   hintText: 'Endorser name (org or individual)',
-                  hintStyle: const TextStyle(color: Colors.white38),
+                  hintStyle: const TextStyle(color: Colors.white60),
                   filled: true,
                   fillColor: Colors.white.withOpacity(0.08),
                   border: OutlineInputBorder(
@@ -537,7 +537,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: selected ? BrandColors.sunriseGold : Colors.white38),
+            Icon(icon, size: 14, color: selected ? BrandColors.sunriseGold : Colors.white60),
             const SizedBox(width: 4),
             Text(
               label,
@@ -854,7 +854,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.location_on, color: Colors.white38, size: 13),
+                    Icon(Icons.location_on, color: Colors.white60, size: 13),
                     const SizedBox(width: 3),
                     Expanded(
                       child: Text(
@@ -1042,7 +1042,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Text(' / 100', style: TextStyle(color: Colors.white38, fontSize: 14)),
+              Text(' / 100', style: TextStyle(color: Colors.white60, fontSize: 14)),
             ],
           ),
         ],
@@ -1107,7 +1107,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                  Text(label, style: const TextStyle(color: Colors.white60, fontSize: 11)),
                   Text(
                     value,
                     style: TextStyle(
@@ -1120,7 +1120,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               ),
             ),
             if (onTap != null)
-              Icon(Icons.open_in_new, color: Colors.white38, size: 14),
+              Icon(Icons.open_in_new, color: Colors.white60, size: 14),
           ],
         ),
       ),
@@ -1319,7 +1319,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 dense: true,
                 leading: Icon(
                   Icons.account_balance,
-                  color: isSelected ? BrandColors.sunriseGold : Colors.white38,
+                  color: isSelected ? BrandColors.sunriseGold : Colors.white60,
                   size: 20,
                 ),
                 title: Text(
@@ -1332,7 +1332,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 ),
                 subtitle: Text(
                   'MEC ID: $mecId',
-                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                  style: const TextStyle(color: Colors.white60, fontSize: 11),
                 ),
                 trailing: isSelected
                     ? const Icon(Icons.check_circle, color: BrandColors.sunriseGold, size: 18)
@@ -1540,7 +1540,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                         const SizedBox(height: 4),
                         Text(
                           shortMonth,
-                          style: const TextStyle(color: Colors.white38, fontSize: 9),
+                          style: const TextStyle(color: Colors.white60, fontSize: 9),
                         ),
                       ],
                     ),
@@ -1631,7 +1631,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                               overflow: TextOverflow.ellipsis,
                             ),
                             if (location.isNotEmpty)
-                              Text(location, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10)),
+                              Text(location, style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 10)),
                           ],
                         ),
                       ),
@@ -1643,7 +1643,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                             style: TextStyle(color: _donorRankColor(i), fontSize: 14, fontWeight: FontWeight.bold),
                           ),
                           if (count > 1)
-                            Text('$count gifts', style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10)),
+                            Text('$count gifts', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 10)),
                         ],
                       ),
                     ],
@@ -1724,7 +1724,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                         if (contrib.donorLocation.isNotEmpty)
                           Text(
                             contrib.donorLocation,
-                            style: const TextStyle(color: Colors.white38, fontSize: 10),
+                            style: const TextStyle(color: Colors.white60, fontSize: 10),
                           ),
                       ],
                     ),
@@ -1732,7 +1732,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   Expanded(
                     child: Text(
                       contrib.contributionDate ?? '',
-                      style: const TextStyle(color: Colors.white38, fontSize: 10),
+                      style: const TextStyle(color: Colors.white60, fontSize: 10),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -1944,7 +1944,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                       children: [
                         Text(name, style: const TextStyle(color: Colors.white, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
                         if (location.isNotEmpty)
-                          Text(location, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                          Text(location, style: const TextStyle(color: Colors.white60, fontSize: 10)),
                       ],
                     ),
                   ),
@@ -1952,7 +1952,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text('\$${_formatMoney(amount)}', style: const TextStyle(color: Colors.amber, fontSize: 14, fontWeight: FontWeight.bold)),
-                      Text('$count payments', style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                      Text('$count payments', style: const TextStyle(color: Colors.white60, fontSize: 10)),
                     ],
                   ),
                 ],
@@ -2062,10 +2062,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                     children: [
                       Text('\$${_formatMoney(raised)} raised', style: TextStyle(color: partyColor, fontSize: 12, fontWeight: FontWeight.w600)),
                       const SizedBox(width: 12),
-                      Text('$contribs donors', style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                      Text('$contribs donors', style: const TextStyle(color: Colors.white60, fontSize: 11)),
                       const Spacer(),
                       if (spent > 0)
-                        Text('\$${_formatMoney(spent)} spent', style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                        Text('\$${_formatMoney(spent)} spent', style: const TextStyle(color: Colors.white60, fontSize: 11)),
                     ],
                   ),
                 ],
@@ -2410,7 +2410,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   // Turnout
                   if (r.totalVotes != null) ...[
                     const SizedBox(height: 6),
-                    Text('Total votes: ${_formatNumber(r.totalVotes!)}', style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                    Text('Total votes: ${_formatNumber(r.totalVotes!)}', style: const TextStyle(color: Colors.white60, fontSize: 11)),
                   ],
                 ],
               ),
@@ -2541,7 +2541,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                         child: Text(
                           '$count',
                           style: TextStyle(
-                            color: isSelected ? BrandColors.sunriseGold : Colors.white38,
+                            color: isSelected ? BrandColors.sunriseGold : Colors.white60,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -2573,7 +2573,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 const SizedBox(height: 8),
                 Text(
                   'No news articles found for ${c.firstName}',
-                  style: const TextStyle(color: Colors.white38, fontSize: 13),
+                  style: const TextStyle(color: Colors.white60, fontSize: 13),
                 ),
               ],
             ),
@@ -2666,7 +2666,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                         color: Colors.white.withOpacity(0.06),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(news.source!, style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.w500)),
+                      child: Text(news.source!, style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.w500)),
                     ),
                   ],
                   const Spacer(),
@@ -2702,7 +2702,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               child: Center(
                 child: Text(
                   'No endorsements recorded yet',
-                  style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                  style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13),
                 ),
               ),
             )
@@ -2738,7 +2738,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                           Text(name, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
                           Text(
                             type.replaceAll('_', ' ').toUpperCase(),
-                            style: const TextStyle(color: Colors.white38, fontSize: 10),
+                            style: const TextStyle(color: Colors.white60, fontSize: 10),
                           ),
                           if (notes != null && notes.isNotEmpty)
                             Text(notes, style: const TextStyle(color: Colors.white54, fontSize: 11)),
@@ -2819,7 +2819,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             ),
             child: Icon(
               c.isContacted ? Icons.check_circle : Icons.radio_button_unchecked,
-              color: c.isContacted ? BrandColors.success : Colors.white38,
+              color: c.isContacted ? BrandColors.success : Colors.white60,
               size: 28,
             ),
           ),
@@ -2841,11 +2841,11 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   c.lastContactDate != null
                       ? 'Last: ${_formatDate(c.lastContactDate!)} via ${c.contactMethod ?? 'unknown'}'
                       : 'No contact recorded',
-                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                  style: const TextStyle(color: Colors.white60, fontSize: 12),
                 ),
                 Text(
                   '${_contactLog.length} interaction${_contactLog.length == 1 ? '' : 's'} logged',
-                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                  style: const TextStyle(color: Colors.white60, fontSize: 12),
                 ),
               ],
             ),
@@ -2940,7 +2940,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                       children: [
                         Icon(
                           isSelected ? Icons.check_circle : Icons.person_outline,
-                          color: isSelected ? BrandColors.steelBlue : Colors.white38,
+                          color: isSelected ? BrandColors.steelBlue : Colors.white60,
                           size: 16,
                         ),
                         const SizedBox(width: 6),
@@ -2982,7 +2982,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
                 'No follow-up reminders set. Log a contact with a follow-up date to create one.',
-                style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 13),
+                style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
               ),
             )
           else
@@ -3102,7 +3102,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(icon, size: 14, color: isSelected ? BrandColors.momentumBlue : Colors.white38),
+                      Icon(icon, size: 14, color: isSelected ? BrandColors.momentumBlue : Colors.white60),
                       const SizedBox(width: 4),
                       Text(
                         type.replaceAll('-', ' '),
@@ -3172,14 +3172,14 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.calendar_today, color: Colors.white38, size: 18),
+                  const Icon(Icons.calendar_today, color: Colors.white60, size: 18),
                   const SizedBox(width: 8),
                   Text(
                     _followUpDate != null
                         ? 'Follow-up: ${_formatDate(_followUpDate!)}'
                         : 'Set follow-up date (optional)',
                     style: TextStyle(
-                      color: _followUpDate != null ? BrandColors.sunriseGold : Colors.white38,
+                      color: _followUpDate != null ? BrandColors.sunriseGold : Colors.white60,
                       fontSize: 13,
                     ),
                   ),
@@ -3187,7 +3187,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                     const Spacer(),
                     GestureDetector(
                       onTap: () => setState(() => _followUpDate = null),
-                      child: const Icon(Icons.close, color: Colors.white38, size: 16),
+                      child: const Icon(Icons.close, color: Colors.white60, size: 16),
                     ),
                   ],
                 ],
@@ -3241,7 +3241,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               child: Center(
                 child: Text(
                   'No contacts logged yet',
-                  style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                  style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13),
                 ),
               ),
             )
@@ -3299,7 +3299,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                                 const Spacer(),
                                 Text(
                                   _formatDate(contact.contactDate),
-                                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                                  style: const TextStyle(color: Colors.white60, fontSize: 11),
                                 ),
                               ],
                             ),
@@ -3452,7 +3452,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             children: [
               Icon(
                 Icons.info_outline,
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withOpacity(0.55),
                 size: 20,
               ),
               const SizedBox(width: 12),
@@ -3511,7 +3511,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                     ),
                     Text(
                       '${_districtCandidates.length} candidate${_districtCandidates.length == 1 ? '' : 's'} filed',
-                      style: const TextStyle(color: Colors.white38, fontSize: 12),
+                      style: const TextStyle(color: Colors.white60, fontSize: 12),
                     ),
                   ],
                 ),
@@ -3587,7 +3587,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   Expanded(child: Divider(color: Colors.white12)),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('Opponents', style: TextStyle(color: Colors.white38, fontSize: 11)),
+                    child: Text('Opponents', style: TextStyle(color: Colors.white60, fontSize: 11)),
                   ),
                   Expanded(child: Divider(color: Colors.white12)),
                 ],
@@ -3597,7 +3597,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           ] else
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text('No opponents filed', style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13)),
+              child: Text('No opponents filed', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13)),
             ),
         ],
       ),
@@ -3790,12 +3790,12 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             const SizedBox(height: 8),
             Text(
               'Based on ${_electionResults.length} election cycle${_electionResults.length == 1 ? '' : 's'}',
-              style: const TextStyle(color: Colors.white38, fontSize: 11),
+              style: const TextStyle(color: Colors.white60, fontSize: 11),
             ),
           ] else
             const Text(
               'No historical data available to estimate partisan lean',
-              style: TextStyle(color: Colors.white38, fontSize: 12),
+              style: TextStyle(color: Colors.white60, fontSize: 12),
               textAlign: TextAlign.center,
             ),
         ],
@@ -3877,7 +3877,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               ],
             ),
           ] else
-            const Text('Voter registration data not available', style: TextStyle(color: Colors.white38, fontSize: 13)),
+            const Text('Voter registration data not available', style: TextStyle(color: Colors.white60, fontSize: 13)),
         ],
       ),
     );
@@ -3889,7 +3889,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(height: 4),
         Text(value, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.bold)),
-        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+        Text(label, style: const TextStyle(color: Colors.white60, fontSize: 10)),
       ],
     );
   }
@@ -3984,7 +3984,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         children: [
           SizedBox(
             width: 80,
-            child: Text(label, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+            child: Text(label, style: const TextStyle(color: Colors.white60, fontSize: 12)),
           ),
           Expanded(child: Text(value, style: const TextStyle(color: Colors.white70, fontSize: 12))),
         ],
@@ -4066,7 +4066,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                         ),
                         Text(
                           '${candidates.length} filed',
-                          style: const TextStyle(color: Colors.white38, fontSize: 10),
+                          style: const TextStyle(color: Colors.white60, fontSize: 10),
                         ),
                       ],
                     ),
@@ -4168,7 +4168,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 '$score',
                 style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 48, fontWeight: FontWeight.bold),
               ),
-              Text(' / $maxScore', style: const TextStyle(color: Colors.white38, fontSize: 20)),
+              Text(' / $maxScore', style: const TextStyle(color: Colors.white60, fontSize: 20)),
             ],
           ),
           const SizedBox(height: 12),
@@ -4221,9 +4221,9 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(label, style: TextStyle(color: active ? Colors.white70 : Colors.white38, fontSize: 13)),
+            child: Text(label, style: TextStyle(color: active ? Colors.white70 : Colors.white60, fontSize: 13)),
           ),
-          Text(value, style: TextStyle(color: active ? Colors.white : Colors.white38, fontSize: 13, fontWeight: FontWeight.w500)),
+          Text(value, style: TextStyle(color: active ? Colors.white : Colors.white60, fontSize: 13, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -4337,14 +4337,14 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               color: Colors.white.withOpacity(0.06),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: Colors.white38, size: 15),
+            child: Icon(icon, color: Colors.white60, size: 15),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 11, fontWeight: FontWeight.w500)),
+                Text(label, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 1),
                 Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.3)),
               ],
