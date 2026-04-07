@@ -520,8 +520,10 @@ class Main extends StatelessWidget {
                   // else (like a dashboard tile) receives focus first.
                   // Only wrap in SelectionArea on desktop where text
                   // selection is expected. On mobile web, skip it entirely.
+                  // Use shortestSide instead of width so landscape iPhones
+                  // (width > 600) still skip SelectionArea on mobile web.
                   final bool isMobileWeb = kIsWeb &&
-                      MediaQuery.of(context).size.width < 600;
+                      MediaQuery.of(context).size.shortestSide < 600;
                   Widget gateChild = SecureGate(
                         blurr: 5,
                         opacity: 0,

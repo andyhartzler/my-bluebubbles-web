@@ -10,6 +10,9 @@ import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_painters.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
+import 'package:bluebubbles/screens/crm/donor_detail_screen.dart';
+import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATE DETAIL SCREEN
@@ -1570,7 +1573,19 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             final location = [city, state].where((s) => s.isNotEmpty).join(', ');
             final barWidth = maxAmount > 0 ? amount / maxAmount : 0.0;
 
-            return Container(
+            final donorId = donor['donor_id'] as int?;
+
+            return GestureDetector(
+              onTap: donorId != null
+                  ? () => Navigator.of(context).push(
+                        ThemeSwitcher.buildPageRoute(
+                          builder: (_) => TitleBarWrapper(
+                            child: DonorDetailScreen(donorId: donorId.toString()),
+                          ),
+                        ),
+                      )
+                  : null,
+              child: Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -1641,6 +1656,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   ),
                 ],
               ),
+            ),
             );
           }),
         ],

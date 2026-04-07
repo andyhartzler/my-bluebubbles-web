@@ -5,7 +5,10 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
 
   <!-- CRITICAL: Viewport for fullscreen PWA -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <!-- FIX: Removed user-scalable=no and maximum-scale=1.0 which caused first-touch
+       drop on iOS 16+ PWA after focus context switch. Using touch-action: manipulation
+       in CSS instead to suppress 300ms tap delay without the side effects. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
   <!-- CRITICAL: App name for iOS home screen -->
   <meta name="apple-mobile-web-app-title" content="MOYD App">
@@ -100,6 +103,9 @@
   <script src="flutter.js" defer=""></script>
 
   <style>
+    /* Suppress 300ms tap delay on mobile without user-scalable=no side effects */
+    * { touch-action: manipulation; }
+
     html, body {
       height: 100%;
       margin: 0;

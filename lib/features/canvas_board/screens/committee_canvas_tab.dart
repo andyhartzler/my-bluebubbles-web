@@ -778,7 +778,7 @@ class _CommitteeCanvasTabState extends State<CommitteeCanvasTab> with SingleTick
 
     return Focus(
       focusNode: _canvasFocusNode,
-      autofocus: true,
+      autofocus: false, // FIX: was true — stole web document focus from IndexedStack, breaking PWA touch
       onKeyEvent: _handleKeyEvent,
       child: Stack(
         children: [
