@@ -1234,6 +1234,14 @@ class _HomeState extends OptimizedState<Home>
             buildOutreachButton(hideIcon: hideIcons),
             _buildNavButton(
               context,
+              _HomeSection.candidates,
+              'Candidates',
+              Icons.how_to_vote,
+              enabled: crmReady,
+              hideIcon: hideIcons,
+            ),
+            _buildNavButton(
+              context,
               _HomeSection.members,
               'Members',
               Icons.groups_outlined,
