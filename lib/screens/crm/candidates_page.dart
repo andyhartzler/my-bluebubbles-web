@@ -593,8 +593,9 @@ class _CandidatesPageState extends State<CandidatesPage>
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
                       sliver: SliverGrid(
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: constraints.maxWidth > 1400 ? 3 : 2,
-                          childAspectRatio: 3.2,
+                          // Use right-pane width (not full page) for column calc
+                          crossAxisCount: (constraints.maxWidth - leftWidth) > 900 ? 3 : 2,
+                          childAspectRatio: 2.8,
                           crossAxisSpacing: 8,
                           mainAxisSpacing: 8,
                         ),
@@ -637,6 +638,26 @@ class _CandidatesPageState extends State<CandidatesPage>
               SliverToBoxAdapter(child: _buildFiltersSection()),
               if (_showAdvancedFilters)
                 SliverToBoxAdapter(child: _buildAdvancedFilters()),
+              // Active filter indicator
+              if (_activeFilterCount > 0)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Row(
+                      children: [
+                        Icon(Icons.filter_list, color: BrandColors.sunriseGold, size: 16),
+                        const SizedBox(width: 6),
+                        Text('${_filteredCandidates.length} of ${_allCandidates.length} candidates',
+                          style: TextStyle(color: BrandColors.sunriseGold, fontSize: 13, fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: _resetAdvancedFilters,
+                          child: Text('Clear all', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12, decoration: TextDecoration.underline)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
                 sliver: SliverList(
@@ -900,7 +921,15 @@ class _CandidatesPageState extends State<CandidatesPage>
         _clickableStatCard(Icons.star, '${_stats.youngDemocrats}', 'Young Dems',
             isActive: _ydOnly,
             onTap: () { setState(() { _ydOnly = !_ydOnly; }); _applyFilters(); }),
-        _clickableStatCard(Icons.gavel, '${_stats.uncontestedDemSeats}', 'Uncontested (D)'),
+        _clickableStatCard(Icons.gavel, '${_stats.uncontestedDemSeats}', 'Uncontested (D)',
+            isActive: _partyFilter == 'Democratic' && _officeLevelFilter == 'state',
+            onTap: () { setState(() {
+              if (_partyFilter == 'Democratic' && _officeLevelFilter == 'state') {
+                _partyFilter = null; _officeLevelFilter = null;
+              } else {
+                _partyFilter = 'Democratic'; _officeLevelFilter = 'state';
+              }
+            }); _applyFilters(); }),
         _clickableStatCard(Icons.thumb_up, '${_stats.endorsed}', 'Endorsed',
             isActive: _moydEndorsed,
             onTap: () { setState(() { _moydEndorsed = !_moydEndorsed; }); _applyFilters(); }),
