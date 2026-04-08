@@ -1146,23 +1146,6 @@ class _HomeState extends OptimizedState<Home>
               contentPadding: EdgeInsets.zero,
             ),
           ),
-          PopupMenuItem<VoidCallback>(
-            value: crmReady
-                ? () => _setSection(_HomeSection.candidates)
-                : null,
-            enabled: crmReady,
-            child: ListTile(
-              leading: const Icon(Icons.how_to_vote),
-              title: const Text('Candidates'),
-              subtitle: crmReady
-                  ? null
-                  : const Text(
-                      'Available when CRM is connected',
-                      style: TextStyle(fontSize: 11),
-                    ),
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
         ],
         child: hideIcon
             ? TextButton(
