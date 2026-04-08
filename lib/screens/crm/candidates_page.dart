@@ -509,26 +509,124 @@ class _CandidatesPageState extends State<CandidatesPage>
       );
     }
 
+    return LayoutBuilder(builder: (context, constraints) {
+      final isDesktop = constraints.maxWidth >= 900;
+      return isDesktop ? _buildDesktopLayout(constraints) : _buildMobileLayout();
+    });
+  }
+
+  // ── Desktop: 2-column layout (map+filters left, list right) ──
+  Widget _buildDesktopLayout(BoxConstraints constraints) {
+    final leftWidth = math.min(440.0, constraints.maxWidth * 0.38);
+
     return Column(
       children: [
-        // ── Bulk Actions Toolbar (when in bulk mode) ──
         if (_bulkMode) _buildBulkToolbar(),
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // LEFT PANE: Map + Stats Grid + Filters
+              SizedBox(
+                width: leftWidth,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.all(12),
+                        children: [
+                          _buildMapSection(desktopHeight: 420),
+                          const SizedBox(height: 12),
+                          _buildStatsGrid(),
+                          const SizedBox(height: 12),
+                          _buildFiltersSection(),
+                          if (_showAdvancedFilters) ...[
+                            const SizedBox(height: 8),
+                            _buildAdvancedFilters(),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Divider
+              Container(width: 1, color: Colors.white.withOpacity(0.08)),
+              // RIGHT PANE: YD Spotlight + Analytics + Candidate Grid
+              Expanded(
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  slivers: [
+                    if (_youngDems.isNotEmpty)
+                      SliverToBoxAdapter(child: _buildYdSpotlight()),
+                    SliverToBoxAdapter(child: _buildAnalyticsToggle()),
+                    if (_showAnalytics)
+                      SliverToBoxAdapter(
+                        child: _analyticsLoading
+                            ? CandidateUI.shimmerSkeleton(cardCount: 2)
+                            : _buildAnalyticsSection(),
+                      ),
+                    // Active filter chip
+                    if (_activeFilterCount > 0)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          child: Row(
+                            children: [
+                              Icon(Icons.filter_list, color: BrandColors.sunriseGold, size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${_filteredCandidates.length} of ${_allCandidates.length} candidates',
+                                style: TextStyle(color: BrandColors.sunriseGold, fontSize: 13, fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: _resetAdvancedFilters,
+                                child: Text('Clear all', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12, decoration: TextDecoration.underline)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    // Candidate grid (2 columns)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
+                      sliver: SliverGrid(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: constraints.maxWidth > 1400 ? 3 : 2,
+                          childAspectRatio: 3.2,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => _buildCandidateRow(_filteredCandidates[index]),
+                          childCount: _filteredCandidates.length,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
+  // ── Mobile: original single-column layout ──
+  Widget _buildMobileLayout() {
+    return Column(
+      children: [
+        if (_bulkMode) _buildBulkToolbar(),
         Expanded(
           child: CustomScrollView(
             controller: _scrollController,
             slivers: [
-              // ── Missouri Map Hero ──
               SliverToBoxAdapter(child: _buildMapSection()),
-
-              // ── Stats Bar ──
               SliverToBoxAdapter(child: _buildStatsBar()),
-
-              // ── Young Democrat Spotlight ──
               if (_youngDems.isNotEmpty)
                 SliverToBoxAdapter(child: _buildYdSpotlight()),
-
-              // ── Analytics Section (collapsible) ──
               SliverToBoxAdapter(child: _buildAnalyticsToggle()),
               if (_showAnalytics)
                 SliverToBoxAdapter(
@@ -536,21 +634,14 @@ class _CandidatesPageState extends State<CandidatesPage>
                       ? CandidateUI.shimmerSkeleton(cardCount: 2)
                       : _buildAnalyticsSection(),
                 ),
-
-              // ── Filters + Search ──
               SliverToBoxAdapter(child: _buildFiltersSection()),
-
-              // ── Advanced Filters (expandable) ──
               if (_showAdvancedFilters)
                 SliverToBoxAdapter(child: _buildAdvancedFilters()),
-
-              // ── Candidate List ──
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) =>
-                        _buildCandidateRow(_filteredCandidates[index]),
+                    (context, index) => _buildCandidateRow(_filteredCandidates[index]),
                     childCount: _filteredCandidates.length,
                   ),
                 ),
@@ -679,7 +770,7 @@ class _CandidatesPageState extends State<CandidatesPage>
   //  MISSOURI MAP — Interactive district visualization
   // ═══════════════════════════════════════════════════════════════
 
-  Widget _buildMapSection() {
+  Widget _buildMapSection({double? desktopHeight}) {
     return Column(
       children: [
         MissouriMapWidget(
@@ -687,7 +778,7 @@ class _CandidatesPageState extends State<CandidatesPage>
           senateDistrictMap: _senateDistrictMap,
           congressionalDistrictMap: _congressionalDistrictMap,
           selectedDistrict: _selectedMapDistrict,
-          height: 340,
+          height: desktopHeight ?? 340,
           showLegend: true,
           showLabels: true,
           interactive: true,
@@ -791,6 +882,78 @@ class _CandidatesPageState extends State<CandidatesPage>
   // ═══════════════════════════════════════════════════════════════
   //  STATS BAR
   // ═══════════════════════════════════════════════════════════════
+
+  // ── Desktop: Stats grid with clickable filter cards ──
+  Widget _buildStatsGrid() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _clickableStatCard(Icons.people, '${_stats.totalCandidates}', 'Total',
+            onTap: _resetAdvancedFilters),
+        _clickableStatCard(Icons.groups, '${_stats.democrats}', 'Democrats',
+            isActive: _partyFilter == 'Democratic',
+            onTap: () { setState(() { _partyFilter = _partyFilter == 'Democratic' ? null : 'Democratic'; }); _applyFilters(); }),
+        _clickableStatCard(Icons.groups_outlined, '${_stats.republicans}', 'Republicans',
+            isActive: _partyFilter == 'Republican',
+            onTap: () { setState(() { _partyFilter = _partyFilter == 'Republican' ? null : 'Republican'; }); _applyFilters(); }),
+        _clickableStatCard(Icons.star, '${_stats.youngDemocrats}', 'Young Dems',
+            isActive: _ydOnly,
+            onTap: () { setState(() { _ydOnly = !_ydOnly; }); _applyFilters(); }),
+        _clickableStatCard(Icons.gavel, '${_stats.uncontestedDemSeats}', 'Uncontested (D)'),
+        _clickableStatCard(Icons.thumb_up, '${_stats.endorsed}', 'Endorsed',
+            isActive: _moydEndorsed,
+            onTap: () { setState(() { _moydEndorsed = !_moydEndorsed; }); _applyFilters(); }),
+        _clickableStatCard(Icons.phone_in_talk, '${_stats.contacted}', 'Contacted',
+            isActive: _moydContacted,
+            onTap: () { setState(() { _moydContacted = !_moydContacted; }); _applyFilters(); }),
+        _clickableStatCard(Icons.language, '${_stats.withWebsite}', 'Has Website',
+            isActive: _hasCampaignWebsite,
+            onTap: () { setState(() { _hasCampaignWebsite = !_hasCampaignWebsite; }); _applyFilters(); }),
+        _clickableStatCard(Icons.attach_money, '${_stats.withMecCommittee}', 'MEC Filed',
+            isActive: _hasFinanceFiled,
+            onTap: () { setState(() { _hasFinanceFiled = !_hasFinanceFiled; }); _applyFilters(); }),
+      ],
+    );
+  }
+
+  Widget _clickableStatCard(IconData icon, String value, String label, {bool isActive = false, VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 120,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isActive
+                ? [BrandColors.sunriseGold.withOpacity(0.2), BrandColors.sunriseGold.withOpacity(0.08)]
+                : [Colors.white.withOpacity(0.06), Colors.white.withOpacity(0.02)],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isActive ? BrandColors.sunriseGold.withOpacity(0.5) : Colors.white.withOpacity(0.08),
+            width: isActive ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: isActive ? BrandColors.sunriseGold : Colors.white.withOpacity(0.5), size: 18),
+            const SizedBox(height: 6),
+            Text(value, style: TextStyle(
+              color: isActive ? BrandColors.sunriseGold : Colors.white,
+              fontSize: 18, fontWeight: FontWeight.w800,
+            )),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(
+              color: isActive ? BrandColors.sunriseGold.withOpacity(0.8) : Colors.white.withOpacity(0.5),
+              fontSize: 10, fontWeight: FontWeight.w500,
+            ), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildStatsBar() {
     return Container(
