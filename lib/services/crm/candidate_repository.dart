@@ -100,7 +100,7 @@ class CandidateRepository {
         query = query.lte('estimated_age', maxAge);
       }
       if (assignedTo != null) {
-        query = query.eq('assigned_to', assignedTo);
+        query = query.eq('moyd_assigned_to', assignedTo);
       }
       // District range — use the `district_num` generated column (integer) so
       // the DB does the filtering with an index instead of parsing text client-side.
@@ -365,7 +365,7 @@ class CandidateRepository {
   Future<void> toggleEndorsement(String id, bool endorsed) async {
     await updateCandidate(id, {
       'moyd_endorsed': endorsed,
-      'endorsement_status': endorsed ? 'endorsed' : 'not_endorsed',
+      'moyd_endorsement_status': endorsed ? 'endorsed' : 'not_endorsed',
     });
   }
 
@@ -374,15 +374,15 @@ class CandidateRepository {
   Future<void> markContacted(String id, String method) async {
     await updateCandidate(id, {
       'moyd_contacted': true,
-      'last_contact_date': DateTime.now().toIso8601String(),
-      'contact_method': method,
+      'moyd_contact_date': DateTime.now().toIso8601String(),
+      'moyd_contact_method': method,
     });
   }
 
   // ─── Assign team member ────────────────────────────────────────
 
   Future<void> assignTeamMember(String id, String? memberName) async {
-    await updateCandidate(id, {'assigned_to': memberName});
+    await updateCandidate(id, {'moyd_assigned_to': memberName});
   }
 
   // ─── Create new candidate ──────────────────────────────────────
@@ -670,7 +670,7 @@ class CandidateRepository {
     try {
       await _client
           .from('candidates')
-          .update({'assigned_to': assignee, 'updated_at': DateTime.now().toIso8601String()})
+          .update({'moyd_assigned_to': assignee, 'updated_at': DateTime.now().toIso8601String()})
           .inFilter('id', candidateIds);
     } catch (e) {
       debugPrint('❌ bulkAssign error: $e');
@@ -687,7 +687,7 @@ class CandidateRepository {
           .update({
             'moyd_contacted': true,
             'moyd_contact_date': DateTime.now().toIso8601String(),
-            'contact_method': method,
+            'moyd_contact_method': method,
             'updated_at': DateTime.now().toIso8601String(),
           })
           .inFilter('id', candidateIds);
@@ -1178,11 +1178,9 @@ class CandidateRepository {
           .from('candidate_endorsements')
           .insert({
             'candidate_id': candidateId,
-            'endorser_name': endorser,
-            'endorsement_type': type,
-            'notes': notes,
-            'endorser_url': endorserUrl,
-            'created_at': DateTime.now().toIso8601String(),
+            'endorser': endorser,
+            'endorser_type': type,
+            'source_url': endorserUrl,
           })
           .select()
           .single();
@@ -1218,7 +1216,7 @@ class CandidateRepository {
       if (current == null) return;
       await updateCandidate(candidateId, {
         'moyd_endorsed': !current.isEndorsed,
-        'endorsement_status': !current.isEndorsed ? 'endorsed' : 'not_endorsed',
+        'moyd_endorsement_status': !current.isEndorsed ? 'endorsed' : 'not_endorsed',
       });
     } catch (e) {
       debugPrint('❌ CandidateRepository.toggleMOYDEndorsed error: $e');

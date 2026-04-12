@@ -176,7 +176,7 @@ class DonorProfileRepository {
       final end = start + pageSize - 1;
 
       final response = await query
-          .order('date', ascending: false)
+          .order('contribution_date', ascending: false)
           .range(start, end);
 
       return (response as List<dynamic>? ?? [])

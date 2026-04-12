@@ -37,19 +37,13 @@ class ContributionRecord {
 
   factory ContributionRecord.fromJson(Map<String, dynamic> json) {
     return ContributionRecord(
-      id: json['id'] as String?,
+      id: json['source_id'] as String?,
       profileId: json['profile_id'] as String?,
       source: json['source'] as String?,
-      contributorName: json['contributor_name'] as String?,
+      contributorName: json['recipient_name'] as String?,
       amount: (json['amount'] as num?)?.toDouble(),
-      date: DonorProfile._parseDate(json['date']),
-      committeeName: json['committee_name'] as String?,
-      committeeId: json['committee_id'] as String?,
+      date: DonorProfile._parseDate(json['contribution_date']),
       paymentMethod: json['payment_method'] as String?,
-      employer: json['employer'] as String?,
-      occupation: json['occupation'] as String?,
-      eventTitle: json['event_title'] as String?,
-      sentThankYou: json['sent_thank_you'] as bool?,
     );
   }
 }
