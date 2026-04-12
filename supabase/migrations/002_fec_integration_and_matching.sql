@@ -32,7 +32,7 @@ SELECT
   d.campaign as recipient_name,
   d.recurring,
   d.status,
-  d.id as source_id
+  d.id::text as source_id
 FROM public.donor_profiles dp
 JOIN public.donations d ON d.donor_id = dp.donor_id
 WHERE dp.donor_id IS NOT NULL
@@ -410,6 +410,7 @@ $$;
 
 -- 7. Create get_donor_unified_profile — full MEC+FEC profile by mec_donor_id
 --    The app calls this via mec_repository.dart#getDonorUnifiedProfile
+DROP FUNCTION IF EXISTS public.get_donor_unified_profile(integer);
 CREATE OR REPLACE FUNCTION public.get_donor_unified_profile(p_donor_id INTEGER)
 RETURNS JSONB
 LANGUAGE plpgsql
