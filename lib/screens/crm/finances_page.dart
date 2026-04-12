@@ -864,15 +864,18 @@ class _FinancesPageState extends State<FinancesPage>
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [color.withOpacity(0.12), Colors.white.withOpacity(0.04)],
+          colors: [
+            BrandColors.unityBlue.withOpacity(0.95),
+            BrandColors.unityBlue.withOpacity(0.8),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withOpacity(0.4)),
         boxShadow: [
           BoxShadow(
-              color: color.withOpacity(0.08),
+              color: Colors.black.withOpacity(0.2),
               blurRadius: 12,
               offset: const Offset(0, 4)),
         ],
@@ -880,7 +883,7 @@ class _FinancesPageState extends State<FinancesPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color.withOpacity(0.7), size: 18),
+          Icon(icon, color: color, size: 18),
           const SizedBox(height: 10),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -898,8 +901,8 @@ class _FinancesPageState extends State<FinancesPage>
                   fontSize: 12,
                   fontWeight: FontWeight.w600)),
           Text(subtitle,
-              style: TextStyle(
-                  color: Colors.white.withOpacity(0.7), fontSize: 10)),
+              style: const TextStyle(
+                  color: Colors.white70, fontSize: 10)),
         ],
       ),
     );
@@ -959,7 +962,7 @@ class _FinancesPageState extends State<FinancesPage>
                         return Text(
                           '\$${CandidateUI.formatMoneyShort(value)}',
                           style: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
+                              color: Colors.white.withOpacity(0.7),
                               fontSize: 10),
                         );
                       },
@@ -1295,7 +1298,7 @@ class _FinancesPageState extends State<FinancesPage>
                               overflow: TextOverflow.ellipsis),
                           Text(date,
                               style: TextStyle(
-                                  color: Colors.white.withOpacity(0.4),
+                                  color: Colors.white.withOpacity(0.7),
                                   fontSize: 10)),
                         ],
                       ),
@@ -1791,7 +1794,7 @@ class _FinancesPageState extends State<FinancesPage>
                     style: TextStyle(
                       color: included
                           ? Colors.white
-                          : Colors.white.withOpacity(0.4),
+                          : Colors.white.withOpacity(0.7),
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1802,7 +1805,7 @@ class _FinancesPageState extends State<FinancesPage>
                     Flexible(
                       child: Text('$date • $category',
                           style: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
+                              color: Colors.white.withOpacity(0.7),
                               fontSize: 10),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis),
@@ -1841,7 +1844,7 @@ class _FinancesPageState extends State<FinancesPage>
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Icon(Icons.label_outline,
-                    color: Colors.white.withOpacity(0.3), size: 14),
+                    color: Colors.white.withOpacity(0.6), size: 14),
               ),
             ),
           const SizedBox(width: 8),
@@ -2598,7 +2601,7 @@ class _FinancesPageState extends State<FinancesPage>
                             style: TextStyle(
                               color: isSelected
                                   ? Colors.white
-                                  : Colors.white.withOpacity(0.4),
+                                  : Colors.white.withOpacity(0.7),
                               fontSize: 10,
                               fontWeight: isSelected
                                   ? FontWeight.w700
@@ -2761,7 +2764,7 @@ class _FinancesPageState extends State<FinancesPage>
                               fontSize: 11)),
                       Text('Itemized for MEC',
                           style: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
+                              color: Colors.white.withOpacity(0.7),
                               fontSize: 11)),
                     ],
                   ),
@@ -3272,6 +3275,7 @@ class _ValidationWarning {
 }
 
 /// Inline receipt viewer using WebView
+/// Handles both HTML and PDF files — PDFs are wrapped in an HTML iframe
 class _ReceiptWebView extends StatefulWidget {
   final String url;
   const _ReceiptWebView({required this.url});
@@ -3283,6 +3287,7 @@ class _ReceiptWebView extends StatefulWidget {
 class _ReceiptWebViewState extends State<_ReceiptWebView> {
   late final WebViewController _controller;
   bool _loading = true;
+  bool _hasError = false;
 
   @override
   void initState() {
@@ -3294,12 +3299,59 @@ class _ReceiptWebViewState extends State<_ReceiptWebView> {
         onPageFinished: (_) {
           if (mounted) setState(() => _loading = false);
         },
-      ))
-      ..loadRequest(Uri.parse(widget.url));
+        onWebResourceError: (_) {
+          if (mounted) setState(() { _loading = false; _hasError = true; });
+        },
+      ));
+
+    // For PDFs, use an HTML wrapper with embedded iframe
+    // For HTML, load directly
+    final url = widget.url;
+    if (url.endsWith('.pdf') || url.contains('.pdf?')) {
+      // Wrap PDF in HTML with embedded object/iframe
+      final html = '''
+<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { margin: 0; padding: 0; }
+  body { background: #fff; }
+  iframe { width: 100%; height: 100vh; border: none; }
+</style>
+</head><body>
+<iframe src="https://docs.google.com/gviewr/viewer?url=${Uri.encodeComponent(url)}&embedded=true"></iframe>
+</body></html>''';
+      _controller.loadHtmlString(html);
+    } else {
+      _controller.loadRequest(Uri.parse(url));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_hasError) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.warning_amber, color: Colors.orange, size: 32),
+            const SizedBox(height: 8),
+            const Text('Could not render document',
+                style: TextStyle(color: Colors.black54, fontSize: 13)),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () {
+                final uri = Uri.tryParse(widget.url);
+                if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+              },
+              icon: const Icon(Icons.open_in_new, size: 16),
+              label: const Text('Open in browser'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Stack(
       children: [
         WebViewWidget(controller: _controller),
