@@ -43,6 +43,7 @@ import 'package:bluebubbles/features/forms/screens/forms_main_screen.dart';
 import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
 import 'package:bluebubbles/screens/crm/surveys_screen.dart';
 import 'package:bluebubbles/screens/crm/candidates_page.dart';
+import 'package:bluebubbles/screens/crm/finances_page.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:provider/provider.dart';
@@ -668,6 +669,7 @@ enum _HomeSection {
   conversations,
   surveys,
   candidates,
+  finances,
 }
 
 class _HomeState extends OptimizedState<Home>
@@ -1031,6 +1033,7 @@ class _HomeState extends OptimizedState<Home>
                       ),
                       const SurveysScreen(key: PageStorageKey('surveys-view')),
                       const CandidatesPage(key: PageStorageKey('candidates-view')),
+                      const FinancesPage(key: PageStorageKey('finances-view')),
                     ],
                   ),
                 ),
@@ -1220,6 +1223,14 @@ class _HomeState extends OptimizedState<Home>
               _HomeSection.candidates,
               'Candidates',
               Icons.how_to_vote,
+              enabled: crmReady,
+              hideIcon: hideIcons,
+            ),
+            _buildNavButton(
+              context,
+              _HomeSection.finances,
+              'Finances',
+              Icons.account_balance,
               enabled: crmReady,
               hideIcon: hideIcons,
             ),
@@ -1637,6 +1648,16 @@ class _HomeState extends OptimizedState<Home>
                   ),
                   buildItem(
                     order: 14,
+                    icon: Icons.account_balance,
+                    label: 'Finances',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.finances)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 15,
                     icon: Icons.how_to_vote,
                     label: 'Candidates',
                     enabled: crmReady,

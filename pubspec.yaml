@@ -230,6 +230,7 @@ dependencies:
     path: packages/app_install_date_stub
   # Canvas Board dependencies
   perfect_freehand: ^2.5.1  # For smooth freehand drawing
+  plaid_flutter: ^5.1.1
 
 dependency_overrides:
   # overrides for packages stuck on outdated versions
