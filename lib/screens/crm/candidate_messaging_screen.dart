@@ -464,8 +464,12 @@ Missouri Young Democrats''',
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: BrandColors.unityBlue.withOpacity(0.9),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3)),
+        ],
       ),
       child: TabBar(
         controller: _tabController,
@@ -639,9 +643,12 @@ Missouri Young Democrats''',
           Container(
             constraints: const BoxConstraints(minHeight: 300),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
+              color: BrandColors.unityBlue.withOpacity(0.9),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.white.withOpacity(0.08)),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3)),
+              ],
             ),
             child: TextField(
               controller: _bodyController,
@@ -709,23 +716,18 @@ Missouri Young Democrats''',
           return Container(
             margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isSelected
-                    ? [
-                        BrandColors.sunriseGold.withOpacity(0.15),
-                        BrandColors.sunriseGold.withOpacity(0.05),
-                      ]
-                    : [
-                        Colors.white.withOpacity(0.06),
-                        Colors.white.withOpacity(0.03),
-                      ],
-              ),
+              color: isSelected
+                  ? BrandColors.sunriseGold.withOpacity(0.18)
+                  : BrandColors.unityBlue.withOpacity(0.9),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: isSelected
                     ? BrandColors.sunriseGold.withOpacity(0.4)
                     : Colors.white.withOpacity(0.08),
               ),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3)),
+              ],
             ),
             child: InkWell(
               onTap: () {
@@ -828,7 +830,7 @@ Missouri Young Democrats''',
       hintText: hint,
       hintStyle: const TextStyle(color: Colors.white70),
       filled: true,
-      fillColor: Colors.white.withOpacity(0.06),
+      fillColor: BrandColors.unityBlue.withOpacity(0.9),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
@@ -852,9 +854,12 @@ Missouri Young Democrats''',
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.06),
+          color: BrandColors.unityBlue.withOpacity(0.9),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.white.withOpacity(0.08)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3)),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

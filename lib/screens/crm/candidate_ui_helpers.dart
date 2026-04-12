@@ -1,23 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 
 /// Shared UI helpers used across candidate detail tabs.
 /// Extracted from candidate_detail_screen.dart to reduce file size.
 class CandidateUI {
   CandidateUI._();
 
-  /// Gradient-bordered card with title+icon header and arbitrary child content.
+  /// Solid-dark card with title+icon header and arbitrary child content.
   static Widget card(String title, IconData icon, Color accent, {required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.07),
-            Colors.white.withOpacity(0.02),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: BrandColors.unityBlue.withOpacity(0.9),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: accent.withOpacity(0.12)),
         boxShadow: [

@@ -224,9 +224,12 @@ class _CandidateCompareScreenState extends State<CandidateCompareScreen>
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.06),
+          color: BrandColors.unityBlue.withOpacity(0.9),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white.withOpacity(0.06)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3)),
+          ],
         ),
         child: Row(
           children: [

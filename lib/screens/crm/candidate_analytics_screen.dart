@@ -173,8 +173,12 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: BrandColors.unityBlue.withOpacity(0.9),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3)),
+        ],
       ),
       child: TabBar(
         controller: _tabController,
