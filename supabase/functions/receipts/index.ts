@@ -214,12 +214,12 @@ serve(async (req) => {
           if (uploadErr) console.error("Upload error:", uploadErr);
         }
 
-        // Get signed URL (valid for 1 year)
+        // Get permanent public URL (bucket is public)
         if (storagePath) {
-          const { data: urlData } = await supabase.storage
+          const { data: urlData } = supabase.storage
             .from("receipts")
-            .createSignedUrl(storagePath, 365 * 24 * 60 * 60);
-          storageUrl = urlData?.signedUrl || "";
+            .getPublicUrl(storagePath);
+          storageUrl = urlData?.publicUrl || "";
         }
 
         // Insert receipt record
@@ -322,7 +322,7 @@ serve(async (req) => {
         );
       }
 
-      // ── Refresh signed URL for a receipt ──
+      // ── Get public URL for a receipt ──
       case "refresh_url": {
         const { receipt_id } = params;
         const { data: receipt } = await supabase
@@ -338,18 +338,18 @@ serve(async (req) => {
           );
         }
 
-        const { data: urlData } = await supabase.storage
+        const { data: urlData } = supabase.storage
           .from("receipts")
-          .createSignedUrl(receipt.storage_path, 365 * 24 * 60 * 60);
+          .getPublicUrl(receipt.storage_path);
 
         // Update stored URL
         await supabase
           .from("receipts")
-          .update({ storage_url: urlData?.signedUrl, updated_at: new Date().toISOString() })
+          .update({ storage_url: urlData?.publicUrl, updated_at: new Date().toISOString() })
           .eq("id", receipt_id);
 
         return new Response(
-          JSON.stringify({ url: urlData?.signedUrl }),
+          JSON.stringify({ url: urlData?.publicUrl }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
