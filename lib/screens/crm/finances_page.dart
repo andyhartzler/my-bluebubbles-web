@@ -268,6 +268,7 @@ class _FinancesPageState extends State<FinancesPage>
   // ═══════════════════════════════════════════════════════════════
 
   Future<void> _syncTransactions() async {
+    if (!mounted) return;
     setState(() => _syncing = true);
     try {
       await _supabase.privilegedClient.functions
@@ -293,13 +294,14 @@ class _FinancesPageState extends State<FinancesPage>
   }
 
   Future<void> _generateReport() async {
+    if (!mounted) return;
     setState(() => _generating = true);
     try {
       final resp = await _supabase.privilegedClient.functions.invoke('plaid',
           body: {'action': 'generate_mec_report', 'quarter': _selectedQuarter});
       await _loadReports();
       if (mounted) {
-        final data = jsonDecode(resp.data as String? ?? '{}');
+        final data = resp.data is Map ? resp.data as Map<String, dynamic> : (resp.data is String ? jsonDecode(resp.data as String) : <String, dynamic>{});
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               'Report generated: ${data['contributions']?['count'] ?? 0} contributions, '
@@ -325,7 +327,7 @@ class _FinancesPageState extends State<FinancesPage>
             'action': 'create_link_token',
             'redirect_uri': 'https://moyd.app/plaid/callback',
           });
-      final data = jsonDecode(resp.data as String? ?? '{}');
+      final data = resp.data is Map ? resp.data as Map<String, dynamic> : (resp.data is String ? jsonDecode(resp.data as String) : <String, dynamic>{});
       final linkToken = data['link_token'] as String?;
       if (linkToken == null) throw Exception('No link token returned');
       if (mounted) {

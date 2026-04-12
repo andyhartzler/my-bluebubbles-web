@@ -1667,14 +1667,14 @@ class _HomeState extends OptimizedState<Home>
                         : null,
                   ),
                   buildItem(
-                    order: 15,
+                    order: 16,
                     icon: Icons.chat_bubble_outline,
                     label: 'Conversations',
                     onActivate: () => _setSection(_HomeSection.conversations),
                   ),
                   const Divider(),
                   buildItem(
-                    order: 16,
+                    order: 17,
                     icon: Icons.search,
                     label: 'Search CRM',
                     enabled: crmReady,
@@ -1684,19 +1684,19 @@ class _HomeState extends OptimizedState<Home>
                         : null,
                   ),
                   buildItem(
-                    order: 16,
+                    order: 18,
                     icon: Icons.add_comment,
                     label: 'New Message',
                     onActivate: () => _openNewMessage(parentContext),
                   ),
                   buildItem(
-                    order: 17,
+                    order: 19,
                     icon: Icons.email_outlined,
                     label: 'New Email',
                     onActivate: () => _openNewEmail(parentContext),
                   ),
                   buildItem(
-                    order: 18,
+                    order: 20,
                     icon: Icons.settings_outlined,
                     label: 'Settings',
                     onActivate: () => Actions.invoke(

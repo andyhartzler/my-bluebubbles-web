@@ -321,7 +321,7 @@ serve(async (req) => {
           .from("bank_transactions")
           .select("*")
           .gte("date", periodStart)
-          .lte("date", periodEnd)
+          .lte("date", periodEnd + "T23:59:59Z")
           .eq("mec_included", true)
           .gt("amount", 0) // Positive = debits/expenses in Plaid
           .order("date");
