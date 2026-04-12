@@ -65,6 +65,11 @@ class _FinancesPageState extends State<FinancesPage>
   bool _generating = false;
   String _selectedQuarter = '';
 
+  // ── Receipts state ──
+  List<Map<String, dynamic>> _receipts = [];
+  bool _receiptsLoading = true;
+  String _receiptFilter = 'all'; // 'all', 'unmatched', 'matched', 'inkind'
+
   // ── Donations / donors state ──
   List<Map<String, dynamic>> _donations = [];
   List<Map<String, dynamic>> _donors = [];
@@ -83,7 +88,7 @@ class _FinancesPageState extends State<FinancesPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
@@ -128,6 +133,7 @@ class _FinancesPageState extends State<FinancesPage>
         _connectionsLoading = false;
         _transactionsLoading = false;
         _reportsLoading = false;
+        _receiptsLoading = false;
       });
       return;
     }
@@ -137,6 +143,7 @@ class _FinancesPageState extends State<FinancesPage>
       _loadReports(),
       _loadDonations(),
       _loadDonors(),
+      _loadReceipts(),
     ]);
     _computeDerivedData();
     if (mounted) _staggerController.forward();
@@ -217,6 +224,22 @@ class _FinancesPageState extends State<FinancesPage>
         _donors = (resp as List).cast<Map<String, dynamic>>();
       });
     } catch (_) {}
+  }
+
+  Future<void> _loadReceipts() async {
+    try {
+      final resp = await _supabase.privilegedClient
+          .from('receipts')
+          .select()
+          .order('email_date', ascending: false)
+          .limit(200);
+      if (mounted) setState(() {
+        _receipts = (resp as List).cast<Map<String, dynamic>>();
+        _receiptsLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _receiptsLoading = false);
+    }
   }
 
   void _computeDerivedData() {
@@ -605,6 +628,7 @@ class _FinancesPageState extends State<FinancesPage>
                   tabs: const [
                     Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
                     Tab(icon: Icon(Icons.receipt_long), text: 'Transactions'),
+                    Tab(icon: Icon(Icons.receipt), text: 'Receipts'),
                     Tab(icon: Icon(Icons.description), text: 'MEC Reports'),
                   ],
                   labelColor: Colors.white,
@@ -633,6 +657,7 @@ class _FinancesPageState extends State<FinancesPage>
               children: [
                 _buildOverviewTab(),
                 _buildTransactionsTab(),
+                _buildReceiptsTab(),
                 _buildReportsTab(),
               ],
             ),
@@ -1948,7 +1973,471 @@ class _FinancesPageState extends State<FinancesPage>
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  TAB 3: MEC REPORTS — Timeline, validation, generation
+  //  TAB 3: RECEIPTS — View, match, and manage receipts
+  // ═══════════════════════════════════════════════════════════════
+
+  List<Map<String, dynamic>> get _filteredReceipts {
+    if (_receiptFilter == 'all') return _receipts;
+    return _receipts.where((r) => r['match_status'] == _receiptFilter).toList();
+  }
+
+  Widget _buildReceiptsTab() {
+    if (_receiptsLoading) return CandidateUI.shimmerSkeleton(cardCount: 4);
+
+    return LayoutBuilder(builder: (context, constraints) {
+      final isMobile = constraints.maxWidth < 600;
+      final hPad = isMobile ? 10.0 : 14.0;
+
+      return Column(
+        children: [
+          // Filter chips
+          Padding(
+            padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 6),
+            child: Row(
+              children: [
+                ...[
+                  ('all', 'All', Icons.list),
+                  ('unmatched', 'Unmatched', Icons.link_off),
+                  ('matched', 'Matched', Icons.link),
+                  ('inkind', 'In-Kind', Icons.volunteer_activism),
+                ].map((item) {
+                  final (value, label, icon) = item;
+                  final selected = _receiptFilter == value;
+                  final count = value == 'all'
+                      ? _receipts.length
+                      : _receipts.where((r) => r['match_status'] == value).length;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: GestureDetector(
+                      onTap: () => setState(() => _receiptFilter = value),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? BrandColors.momentumBlue.withOpacity(0.2)
+                              : Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: selected
+                                ? BrandColors.momentumBlue.withOpacity(0.5)
+                                : Colors.white.withOpacity(0.1),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(icon,
+                                color: selected ? BrandColors.momentumBlue : Colors.white70,
+                                size: 14),
+                            const SizedBox(width: 4),
+                            Text('$label ($count)',
+                                style: TextStyle(
+                                  color: selected ? BrandColors.momentumBlue : Colors.white70,
+                                  fontSize: 11,
+                                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                                )),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+
+          // Receipt list
+          Expanded(
+            child: _filteredReceipts.isEmpty
+                ? CandidateUI.emptyState(
+                    Icons.receipt,
+                    'No Receipts',
+                    _receiptFilter == 'all'
+                        ? 'Receipts from email will appear here automatically.'
+                        : 'No receipts with status "$_receiptFilter".',
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 12),
+                    itemCount: _filteredReceipts.length,
+                    itemBuilder: (context, index) =>
+                        _buildReceiptRow(_filteredReceipts[index]),
+                  ),
+          ),
+
+          // Summary bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.06),
+              border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  '${_filteredReceipts.length} receipts',
+                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12),
+                ),
+                const Spacer(),
+                Text(
+                  'Total: \$${CandidateUI.formatMoney(_filteredReceipts.fold(0.0, (sum, r) => sum + ((r['amount'] as num?)?.toDouble() ?? 0)))}',
+                  style: const TextStyle(
+                      color: BrandColors.sunriseGold,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    });
+  }
+
+  Widget _buildReceiptRow(Map<String, dynamic> r) {
+    final amount = (r['amount'] as num?)?.toDouble() ?? 0;
+    final vendor = r['vendor_name'] as String? ?? 'Unknown Vendor';
+    final category = r['category'] as String? ?? '';
+    final emailDate = r['email_date'] as String? ?? '';
+    final subject = r['email_subject'] as String? ?? '';
+    final matchStatus = r['match_status'] as String? ?? 'unmatched';
+    final hasFile = (r['storage_path'] as String?)?.isNotEmpty ?? false;
+
+    Color statusColor;
+    IconData statusIcon;
+    switch (matchStatus) {
+      case 'matched':
+        statusColor = BrandColors.success;
+        statusIcon = Icons.check_circle;
+        break;
+      case 'inkind':
+        statusColor = BrandColors.sunriseGold;
+        statusIcon = Icons.volunteer_activism;
+        break;
+      case 'ignored':
+        statusColor = Colors.grey;
+        statusIcon = Icons.block;
+        break;
+      default:
+        statusColor = Colors.orange;
+        statusIcon = Icons.pending;
+    }
+
+    return GestureDetector(
+      onTap: () => _showReceiptDetail(r),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+        ),
+        child: Row(
+          children: [
+            // Status indicator
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(statusIcon, color: statusColor, size: 16),
+            ),
+            const SizedBox(width: 10),
+            // Vendor + subject
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(vendor,
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  Row(
+                    children: [
+                      if (emailDate.isNotEmpty)
+                        Text('${_formatDate(emailDate)} • ',
+                            style: TextStyle(
+                                color: Colors.white.withOpacity(0.7), fontSize: 10)),
+                      Flexible(
+                        child: Text(category.isNotEmpty ? category : subject,
+                            style: TextStyle(
+                                color: Colors.white.withOpacity(0.7), fontSize: 10),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // File indicator
+            if (hasFile)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Icon(Icons.attach_file, color: Colors.white.withOpacity(0.5), size: 14),
+              ),
+            // Amount
+            if (amount > 0)
+              Text('\$${CandidateUI.formatMoney(amount)}',
+                  style: TextStyle(
+                      color: BrandColors.sunriseGold,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showReceiptDetail(Map<String, dynamic> r) {
+    final amount = (r['amount'] as num?)?.toDouble() ?? 0;
+    final vendor = r['vendor_name'] as String? ?? 'Unknown';
+    final category = r['category'] as String? ?? '';
+    final description = r['description'] as String? ?? '';
+    final subject = r['email_subject'] as String? ?? '';
+    final from = r['email_from'] as String? ?? '';
+    final matchStatus = r['match_status'] as String? ?? 'unmatched';
+    final storageUrl = r['storage_url'] as String? ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1A2E4A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, scrollCtrl) => ListView(
+          controller: scrollCtrl,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Header
+            Text(vendor,
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            if (amount > 0)
+              Text('\$${CandidateUI.formatMoney(amount)}',
+                  style: const TextStyle(
+                      color: BrandColors.sunriseGold,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900)),
+            const SizedBox(height: 16),
+
+            // Details
+            _receiptDetailRow('Category', category),
+            _receiptDetailRow('Description', description),
+            _receiptDetailRow('Subject', subject),
+            _receiptDetailRow('From', from),
+            _receiptDetailRow('Date', _formatDate(r['email_date'])),
+            _receiptDetailRow('Status', matchStatus.toUpperCase()),
+
+            const SizedBox(height: 16),
+
+            // Actions
+            Row(
+              children: [
+                Expanded(
+                  child: _actionButton(
+                    icon: Icons.link,
+                    label: 'Match',
+                    color: BrandColors.success,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showMatchDialog(r);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _actionButton(
+                    icon: Icons.volunteer_activism,
+                    label: 'In-Kind',
+                    color: BrandColors.sunriseGold,
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _updateReceiptStatus(r, 'inkind');
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _actionButton(
+                    icon: Icons.block,
+                    label: 'Ignore',
+                    color: Colors.grey,
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _updateReceiptStatus(r, 'ignored');
+                    },
+                  ),
+                ),
+              ],
+            ),
+
+            if (storageUrl.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _actionButton(
+                icon: Icons.open_in_new,
+                label: 'View Receipt Document',
+                color: BrandColors.momentumBlue,
+                onTap: () {
+                  final uri = Uri.tryParse(storageUrl);
+                  if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _receiptDetailRow(String label, String value) {
+    if (value.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(label,
+                style: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(color: Colors.white, fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateReceiptStatus(Map<String, dynamic> r, String status) async {
+    final id = r['id'];
+    if (id == null) return;
+    try {
+      await _supabase.privilegedClient
+          .from('receipts')
+          .update({'match_status': status, 'updated_at': DateTime.now().toIso8601String()})
+          .eq('id', id);
+      if (mounted) setState(() => r['match_status'] = status);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed to update: $e'),
+        backgroundColor: Colors.red,
+      ));
+    }
+  }
+
+  void _showMatchDialog(Map<String, dynamic> receipt) {
+    // Show transactions that could match this receipt
+    final receiptAmount = (receipt['amount'] as num?)?.toDouble() ?? 0;
+    final candidateTxns = _transactions.where((t) {
+      final txnAmount = ((t['amount'] as num?)?.toDouble() ?? 0).abs();
+      // Match within 10% or $5
+      if (receiptAmount <= 0) return true;
+      final diff = (txnAmount - receiptAmount).abs();
+      return diff < 5 || diff / receiptAmount < 0.1;
+    }).take(10).toList();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E3A5F),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Match to Transaction',
+            style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (candidateTxns.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Text('No matching transactions found',
+                      style: TextStyle(color: Colors.white70)),
+                )
+              else
+                ...candidateTxns.map((t) {
+                  final name = t['merchant_name'] as String? ?? t['name'] as String? ?? 'Unknown';
+                  final amount = ((t['amount'] as num?)?.toDouble() ?? 0).abs();
+                  final date = t['date'] as String? ?? '';
+                  return ListTile(
+                    dense: true,
+                    title: Text(name,
+                        style: const TextStyle(color: Colors.white, fontSize: 13)),
+                    subtitle: Text('$date • \$${CandidateUI.formatMoney(amount)}',
+                        style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
+                    trailing: Icon(Icons.link, color: BrandColors.success.withOpacity(0.7), size: 18),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final receiptId = receipt['id'];
+                      final txnId = t['id']?.toString();
+                      if (receiptId == null || txnId == null) return;
+                      try {
+                        await _supabase.privilegedClient
+                            .from('receipts')
+                            .update({
+                              'transaction_id': txnId,
+                              'match_status': 'matched',
+                              'updated_at': DateTime.now().toIso8601String(),
+                            })
+                            .eq('id', receiptId);
+                        if (mounted) setState(() {
+                          receipt['match_status'] = 'matched';
+                          receipt['transaction_id'] = txnId;
+                        });
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('Receipt matched to $name'),
+                            backgroundColor: BrandColors.success,
+                          ));
+                        }
+                      } catch (e) {
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Match failed: $e'),
+                          backgroundColor: Colors.red,
+                        ));
+                      }
+                    },
+                  );
+                }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  TAB 4: MEC REPORTS — Timeline, validation, generation
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildReportsTab() {
