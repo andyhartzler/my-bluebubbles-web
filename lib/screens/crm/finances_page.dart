@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:plaid_flutter/plaid_flutter.dart';
@@ -9,6 +10,8 @@ import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:printing/printing.dart';
+import 'package:http/http.dart' as http;
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  FINANCES PAGE — World-class Campaign Finance Dashboard
@@ -3283,8 +3286,7 @@ class _ValidationWarning {
   const _ValidationWarning(this.message, this.icon, this.color);
 }
 
-/// Inline receipt viewer using WebView
-/// Handles both HTML and PDF files — PDFs are wrapped in an HTML iframe
+/// Inline receipt viewer — renders PDFs natively and HTML via WebView
 class _ReceiptWebView extends StatefulWidget {
   final String url;
   const _ReceiptWebView({required this.url});
@@ -3294,9 +3296,111 @@ class _ReceiptWebView extends StatefulWidget {
 }
 
 class _ReceiptWebViewState extends State<_ReceiptWebView> {
+  bool get _isPdf {
+    final u = widget.url.toLowerCase();
+    return u.endsWith('.pdf') || u.contains('.pdf?') || u.contains('.pdf%');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isPdf) {
+      return _PdfReceiptViewer(url: widget.url);
+    }
+    return _HtmlReceiptViewer(url: widget.url);
+  }
+}
+
+/// Native PDF rendering using the printing package's PdfPreview
+class _PdfReceiptViewer extends StatefulWidget {
+  final String url;
+  const _PdfReceiptViewer({required this.url});
+
+  @override
+  State<_PdfReceiptViewer> createState() => _PdfReceiptViewerState();
+}
+
+class _PdfReceiptViewerState extends State<_PdfReceiptViewer> {
+  Uint8List? _pdfData;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPdf();
+  }
+
+  Future<void> _loadPdf() async {
+    try {
+      final response = await http.get(Uri.parse(widget.url));
+      if (response.statusCode == 200) {
+        if (mounted) setState(() { _pdfData = response.bodyBytes; _loading = false; });
+      } else {
+        if (mounted) setState(() { _error = 'HTTP ${response.statusCode}'; _loading = false; });
+      }
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(color: BrandColors.momentumBlue),
+      );
+    }
+
+    if (_error != null || _pdfData == null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.warning_amber, color: Colors.orange, size: 32),
+            const SizedBox(height: 8),
+            Text(_error ?? 'Failed to load PDF',
+                style: const TextStyle(color: Colors.black54, fontSize: 13)),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () {
+                final uri = Uri.tryParse(widget.url);
+                if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+              },
+              icon: const Icon(Icons.open_in_new, size: 16),
+              label: const Text('Open externally'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return PdfPreview(
+      build: (format) async => _pdfData!,
+      canChangePageFormat: false,
+      canChangeOrientation: false,
+      canDebug: false,
+      allowPrinting: false,
+      allowSharing: false,
+      pdfFileName: 'receipt.pdf',
+      loadingWidget: const Center(
+        child: CircularProgressIndicator(color: BrandColors.momentumBlue),
+      ),
+    );
+  }
+}
+
+/// HTML receipt viewer using WebView
+class _HtmlReceiptViewer extends StatefulWidget {
+  final String url;
+  const _HtmlReceiptViewer({required this.url});
+
+  @override
+  State<_HtmlReceiptViewer> createState() => _HtmlReceiptViewerState();
+}
+
+class _HtmlReceiptViewerState extends State<_HtmlReceiptViewer> {
   late final WebViewController _controller;
   bool _loading = true;
-  bool _hasError = false;
 
   @override
   void initState() {
@@ -3308,67 +3412,12 @@ class _ReceiptWebViewState extends State<_ReceiptWebView> {
         onPageFinished: (_) {
           if (mounted) setState(() => _loading = false);
         },
-        onWebResourceError: (_) {
-          if (mounted) setState(() { _loading = false; _hasError = true; });
-        },
-      ));
-
-    final url = widget.url;
-    final isPdf = url.endsWith('.pdf') || url.contains('.pdf?') || url.contains('.pdf%');
-
-    if (isPdf) {
-      // PDFs can't render inline on mobile WebView — show a styled preview page
-      final html = '''
-<!DOCTYPE html>
-<html><head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-  body { font-family: -apple-system, sans-serif; margin: 0; padding: 40px 20px;
-    background: #f8f9fa; text-align: center; color: #333; }
-  .icon { font-size: 64px; margin-bottom: 16px; }
-  h2 { font-size: 16px; margin-bottom: 8px; }
-  p { font-size: 13px; color: #666; margin-bottom: 20px; }
-  a { display: inline-block; padding: 12px 24px; background: #273351;
-    color: white; text-decoration: none; border-radius: 8px; font-weight: 600; }
-</style>
-</head><body>
-<div class="icon">\u{1F4C4}</div>
-<h2>PDF Receipt</h2>
-<p>Tap below to view the full document</p>
-<a href="$url" target="_blank">Open PDF</a>
-</body></html>''';
-      _controller.loadHtmlString(html);
-    } else {
-      // HTML receipts load directly
-      _controller.loadRequest(Uri.parse(url));
-    }
+      ))
+      ..loadRequest(Uri.parse(widget.url));
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_hasError) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.warning_amber, color: Colors.orange, size: 32),
-            const SizedBox(height: 8),
-            const Text('Could not render document',
-                style: TextStyle(color: Colors.black54, fontSize: 13)),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () {
-                final uri = Uri.tryParse(widget.url);
-                if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
-              },
-              icon: const Icon(Icons.open_in_new, size: 16),
-              label: const Text('Open in browser'),
-            ),
-          ],
-        ),
-      );
-    }
-
     return Stack(
       children: [
         WebViewWidget(controller: _controller),
