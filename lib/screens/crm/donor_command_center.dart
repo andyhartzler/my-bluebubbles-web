@@ -55,7 +55,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
   List<String>? _selectedTags;
 
   // Sort state
-  String _sortBy = 'last_name';
+  String _sortBy = 'name';
   bool _ascending = true;
 
   // Tag list for filter UI
@@ -810,10 +810,10 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
 
   Widget _buildSortDropdown() {
     const options = {
-      'last_name': 'Name',
+      'name': 'Name',
       'total_donated_moyd': 'Total Given',
       'wealth_score': 'Wealth Score',
-      'last_donation_date': 'Last Gift',
+      'total_donated_political': 'Political Giving',
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),

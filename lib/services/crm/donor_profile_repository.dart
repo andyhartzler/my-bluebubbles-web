@@ -37,23 +37,20 @@ class DonorProfileRepository {
 
     try {
       final response = await _readClient.rpc('search_donor_profiles', params: {
-        'p_query': query,
-        'p_tier': tier,
-        'p_county': county,
-        'p_cd': congressionalDistrict,
-        'p_party_lean': partyLean,
-        'p_min_wealth': minWealthScore,
-        'p_max_wealth': maxWealthScore,
-        'p_min_political': minPoliticalGiving,
-        'p_has_enrichment': hasEnrichment,
-        'p_has_van': hasVan,
-        'p_has_property': hasPropertyRecords,
-        'p_is_homeowner': isHomeowner,
-        'p_tags': tags != null ? tags.toString() : null,
-        'p_sort_by': sortBy,
-        'p_ascending': ascending,
-        'p_page': page,
-        'p_page_size': pageSize,
+        'search_query': query,
+        'filter_tier': tier,
+        'filter_party': partyLean,
+        'filter_county': county,
+        'filter_cd': congressionalDistrict,
+        'filter_min_donated': minPoliticalGiving,
+        'filter_max_donated': maxWealthScore,
+        'filter_min_wealth': minWealthScore,
+        'filter_has_enrichment': hasEnrichment,
+        'filter_has_van': hasVan,
+        'sort_by': sortBy,
+        'sort_dir': ascending ? 'asc' : 'desc',
+        'page_num': page + 1, // SQL function is 1-based
+        'page_size': pageSize,
       });
 
       final rows = (response as List<dynamic>? ?? [])

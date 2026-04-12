@@ -500,104 +500,88 @@ class _FinancesPageState extends State<FinancesPage>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF0B1E37), BrandColors.unityBlue],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildTabBar(),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildOverviewTab(),
-                  _buildTransactionsTab(),
-                  _buildReportsTab(),
-                ],
-              ),
+    return Column(
+      children: [
+        // Branded gradient header with integrated TabBar (matches Slack page)
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: BrandColors.tileGradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [
-                BrandColors.sunriseGold.withOpacity(0.3),
-                BrandColors.sunriseGold.withOpacity(0.1),
-              ]),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.account_balance,
-                color: BrandColors.sunriseGold, size: 24),
           ),
-          const SizedBox(width: 14),
-          Expanded(
+          child: SafeArea(
+            bottom: false,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Finances',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5)),
-                Text('Bank Integration & MEC Reports',
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(0.5), fontSize: 13)),
+                // Title row with sync button
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.account_balance, color: BrandColors.sunriseGold, size: 22),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text('Finances',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.3)),
+                      ),
+                      if (_connections.isNotEmpty)
+                        IconButton(
+                          icon: Icon(
+                            _syncing ? Icons.hourglass_top : Icons.sync,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
+                          tooltip: _syncing ? 'Syncing...' : 'Sync Transactions',
+                          onPressed: _syncing ? null : _syncTransactions,
+                        ),
+                    ],
+                  ),
+                ),
+                // Tab bar
+                TabBar(
+                  controller: _tabController,
+                  tabs: const [
+                    Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
+                    Tab(icon: Icon(Icons.receipt_long), text: 'Transactions'),
+                    Tab(icon: Icon(Icons.description), text: 'MEC Reports'),
+                  ],
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white70,
+                  indicatorColor: BrandColors.sunriseGold,
+                  indicatorWeight: 3,
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.normal,
+                    fontSize: 13,
+                  ),
+                ),
               ],
             ),
           ),
-          if (_connections.isNotEmpty)
-            _actionButton(
-              icon: _syncing ? Icons.hourglass_top : Icons.sync,
-              label: _syncing ? 'Syncing...' : 'Sync',
-              color: BrandColors.momentumBlue,
-              onTap: _syncing ? null : _syncTransactions,
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TabBar(
-        controller: _tabController,
-        indicator: BoxDecoration(
-          color: BrandColors.sunriseGold.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
         ),
-        labelColor: BrandColors.sunriseGold,
-        unselectedLabelColor: Colors.white54,
-        labelStyle:
-            const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-        tabs: const [
-          Tab(text: 'Overview'),
-          Tab(text: 'Transactions'),
-          Tab(text: 'MEC Reports'),
-        ],
-      ),
+        // Tab content with branded background
+        Expanded(
+          child: BrandedBackground(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildOverviewTab(),
+                _buildTransactionsTab(),
+                _buildReportsTab(),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1284,10 +1268,21 @@ class _FinancesPageState extends State<FinancesPage>
 
   Widget _buildDeadlineCard() {
     final now = DateTime.now();
-    final q = ((now.month - 1) ~/ 3) + 1;
-    final deadlineMonth = q == 4 ? 1 : q * 3 + 1;
-    final deadlineYear = q == 4 ? now.year + 1 : now.year;
-    final deadline = DateTime(deadlineYear, deadlineMonth, 15);
+    // Show the NEXT upcoming MEC filing deadline
+    // Q1 (Jan-Mar) due Apr 15, Q2 (Apr-Jun) due Jul 15,
+    // Q3 (Jul-Sep) due Oct 15, Q4 (Oct-Dec) due Jan 15 next year
+    final deadlines = [
+      (q: 1, date: DateTime(now.year, 4, 15)),
+      (q: 2, date: DateTime(now.year, 7, 15)),
+      (q: 3, date: DateTime(now.year, 10, 15)),
+      (q: 4, date: DateTime(now.year + 1, 1, 15)),
+    ];
+    final next = deadlines.firstWhere(
+      (d) => d.date.isAfter(now),
+      orElse: () => (q: 1, date: DateTime(now.year + 1, 4, 15)),
+    );
+    final q = next.q;
+    final deadline = next.date;
     final daysLeft = deadline.difference(now).inDays;
 
     final urgency = daysLeft < 7
