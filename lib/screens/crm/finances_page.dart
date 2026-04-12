@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:plaid_flutter/plaid_flutter.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
@@ -75,6 +77,9 @@ class _FinancesPageState extends State<FinancesPage>
   Map<String, double> _expenseCategories = {};
   List<Map<String, dynamic>> _recentActivity = [];
 
+  StreamSubscription? _plaidSuccessSub;
+  StreamSubscription? _plaidExitSub;
+
   @override
   void initState() {
     super.initState();
@@ -92,11 +97,17 @@ class _FinancesPageState extends State<FinancesPage>
     final q = ((now.month - 1) ~/ 3) + 1;
     _selectedQuarter = '${now.year}-Q$q';
 
+    // Listen for Plaid Link callbacks
+    _plaidSuccessSub = PlaidLink.onSuccess.listen(_onPlaidSuccess);
+    _plaidExitSub = PlaidLink.onExit.listen(_onPlaidExit);
+
     _loadAll();
   }
 
   @override
   void dispose() {
+    _plaidSuccessSub?.cancel();
+    _plaidExitSub?.cancel();
     _tabController.dispose();
     _pulseController.dispose();
     _staggerController.dispose();
@@ -322,17 +333,26 @@ class _FinancesPageState extends State<FinancesPage>
 
   Future<void> _connectBank() async {
     try {
+      // 1. Get a link_token from the Edge Function
       final resp = await _supabase.privilegedClient.functions.invoke('plaid',
           body: {
             'action': 'create_link_token',
             'redirect_uri': 'https://moyd.app/plaid/callback',
           });
-      final data = resp.data is Map ? resp.data as Map<String, dynamic> : (resp.data is String ? jsonDecode(resp.data as String) : <String, dynamic>{});
+      final data = resp.data is Map
+          ? resp.data as Map<String, dynamic>
+          : (resp.data is String ? jsonDecode(resp.data as String) : <String, dynamic>{});
       final linkToken = data['link_token'] as String?;
-      if (linkToken == null) throw Exception('No link token returned');
+      if (linkToken == null) throw Exception('No link token returned from Plaid');
+
+      // 2. Create and open Plaid Link with the token
+      final configuration = LinkTokenConfiguration(token: linkToken);
+      await PlaidLink.create(configuration: configuration);
+      PlaidLink.open();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Opening Plaid Link...'),
+          content: Text('Plaid Link opened — complete the bank login'),
           backgroundColor: BrandColors.momentumBlue,
         ));
       }
@@ -343,6 +363,51 @@ class _FinancesPageState extends State<FinancesPage>
           backgroundColor: Colors.red,
         ));
       }
+    }
+  }
+
+  /// Called when user successfully links their bank account via Plaid.
+  Future<void> _onPlaidSuccess(LinkSuccess event) async {
+    final publicToken = event.publicToken;
+    final institutionId = event.metadata.institution?.id ?? '';
+    final institutionName = event.metadata.institution?.name ?? 'UMB Bank';
+
+    try {
+      // Exchange the public_token for a permanent access_token via Edge Function
+      await _supabase.privilegedClient.functions.invoke('plaid', body: {
+        'action': 'exchange_token',
+        'public_token': publicToken,
+        'institution_id': institutionId,
+        'institution_name': institutionName,
+      });
+
+      // Immediately sync transactions
+      await _syncTransactions();
+      await _loadConnections();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('$institutionName connected successfully!'),
+          backgroundColor: BrandColors.success,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Token exchange failed: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
+  }
+
+  /// Called when user exits Plaid Link (cancels or error).
+  void _onPlaidExit(LinkExit event) {
+    if (event.error != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Plaid Link error: ${event.error?.message ?? "Unknown"}'),
+        backgroundColor: Colors.orange,
+      ));
     }
   }
 
