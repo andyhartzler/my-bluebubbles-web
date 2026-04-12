@@ -281,6 +281,9 @@ serve(async (req) => {
         let totalContributions = 0;
         let monetaryTotal = 0;
 
+        // Track cumulative aggregate per donor for MEC compliance
+        const donorAggregates: Record<string, number> = {};
+
         for (const d of donations ?? []) {
           const donor = d.donors;
           if (!donor) continue;
@@ -290,6 +293,10 @@ serve(async (req) => {
           const amount = d.amount ?? 0;
           totalContributions += amount;
           monetaryTotal += amount;
+
+          // Cumulative aggregate for this donor in the reporting period
+          const donorKey = donor.id ?? donor.name ?? "";
+          donorAggregates[donorKey] = (donorAggregates[donorKey] ?? 0) + amount;
 
           // CD1_A: Committee Name, Business, First, Last, Addr1, Addr2, City, State, Zip, Employer, Occupation, Date, Amount, Aggregate, Type, Election
           cd1aRows.push(
@@ -309,8 +316,8 @@ serve(async (req) => {
                 ? new Date(d.donation_date).toLocaleDateString("en-US")
                 : "",
               amount.toFixed(2),
-              amount.toFixed(2), // Aggregate (same for single donation)
-              d.payment_method === "actblue" ? "M" : "M", // All monetary
+              donorAggregates[donorKey].toFixed(2), // Cumulative aggregate for period
+              "M", // Monetary
               "G", // General election
             ].join(",")
           );

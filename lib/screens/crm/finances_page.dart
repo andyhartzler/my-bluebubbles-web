@@ -119,7 +119,18 @@ class _FinancesPageState extends State<FinancesPage>
   //  DATA LOADING
   // ═══════════════════════════════════════════════════════════════
 
+  String? _loadError;
+
   Future<void> _loadAll() async {
+    if (!_supabase.isInitialized) {
+      if (mounted) setState(() {
+        _loadError = 'CRM not initialized. Check Supabase configuration.';
+        _connectionsLoading = false;
+        _transactionsLoading = false;
+        _reportsLoading = false;
+      });
+      return;
+    }
     await Future.wait([
       _loadConnections(),
       _loadTransactions(),
@@ -419,8 +430,13 @@ class _FinancesPageState extends State<FinancesPage>
           .from('bank_transactions')
           .update({'mec_included': value})
           .eq('id', id);
-      setState(() => txn['mec_included'] = value);
-    } catch (_) {}
+      if (mounted) setState(() => txn['mec_included'] = value);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed to update MEC inclusion: $e'),
+        backgroundColor: Colors.red,
+      ));
+    }
   }
 
   Future<void> _updateMecPurpose(Map<String, dynamic> txn, String purpose) async {
@@ -431,8 +447,13 @@ class _FinancesPageState extends State<FinancesPage>
           .from('bank_transactions')
           .update({'mec_purpose': purpose})
           .eq('id', id);
-      setState(() => txn['mec_purpose'] = purpose);
-    } catch (_) {}
+      if (mounted) setState(() => txn['mec_purpose'] = purpose);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed to update purpose: $e'),
+        backgroundColor: Colors.red,
+      ));
+    }
   }
 
   Future<void> _toggleReportFiled(Map<String, dynamic> report) async {
@@ -445,8 +466,13 @@ class _FinancesPageState extends State<FinancesPage>
           .from('mec_reports')
           .update({'status': newStatus})
           .eq('id', id);
-      setState(() => report['status'] = newStatus);
-    } catch (_) {}
+      if (mounted) setState(() => report['status'] = newStatus);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed to update report status: $e'),
+        backgroundColor: Colors.red,
+      ));
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -590,6 +616,27 @@ class _FinancesPageState extends State<FinancesPage>
   // ═══════════════════════════════════════════════════════════════
 
   Widget _buildOverviewTab() {
+    if (_loadError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+              const SizedBox(height: 16),
+              Text(_loadError!, style: const TextStyle(color: Colors.white70, fontSize: 16)),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () { setState(() => _loadError = null); _loadAll(); },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     if (_connectionsLoading) return CandidateUI.shimmerSkeleton(cardCount: 4);
 
     return LayoutBuilder(builder: (context, constraints) {
@@ -1099,7 +1146,7 @@ class _FinancesPageState extends State<FinancesPage>
               final isDonation = item['type'] == 'donation';
               final color =
                   isDonation ? BrandColors.success : BrandColors.republicanRed;
-              final amount = (item['amount'] as double?) ?? 0;
+              final amount = (item['amount'] as num?)?.toDouble() ?? 0;
               final label = item['label'] as String? ?? '';
               final date = item['date'] as String? ?? '';
 
