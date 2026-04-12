@@ -629,6 +629,7 @@ class _FinancesPageState extends State<FinancesPage>
           child: BrandedBackground(
             child: TabBarView(
               controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(),
               children: [
                 _buildOverviewTab(),
                 _buildTransactionsTab(),
@@ -872,7 +873,7 @@ class _FinancesPageState extends State<FinancesPage>
                   fontWeight: FontWeight.w600)),
           Text(subtitle,
               style: TextStyle(
-                  color: Colors.white.withOpacity(0.4), fontSize: 10)),
+                  color: Colors.white.withOpacity(0.7), fontSize: 10)),
         ],
       ),
     );
@@ -1029,7 +1030,7 @@ class _FinancesPageState extends State<FinancesPage>
               padding: const EdgeInsets.all(20),
               child: Text('No donor data yet',
                   style: TextStyle(
-                      color: Colors.white.withOpacity(0.4), fontSize: 13)),
+                      color: Colors.white.withOpacity(0.7), fontSize: 13)),
             )
           else
             ...List.generate(_topDonors.length, (i) {
@@ -1154,7 +1155,7 @@ class _FinancesPageState extends State<FinancesPage>
               padding: const EdgeInsets.all(20),
               child: Text('No expense data yet',
                   style: TextStyle(
-                      color: Colors.white.withOpacity(0.4), fontSize: 13)),
+                      color: Colors.white.withOpacity(0.7), fontSize: 13)),
             )
           else
             ...List.generate(top.length, (i) {
@@ -1220,7 +1221,7 @@ class _FinancesPageState extends State<FinancesPage>
               padding: const EdgeInsets.all(20),
               child: Text('No activity yet',
                   style: TextStyle(
-                      color: Colors.white.withOpacity(0.4), fontSize: 13)),
+                      color: Colors.white.withOpacity(0.7), fontSize: 13)),
             )
           else
             ...List.generate(_recentActivity.length, (i) {
@@ -1344,13 +1345,13 @@ class _FinancesPageState extends State<FinancesPage>
                     '${conn['institution_name'] ?? 'UMB Bank'} • '
                     '${(conn['account_names'] as List?)?.join(', ') ?? 'Account'}',
                     style: TextStyle(
-                        color: Colors.white.withOpacity(0.6), fontSize: 12),
+                        color: Colors.white.withOpacity(0.75), fontSize: 12),
                   ),
                   if (conn['last_synced_at'] != null)
                     Text(
                       'Last synced: ${_formatDate(conn['last_synced_at'])}',
                       style: TextStyle(
-                          color: Colors.white.withOpacity(0.4), fontSize: 11),
+                          color: Colors.white.withOpacity(0.7), fontSize: 11),
                     ),
                 ],
               ],
@@ -1425,7 +1426,7 @@ class _FinancesPageState extends State<FinancesPage>
                 Text(
                   '${now.year}-Q$q Report • Due ${deadline.month}/${deadline.day}/${deadline.year}',
                   style: TextStyle(
-                      color: Colors.white.withOpacity(0.6), fontSize: 12),
+                      color: Colors.white.withOpacity(0.75), fontSize: 12),
                 ),
               ],
             ),
@@ -1510,13 +1511,13 @@ class _FinancesPageState extends State<FinancesPage>
           style: const TextStyle(color: Colors.white, fontSize: 14),
           decoration: InputDecoration(
             hintText: 'Search by name or merchant...',
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
             prefixIcon: Icon(Icons.search,
-                color: Colors.white.withOpacity(0.4), size: 20),
+                color: Colors.white.withOpacity(0.7), size: 20),
             suffixIcon: _searchQuery.isNotEmpty
                 ? IconButton(
                     icon: Icon(Icons.clear,
-                        color: Colors.white.withOpacity(0.4), size: 18),
+                        color: Colors.white.withOpacity(0.7), size: 18),
                     onPressed: () {
                       _searchCtrl.clear();
                       setState(() => _searchQuery = '');
@@ -1582,7 +1583,7 @@ class _FinancesPageState extends State<FinancesPage>
                       Icon(Icons.date_range,
                           color: _dateRange != null
                               ? BrandColors.momentumBlue
-                              : Colors.white54,
+                              : Colors.white70,
                           size: 16),
                       const SizedBox(width: 6),
                       Text(
@@ -1592,7 +1593,7 @@ class _FinancesPageState extends State<FinancesPage>
                         style: TextStyle(
                           color: _dateRange != null
                               ? BrandColors.momentumBlue
-                              : Colors.white54,
+                              : Colors.white70,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1606,7 +1607,7 @@ class _FinancesPageState extends State<FinancesPage>
                 GestureDetector(
                   onTap: () => setState(() => _dateRange = null),
                   child: Icon(Icons.close,
-                      color: Colors.white.withOpacity(0.4), size: 16),
+                      color: Colors.white.withOpacity(0.7), size: 16),
                 ),
               ],
               const Spacer(),
@@ -1671,7 +1672,7 @@ class _FinancesPageState extends State<FinancesPage>
                           style: TextStyle(
                             color: selected
                                 ? BrandColors.steelBlue
-                                : Colors.white54,
+                                : Colors.white70,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                           )),
@@ -2207,7 +2208,7 @@ class _FinancesPageState extends State<FinancesPage>
                           style: TextStyle(
                             color: isSelected
                                 ? BrandColors.sunriseGold
-                                : Colors.white60,
+                                : Colors.white70,
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           )),
@@ -2433,7 +2434,7 @@ class _FinancesPageState extends State<FinancesPage>
           if (sampleContribs.isEmpty)
             Text('No contribution data for this period',
                 style: TextStyle(
-                    color: Colors.white.withOpacity(0.4), fontSize: 11))
+                    color: Colors.white.withOpacity(0.7), fontSize: 11))
           else
             ...sampleContribs.map((d) => Container(
                   margin: const EdgeInsets.only(bottom: 4),
@@ -2483,7 +2484,7 @@ class _FinancesPageState extends State<FinancesPage>
           if (sampleExps.isEmpty)
             Text('No itemized expenditures for this period',
                 style: TextStyle(
-                    color: Colors.white.withOpacity(0.4), fontSize: 11))
+                    color: Colors.white.withOpacity(0.7), fontSize: 11))
           else
             ...sampleExps.map((t) => Container(
                   margin: const EdgeInsets.only(bottom: 4),
@@ -2624,7 +2625,7 @@ class _FinancesPageState extends State<FinancesPage>
                             : Icons.radio_button_unchecked,
                         color: status == 'filed'
                             ? BrandColors.success
-                            : Colors.white54,
+                            : Colors.white70,
                         size: 14,
                       ),
                       const SizedBox(width: 4),
@@ -2633,7 +2634,7 @@ class _FinancesPageState extends State<FinancesPage>
                         style: TextStyle(
                           color: status == 'filed'
                               ? BrandColors.success
-                              : Colors.white54,
+                              : Colors.white70,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
