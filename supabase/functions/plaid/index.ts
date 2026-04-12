@@ -1,10 +1,8 @@
 // Plaid Integration Edge Function
 // Handles: link token creation, token exchange, transaction sync
 //
-// Environment variables (set in Supabase Dashboard → Edge Functions → Secrets):
-//   PLAID_CLIENT_ID=69b6acecb236c9000d2afc21
-//   PLAID_SECRET=0a32a69d8d71c0e390b886ebca4e98
-//   PLAID_ENV=production
+// Environment variables are set via Supabase Dashboard → Edge Functions → Secrets:
+//   PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
@@ -24,7 +22,7 @@ const SUPABASE_SERVICE_ROLE_KEY =
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://moyd.app",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
@@ -39,7 +37,11 @@ async function plaidRequest(endpoint: string, body: Record<string, unknown>) {
       ...body,
     }),
   });
-  return resp.json();
+  const data = await resp.json();
+  if (!resp.ok) {
+    throw new Error(`Plaid API error: ${data.error_message ?? data.error_code ?? resp.statusText}`);
+  }
+  return data;
 }
 
 serve(async (req) => {
@@ -244,6 +246,12 @@ serve(async (req) => {
       // ── Generate MEC Quarterly Report ──
       case "generate_mec_report": {
         const { quarter } = params; // e.g. "2026-Q1"
+        if (!quarter || !/^\d{4}-Q[1-4]$/.test(quarter)) {
+          return new Response(
+            JSON.stringify({ error: 'Invalid quarter format. Use "YYYY-Q1" through "YYYY-Q4".' }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         const [year, q] = quarter.split("-");
         const qNum = parseInt(q.replace("Q", ""));
         const periodStart = `${year}-${String((qNum - 1) * 3 + 1).padStart(2, "0")}-01`;
@@ -264,7 +272,7 @@ serve(async (req) => {
         const { data: donations } = await supabase
           .from("donations")
           .select("*, donors(*)")
-          .gte("donation_date", periodStart)
+          .gte("donation_date", periodStart + "T00:00:00Z")
           .lte("donation_date", periodEnd + "T23:59:59Z")
           .eq("status", "completed")
           .order("donation_date");
@@ -321,10 +329,11 @@ serve(async (req) => {
         const cd3bRows: string[] = [];
         let totalExpenditures = 0;
 
+        // Sum ALL expenditures for the total, but only ITEMIZE those over $100 in the CSV
         for (const t of expenditures ?? []) {
           const amount = Math.abs(t.amount);
-          if (amount < 100) continue; // Only itemize expenditures over $100
           totalExpenditures += amount;
+          if (amount < 100) continue; // MEC only requires itemization over $100
 
           cd3bRows.push(
             [
@@ -453,9 +462,9 @@ serve(async (req) => {
           }
         );
     }
-  } catch (error) {
+  } catch (error: unknown) {
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
