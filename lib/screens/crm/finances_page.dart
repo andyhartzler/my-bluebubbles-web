@@ -8,6 +8,7 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  FINANCES PAGE — World-class Campaign Finance Dashboard
@@ -2297,15 +2298,19 @@ class _FinancesPageState extends State<FinancesPage>
             ),
 
             if (storageUrl.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _actionButton(
-                icon: Icons.open_in_new,
-                label: 'View Receipt Document',
-                color: BrandColors.momentumBlue,
-                onTap: () {
-                  final uri = Uri.tryParse(storageUrl);
-                  if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
-                },
+              const SizedBox(height: 16),
+              const Text('Receipt Document',
+                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Container(
+                height: 400,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: _ReceiptWebView(url: storageUrl),
               ),
             ],
           ],
@@ -3264,4 +3269,45 @@ class _ValidationWarning {
   final IconData icon;
   final Color color;
   const _ValidationWarning(this.message, this.icon, this.color);
+}
+
+/// Inline receipt viewer using WebView
+class _ReceiptWebView extends StatefulWidget {
+  final String url;
+  const _ReceiptWebView({required this.url});
+
+  @override
+  State<_ReceiptWebView> createState() => _ReceiptWebViewState();
+}
+
+class _ReceiptWebViewState extends State<_ReceiptWebView> {
+  late final WebViewController _controller;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.white)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageFinished: (_) {
+          if (mounted) setState(() => _loading = false);
+        },
+      ))
+      ..loadRequest(Uri.parse(widget.url));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        WebViewWidget(controller: _controller),
+        if (_loading)
+          const Center(
+            child: CircularProgressIndicator(color: BrandColors.momentumBlue),
+          ),
+      ],
+    );
+  }
 }
