@@ -344,17 +344,47 @@ class _FinancesPageState extends State<FinancesPage>
 
   Future<void> _connectBank() async {
     try {
+      if (!_supabase.isInitialized) {
+        throw Exception('CRM not initialized. Check Supabase configuration.');
+      }
+
       // 1. Get a link_token from the Edge Function
       final resp = await _supabase.privilegedClient.functions.invoke('plaid',
           body: {
             'action': 'create_link_token',
             'redirect_uri': 'https://moyd.app/plaid/callback',
           });
-      final data = resp.data is Map
-          ? resp.data as Map<String, dynamic>
-          : (resp.data is String ? jsonDecode(resp.data as String) : <String, dynamic>{});
+
+      // Safely parse the response — resp.data can be null, Map, or String
+      final dynamic rawData = resp.data;
+      Map<String, dynamic> data;
+      if (rawData is Map<String, dynamic>) {
+        data = rawData;
+      } else if (rawData is Map) {
+        data = Map<String, dynamic>.from(rawData);
+      } else if (rawData is String && rawData.isNotEmpty) {
+        try {
+          data = jsonDecode(rawData) as Map<String, dynamic>;
+        } catch (_) {
+          throw Exception('Invalid response from Plaid function: $rawData');
+        }
+      } else {
+        throw Exception(
+            'Plaid function returned empty response. '
+            'Check that Edge Function secrets (PLAID_CLIENT_ID, PLAID_SECRET) are set.');
+      }
+
+      // Check for error in the response body
+      if (data.containsKey('error')) {
+        throw Exception(data['error']?.toString() ?? 'Unknown Plaid error');
+      }
+
       final linkToken = data['link_token'] as String?;
-      if (linkToken == null) throw Exception('No link token returned from Plaid');
+      if (linkToken == null || linkToken.isEmpty) {
+        throw Exception(
+            'No link token returned. '
+            'Verify Plaid credentials are configured in Supabase Edge Function secrets.');
+      }
 
       // 2. Create and open Plaid Link with the token
       final configuration = LinkTokenConfiguration(token: linkToken);
@@ -641,17 +671,26 @@ class _FinancesPageState extends State<FinancesPage>
 
     return LayoutBuilder(builder: (context, constraints) {
       final isWide = constraints.maxWidth > 900;
+      final isMobile = constraints.maxWidth < 600;
+      final hPad = isMobile ? 12.0 : 16.0;
+      final gap = isMobile ? 10.0 : 16.0;
 
       return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+        padding: EdgeInsets.fromLTRB(hPad, hPad, hPad, 40),
         children: [
+          // Deadline card first on mobile — filing deadline is urgent
+          if (isMobile) ...[
+            _buildDeadlineCard(),
+            SizedBox(height: gap),
+          ],
+
           // Bank connection card
           _buildConnectionCard(),
-          const SizedBox(height: 16),
+          SizedBox(height: gap),
 
-          // Animated stat cards
+          // Animated stat cards — 2x2 grid on mobile
           _buildAnimatedStatCards(),
-          const SizedBox(height: 20),
+          SizedBox(height: gap + 4),
 
           // Two-column layout on wide screens
           if (isWide)
@@ -662,18 +701,18 @@ class _FinancesPageState extends State<FinancesPage>
                   flex: 3,
                   child: Column(children: [
                     _buildMonthlyTrendChart(),
-                    const SizedBox(height: 16),
+                    SizedBox(height: gap),
                     _buildRecentActivityFeed(),
                   ]),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: gap),
                 Expanded(
                   flex: 2,
                   child: Column(children: [
                     _buildTopDonorsLeaderboard(),
-                    const SizedBox(height: 16),
+                    SizedBox(height: gap),
                     _buildExpenseCategoriesBreakdown(),
-                    const SizedBox(height: 16),
+                    SizedBox(height: gap),
                     _buildDeadlineCard(),
                   ]),
                 ),
@@ -681,14 +720,16 @@ class _FinancesPageState extends State<FinancesPage>
             )
           else ...[
             _buildMonthlyTrendChart(),
-            const SizedBox(height: 16),
+            SizedBox(height: gap),
             _buildTopDonorsLeaderboard(),
-            const SizedBox(height: 16),
+            SizedBox(height: gap),
             _buildExpenseCategoriesBreakdown(),
-            const SizedBox(height: 16),
+            SizedBox(height: gap),
             _buildRecentActivityFeed(),
-            const SizedBox(height: 16),
-            _buildDeadlineCard(),
+            if (!isMobile) ...[
+              SizedBox(height: gap),
+              _buildDeadlineCard(),
+            ],
           ],
         ],
       );
@@ -718,35 +759,76 @@ class _FinancesPageState extends State<FinancesPage>
           BrandColors.sunriseGold, Icons.description),
     ];
 
-    return AnimatedBuilder(
-      animation: _staggerController,
-      builder: (context, _) {
-        return Row(
-          children: List.generate(cards.length, (i) {
-            final delay = i * 0.15;
-            final progress = ((_staggerController.value - delay) / (1 - delay))
-                .clamp(0.0, 1.0);
-            final curve = Curves.easeOutBack.transform(progress);
+    return LayoutBuilder(builder: (context, constraints) {
+      final isMobile = constraints.maxWidth < 600;
 
-            return Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(right: i < cards.length - 1 ? 10 : 0),
-                child: Transform.translate(
-                  offset: Offset(0, 30 * (1 - curve)),
-                  child: Opacity(
-                    opacity: progress,
-                    child: _statCard(
-                      cards[i].label, cards[i].value, cards[i].subtitle,
-                      cards[i].color, cards[i].icon,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
+      Widget buildCard(int i) {
+        final delay = i * 0.15;
+        final progress = ((_staggerController.value - delay) / (1 - delay))
+            .clamp(0.0, 1.0);
+        final curve = Curves.easeOutBack.transform(progress);
+
+        return Transform.translate(
+          offset: Offset(0, 30 * (1 - curve)),
+          child: Opacity(
+            opacity: progress,
+            child: _statCard(
+              cards[i].label, cards[i].value, cards[i].subtitle,
+              cards[i].color, cards[i].icon,
+            ),
+          ),
         );
-      },
-    );
+      }
+
+      return AnimatedBuilder(
+        animation: _staggerController,
+        builder: (context, _) {
+          if (isMobile) {
+            // 2x2 grid on mobile for readability
+            return Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: Padding(
+                      padding: const EdgeInsets.only(right: 6, bottom: 6),
+                      child: buildCard(0),
+                    )),
+                    Expanded(child: Padding(
+                      padding: const EdgeInsets.only(left: 6, bottom: 6),
+                      child: buildCard(1),
+                    )),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Expanded(child: Padding(
+                      padding: const EdgeInsets.only(right: 6, top: 6),
+                      child: buildCard(2),
+                    )),
+                    Expanded(child: Padding(
+                      padding: const EdgeInsets.only(left: 6, top: 6),
+                      child: buildCard(3),
+                    )),
+                  ],
+                ),
+              ],
+            );
+          }
+
+          // Desktop: 4 in a row
+          return Row(
+            children: List.generate(cards.length, (i) {
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: i < cards.length - 1 ? 10 : 0),
+                  child: buildCard(i),
+                ),
+              );
+            }),
+          );
+        },
+      );
+    });
   }
 
   Widget _statCard(String label, String value, String subtitle, Color color,
@@ -1212,35 +1294,14 @@ class _FinancesPageState extends State<FinancesPage>
   Widget _buildConnectionCard() {
     final connected = _connections.isNotEmpty;
     final conn = connected ? _connections.first : null;
+    final statusColor = connected ? BrandColors.success : Colors.orange;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: connected
-              ? [
-                  BrandColors.success.withOpacity(0.15),
-                  BrandColors.success.withOpacity(0.05),
-                ]
-              : [
-                  Colors.orange.withOpacity(0.15),
-                  Colors.orange.withOpacity(0.05),
-                ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: connected
-                ? BrandColors.success.withOpacity(0.3)
-                : Colors.orange.withOpacity(0.3)),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 20,
-              offset: const Offset(0, 6)),
-        ],
-      ),
+    return BrandedCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      gradientColors: [
+        statusColor.withOpacity(0.2),
+        BrandColors.unityBlue.withOpacity(0.9),
+      ],
       child: Row(
         children: [
           AnimatedBuilder(
@@ -1251,15 +1312,11 @@ class _FinancesPageState extends State<FinancesPage>
                 height: 12,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: connected
-                      ? BrandColors.success
-                          .withOpacity(0.5 + _pulseController.value * 0.5)
-                      : Colors.orange
-                          .withOpacity(0.5 + _pulseController.value * 0.5),
+                  color: statusColor
+                      .withOpacity(0.5 + _pulseController.value * 0.5),
                   boxShadow: [
                     BoxShadow(
-                      color: (connected ? BrandColors.success : Colors.orange)
-                          .withOpacity(0.3),
+                      color: statusColor.withOpacity(0.3),
                       blurRadius: 8,
                       spreadRadius: _pulseController.value * 2,
                     ),
@@ -1276,8 +1333,8 @@ class _FinancesPageState extends State<FinancesPage>
                 Text(
                   connected ? 'Bank Connected' : 'No Bank Connected',
                   style: TextStyle(
-                    color: connected ? BrandColors.success : Colors.orange,
-                    fontSize: 16,
+                    color: statusColor,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -1338,26 +1395,23 @@ class _FinancesPageState extends State<FinancesPage>
             ? Colors.orange
             : BrandColors.momentumBlue;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [urgency.withOpacity(0.15), Colors.white.withOpacity(0.04)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: urgency.withOpacity(0.3)),
-      ),
+    return BrandedCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      gradientColors: [
+        urgency.withOpacity(0.25),
+        BrandColors.unityBlue,
+      ],
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: urgency.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
+              color: urgency.withOpacity(0.25),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.calendar_today, color: urgency, size: 22),
+            child: Icon(Icons.calendar_today, color: urgency, size: 20),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1365,7 +1419,7 @@ class _FinancesPageState extends State<FinancesPage>
                 Text('Next MEC Filing Deadline',
                     style: TextStyle(
                         color: urgency,
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700)),
                 const SizedBox(height: 2),
                 Text(
@@ -1377,15 +1431,15 @@ class _FinancesPageState extends State<FinancesPage>
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: urgency.withOpacity(0.2),
+              color: urgency.withOpacity(0.3),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text('$daysLeft days',
                 style: TextStyle(
                     color: urgency,
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w800)),
           ),
         ],
@@ -1412,28 +1466,33 @@ class _FinancesPageState extends State<FinancesPage>
 
     final filtered = _filteredTransactions;
 
-    return Column(
-      children: [
-        // Search bar
-        _buildTransactionSearchBar(),
+    return LayoutBuilder(builder: (context, constraints) {
+      final isMobile = constraints.maxWidth < 600;
+      final hPad = isMobile ? 8.0 : 12.0;
 
-        // Date range + category filters
-        _buildTransactionFilters(),
+      return Column(
+        children: [
+          // Search bar
+          _buildTransactionSearchBar(),
 
-        // Transaction list
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            itemCount: filtered.length,
-            itemBuilder: (context, index) =>
-                _buildTransactionRow(filtered[index]),
+          // Date range + category filters
+          _buildTransactionFilters(),
+
+          // Transaction list
+          Expanded(
+            child: ListView.builder(
+              padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 12),
+              itemCount: filtered.length,
+              itemBuilder: (context, index) =>
+                  _buildTransactionRow(filtered[index]),
+            ),
           ),
-        ),
 
-        // Total row
-        _buildTransactionTotalRow(filtered),
-      ],
-    );
+          // Total row
+          _buildTransactionTotalRow(filtered),
+        ],
+      );
+    });
   }
 
   Widget _buildTransactionSearchBar() {
@@ -1894,13 +1953,16 @@ class _FinancesPageState extends State<FinancesPage>
   Widget _buildReportsTab() {
     return LayoutBuilder(builder: (context, constraints) {
       final isWide = constraints.maxWidth > 900;
+      final isMobile = constraints.maxWidth < 600;
+      final hPad = isMobile ? 12.0 : 16.0;
+      final gap = isMobile ? 12.0 : 20.0;
 
       return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+        padding: EdgeInsets.fromLTRB(hPad, hPad, hPad, 40),
         children: [
           // Quarter timeline
           _buildQuarterTimeline(),
-          const SizedBox(height: 20),
+          SizedBox(height: gap),
 
           if (isWide)
             Row(
@@ -1913,15 +1975,15 @@ class _FinancesPageState extends State<FinancesPage>
             )
           else ...[
             _buildReportGenerator(),
-            const SizedBox(height: 16),
+            SizedBox(height: gap - 4),
             _buildValidationWarnings(),
           ],
 
-          const SizedBox(height: 20),
+          SizedBox(height: gap),
 
           // Report breakdown preview
           _buildReportPreview(),
-          const SizedBox(height: 20),
+          SizedBox(height: gap),
 
           // Historical reports
           if (_reportsLoading)
