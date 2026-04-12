@@ -515,97 +515,91 @@ class _CandidatesPageState extends State<CandidatesPage>
     });
   }
 
-  // ── Desktop: 2-column layout (map+filters left, list right) ──
+  // ── Desktop: Map as hero at top, full-width candidate list below ──
   Widget _buildDesktopLayout(BoxConstraints constraints) {
-    final leftWidth = math.min(440.0, constraints.maxWidth * 0.38);
-
     return Column(
       children: [
         if (_bulkMode) _buildBulkToolbar(),
         Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // LEFT PANE: Map + Stats Grid + Filters
-              SizedBox(
-                width: leftWidth,
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.all(12),
-                        children: [
-                          _buildMapSection(desktopHeight: 420),
-                          const SizedBox(height: 12),
-                          _buildStatsGrid(),
-                          const SizedBox(height: 12),
-                          _buildFiltersSection(),
-                          if (_showAdvancedFilters) ...[
-                            const SizedBox(height: 8),
-                            _buildAdvancedFilters(),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
+          child: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              // HERO MAP — Large, prominent, at the top
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  child: _buildHeroMapSection(constraints.maxWidth),
                 ),
               ),
-              // Divider
-              Container(width: 1, color: Colors.white.withOpacity(0.08)),
-              // RIGHT PANE: YD Spotlight + Analytics + Candidate Grid
-              Expanded(
-                child: CustomScrollView(
-                  controller: _scrollController,
-                  slivers: [
-                    if (_youngDems.isNotEmpty)
-                      SliverToBoxAdapter(child: _buildYdSpotlight()),
-                    SliverToBoxAdapter(child: _buildAnalyticsToggle()),
-                    if (_showAnalytics)
-                      SliverToBoxAdapter(
-                        child: _analyticsLoading
-                            ? CandidateUI.shimmerSkeleton(cardCount: 2)
-                            : _buildAnalyticsSection(),
-                      ),
-                    // Active filter chip
-                    if (_activeFilterCount > 0)
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                          child: Row(
-                            children: [
-                              Icon(Icons.filter_list, color: BrandColors.sunriseGold, size: 16),
-                              const SizedBox(width: 6),
-                              Text(
-                                '${_filteredCandidates.length} of ${_allCandidates.length} candidates',
-                                style: TextStyle(color: BrandColors.sunriseGold, fontSize: 13, fontWeight: FontWeight.w600),
-                              ),
-                              const SizedBox(width: 8),
-                              GestureDetector(
-                                onTap: _resetAdvancedFilters,
-                                child: Text('Clear all', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12, decoration: TextDecoration.underline)),
-                              ),
-                            ],
-                          ),
+              // Stats row under the map
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _buildStatsBar(),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              // YD spotlight if present
+              if (_youngDems.isNotEmpty)
+                SliverToBoxAdapter(child: _buildYdSpotlight()),
+              // Filters (collapsible)
+              SliverToBoxAdapter(child: _buildFiltersSection()),
+              if (_showAdvancedFilters)
+                SliverToBoxAdapter(child: _buildAdvancedFilters()),
+              // Analytics toggle
+              SliverToBoxAdapter(child: _buildAnalyticsToggle()),
+              if (_showAnalytics)
+                SliverToBoxAdapter(
+                  child: _analyticsLoading
+                      ? CandidateUI.shimmerSkeleton(cardCount: 2)
+                      : _buildAnalyticsSection(),
+                ),
+              // Active filter indicator
+              if (_activeFilterCount > 0)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.filter_list, color: BrandColors.sunriseGold, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${_filteredCandidates.length} of ${_allCandidates.length} candidates',
+                          style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 13, fontWeight: FontWeight.w600),
                         ),
-                      ),
-                    // Candidate grid (2 columns)
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
-                      sliver: SliverGrid(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          // Use right-pane width (not full page) for column calc
-                          crossAxisCount: (constraints.maxWidth - leftWidth) > 900 ? 3 : 2,
-                          childAspectRatio: 2.8,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: _resetAdvancedFilters,
+                          child: const Text('Clear all', style: TextStyle(color: Colors.white70, fontSize: 12, decoration: TextDecoration.underline)),
                         ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) => _buildCandidateRow(_filteredCandidates[index]),
-                          childCount: _filteredCandidates.length,
-                        ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
+                ),
+              // Candidate list header
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.people, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Candidates (${_filteredCandidates.length})',
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // FULL-WIDTH CANDIDATE LIST (no more cramped grid)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _buildCandidateRow(_filteredCandidates[index]),
+                    childCount: _filteredCandidates.length,
+                  ),
                 ),
               ),
             ],
@@ -615,7 +609,94 @@ class _CandidatesPageState extends State<CandidatesPage>
     );
   }
 
-  // ── Mobile: original single-column layout ──
+  // ── HERO MAP — Big, prominent Missouri map as the focal point ──
+  Widget _buildHeroMapSection(double screenWidth) {
+    // Take most of the screen width, capped at 1200
+    final mapHeight = (screenWidth > 900) ? 540.0 : 420.0;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: BrandColors.unityBlue.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: BrandColors.sunriseGold.withOpacity(0.25)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8)),
+          BoxShadow(color: BrandColors.sunriseGold.withOpacity(0.08), blurRadius: 30, offset: const Offset(0, 4)),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            child: Row(
+              children: [
+                const Icon(Icons.map_outlined, color: BrandColors.sunriseGold, size: 22),
+                const SizedBox(width: 10),
+                const Text(
+                  'Missouri Districts',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: BrandColors.sunriseGold.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: BrandColors.sunriseGold.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    '${_allCandidates.length} candidates',
+                    style: const TextStyle(
+                      color: BrandColors.sunriseGold,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                // Legend dots
+                _legendDot(BrandColors.democratBlue, 'Dem'),
+                const SizedBox(width: 8),
+                _legendDot(BrandColors.republicanRed, 'Rep'),
+                const SizedBox(width: 8),
+                _legendDot(Colors.white70, 'Other'),
+              ],
+            ),
+          ),
+          const Divider(color: Colors.white12, height: 1),
+          // The map itself
+          SizedBox(
+            height: mapHeight,
+            child: _buildMapSection(desktopHeight: mapHeight),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8, height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+      ],
+    );
+  }
+
+  // ── Mobile: Map as hero, then full-width list ──
   Widget _buildMobileLayout() {
     return Column(
       children: [
@@ -624,8 +705,16 @@ class _CandidatesPageState extends State<CandidatesPage>
           child: CustomScrollView(
             controller: _scrollController,
             slivers: [
-              SliverToBoxAdapter(child: _buildMapSection()),
-              SliverToBoxAdapter(child: _buildStatsBar()),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                  child: _buildHeroMapSection(400),
+                ),
+              ),
+              SliverToBoxAdapter(child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: _buildStatsBar(),
+              )),
               if (_youngDems.isNotEmpty)
                 SliverToBoxAdapter(child: _buildYdSpotlight()),
               SliverToBoxAdapter(child: _buildAnalyticsToggle()),
@@ -2260,15 +2349,24 @@ class _CandidatesPageState extends State<CandidatesPage>
     final isSelected = _selectedIds.contains(c.id);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 4),
+      margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
         color: isSelected
-            ? BrandColors.sunriseGold.withOpacity(0.1)
-            : BrandColors.unityBlue.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(10),
-        border: isSelected
-            ? Border.all(color: BrandColors.sunriseGold.withOpacity(0.4))
-            : null,
+            ? BrandColors.sunriseGold.withOpacity(0.2)
+            : BrandColors.unityBlue.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected
+              ? BrandColors.sunriseGold.withOpacity(0.5)
+              : Colors.white.withOpacity(0.1),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: InkWell(
         onTap: _bulkMode

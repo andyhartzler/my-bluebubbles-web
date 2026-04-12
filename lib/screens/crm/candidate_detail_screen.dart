@@ -29,8 +29,13 @@ import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 
 class CandidateDetailScreen extends StatefulWidget {
   final Candidate candidate;
+  final int initialTab;
 
-  const CandidateDetailScreen({super.key, required this.candidate});
+  const CandidateDetailScreen({
+    super.key,
+    required this.candidate,
+    this.initialTab = 0,
+  });
 
   @override
   State<CandidateDetailScreen> createState() => _CandidateDetailScreenState();
@@ -120,7 +125,11 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       parent: _animController,
       curve: const Interval(0.2, 1.0, curve: Curves.easeOut),
     ));
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: widget.initialTab.clamp(0, 3),
+    );
     _tabController.addListener(_onTabChanged);
     _notesController.text = c.notes ?? '';
     _animController.forward();
@@ -2016,79 +2025,105 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             }
 
             final barWidth = maxRaised > 0 ? raised / maxRaised : 0.0;
+            final candidateId = candidate['candidate_id']?.toString();
 
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isCurrent ? BrandColors.sunriseGold.withOpacity(0.08) : Colors.white.withOpacity(0.05),
+                color: isCurrent
+                    ? BrandColors.sunriseGold.withOpacity(0.18)
+                    : BrandColors.unityBlue.withOpacity(0.9),
                 borderRadius: BorderRadius.circular(12),
-                border: isCurrent ? Border.all(color: BrandColors.sunriseGold.withOpacity(0.3)) : null,
+                border: Border.all(
+                  color: isCurrent
+                      ? BrandColors.sunriseGold.withOpacity(0.5)
+                      : partyColor.withOpacity(0.3),
+                ),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6, offset: const Offset(0, 2)),
+                ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: partyColor.withOpacity(0.25),
-                          borderRadius: BorderRadius.circular(6),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: isCurrent
+                      ? null
+                      : () => _openOpponentFinanceDetail(
+                            candidate: candidate,
+                            candidateId: candidateId,
+                            partyColor: partyColor,
+                          ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: partyColor.withOpacity(0.25),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  party.contains('democrat') ? 'D' : party.contains('republican') ? 'R' : '?',
+                                  style: TextStyle(color: partyColor, fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                name,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            if (isCurrent)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: BrandColors.sunriseGold.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text('You', style: TextStyle(color: BrandColors.sunriseGold, fontSize: 9, fontWeight: FontWeight.bold)),
+                              )
+                            else
+                              Icon(Icons.chevron_right, color: Colors.white.withOpacity(0.6), size: 18),
+                          ],
                         ),
-                        child: Center(
-                          child: Text(
-                            party.contains('democrat') ? 'D' : party.contains('republican') ? 'R' : '?',
-                            style: TextStyle(color: partyColor, fontSize: 12, fontWeight: FontWeight.bold),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: barWidth,
+                            minHeight: 14,
+                            backgroundColor: Colors.white.withOpacity(0.1),
+                            valueColor: AlwaysStoppedAnimation<Color>(partyColor.withOpacity(0.9)),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          name,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                          ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Text('\$${_formatMoney(raised)} raised', style: TextStyle(color: partyColor, fontSize: 12, fontWeight: FontWeight.w700)),
+                            const SizedBox(width: 12),
+                            Text('$contribs donors', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                            const Spacer(),
+                            if (spent > 0)
+                              Text('\$${_formatMoney(spent)} spent', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                          ],
                         ),
-                      ),
-                      if (isCurrent)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: BrandColors.sunriseGold.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text('You', style: TextStyle(color: BrandColors.sunriseGold, fontSize: 9, fontWeight: FontWeight.bold)),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Fundraising bar
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: barWidth,
-                      minHeight: 14,
-                      backgroundColor: Colors.white.withOpacity(0.08),
-                      valueColor: AlwaysStoppedAnimation<Color>(partyColor.withOpacity(0.7)),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Text('\$${_formatMoney(raised)} raised', style: TextStyle(color: partyColor, fontSize: 12, fontWeight: FontWeight.w600)),
-                      const SizedBox(width: 12),
-                      Text('$contribs donors', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                      const Spacer(),
-                      if (spent > 0)
-                        Text('\$${_formatMoney(spent)} spent', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                    ],
-                  ),
-                ],
+                ),
               ),
             );
           }),
@@ -2554,8 +2589,12 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: BrandColors.unityBlue.withOpacity(0.9),
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3)),
+        ],
       ),
       child: Row(
         children: List.generate(segments.length, (i) {
@@ -3772,6 +3811,162 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
+  /// Opens a detailed finance view for an opponent candidate.
+  /// Tries to find the full Candidate record to open full detail; falls back
+  /// to a modal sheet with available finance data.
+  void _openOpponentFinanceDetail({
+    required Map<String, dynamic> candidate,
+    String? candidateId,
+    required Color partyColor,
+  }) {
+    // Try to find the full Candidate object to open the full detail screen
+    Candidate? opponent;
+    for (final dc in _districtCandidates) {
+      if (dc.id == candidateId) {
+        opponent = dc;
+        break;
+      }
+    }
+    if (opponent == null) {
+      final targetName = (candidate['name'] as String? ?? '').toLowerCase();
+      for (final dc in _districtCandidates) {
+        if (dc.name.toLowerCase() == targetName) {
+          opponent = dc;
+          break;
+        }
+      }
+    }
+
+    final foundOpponent = opponent;
+    if (foundOpponent != null) {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => CandidateDetailScreen(candidate: foundOpponent, initialTab: 2),
+      ));
+      return;
+    }
+
+    // Fallback: show a detail sheet with what we have
+    final name = candidate['name'] as String? ?? 'Unknown';
+    final raised = (candidate['total_raised'] as num?)?.toDouble() ?? 0;
+    final spent = (candidate['total_spent'] as num?)?.toDouble() ?? 0;
+    final contribs = (candidate['contribution_count'] as num?)?.toInt() ?? 0;
+    final party = candidate['party'] as String? ?? '';
+    final mecId = candidate['mec_id']?.toString() ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0b1e37),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.85,
+        expand: false,
+        builder: (_, scrollCtrl) => ListView(
+          controller: scrollCtrl,
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(name, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(party, style: TextStyle(color: partyColor, fontSize: 14, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 20),
+
+            // Stats
+            Row(
+              children: [
+                Expanded(child: _opponentStatCard(
+                  'Raised', '\$${_formatMoney(raised)}', BrandColors.success,
+                )),
+                const SizedBox(width: 8),
+                Expanded(child: _opponentStatCard(
+                  'Spent', '\$${_formatMoney(spent)}', BrandColors.republicanRed,
+                )),
+                const SizedBox(width: 8),
+                Expanded(child: _opponentStatCard(
+                  'Donors', '$contribs', BrandColors.momentumBlue,
+                )),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Cash on hand
+            if (raised > 0 || spent > 0)
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: BrandColors.unityBlue.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Cash on Hand (approx)',
+                        style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Text(
+                      '\$${_formatMoney(raised - spent)}',
+                      style: TextStyle(
+                        color: (raised - spent) >= 0 ? BrandColors.success : BrandColors.republicanRed,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 16),
+            if (mecId.isNotEmpty)
+              Text('MEC ID: $mecId',
+                  style: const TextStyle(color: Colors.white54, fontSize: 11)),
+            const SizedBox(height: 8),
+            const Text(
+              'Detailed contribution and expenditure breakdowns are available when this opponent has a linked candidate profile.',
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _opponentStatCard(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: BrandColors.unityBlue.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPartisanLean() {
     // Calculate from election history if available
     double partisanLean = 0;
@@ -4594,14 +4789,11 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [color.withOpacity(0.2), color.withOpacity(0.08)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
+          color: BrandColors.unityBlue.withOpacity(0.9),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.25)),
+          border: Border.all(color: color.withOpacity(0.6), width: 1.2),
           boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3)),
             BoxShadow(color: color.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
