@@ -1267,7 +1267,7 @@ class _FinancesPageState extends State<FinancesPage>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.03),
+                  color: BrandColors.unityBlue.withOpacity(0.7),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
@@ -1530,9 +1530,9 @@ class _FinancesPageState extends State<FinancesPage>
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.06),
+          color: BrandColors.unityBlue.withOpacity(0.9),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: Colors.white.withOpacity(0.15)),
         ),
         child: TextField(
           controller: _searchCtrl,
@@ -1689,7 +1689,7 @@ class _FinancesPageState extends State<FinancesPage>
                       decoration: BoxDecoration(
                         color: selected
                             ? BrandColors.steelBlue.withOpacity(0.2)
-                            : Colors.white.withOpacity(0.04),
+                            : BrandColors.unityBlue.withOpacity(0.7),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: selected
@@ -1747,10 +1747,13 @@ class _FinancesPageState extends State<FinancesPage>
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(included ? 0.05 : 0.02),
+        color: BrandColors.unityBlue.withOpacity(included ? 0.9 : 0.6),
         borderRadius: BorderRadius.circular(12),
         border:
-            Border.all(color: Colors.white.withOpacity(included ? 0.08 : 0.03)),
+            Border.all(color: Colors.white.withOpacity(included ? 0.15 : 0.06)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6, offset: const Offset(0, 2)),
+        ],
       ),
       child: Row(
         children: [
@@ -1874,15 +1877,15 @@ class _FinancesPageState extends State<FinancesPage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: BrandColors.unityBlue,
         border:
-            Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
+            Border(top: BorderSide(color: Colors.white.withOpacity(0.15))),
       ),
       child: Row(
         children: [
           Text('${filtered.length} transactions',
-              style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
+              style: const TextStyle(
+                  color: Colors.white70,
                   fontSize: 12,
                   fontWeight: FontWeight.w500)),
           const Spacer(),
@@ -2073,8 +2076,8 @@ class _FinancesPageState extends State<FinancesPage>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
-              border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
+              color: BrandColors.unityBlue,
+              border: Border(top: BorderSide(color: Colors.white.withOpacity(0.15))),
             ),
             child: Row(
               children: [
@@ -2133,9 +2136,12 @@ class _FinancesPageState extends State<FinancesPage>
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: BrandColors.unityBlue.withOpacity(0.9),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: statusColor.withOpacity(0.2)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6, offset: const Offset(0, 2)),
+          ],
         ),
         child: Row(
           children: [
@@ -2144,7 +2150,7 @@ class _FinancesPageState extends State<FinancesPage>
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.15),
+                color: statusColor.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(statusIcon, color: statusColor, size: 16),
@@ -2517,9 +2523,12 @@ class _FinancesPageState extends State<FinancesPage>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: BrandColors.unityBlue.withOpacity(0.9),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2527,7 +2536,7 @@ class _FinancesPageState extends State<FinancesPage>
           Row(
             children: [
               Icon(Icons.timeline,
-                  color: Colors.white.withOpacity(0.6), size: 18),
+                  color: Colors.white.withOpacity(0.8), size: 18),
               const SizedBox(width: 8),
               const Text('Quarterly Filing Timeline',
                   style: TextStyle(
@@ -2641,12 +2650,12 @@ class _FinancesPageState extends State<FinancesPage>
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(colors: [
-          BrandColors.sunriseGold.withOpacity(0.12),
-          Colors.white.withOpacity(0.04),
+          BrandColors.unityBlue,
+          BrandColors.sunriseGold.withOpacity(0.15),
         ]),
         borderRadius: BorderRadius.circular(20),
         border:
-            Border.all(color: BrandColors.sunriseGold.withOpacity(0.25)),
+            Border.all(color: BrandColors.sunriseGold.withOpacity(0.35)),
         boxShadow: [
           BoxShadow(
               color: Colors.black.withOpacity(0.2),
@@ -2720,7 +2729,7 @@ class _FinancesPageState extends State<FinancesPage>
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.04),
+              color: BrandColors.unityBlue.withOpacity(0.7),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -3304,25 +3313,33 @@ class _ReceiptWebViewState extends State<_ReceiptWebView> {
         },
       ));
 
-    // For PDFs, use an HTML wrapper with embedded iframe
-    // For HTML, load directly
     final url = widget.url;
-    if (url.endsWith('.pdf') || url.contains('.pdf?')) {
-      // Wrap PDF in HTML with embedded object/iframe
+    final isPdf = url.endsWith('.pdf') || url.contains('.pdf?') || url.contains('.pdf%');
+
+    if (isPdf) {
+      // PDFs can't render inline on mobile WebView — show a styled preview page
       final html = '''
 <!DOCTYPE html>
 <html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  * { margin: 0; padding: 0; }
-  body { background: #fff; }
-  iframe { width: 100%; height: 100vh; border: none; }
+  body { font-family: -apple-system, sans-serif; margin: 0; padding: 40px 20px;
+    background: #f8f9fa; text-align: center; color: #333; }
+  .icon { font-size: 64px; margin-bottom: 16px; }
+  h2 { font-size: 16px; margin-bottom: 8px; }
+  p { font-size: 13px; color: #666; margin-bottom: 20px; }
+  a { display: inline-block; padding: 12px 24px; background: #273351;
+    color: white; text-decoration: none; border-radius: 8px; font-weight: 600; }
 </style>
 </head><body>
-<iframe src="https://docs.google.com/gviewr/viewer?url=${Uri.encodeComponent(url)}&embedded=true"></iframe>
+<div class="icon">\u{1F4C4}</div>
+<h2>PDF Receipt</h2>
+<p>Tap below to view the full document</p>
+<a href="$url" target="_blank">Open PDF</a>
 </body></html>''';
       _controller.loadHtmlString(html);
     } else {
+      // HTML receipts load directly
       _controller.loadRequest(Uri.parse(url));
     }
   }
