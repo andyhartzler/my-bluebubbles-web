@@ -1746,7 +1746,9 @@ class _FinancesPageState extends State<FinancesPage>
       amountWeight = FontWeight.w500;
     }
 
-    return Container(
+    return GestureDetector(
+      onTap: () => _openMerchantDetail(vendor: name, initialTransaction: t),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
       decoration: BoxDecoration(
@@ -1864,6 +1866,7 @@ class _FinancesPageState extends State<FinancesPage>
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -2134,7 +2137,10 @@ class _FinancesPageState extends State<FinancesPage>
     }
 
     return GestureDetector(
-      onTap: () => _showReceiptDetail(r),
+      onTap: () => _openMerchantDetail(
+        vendor: vendor,
+        initialReceipt: r,
+      ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
@@ -2205,6 +2211,61 @@ class _FinancesPageState extends State<FinancesPage>
         ),
       ),
     );
+  }
+
+  /// Opens full-screen merchant detail view showing all receipts + transactions
+  void _openMerchantDetail({
+    required String vendor,
+    Map<String, dynamic>? initialReceipt,
+    Map<String, dynamic>? initialTransaction,
+  }) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => MerchantDetailScreen(
+        vendor: vendor,
+        allReceipts: _receipts,
+        allTransactions: _transactions,
+        initialReceipt: initialReceipt,
+        initialTransaction: initialTransaction,
+        onDelete: (receiptId) async {
+          await _deleteReceipt(receiptId);
+          if (mounted) setState(() {
+            _receipts.removeWhere((r) => r['id'] == receiptId);
+          });
+        },
+        onUpdateStatus: (receiptId, status) async {
+          try {
+            await _supabase.privilegedClient
+                .from('receipts')
+                .update({'match_status': status, 'updated_at': DateTime.now().toIso8601String()})
+                .eq('id', receiptId);
+            if (mounted) setState(() {
+              final r = _receipts.firstWhere((r) => r['id'] == receiptId, orElse: () => {});
+              if (r.isNotEmpty) r['match_status'] = status;
+            });
+          } catch (_) {}
+        },
+      ),
+    ));
+  }
+
+  Future<void> _deleteReceipt(String receiptId) async {
+    try {
+      await _supabase.privilegedClient.functions
+          .invoke('receipts', body: {'action': 'delete', 'receipt_id': receiptId});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Receipt deleted'),
+          backgroundColor: BrandColors.success,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Delete failed: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
   }
 
   void _showReceiptDetail(Map<String, dynamic> r) {
@@ -3284,6 +3345,522 @@ class _ValidationWarning {
   final IconData icon;
   final Color color;
   const _ValidationWarning(this.message, this.icon, this.color);
+}
+
+/// Full-screen merchant detail view showing all receipts + transactions for a vendor
+class MerchantDetailScreen extends StatefulWidget {
+  final String vendor;
+  final List<Map<String, dynamic>> allReceipts;
+  final List<Map<String, dynamic>> allTransactions;
+  final Map<String, dynamic>? initialReceipt;
+  final Map<String, dynamic>? initialTransaction;
+  final Future<void> Function(String receiptId) onDelete;
+  final Future<void> Function(String receiptId, String status) onUpdateStatus;
+
+  const MerchantDetailScreen({
+    super.key,
+    required this.vendor,
+    required this.allReceipts,
+    required this.allTransactions,
+    this.initialReceipt,
+    this.initialTransaction,
+    required this.onDelete,
+    required this.onUpdateStatus,
+  });
+
+  @override
+  State<MerchantDetailScreen> createState() => _MerchantDetailScreenState();
+}
+
+class _MerchantDetailScreenState extends State<MerchantDetailScreen> {
+  Map<String, dynamic>? _selectedReceipt;
+
+  // Normalize vendor name for matching (Facebook = FACEBK, etc.)
+  static const _vendorAliases = {
+    'facebook': ['facebook', 'facebk', 'meta'],
+    'meta': ['facebook', 'facebk', 'meta'],
+    'google': ['google', 'gstatic', 'gsuite', 'workspace'],
+    'googleapis': ['google', 'gstatic', 'gsuite', 'workspace'],
+    'supabase': ['supabase', 'withorb'],
+    'withorb': ['supabase', 'withorb'],
+    'anthropic': ['anthropic', 'claude', 'parcel'],
+    'parcel': ['anthropic', 'claude', 'parcel'],
+    'netlify': ['netlify'],
+    'vercel': ['vercel'],
+    'digitalocean': ['digitalocean'],
+    'mailchimp': ['mailchimp', 'reply'],
+    'reply': ['mailchimp', 'reply'],
+    'zoom': ['zoom'],
+    'zapier': ['zapier'],
+    'notion': ['notion'],
+    'squarespace': ['sqsp', 'squarespac', 'squarespace'],
+    'sqsp': ['sqsp', 'squarespac', 'squarespace'],
+    'x corp': ['x corp', 'about.x'],
+    'versapay': ['versapay', 'vsp*raven', 'raven printing', 'vpy'],
+  };
+
+  String _normalize(String s) =>
+      s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+  bool _matchesVendor(String name, String target) {
+    final n = _normalize(name);
+    final t = _normalize(target);
+    if (n == t || n.contains(t) || t.contains(n)) return true;
+
+    // Check aliases
+    for (final entry in _vendorAliases.entries) {
+      final key = entry.key;
+      final aliases = entry.value;
+      if (t == _normalize(key) || aliases.any((a) => _normalize(a) == t)) {
+        if (aliases.any((a) => n.contains(_normalize(a)))) return true;
+      }
+    }
+    return false;
+  }
+
+  List<Map<String, dynamic>> get _merchantReceipts {
+    return widget.allReceipts
+        .where((r) => r['match_status'] != 'ignored')
+        .where((r) => _matchesVendor(r['vendor_name'] as String? ?? '', widget.vendor))
+        .toList()
+      ..sort((a, b) => (b['email_date'] as String? ?? '').compareTo(a['email_date'] as String? ?? ''));
+  }
+
+  List<Map<String, dynamic>> get _merchantTransactions {
+    return widget.allTransactions
+        .where((t) => _matchesVendor(
+              (t['merchant_name'] as String? ?? t['name'] as String? ?? ''),
+              widget.vendor,
+            ))
+        .toList()
+      ..sort((a, b) => (b['date'] as String? ?? '').compareTo(a['date'] as String? ?? ''));
+  }
+
+  double get _totalSpent {
+    double total = 0;
+    for (final t in _merchantTransactions) {
+      final amt = (t['amount'] as num?)?.toDouble() ?? 0;
+      if (amt > 0) total += amt;
+    }
+    return total;
+  }
+
+  double get _totalReceiptAmount {
+    double total = 0;
+    for (final r in _merchantReceipts) {
+      total += (r['amount'] as num?)?.toDouble() ?? 0;
+    }
+    return total;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedReceipt = widget.initialReceipt;
+    // If opening from a transaction, try to find a matched receipt
+    if (_selectedReceipt == null && widget.initialTransaction != null) {
+      final txnId = widget.initialTransaction!['id']?.toString();
+      if (txnId != null) {
+        final matched = widget.allReceipts.firstWhere(
+          (r) => r['transaction_id']?.toString() == txnId,
+          orElse: () => {},
+        );
+        if (matched.isNotEmpty) _selectedReceipt = matched;
+      }
+    }
+    // Fall back to the first receipt for this merchant
+    _selectedReceipt ??= _merchantReceipts.isNotEmpty ? _merchantReceipts.first : null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: BrandColors.unityBlue,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: BrandColors.tileGradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        title: Text(widget.vendor,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: BrandedBackground(
+        child: LayoutBuilder(builder: (context, constraints) {
+          final isWide = constraints.maxWidth > 900;
+          return isWide
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left: receipt preview
+                    Expanded(flex: 3, child: _buildReceiptPreviewPanel()),
+                    // Right: lists
+                    Expanded(flex: 2, child: _buildListsPanel()),
+                  ],
+                )
+              : ListView(
+                  padding: const EdgeInsets.all(12),
+                  children: [
+                    _buildHeaderCard(),
+                    const SizedBox(height: 12),
+                    if (_selectedReceipt != null) ...[
+                      SizedBox(
+                        height: 400,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: _ReceiptWebView(
+                            url: _selectedReceipt!['storage_url'] as String? ?? '',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildReceiptActions(_selectedReceipt!),
+                      const SizedBox(height: 16),
+                    ],
+                    _buildTransactionsSection(),
+                    const SizedBox(height: 16),
+                    _buildReceiptsSection(),
+                  ],
+                );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildHeaderCard() {
+    final txnCount = _merchantTransactions.length;
+    final receiptCount = _merchantReceipts.length;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: BrandColors.unityBlue.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: BrandColors.sunriseGold.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.vendor,
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _headerStat('Total Spent', '\$${CandidateUI.formatMoney(_totalSpent)}', BrandColors.sunriseGold),
+              _headerStat('Transactions', '$txnCount', BrandColors.momentumBlue),
+              _headerStat('Receipts', '$receiptCount', BrandColors.success),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _headerStat(String label, String value, Color color) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(value,
+              style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w800)),
+          Text(label,
+              style: const TextStyle(color: Colors.white70, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReceiptPreviewPanel() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeaderCard(),
+          const SizedBox(height: 16),
+          const Text('Receipt Document',
+              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: _selectedReceipt != null
+                  ? _ReceiptWebView(url: _selectedReceipt!['storage_url'] as String? ?? '')
+                  : const Center(
+                      child: Text('No receipt selected',
+                          style: TextStyle(color: Colors.black54))),
+            ),
+          ),
+          if (_selectedReceipt != null) ...[
+            const SizedBox(height: 12),
+            _buildReceiptActions(_selectedReceipt!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListsPanel() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 16, 16, 16),
+      child: ListView(
+        children: [
+          _buildTransactionsSection(),
+          const SizedBox(height: 16),
+          _buildReceiptsSection(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReceiptActions(Map<String, dynamic> r) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: const Color(0xFF1E3A5F),
+                  title: const Text('Delete receipt?',
+                      style: TextStyle(color: Colors.white, fontSize: 16)),
+                  content: const Text(
+                      'This will permanently remove it from the CRM and storage.',
+                      style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Delete',
+                          style: TextStyle(color: Colors.redAccent)),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed == true) {
+                await widget.onDelete(r['id'] as String);
+                if (mounted) {
+                  setState(() {
+                    _selectedReceipt = _merchantReceipts.isNotEmpty
+                        ? _merchantReceipts.first
+                        : null;
+                  });
+                }
+              }
+            },
+            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
+            label: const Text('Delete',
+                style: TextStyle(color: Colors.redAccent, fontSize: 13)),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.redAccent),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              await widget.onUpdateStatus(r['id'] as String, 'inkind');
+              if (mounted) setState(() => r['match_status'] = 'inkind');
+            },
+            icon: const Icon(Icons.volunteer_activism, color: BrandColors.sunriseGold, size: 18),
+            label: const Text('In-Kind',
+                style: TextStyle(color: BrandColors.sunriseGold, fontSize: 13)),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: BrandColors.sunriseGold.withOpacity(0.5)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              await widget.onUpdateStatus(r['id'] as String, 'ignored');
+              if (mounted) setState(() => r['match_status'] = 'ignored');
+            },
+            icon: const Icon(Icons.block, color: Colors.grey, size: 18),
+            label: const Text('Ignore',
+                style: TextStyle(color: Colors.grey, fontSize: 13)),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.grey),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTransactionsSection() {
+    final txns = _merchantTransactions;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: BrandColors.unityBlue.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt_long, color: BrandColors.momentumBlue, size: 18),
+              const SizedBox(width: 8),
+              Text('Transactions (${txns.length})',
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (txns.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('No bank transactions for this merchant',
+                  style: TextStyle(color: Colors.white70, fontSize: 12)),
+            )
+          else
+            ...txns.map((t) {
+              final amount = ((t['amount'] as num?)?.toDouble() ?? 0).abs();
+              final date = t['date'] as String? ?? '';
+              final name = t['merchant_name'] as String? ?? t['name'] as String? ?? '';
+              return Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name,
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text(date,
+                              style: const TextStyle(color: Colors.white60, fontSize: 10)),
+                        ],
+                      ),
+                    ),
+                    Text('\$${CandidateUI.formatMoney(amount)}',
+                        style: const TextStyle(
+                            color: BrandColors.sunriseGold,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReceiptsSection() {
+    final receipts = _merchantReceipts;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: BrandColors.unityBlue.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt, color: BrandColors.success, size: 18),
+              const SizedBox(width: 8),
+              Text('Receipts (${receipts.length})',
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (receipts.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('No receipts for this merchant',
+                  style: TextStyle(color: Colors.white70, fontSize: 12)),
+            )
+          else
+            ...receipts.map((r) {
+              final isSelected = _selectedReceipt?['id'] == r['id'];
+              final amount = (r['amount'] as num?)?.toDouble() ?? 0;
+              final date = r['email_date'] as String? ?? '';
+              final subject = r['email_subject'] as String? ?? '';
+              return GestureDetector(
+                onTap: () => setState(() => _selectedReceipt = r),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? BrandColors.success.withOpacity(0.15)
+                        : Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected
+                          ? BrandColors.success.withOpacity(0.5)
+                          : Colors.transparent,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(subject,
+                                style: const TextStyle(color: Colors.white, fontSize: 11),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                            Text(date.length > 10 ? date.substring(0, 10) : date,
+                                style: const TextStyle(color: Colors.white60, fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                      if (amount > 0)
+                        Text('\$${CandidateUI.formatMoney(amount)}',
+                            style: const TextStyle(
+                                color: BrandColors.success,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
 }
 
 /// Inline receipt viewer — renders PDFs natively and HTML via WebView

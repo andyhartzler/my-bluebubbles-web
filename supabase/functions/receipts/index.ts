@@ -272,6 +272,36 @@ serve(async (req) => {
         );
       }
 
+      // ── Delete receipt (DB record + storage file) ──
+      case "delete": {
+        const { receipt_id } = params;
+        const { data: receipt } = await supabase
+          .from("receipts")
+          .select("storage_path")
+          .eq("id", receipt_id)
+          .maybeSingle();
+
+        // Delete from storage first
+        if (receipt?.storage_path) {
+          await supabase.storage
+            .from("receipts")
+            .remove([receipt.storage_path]);
+        }
+
+        // Delete DB record
+        const { error } = await supabase
+          .from("receipts")
+          .delete()
+          .eq("id", receipt_id);
+
+        if (error) throw error;
+
+        return new Response(
+          JSON.stringify({ success: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       // ── Match receipt to transaction ──
       case "match": {
         const { receipt_id, transaction_id, match_status } = params;
