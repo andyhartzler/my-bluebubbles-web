@@ -447,7 +447,7 @@ class _SubscribersOverviewTabState extends State<SubscribersOverviewTab> {
                 color: _momentumBlue,
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right, color: Colors.white54),
+              const Icon(Icons.chevron_right, color: Colors.white70),
             ],
           ),
         ),
@@ -472,7 +472,7 @@ class _SubscribersOverviewTabState extends State<SubscribersOverviewTab> {
         Text(
           label,
           style: theme.textTheme.labelSmall?.copyWith(
-            color: Colors.white60,
+            color: Colors.white70,
           ),
         ),
       ],

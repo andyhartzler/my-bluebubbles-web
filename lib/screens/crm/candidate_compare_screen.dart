@@ -146,7 +146,7 @@ class _CandidateCompareScreenState extends State<CandidateCompareScreen>
                 ),
                 child: const Text(
                   'Change',
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ),
             ),
@@ -186,7 +186,7 @@ class _CandidateCompareScreenState extends State<CandidateCompareScreen>
           padding: EdgeInsets.symmetric(horizontal: 16),
           child: Text(
             'Select a candidate to compare against:',
-            style: TextStyle(color: Colors.white54, fontSize: 13),
+            style: TextStyle(color: Colors.white70, fontSize: 13),
           ),
         ),
         const SizedBox(height: 12),
@@ -262,7 +262,7 @@ class _CandidateCompareScreenState extends State<CandidateCompareScreen>
                   ),
                   Text(
                     c.officeDisplay,
-                    style: const TextStyle(color: Colors.white38, fontSize: 11),
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                 ],
               ),
@@ -270,7 +270,7 @@ class _CandidateCompareScreenState extends State<CandidateCompareScreen>
             if (c.isYoungDem)
               const Icon(Icons.star, color: BrandColors.sunriseGold, size: 16),
             const SizedBox(width: 4),
-            const Icon(Icons.compare_arrows, color: Colors.white30, size: 18),
+            const Icon(Icons.compare_arrows, color: Colors.white70, size: 18),
           ],
         ),
       ),
@@ -411,7 +411,7 @@ class _CandidateCompareScreenState extends State<CandidateCompareScreen>
           const SizedBox(height: 4),
           Text(
             c.compactOffice,
-            style: const TextStyle(color: Colors.white54, fontSize: 11),
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
             textAlign: TextAlign.center,
           ),
           if (c.isYoungDem) ...[
@@ -483,7 +483,7 @@ class _CandidateCompareScreenState extends State<CandidateCompareScreen>
               child: Text(
                 label,
                 style: const TextStyle(
-                  color: Colors.white38,
+                  color: Colors.white70,
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
                 ),
@@ -521,7 +521,7 @@ class _CandidateCompareScreenState extends State<CandidateCompareScreen>
                 Text(
                   '$valueA',
                   style: TextStyle(
-                    color: betterA ? BrandColors.success : Colors.white54,
+                    color: betterA ? BrandColors.success : Colors.white70,
                     fontSize: 13,
                     fontWeight: betterA ? FontWeight.bold : FontWeight.normal,
                   ),
@@ -549,7 +549,7 @@ class _CandidateCompareScreenState extends State<CandidateCompareScreen>
             child: Center(
               child: Text(
                 label,
-                style: const TextStyle(color: Colors.white30, fontSize: 9),
+                style: const TextStyle(color: Colors.white70, fontSize: 9),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -576,7 +576,7 @@ class _CandidateCompareScreenState extends State<CandidateCompareScreen>
                 Text(
                   '$valueB',
                   style: TextStyle(
-                    color: betterB ? BrandColors.success : Colors.white54,
+                    color: betterB ? BrandColors.success : Colors.white70,
                     fontSize: 13,
                     fontWeight: betterB ? FontWeight.bold : FontWeight.normal,
                   ),
@@ -610,7 +610,7 @@ class _CandidateCompareScreenState extends State<CandidateCompareScreen>
             child: Center(
               child: Text(
                 label,
-                style: const TextStyle(color: Colors.white30, fontSize: 9),
+                style: const TextStyle(color: Colors.white70, fontSize: 9),
                 textAlign: TextAlign.center,
               ),
             ),

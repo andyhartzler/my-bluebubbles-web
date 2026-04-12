@@ -885,7 +885,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.person_search, size: 64, color: Colors.white.withOpacity(0.4)),
+            Icon(Icons.person_search, size: 64, color: Colors.white.withOpacity(0.7)),
             const SizedBox(height: 16),
             const Text(
               'No donors found',
@@ -1101,7 +1101,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
                                   ? _dateFmt.format(r.lastDonationDate!)
                                   : '--',
                               style: const TextStyle(
-                                color: Colors.white54,
+                                color: Colors.white70,
                                 fontSize: 12,
                               ),
                             ),

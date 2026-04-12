@@ -327,7 +327,7 @@ class _CallTimeTabState extends State<CallTimeTab> {
                 const SizedBox(width: 4),
                 IconButton(
                   icon: const Icon(Icons.delete_outline,
-                      color: Colors.white54, size: 20),
+                      color: Colors.white70, size: 20),
                   onPressed: () => _confirmDeleteList(list),
                   tooltip: 'Delete list',
                   constraints:
@@ -882,7 +882,7 @@ class _CallTimeTabState extends State<CallTimeTab> {
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label.isEmpty ? null : label,
-      labelStyle: const TextStyle(color: Colors.white54),
+      labelStyle: const TextStyle(color: Colors.white70),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: Colors.white24),
@@ -1181,7 +1181,7 @@ class _ExpandableItemTileState extends State<_ExpandableItemTile> {
   InputDecoration _expandedInputDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
+      labelStyle: const TextStyle(color: Colors.white70, fontSize: 13),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: Colors.white24),
@@ -1337,7 +1337,7 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
   InputDecoration _filterInputDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+      labelStyle: const TextStyle(color: Colors.white70, fontSize: 12),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: Colors.white24),
@@ -1467,7 +1467,7 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
                     _filtersExpanded
                         ? Icons.keyboard_arrow_up
                         : Icons.keyboard_arrow_down,
-                    color: Colors.white54,
+                    color: Colors.white70,
                     size: 20,
                   ),
                 ],
@@ -1489,9 +1489,9 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
                     decoration: InputDecoration(
                       hintText: 'Search by donor name...',
                       hintStyle:
-                          const TextStyle(color: Colors.white38, fontSize: 14),
+                          const TextStyle(color: Colors.white54, fontSize: 14),
                       prefixIcon:
-                          const Icon(Icons.search, color: Colors.white54, size: 20),
+                          const Icon(Icons.search, color: Colors.white70, size: 20),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: Colors.white24),
@@ -1679,7 +1679,7 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Icon(Icons.phone, size: 14, color: Colors.white54),
+                              const Icon(Icons.phone, size: 14, color: Colors.white70),
                               const SizedBox(width: 4),
                               const Text('Has Phone',
                                   style: TextStyle(color: Colors.white70, fontSize: 12)),
@@ -1705,7 +1705,7 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Icon(Icons.email, size: 14, color: Colors.white54),
+                              const Icon(Icons.email, size: 14, color: Colors.white70),
                               const SizedBox(width: 4),
                               const Text('Has Email',
                                   style: TextStyle(color: Colors.white70, fontSize: 12)),
@@ -1980,7 +1980,7 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
                               if (ageEstimate != null) 'Age ~$ageEstimate',
                             ].join(' \u2022 '),
                             style: const TextStyle(
-                              color: Colors.white54,
+                              color: Colors.white70,
                               fontSize: 12,
                             ),
                             overflow: TextOverflow.ellipsis,
@@ -2053,7 +2053,7 @@ class _SmartDonorSearchDialogState extends State<_SmartDonorSearchDialog> {
               decoration: InputDecoration(
                 labelText: 'Suggested Ask (\$)',
                 labelStyle:
-                    const TextStyle(color: Colors.white54, fontSize: 12),
+                    const TextStyle(color: Colors.white70, fontSize: 12),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: Colors.white24),

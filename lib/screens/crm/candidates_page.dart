@@ -706,7 +706,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                 padding: const EdgeInsets.all(4),
                 child: Icon(
                   allSelected ? Icons.check_box : Icons.check_box_outline_blank,
-                  color: allSelected ? BrandColors.sunriseGold : Colors.white54,
+                  color: allSelected ? BrandColors.sunriseGold : Colors.white70,
                   size: 22,
                 ),
               ),
@@ -861,7 +861,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                   _selectedMapDistrict = null;
                   _selectedDistrictCandidates = null;
                 }),
-                child: const Icon(Icons.close, color: Colors.white54, size: 18),
+                child: const Icon(Icons.close, color: Colors.white70, size: 18),
               ),
             ],
           ),
@@ -886,11 +886,11 @@ class _CandidatesPageState extends State<CandidatesPage>
                         Text(
                           'Age ${c.estimatedAge}',
                           style: const TextStyle(
-                              color: Colors.white54, fontSize: 12),
+                              color: Colors.white70, fontSize: 12),
                         ),
                       const SizedBox(width: 4),
                       const Icon(Icons.chevron_right,
-                          color: Colors.white60, size: 18),
+                          color: Colors.white70, size: 18),
                     ],
                   ),
                 ),
@@ -1105,7 +1105,7 @@ class _CandidatesPageState extends State<CandidatesPage>
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(color: Colors.white54, fontSize: 11),
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
             textAlign: TextAlign.center,
           ),
         ],
@@ -1138,7 +1138,7 @@ class _CandidatesPageState extends State<CandidatesPage>
               const Spacer(),
               Text(
                 '${_youngDems.length} candidates',
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ],
           ),
@@ -1295,7 +1295,7 @@ class _CandidatesPageState extends State<CandidatesPage>
             children: [
               Icon(
                 Icons.analytics,
-                color: _showAnalytics ? BrandColors.sunriseGold : Colors.white54,
+                color: _showAnalytics ? BrandColors.sunriseGold : Colors.white70,
                 size: 20,
               ),
               const SizedBox(width: 8),
@@ -1306,7 +1306,7 @@ class _CandidatesPageState extends State<CandidatesPage>
               const Spacer(),
               Icon(
                 _showAnalytics ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                color: Colors.white54,
+                color: Colors.white70,
                 size: 20,
               ),
             ],
@@ -1409,7 +1409,7 @@ class _CandidatesPageState extends State<CandidatesPage>
         children: [
           Container(width: 8, height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
           const SizedBox(width: 6),
-          Expanded(child: Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10))),
+          Expanded(child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10))),
           Text('$count ($pct%)', style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w500)),
         ],
       ),
@@ -1454,7 +1454,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Text('$val', style: const TextStyle(color: Colors.white54, fontSize: 8)),
+                        Text('$val', style: const TextStyle(color: Colors.white70, fontSize: 8)),
                         const SizedBox(height: 2),
                         Container(
                           height: h.clamp(4.0, 80.0),
@@ -1468,7 +1468,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(labels[i], style: const TextStyle(color: Colors.white60, fontSize: 8)),
+                        Text(labels[i], style: const TextStyle(color: Colors.white70, fontSize: 8)),
                       ],
                     ),
                   ),
@@ -1510,7 +1510,7 @@ class _CandidatesPageState extends State<CandidatesPage>
           _contestRow('Uncontested (D)', uncontestedDem, total, BrandColors.democratBlue),
           _contestRow('Uncontested (R)', uncontestedRep, total, BrandColors.republicanRed),
           const SizedBox(height: 6),
-          Text('$total total districts', style: const TextStyle(color: Colors.white60, fontSize: 10)),
+          Text('$total total districts', style: const TextStyle(color: Colors.white70, fontSize: 10)),
         ],
       ),
     );
@@ -1526,7 +1526,7 @@ class _CandidatesPageState extends State<CandidatesPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
               Text('$count', style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
             ],
           ),
@@ -1580,7 +1580,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                 ),
                 const Text(
                   'GOP seats with\nno Dem filed',
-                  style: TextStyle(color: Colors.white60, fontSize: 11),
+                  style: TextStyle(color: Colors.white70, fontSize: 11),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -1650,7 +1650,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                     child: Text(
                       '#${i + 1}',
                       style: TextStyle(
-                        color: i < 3 ? BrandColors.sunriseGold : Colors.white60,
+                        color: i < 3 ? BrandColors.sunriseGold : Colors.white70,
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1766,11 +1766,11 @@ class _CandidatesPageState extends State<CandidatesPage>
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'Search candidates by name, district, office…',
-                    hintStyle: const TextStyle(color: Colors.white60),
-                    prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                    hintStyle: const TextStyle(color: Colors.white70),
+                    prefixIcon: const Icon(Icons.search, color: Colors.white70),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear, color: Colors.white54),
+                            icon: const Icon(Icons.clear, color: Colors.white70),
                             onPressed: () {
                               _searchController.clear();
                               _applyFilters();
@@ -1804,7 +1804,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                   ),
                   child: Icon(
                     Icons.checklist,
-                    color: _bulkMode ? BrandColors.sunriseGold : Colors.white54,
+                    color: _bulkMode ? BrandColors.sunriseGold : Colors.white70,
                     size: 20,
                   ),
                 ),
@@ -1884,7 +1884,7 @@ class _CandidatesPageState extends State<CandidatesPage>
             children: [
               Text(
                 '${_filteredCandidates.length} candidates',
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
               const Spacer(),
               // Advanced filter button
@@ -1909,13 +1909,13 @@ class _CandidatesPageState extends State<CandidatesPage>
                       Icon(
                         Icons.tune,
                         size: 14,
-                        color: _activeFilterCount > 0 ? BrandColors.sunriseGold : Colors.white54,
+                        color: _activeFilterCount > 0 ? BrandColors.sunriseGold : Colors.white70,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         _activeFilterCount > 0 ? 'Filters ($_activeFilterCount)' : 'Filters',
                         style: TextStyle(
-                          color: _activeFilterCount > 0 ? BrandColors.sunriseGold : Colors.white54,
+                          color: _activeFilterCount > 0 ? BrandColors.sunriseGold : Colors.white70,
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
                         ),
@@ -1925,7 +1925,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                 ),
               ),
               const SizedBox(width: 8),
-              const Text('Sort: ', style: TextStyle(color: Colors.white54, fontSize: 12)),
+              const Text('Sort: ', style: TextStyle(color: Colors.white70, fontSize: 12)),
               _sortChip('Name', 'name'),
               _sortChip('Age', 'age'),
               _sortChip('Dist', 'district'),
@@ -1983,7 +1983,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                       color: Colors.white.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text('Reset All', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    child: const Text('Reset All', style: TextStyle(color: Colors.white70, fontSize: 11)),
                   ),
                 ),
             ],
@@ -2017,7 +2017,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                   ),
                   child: Text(
                     party,
-                    style: TextStyle(color: selected ? Colors.white : Colors.white54, fontSize: 11),
+                    style: TextStyle(color: selected ? Colors.white : Colors.white70, fontSize: 11),
                   ),
                 ),
               );
@@ -2052,7 +2052,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                   ),
                   child: Text(
                     level.substring(0, 1).toUpperCase() + level.substring(1),
-                    style: TextStyle(color: selected ? Colors.white : Colors.white54, fontSize: 11),
+                    style: TextStyle(color: selected ? Colors.white : Colors.white70, fontSize: 11),
                   ),
                 ),
               );
@@ -2151,7 +2151,7 @@ class _CandidatesPageState extends State<CandidatesPage>
   Widget _filterLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Text(text, style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w500)),
+      child: Text(text, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500)),
     );
   }
 
@@ -2171,13 +2171,13 @@ class _CandidatesPageState extends State<CandidatesPage>
             Icon(
               value ? Icons.check_circle : icon,
               size: 14,
-              color: value ? BrandColors.success : Colors.white60,
+              color: value ? BrandColors.success : Colors.white70,
             ),
             const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
-                color: value ? Colors.white : Colors.white54,
+                color: value ? Colors.white : Colors.white70,
                 fontSize: 11,
                 fontWeight: value ? FontWeight.w600 : FontWeight.normal,
               ),
@@ -2240,7 +2240,7 @@ class _CandidatesPageState extends State<CandidatesPage>
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? BrandColors.sunriseGold : Colors.white54,
+            color: isSelected ? BrandColors.sunriseGold : Colors.white70,
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
             decoration:
@@ -2291,7 +2291,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                   padding: const EdgeInsets.only(right: 8),
                   child: Icon(
                     isSelected ? Icons.check_box : Icons.check_box_outline_blank,
-                    color: isSelected ? BrandColors.sunriseGold : Colors.white60,
+                    color: isSelected ? BrandColors.sunriseGold : Colors.white70,
                     size: 20,
                   ),
                 ),
@@ -2345,7 +2345,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                         Expanded(
                           child: Text(
                             c.officeDisplay,
-                            style: const TextStyle(color: Colors.white54, fontSize: 12),
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -2393,7 +2393,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                   ),
                 ),
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
+              const Icon(Icons.chevron_right, color: Colors.white70, size: 18),
             ],
           ),
         ),
@@ -2540,7 +2540,7 @@ class _BulkAssignDialogState extends State<_BulkAssignDialog> {
                     children: [
                       Icon(
                         isCustom ? Icons.edit : Icons.person,
-                        color: isSelected ? BrandColors.sunriseGold : Colors.white60,
+                        color: isSelected ? BrandColors.sunriseGold : Colors.white70,
                         size: 18,
                       ),
                       const SizedBox(width: 10),
@@ -2567,7 +2567,7 @@ class _BulkAssignDialogState extends State<_BulkAssignDialog> {
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Enter team member name',
-                hintStyle: const TextStyle(color: Colors.white60),
+                hintStyle: const TextStyle(color: Colors.white70),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.08),
                 border: OutlineInputBorder(
@@ -2582,7 +2582,7 @@ class _BulkAssignDialogState extends State<_BulkAssignDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
         ),
         ElevatedButton(
           onPressed: () {

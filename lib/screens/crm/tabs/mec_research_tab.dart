@@ -642,7 +642,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
         padding: EdgeInsets.all(32),
         child: Column(
           children: [
-            Icon(Icons.search_off, size: 48, color: Colors.white38),
+            Icon(Icons.search_off, size: 48, color: Colors.white60),
             SizedBox(height: 12),
             Text('No donors found', style: BrandTextStyles.subtitle),
             SizedBox(height: 4),
@@ -802,12 +802,12 @@ class _MecResearchTabState extends State<MecResearchTab> {
                           if (ageEstimate != null)
                             _buildEnrichmentChip(
                               'Age ~$ageEstimate',
-                              Colors.white54,
+                              Colors.white70,
                             ),
                           if (gender != null && gender.isNotEmpty)
                             _buildEnrichmentChip(
                               gender,
-                              Colors.white54,
+                              Colors.white70,
                             ),
                           if (hasPhone)
                             Container(
@@ -874,14 +874,14 @@ class _MecResearchTabState extends State<MecResearchTab> {
                 child: Row(
                   children: [
                     if (location.isNotEmpty) ...[
-                      const Icon(Icons.location_on, size: 14, color: Colors.white54),
+                      const Icon(Icons.location_on, size: 14, color: Colors.white70),
                       const SizedBox(width: 4),
                       Text(location, style: BrandTextStyles.caption),
                     ],
                     if (location.isNotEmpty && employer != null && employer.isNotEmpty)
                       const Text('  |  ', style: BrandTextStyles.caption),
                     if (employer != null && employer.isNotEmpty) ...[
-                      const Icon(Icons.business, size: 14, color: Colors.white54),
+                      const Icon(Icons.business, size: 14, color: Colors.white70),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
@@ -902,7 +902,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
             Row(
               children: [
                 if (firstYear != null && lastYear != null) ...[
-                  const Icon(Icons.calendar_today, size: 13, color: Colors.white54),
+                  const Icon(Icons.calendar_today, size: 13, color: Colors.white70),
                   const SizedBox(width: 4),
                   Text(
                     firstYear == lastYear ? '$firstYear' : '$firstYear - $lastYear',
@@ -1149,9 +1149,9 @@ class _MecResearchTabState extends State<MecResearchTab> {
                 if (partyLean != null && partyLean.isNotEmpty)
                   _buildEnrichmentChip(partyLean, _partyLeanColor(partyLean)),
                 if (ageEstimate != null)
-                  _buildEnrichmentChip('Age ~$ageEstimate', Colors.white54),
+                  _buildEnrichmentChip('Age ~$ageEstimate', Colors.white70),
                 if (gender != null && gender.isNotEmpty)
-                  _buildEnrichmentChip(gender, Colors.white54),
+                  _buildEnrichmentChip(gender, Colors.white70),
                 if (generation != null && generation.isNotEmpty)
                   _buildEnrichmentChip(generation, Colors.tealAccent),
                 if (isHomeowner == true)
@@ -1347,9 +1347,9 @@ class _MecResearchTabState extends State<MecResearchTab> {
               if (partyLean != null && partyLean.isNotEmpty)
                 _buildEnrichmentChip(partyLean, _partyLeanColor(partyLean)),
               if (ageEstimate != null)
-                _buildEnrichmentChip('Age ~$ageEstimate', Colors.white54),
+                _buildEnrichmentChip('Age ~$ageEstimate', Colors.white70),
               if (gender != null && gender.isNotEmpty)
-                _buildEnrichmentChip(gender, Colors.white54),
+                _buildEnrichmentChip(gender, Colors.white70),
               if (generation != null && generation.isNotEmpty)
                 _buildEnrichmentChip(generation, Colors.tealAccent),
               if (isHomeowner == true)
@@ -1689,13 +1689,13 @@ class _MecResearchTabState extends State<MecResearchTab> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.white54, size: 16),
+          Icon(icon, color: Colors.white70, size: 16),
           const SizedBox(width: 8),
           SizedBox(
             width: 90,
             child: Text(
               label,
-              style: BrandTextStyles.caption.copyWith(color: Colors.white54),
+              style: BrandTextStyles.caption.copyWith(color: Colors.white70),
             ),
           ),
           Expanded(
@@ -2154,7 +2154,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right, color: Colors.white38, size: 18),
+                  const Icon(Icons.chevron_right, color: Colors.white60, size: 18),
                 ],
               ),
             ),

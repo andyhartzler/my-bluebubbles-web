@@ -405,7 +405,7 @@ Missouri Young Democrats''',
                 ),
                 Text(
                   widget.candidate.officeDisplay,
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ],
             ),
@@ -474,7 +474,7 @@ Missouri Young Democrats''',
           borderRadius: BorderRadius.circular(12),
         ),
         labelColor: BrandColors.sunriseGold,
-        unselectedLabelColor: Colors.white54,
+        unselectedLabelColor: Colors.white70,
         labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         tabs: const [
           Tab(text: 'Compose'),
@@ -654,7 +654,7 @@ Missouri Young Democrats''',
               ),
               decoration: InputDecoration(
                 hintText: 'Write your message…',
-                hintStyle: const TextStyle(color: Colors.white30),
+                hintStyle: const TextStyle(color: Colors.white70),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.all(16),
               ),
@@ -698,7 +698,7 @@ Missouri Young Democrats''',
       children: [
         const Text(
           'Choose a template to get started quickly.',
-          style: TextStyle(color: Colors.white54, fontSize: 13),
+          style: TextStyle(color: Colors.white70, fontSize: 13),
         ),
         const SizedBox(height: 16),
         ..._templates.entries.map((entry) {
@@ -771,7 +771,7 @@ Missouri Young Democrats''',
                                 .replaceAll('{{office}}',
                                     widget.candidate.officeDisplay),
                             style: const TextStyle(
-                                color: Colors.white38, fontSize: 12),
+                                color: Colors.white70, fontSize: 12),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -783,7 +783,7 @@ Missouri Young Democrats''',
                           color: BrandColors.sunriseGold, size: 22)
                     else
                       const Icon(Icons.chevron_right,
-                          color: Colors.white30, size: 20),
+                          color: Colors.white70, size: 20),
                   ],
                 ),
               ),
@@ -805,7 +805,7 @@ Missouri Young Democrats''',
               Text(
                 label,
                 style: const TextStyle(
-                  color: Colors.white54,
+                  color: Colors.white70,
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
@@ -826,7 +826,7 @@ Missouri Young Democrats''',
   InputDecoration _fieldDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: Colors.white30),
+      hintStyle: const TextStyle(color: Colors.white70),
       filled: true,
       fillColor: Colors.white.withOpacity(0.06),
       border: OutlineInputBorder(
@@ -859,11 +859,11 @@ Missouri Young Democrats''',
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Colors.white54, size: 16),
+            Icon(icon, color: Colors.white70, size: 16),
             const SizedBox(width: 6),
             Text(
               label,
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
           ],
         ),

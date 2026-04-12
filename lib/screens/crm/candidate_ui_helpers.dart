@@ -71,7 +71,7 @@ class CandidateUI {
       children: [
         Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
       ],
     );
   }
@@ -91,10 +91,10 @@ class CandidateUI {
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white.withOpacity(0.06)),
               ),
-              child: Icon(icon, color: Colors.white.withOpacity(0.35), size: 48),
+              child: Icon(icon, color: Colors.white.withOpacity(0.7), size: 48),
             ),
             const SizedBox(height: 20),
-            Text(title, style: const TextStyle(color: Colors.white60, fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+            Text(title, style: const TextStyle(color: Colors.white70, fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
             const SizedBox(height: 8),
             Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13, height: 1.4), textAlign: TextAlign.center),
           ],

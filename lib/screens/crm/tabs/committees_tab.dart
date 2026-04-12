@@ -397,11 +397,11 @@ class CommitteesTabState extends State<CommitteesTab> {
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
           hintText: 'Search committees, candidates, treasurers...',
-          hintStyle: const TextStyle(color: Colors.white38),
-          prefixIcon: const Icon(Icons.search, color: Colors.white54),
+          hintStyle: const TextStyle(color: Colors.white54),
+          prefixIcon: const Icon(Icons.search, color: Colors.white70),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear, color: Colors.white54),
+                  icon: const Icon(Icons.clear, color: Colors.white70),
                   onPressed: () {
                     _searchController.clear();
                     _performSearch();
@@ -574,7 +574,7 @@ class CommitteesTabState extends State<CommitteesTab> {
                     child: Text(
                       status,
                       style: TextStyle(
-                        color: isActive ? BrandColors.success : Colors.white54,
+                        color: isActive ? BrandColors.success : Colors.white70,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
@@ -610,7 +610,7 @@ class CommitteesTabState extends State<CommitteesTab> {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  const Icon(Icons.person, color: Colors.white54, size: 14),
+                  const Icon(Icons.person, color: Colors.white70, size: 14),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
@@ -627,7 +627,7 @@ class CommitteesTabState extends State<CommitteesTab> {
               const SizedBox(height: 2),
               Row(
                 children: [
-                  const Icon(Icons.account_balance_wallet, color: Colors.white54, size: 14),
+                  const Icon(Icons.account_balance_wallet, color: Colors.white70, size: 14),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
@@ -757,7 +757,7 @@ class CommitteesTabState extends State<CommitteesTab> {
                             child: Text(
                               status,
                               style: TextStyle(
-                                color: isActive ? BrandColors.success : Colors.white60,
+                                color: isActive ? BrandColors.success : Colors.white70,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12,
                               ),
@@ -1293,7 +1293,7 @@ class CommitteesTabState extends State<CommitteesTab> {
                   ),
                   Icon(
                     expanded ? Icons.expand_less : Icons.expand_more,
-                    color: Colors.white38,
+                    color: Colors.white60,
                     size: 20,
                   ),
                 ],
@@ -1362,7 +1362,7 @@ class CommitteesTabState extends State<CommitteesTab> {
               padding: const EdgeInsets.only(bottom: 6),
               child: Row(
                 children: [
-                  const Icon(Icons.how_to_vote, color: Colors.white38, size: 16),
+                  const Icon(Icons.how_to_vote, color: Colors.white60, size: 16),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(

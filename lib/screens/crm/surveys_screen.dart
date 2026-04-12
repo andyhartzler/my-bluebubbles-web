@@ -305,11 +305,11 @@ class _SurveysScreenState extends State<SurveysScreen>
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
           hintText: 'Search surveys...',
-          hintStyle: const TextStyle(color: Colors.white54),
-          prefixIcon: const Icon(Icons.search, color: Colors.white54),
+          hintStyle: const TextStyle(color: Colors.white70),
+          prefixIcon: const Icon(Icons.search, color: Colors.white70),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear, color: Colors.white54, size: 18),
+                  icon: const Icon(Icons.clear, color: Colors.white70, size: 18),
                   onPressed: () {
                     _searchController.clear();
                     setState(() => _searchQuery = '');
@@ -474,7 +474,7 @@ class _SurveysScreenState extends State<SurveysScreen>
                       _buildInfoChip(
                         Icons.calendar_today,
                         dateFmt.format(survey.createdAt!),
-                        Colors.white54,
+                        Colors.white70,
                       ),
                   ],
                 ),

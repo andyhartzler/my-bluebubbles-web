@@ -1207,7 +1207,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: Row(
                   children: const [
-                    Icon(Icons.info_outline, color: Colors.white54),
+                    Icon(Icons.info_outline, color: Colors.white70),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(

@@ -2988,7 +2988,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                 final idx = value.toInt();
                 if (idx < 0 || idx >= sortedDays.length) return const SizedBox();
                 return Text(dateFormat.format(DateTime.parse(sortedDays[idx])),
-                  style: const TextStyle(color: Colors.white54, fontSize: 10));
+                  style: const TextStyle(color: Colors.white70, fontSize: 10));
               },
             ),
           ),
@@ -3014,7 +3014,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
   Widget _buildDevicePieChart(analytics.EventAnalyticsSummary summary) {
     final sections = <PieChartSectionData>[];
     final total = summary.desktopViews + summary.mobileViews + summary.tabletViews;
-    if (total == 0) return const Center(child: Text('No data', style: TextStyle(color: Colors.white54)));
+    if (total == 0) return const Center(child: Text('No data', style: TextStyle(color: Colors.white70)));
 
     if (summary.desktopViews > 0) {
       sections.add(PieChartSectionData(
@@ -3056,7 +3056,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       final b = pv.browser ?? 'Unknown';
       counts[b] = (counts[b] ?? 0) + 1;
     }
-    if (counts.isEmpty) return const Center(child: Text('No data', style: TextStyle(color: Colors.white54)));
+    if (counts.isEmpty) return const Center(child: Text('No data', style: TextStyle(color: Colors.white70)));
 
     final sorted = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     final top = sorted.take(5).toList();
@@ -3163,7 +3163,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                     : top[idx].key;
                 return Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: Text(label, style: const TextStyle(color: Colors.white54, fontSize: 9)),
+                  child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 9)),
                 );
               },
             ),
@@ -3336,7 +3336,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                         pv.deviceType == 'mobile' ? Icons.phone_android
                             : pv.deviceType == 'tablet' ? Icons.tablet_android
                             : Icons.desktop_windows,
-                        color: Colors.white54, size: 18,
+                        color: Colors.white70, size: 18,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -3366,7 +3366,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                         width: 50,
                         child: Text(
                           pv.durationSeconds != null ? '${pv.durationSeconds}s' : '-',
-                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
                           textAlign: TextAlign.right,
                         ),
                       ),
@@ -3374,12 +3374,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
                         width: 45,
                         child: Text(
                           pv.scrollDepthPct != null ? '${pv.scrollDepthPct}%' : '-',
-                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
                           textAlign: TextAlign.right,
                         ),
                       ),
                       Icon(isExpanded ? Icons.expand_less : Icons.expand_more,
-                        color: Colors.white38, size: 20),
+                        color: Colors.white60, size: 20),
                     ],
                   ),
                 ),
@@ -3435,7 +3435,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: RichText(
         text: TextSpan(children: [
-          TextSpan(text: '$label: ', style: const TextStyle(color: Colors.white38, fontSize: 11)),
+          TextSpan(text: '$label: ', style: const TextStyle(color: Colors.white54, fontSize: 11)),
           TextSpan(text: value, style: const TextStyle(color: Colors.white70, fontSize: 11)),
         ]),
       ),

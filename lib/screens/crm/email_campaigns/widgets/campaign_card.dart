@@ -246,14 +246,14 @@ class _StatItem extends StatelessWidget {
           Text(
             subValue!,
             style: TextStyle(
-              color: Colors.white60,
+              color: Colors.white70,
               fontSize: 10,
             ),
           ),
         Text(
           label,
           style: TextStyle(
-            color: Colors.white60,
+            color: Colors.white70,
             fontSize: 10,
           ),
         ),

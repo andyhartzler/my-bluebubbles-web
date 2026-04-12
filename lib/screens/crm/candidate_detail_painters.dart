@@ -140,7 +140,7 @@ class ScoreRadarPainter extends CustomPainter {
       final textPainter = TextPainter(
         text: TextSpan(
           text: axes[i],
-          style: const TextStyle(color: Colors.white54, fontSize: 10),
+          style: const TextStyle(color: Colors.white70, fontSize: 10),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -222,7 +222,7 @@ class MarginTrendPainter extends CustomPainter {
       final textPainter = TextPainter(
         text: TextSpan(
           text: '${r.year}',
-          style: const TextStyle(color: Colors.white38, fontSize: 9),
+          style: const TextStyle(color: Colors.white70, fontSize: 9),
         ),
         textDirection: TextDirection.ltr,
       )..layout();

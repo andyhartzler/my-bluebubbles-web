@@ -174,7 +174,7 @@ class _EventsScreenState extends State<EventsScreen> {
                       color: Colors.black,
                       height: 260,
                       child: const Center(
-                        child: Icon(Icons.image_not_supported_outlined, color: Colors.white54, size: 48),
+                        child: Icon(Icons.image_not_supported_outlined, color: Colors.white70, size: 48),
                       ),
                     ),
             ),
