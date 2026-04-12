@@ -48,7 +48,10 @@ class OpenStatesService {
         throw Exception('Failed to search bills: $errorMsg');
       }
 
-      return BillSearchResult.fromJson(response.data as Map<String, dynamic>);
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : throw Exception('Unexpected response from openstates-search-bills');
+      return BillSearchResult.fromJson(data);
     } catch (e) {
       throw Exception('Failed to search bills: $e');
     }
@@ -78,7 +81,10 @@ class OpenStatesService {
         throw Exception('Failed to get bill: $errorMsg');
       }
 
-      return OpenStatesBill.fromJson(response.data['bill'] as Map<String, dynamic>);
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : throw Exception('Unexpected response from openstates-get-bill');
+      return OpenStatesBill.fromJson(data['bill'] as Map<String, dynamic>);
     } catch (e) {
       throw Exception('Failed to get bill: $e');
     }
@@ -110,7 +116,10 @@ class OpenStatesService {
         throw Exception('Failed to get legislators: $errorMsg');
       }
 
-      final legislatorsData = response.data['legislators'] as List<dynamic>? ?? [];
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : throw Exception('Unexpected response from openstates-get-legislators');
+      final legislatorsData = data['legislators'] as List<dynamic>? ?? [];
       return legislatorsData
           .map((json) => Legislator.fromJson(json as Map<String, dynamic>))
           .toList();
@@ -133,7 +142,10 @@ class OpenStatesService {
         throw Exception('Failed to sync: $errorMsg');
       }
 
-      return SyncResult.fromJson(response.data as Map<String, dynamic>);
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : throw Exception('Unexpected response from openstates-sync-tracked-bills');
+      return SyncResult.fromJson(data);
     } catch (e) {
       throw Exception('Failed to sync: $e');
     }

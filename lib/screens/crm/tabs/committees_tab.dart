@@ -681,9 +681,9 @@ class CommitteesTabState extends State<CommitteesTab> {
     final isRep = party.toLowerCase().contains('republican');
 
     final stats = _committeeStats ?? {};
-    final totalRaised = (stats['totalRaised'] as double?) ?? 0;
+    final totalRaised = (stats['totalRaised'] as num?)?.toDouble() ?? 0;
     final contribCount = (stats['contributionCount'] as int?) ?? 0;
-    final avgContrib = (stats['avgContribution'] as double?) ?? 0;
+    final avgContrib = (stats['avgContribution'] as num?)?.toDouble() ?? 0;
     final yearTotals = (stats['yearTotals'] as Map<int, double>?) ?? {};
     final yearCounts = (stats['yearCounts'] as Map<int, int>?) ?? {};
 

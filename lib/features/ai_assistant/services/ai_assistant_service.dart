@@ -145,7 +145,9 @@ class AIAssistantService {
       throw Exception('Query failed: $error');
     }
 
-    final data = response.data as Map<String, dynamic>;
+    final data = response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : throw Exception('Unexpected response from query-knowledge-base');
 
     // Parse V2 classification (replaces old intent field)
     TaskClassification? classification;
@@ -381,7 +383,9 @@ class AIAssistantService {
       throw Exception('Failed to process embeddings');
     }
 
-    return response.data as Map<String, dynamic>;
+    return response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : throw Exception('Unexpected response from generate-embeddings');
   }
 
   /// Trigger storage file indexing
@@ -401,7 +405,9 @@ class AIAssistantService {
       throw Exception('Failed to index files');
     }
 
-    return response.data as Map<String, dynamic>;
+    return response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : throw Exception('Unexpected response from index-storage-files');
   }
 
   /// Discover new tables
@@ -412,7 +418,10 @@ class AIAssistantService {
       throw Exception('Failed to discover tables');
     }
 
-    return (response.data['discovered_tables'] as List? ?? [])
+    final data = response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : throw Exception('Unexpected response from discover-tables');
+    return (data['discovered_tables'] as List? ?? [])
         .cast<Map<String, dynamic>>();
   }
 

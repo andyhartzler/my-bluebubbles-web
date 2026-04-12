@@ -129,8 +129,8 @@ class EmailCampaignRepository {
         totalClicks: aggregates['total_clicks'] as int? ?? 0,
         totalBounces: aggregates['total_bounces'] as int? ?? 0,
         totalUnsubscribes: aggregates['total_unsubscribes'] as int? ?? 0,
-        averageOpenRate: aggregates['avg_open_rate'] as double? ?? 0,
-        averageClickRate: aggregates['avg_click_rate'] as double? ?? 0,
+        averageOpenRate: (aggregates['avg_open_rate'] as num?)?.toDouble() ?? 0,
+        averageClickRate: (aggregates['avg_click_rate'] as num?)?.toDouble() ?? 0,
         bySource: bySource,
       );
     } catch (e) {

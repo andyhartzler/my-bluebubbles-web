@@ -173,10 +173,10 @@ class _FundraisingTabState extends State<FundraisingTab> {
         _recurringCount = stats['recurring'] as int? ?? 0;
         _linkedCount = stats['linked'] as int? ?? 0;
         _totalRaised =
-            stats['totalRaised'] as double? ??
+            (stats['totalRaised'] as num?)?.toDouble() ??
             _calculateTotalRaised(result.donors);
         _recurringTotal =
-            stats['recurringTotal'] as double? ??
+            (stats['recurringTotal'] as num?)?.toDouble() ??
             _calculateRecurringTotal(result.donors);
         _recentDonations = donations;
         _loading = false;

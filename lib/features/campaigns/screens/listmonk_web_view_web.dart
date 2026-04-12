@@ -306,7 +306,9 @@ class _IframeState extends State<Iframe> {
         return null;
       }
 
-      final data = response.data as Map<String, dynamic>?;
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : null;
 
       if (data != null) {
         debugPrint('📧 Listmonk: Auth data received');

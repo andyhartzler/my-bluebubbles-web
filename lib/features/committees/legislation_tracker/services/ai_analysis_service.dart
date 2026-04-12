@@ -104,7 +104,10 @@ class AiAnalysisService {
         return AiAnalysisResult(success: false, error: error.toString());
       }
 
-      return AiAnalysisResult.fromJson(response.data as Map<String, dynamic>);
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : throw Exception('Unexpected response from analyze-bill');
+      return AiAnalysisResult.fromJson(data);
     } catch (e) {
       return AiAnalysisResult(success: false, error: e.toString());
     }
@@ -134,7 +137,10 @@ class AiAnalysisService {
         return BatchAnalysisResult(success: false, error: error.toString());
       }
 
-      return BatchAnalysisResult.fromJson(response.data as Map<String, dynamic>);
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : throw Exception('Unexpected response from analyze-bills-batch');
+      return BatchAnalysisResult.fromJson(data);
     } catch (e) {
       return BatchAnalysisResult(success: false, error: e.toString());
     }

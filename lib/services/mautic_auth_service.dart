@@ -39,13 +39,19 @@ class MauticAuthService {
       debugPrint('Mautic: Edge Function response data: ${response.data}');
 
       if (response.status != 200) {
-        final error = response.data?['error'] ?? 'Unknown error (status ${response.status})';
+        final errorData = response.data is Map<String, dynamic>
+            ? response.data as Map<String, dynamic>
+            : null;
+        final error = errorData?['error'] ?? 'Unknown error (status ${response.status})';
         debugPrint('Mautic: Edge Function error: $error');
         // Fall back to dashboard URL
         return mauticDashboardUrl;
       }
 
-      final loginUrl = response.data['login_url'] as String?;
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : null;
+      final loginUrl = data?['login_url'] as String?;
       if (loginUrl == null || loginUrl.isEmpty) {
         debugPrint('Mautic: No login_url in response, falling back to dashboard');
         return mauticDashboardUrl;

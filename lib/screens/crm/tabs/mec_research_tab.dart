@@ -1271,7 +1271,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
     }
 
     // Legacy profile header (when _unifiedProfile is null)
-    final totalAmount = _profileData['totalAmount'] as double? ?? 0.0;
+    final totalAmount = (_profileData['totalAmount'] as num?)?.toDouble() ?? 0.0;
     final count = _profileData['count'] as int? ?? 0;
     final firstYear = _profileData['firstYear'] as int?;
     final lastYear = _profileData['lastYear'] as int?;
@@ -1947,7 +1947,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
   void _showCommitteeDonationsDialog(Map<String, dynamic> committee) {
     final committeeName = committee['committeeName'] as String? ?? 'Unknown Committee';
     final mecId = committee['mecId'] as String?;
-    final total = committee['total'] as double? ?? 0.0;
+    final total = (committee['total'] as num?)?.toDouble() ?? 0.0;
     final count = committee['count'] as int? ?? 0;
 
     // Filter contributions for this committee
@@ -2111,7 +2111,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
         ...committees.map((c) {
           final map = c as Map<String, dynamic>;
           final name = map['committeeName'] as String? ?? 'Unknown Committee';
-          final total = map['total'] as double? ?? 0.0;
+          final total = (map['total'] as num?)?.toDouble() ?? 0.0;
           final count = map['count'] as int? ?? 0;
 
           return Padding(

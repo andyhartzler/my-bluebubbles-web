@@ -244,7 +244,9 @@ class ZoomMeetingService {
 
       final statusCode = response.status;
       if (statusCode != 200) {
-        final data = response.data as Map<String, dynamic>?;
+        final data = response.data is Map<String, dynamic>
+            ? response.data as Map<String, dynamic>
+            : null;
         final errorMessage = data?['error']?.toString() ?? 'Unknown error';
         throw ZoomMeetingException('Failed to send invites (HTTP $statusCode): $errorMessage');
       }
@@ -405,7 +407,9 @@ class ZoomMeetingService {
         throw ZoomMeetingException('Failed to create Zoom meeting (HTTP $statusCode): $errorMessage');
       }
 
-      final data = response.data as Map<String, dynamic>;
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : throw ZoomMeetingException('Unexpected response from zoom-create-meeting');
       return ZoomMeetingResponse.fromJson(data);
     } catch (e) {
       if (e is ZoomMeetingException) rethrow;

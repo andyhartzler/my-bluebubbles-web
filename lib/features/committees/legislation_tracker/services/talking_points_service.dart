@@ -61,7 +61,9 @@ class TalkingPointsService {
       );
 
       if (response.status != 200) {
-        final data = response.data as Map<String, dynamic>?;
+        final data = response.data is Map<String, dynamic>
+            ? response.data as Map<String, dynamic>
+            : null;
         return TalkingPointsResult(
           success: false,
           error: data?['error']?.toString() ?? 'Unknown error',
@@ -69,7 +71,10 @@ class TalkingPointsService {
         );
       }
 
-      return TalkingPointsResult.fromJson(response.data as Map<String, dynamic>);
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : throw Exception('Unexpected response from generate-talking-points');
+      return TalkingPointsResult.fromJson(data);
     } catch (e) {
       return TalkingPointsResult(success: false, error: e.toString());
     }
