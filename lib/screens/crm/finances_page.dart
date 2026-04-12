@@ -722,7 +722,7 @@ class _FinancesPageState extends State<FinancesPage>
                 maxY: topY,
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (_) => const Color(0xFF1E3A5F),
+                    // tooltipBgColor handled by fl_chart version
                     tooltipPadding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 6),
                     tooltipMargin: 8,
