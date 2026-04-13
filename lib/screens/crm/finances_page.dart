@@ -9,9 +9,12 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:printing/printing.dart';
 import 'package:http/http.dart' as http;
+import 'receipt_viewer_stub.dart'
+    if (dart.library.html) 'receipt_viewer_web.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  FINANCES PAGE — World-class Campaign Finance Dashboard
@@ -3863,7 +3866,17 @@ class _MerchantDetailScreenState extends State<MerchantDetailScreen> {
   }
 }
 
-/// Inline receipt viewer — renders PDFs natively and HTML via WebView
+/// Inline receipt viewer — picks the right rendering strategy per file type.
+///
+/// Strategy:
+///   - `.pdf` on Flutter Web  → browser-native `<iframe>` (via HtmlElementView).
+///     This delegates to Chrome/Firefox/Safari's built-in PDF viewer and
+///     sidesteps every bug the `printing` package's PDF.js/PDFium wrapper can
+///     hit on malformed/complex PDFs.
+///   - `.pdf` on mobile/desktop → `printing.PdfPreview` (works fine there).
+///   - `.html` / `.htm`        → WebView (renders HTML receipts).
+///   - Everything else (`.xlsx`, `.docx`, `.bin`, unknown) → "Open externally"
+///     fallback so the user can at least download the file.
 class _ReceiptWebView extends StatefulWidget {
   final String url;
   const _ReceiptWebView({required this.url});
@@ -3872,22 +3885,37 @@ class _ReceiptWebView extends StatefulWidget {
   State<_ReceiptWebView> createState() => _ReceiptWebViewState();
 }
 
+enum _ReceiptKind { pdf, html, unsupported }
+
 class _ReceiptWebViewState extends State<_ReceiptWebView> {
-  bool get _isPdf {
+  _ReceiptKind _classify() {
     final u = widget.url.toLowerCase();
-    return u.endsWith('.pdf') || u.contains('.pdf?') || u.contains('.pdf%');
+    final path = Uri.tryParse(u)?.path ?? u;
+    if (path.endsWith('.pdf')) return _ReceiptKind.pdf;
+    if (path.endsWith('.html') || path.endsWith('.htm')) return _ReceiptKind.html;
+    return _ReceiptKind.unsupported;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isPdf) {
-      return _PdfReceiptViewer(url: widget.url);
+    switch (_classify()) {
+      case _ReceiptKind.pdf:
+        return _PdfReceiptViewer(url: widget.url);
+      case _ReceiptKind.html:
+        return _HtmlReceiptViewer(url: widget.url);
+      case _ReceiptKind.unsupported:
+        return _UnsupportedReceiptViewer(url: widget.url);
     }
-    return _HtmlReceiptViewer(url: widget.url);
   }
 }
 
-/// Native PDF rendering using the printing package's PdfPreview
+/// PDF viewer:
+///   - On web: native browser iframe (bulletproof).
+///   - On mobile/desktop: printing package's PdfPreview, with http-fetched
+///     bytes and an in-widget error boundary so a rendering throw in
+///     PdfPreview surfaces as an inline "Open externally" card instead of
+///     propagating to the global ErrorWidget.builder (which would mask the
+///     failure as "An unexpected error occurred when rendering").
 class _PdfReceiptViewer extends StatefulWidget {
   final String url;
   const _PdfReceiptViewer({required this.url});
@@ -3897,6 +3925,7 @@ class _PdfReceiptViewer extends StatefulWidget {
 }
 
 class _PdfReceiptViewerState extends State<_PdfReceiptViewer> {
+  // Mobile/desktop path state — unused on web.
   Uint8List? _pdfData;
   bool _loading = true;
   String? _error;
@@ -3904,16 +3933,28 @@ class _PdfReceiptViewerState extends State<_PdfReceiptViewer> {
   @override
   void initState() {
     super.initState();
-    _loadPdf();
+    if (!kIsWeb) {
+      _loadPdf();
+    }
   }
 
   Future<void> _loadPdf() async {
     try {
       final response = await http.get(Uri.parse(widget.url));
       if (response.statusCode == 200) {
-        if (mounted) setState(() { _pdfData = response.bodyBytes; _loading = false; });
+        if (mounted) {
+          setState(() {
+            _pdfData = response.bodyBytes;
+            _loading = false;
+          });
+        }
       } else {
-        if (mounted) setState(() { _error = 'HTTP ${response.statusCode}'; _loading = false; });
+        if (mounted) {
+          setState(() {
+            _error = 'HTTP ${response.statusCode}';
+            _loading = false;
+          });
+        }
       }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
@@ -3922,6 +3963,14 @@ class _PdfReceiptViewerState extends State<_PdfReceiptViewer> {
 
   @override
   Widget build(BuildContext context) {
+    // ── Web: hand the URL straight to the browser's built-in PDF viewer ──
+    if (kIsWeb) {
+      final native = buildBrowserNativePdfViewer(widget.url);
+      if (native != null) return native;
+      // Fall through to the error card if somehow the web impl didn't return.
+    }
+
+    // ── Mobile/desktop: fetch bytes and hand to printing.PdfPreview ──
     if (_loading) {
       return const Center(
         child: CircularProgressIndicator(color: BrandColors.momentumBlue),
@@ -3929,25 +3978,9 @@ class _PdfReceiptViewerState extends State<_PdfReceiptViewer> {
     }
 
     if (_error != null || _pdfData == null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.warning_amber, color: Colors.orange, size: 32),
-            const SizedBox(height: 8),
-            Text(_error ?? 'Failed to load PDF',
-                style: const TextStyle(color: Colors.black54, fontSize: 13)),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () {
-                final uri = Uri.tryParse(widget.url);
-                if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
-              },
-              icon: const Icon(Icons.open_in_new, size: 16),
-              label: const Text('Open externally'),
-            ),
-          ],
-        ),
+      return _openExternallyCard(
+        message: _error ?? 'Failed to load PDF',
+        url: widget.url,
       );
     }
 
@@ -3964,6 +3997,59 @@ class _PdfReceiptViewerState extends State<_PdfReceiptViewer> {
       ),
     );
   }
+}
+
+/// Fallback for file types we can't preview inline (xlsx, docx, unknown .bin,
+/// etc.). Offers a one-click "Open externally" so the user can download and
+/// view in their native app.
+class _UnsupportedReceiptViewer extends StatelessWidget {
+  final String url;
+  const _UnsupportedReceiptViewer({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = _extOf(url);
+    return _openExternallyCard(
+      message: ext.isEmpty
+          ? 'No preview available for this file type.'
+          : 'No inline preview for .$ext files.',
+      url: url,
+    );
+  }
+
+  static String _extOf(String url) {
+    final path = Uri.tryParse(url.toLowerCase())?.path ?? url.toLowerCase();
+    final dot = path.lastIndexOf('.');
+    if (dot < 0 || dot == path.length - 1) return '';
+    return path.substring(dot + 1);
+  }
+}
+
+/// Shared "Open externally" card used as an error/fallback widget.
+Widget _openExternallyCard({required String message, required String url}) {
+  return Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.description_outlined, color: Colors.orange, size: 32),
+        const SizedBox(height: 8),
+        Text(
+          message,
+          style: const TextStyle(color: Colors.black54, fontSize: 13),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: () {
+            final uri = Uri.tryParse(url);
+            if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
+          icon: const Icon(Icons.open_in_new, size: 16),
+          label: const Text('Open externally'),
+        ),
+      ],
+    ),
+  );
 }
 
 /// HTML receipt viewer using WebView
