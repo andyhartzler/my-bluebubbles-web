@@ -152,6 +152,25 @@ serve(async (req) => {
           body_html, body_text, attachments, account,
         } = params;
 
+        // Require a message_id — without it we have no dedup key and end up
+        // creating garbage rows on every poll.
+        if (!message_id || typeof message_id !== "string") {
+          return new Response(
+            JSON.stringify({ error: "message_id is required" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Normalize Gmail's RFC 2822 Date header to ISO 8601 for TIMESTAMPTZ.
+        // Falling through a raw RFC 2822 string to PostgREST triggers
+        // "invalid input syntax for type timestamp" and a 500, which n8n
+        // surfaces as "The service was not able to process your request".
+        let isoDate: string | null = null;
+        if (date) {
+          const d = new Date(date);
+          if (!isNaN(d.getTime())) isoDate = d.toISOString();
+        }
+
         // Check if already processed
         const { data: existing } = await supabase
           .from("receipts")
@@ -230,7 +249,7 @@ serve(async (req) => {
             email_from: from,
             email_to: to,
             email_subject: subject,
-            email_date: date,
+            email_date: isoDate,
             email_account: account || "unknown",
             vendor_name: analysis.vendor_name,
             amount: analysis.amount,
