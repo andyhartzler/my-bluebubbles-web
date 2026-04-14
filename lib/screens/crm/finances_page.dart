@@ -72,6 +72,14 @@ class _FinancesPageState extends State<FinancesPage>
   bool _generating = false;
   String _selectedQuarter = '';
 
+  // ── Past filings archive (scraped from MEC portal) ──
+  // Populated from public.mec_historical_filings, distinct from _reports
+  // which holds MOYD's own generated quarterly reports from the plaid
+  // Edge Function. See migration 005_mec_historical_filings.sql.
+  static const String _moydMecId = 'C253556';
+  List<Map<String, dynamic>> _pastFilings = [];
+  bool _pastFilingsLoading = true;
+
   // ── Receipts state ──
   List<Map<String, dynamic>> _receipts = [];
   bool _receiptsLoading = true;
@@ -151,6 +159,7 @@ class _FinancesPageState extends State<FinancesPage>
       _loadDonations(),
       _loadDonors(),
       _loadReceipts(),
+      _loadPastFilings(),
     ]);
     _computeDerivedData();
     if (mounted) _staggerController.forward();
@@ -246,6 +255,27 @@ class _FinancesPageState extends State<FinancesPage>
       });
     } catch (_) {
       if (mounted) setState(() => _receiptsLoading = false);
+    }
+  }
+
+  Future<void> _loadPastFilings() async {
+    try {
+      final resp = await _supabase.privilegedClient
+          .from('mec_historical_filings')
+          .select()
+          .eq('committee_mec_id', _moydMecId)
+          .order('filing_date', ascending: false)
+          .limit(50);
+      if (mounted) setState(() {
+        _pastFilings = (resp as List).cast<Map<String, dynamic>>();
+        _pastFilingsLoading = false;
+      });
+    } catch (_) {
+      // Missing table or permission error — fall through to empty state
+      if (mounted) setState(() {
+        _pastFilings = [];
+        _pastFilingsLoading = false;
+      });
     }
   }
 
@@ -2564,9 +2594,193 @@ class _FinancesPageState extends State<FinancesPage>
           else
             CandidateUI.emptyState(Icons.description, 'No Reports Yet',
                 'Generate your first MEC quarterly report above.'),
+
+          SizedBox(height: gap),
+
+          // Public-record filings archive (scraped from mec.mo.gov)
+          if (_pastFilingsLoading)
+            CandidateUI.shimmerSkeleton(cardCount: 1)
+          else
+            _buildPastFilingsArchive(),
         ],
       );
     });
+  }
+
+  // ── Past filings archive (mec_historical_filings) ──
+
+  Widget _buildPastFilingsArchive() {
+    return CandidateUI.card(
+      'Past Filings — MEC Public Record',
+      Icons.archive,
+      BrandColors.steelBlue,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 6),
+          Text(
+            'Every filing MEC has on record for Missouri Young Democrats ($_moydMecId). '
+            'Updated by the mec-scraper committee-filings crawl.',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.55),
+              fontSize: 11,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_pastFilings.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline,
+                      color: Colors.white.withOpacity(0.55), size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'No archived filings yet. Run `python3 '
+                      'scrape_committee_filings.py --mecid $_moydMecId --apply` '
+                      'in /Users/moyd/mec-scraper to seed the archive.',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 11,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ..._pastFilings.map(_pastFilingRow),
+        ],
+      ),
+    );
+  }
+
+  Widget _pastFilingRow(Map<String, dynamic> f) {
+    final filingType = (f['filing_type'] as String?) ?? 'Filing';
+    final filingDate = (f['filing_date'] as String?) ?? '';
+    final sourceUrl = f['source_url'] as String?;
+    final storagePath = f['storage_path'] as String?;
+    final totalContrib = (f['total_contributions'] as num?)?.toDouble();
+    final totalExp = (f['total_expenditures'] as num?)?.toDouble();
+    final quarter = f['quarter'] as String?;
+    final year = f['filing_year'];
+
+    final headerBadge = [
+      if (year != null) year.toString(),
+      if (quarter != null && quarter.isNotEmpty) quarter,
+    ].join(' · ');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: BrandColors.steelBlue.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  filingType,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (headerBadge.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: BrandColors.steelBlue.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    headerBadge,
+                    style: TextStyle(
+                      color: BrandColors.steelBlue,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (filingDate.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Filed $filingDate',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 11,
+              ),
+            ),
+          ],
+          if (totalContrib != null || totalExp != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                if (totalContrib != null)
+                  Text(
+                    'Contributions: \$${CandidateUI.formatMoney(totalContrib)}',
+                    style: TextStyle(
+                      color: BrandColors.success.withOpacity(0.7),
+                      fontSize: 11,
+                    ),
+                  ),
+                if (totalContrib != null && totalExp != null)
+                  const SizedBox(width: 12),
+                if (totalExp != null)
+                  Text(
+                    'Expenditures: \$${CandidateUI.formatMoney(totalExp)}',
+                    style: TextStyle(
+                      color: BrandColors.republicanRed.withOpacity(0.7),
+                      fontSize: 11,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          if (sourceUrl != null || storagePath != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (sourceUrl != null)
+                  _downloadChip(
+                      'Open on MEC',
+                      sourceUrl,
+                      BrandColors.steelBlue),
+                if (sourceUrl != null && storagePath != null)
+                  const SizedBox(width: 8),
+                if (storagePath != null)
+                  _downloadChip(
+                      'Archived PDF',
+                      _supabase.privilegedClient.storage
+                          .from('mec-filings')
+                          .getPublicUrl(storagePath),
+                      BrandColors.momentumBlue),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   // ── Quarter timeline ──
