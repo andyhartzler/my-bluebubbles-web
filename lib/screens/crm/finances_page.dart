@@ -747,6 +747,12 @@ class _FinancesPageState extends State<FinancesPage>
             SizedBox(height: gap),
           ],
 
+          // Filing readiness banner — at-a-glance health for the current
+          // quarter: generated report state + receipt matching progress +
+          // unresolved blockers.
+          _buildFilingReadinessBanner(),
+          SizedBox(height: gap),
+
           // Bank connection card
           _buildConnectionCard(),
           SizedBox(height: gap),
@@ -1434,6 +1440,271 @@ class _FinancesPageState extends State<FinancesPage>
     );
   }
 
+  // ── Filing readiness banner ──
+
+  Widget _buildFilingReadinessBanner() {
+    // Snapshot the health of the CURRENT quarter: do we have a generated
+    // mec_reports row? Are all receipts reviewed? Are there bank
+    // transactions that should be flagged for MEC but aren't?
+    final now = DateTime.now();
+    final currentQuarter = '${now.year}-Q${((now.month - 1) ~/ 3) + 1}';
+
+    final generated = _reports.cast<Map<String, dynamic>?>().firstWhere(
+          (r) => r?['quarter'] == currentQuarter,
+          orElse: () => null,
+        );
+    final reportStatus = generated?['status'] as String?;
+
+    final unmatchedReceipts = _receipts.where((r) {
+      final s = r['match_status'];
+      return s == null || s == '' || s == 'unmatched';
+    }).length;
+
+    // Transactions with no mec_purpose / mec_payee_address during the
+    // current quarter are still blockers for filing CD3_B.
+    final quarterStart = DateTime(now.year, ((((now.month - 1) ~/ 3)) * 3) + 1, 1);
+    final txInQuarter = _transactions.where((t) {
+      final dateStr = t['date'] as String?;
+      if (dateStr == null) return false;
+      final d = DateTime.tryParse(dateStr);
+      if (d == null) return false;
+      return !d.isBefore(quarterStart) && !d.isAfter(now);
+    }).toList();
+    final unflaggedTx = txInQuarter.where((t) {
+      final amt = (t['amount'] as num?)?.toDouble() ?? 0;
+      if (amt <= 0) return false; // outflows only (positive = expense)
+      final hasPurpose = (t['mec_purpose'] as String?)?.isNotEmpty ?? false;
+      return !hasPurpose;
+    }).length;
+
+    // Determine the traffic light.
+    Color stateColor;
+    String stateLabel;
+    IconData stateIcon;
+    String headline;
+
+    if (reportStatus == 'filed') {
+      stateColor = BrandColors.success;
+      stateLabel = 'FILED';
+      stateIcon = Icons.check_circle;
+      headline = '$currentQuarter filed and accepted.';
+    } else if (reportStatus == 'ready') {
+      stateColor = BrandColors.momentumBlue;
+      stateLabel = 'READY';
+      stateIcon = Icons.check_circle_outline;
+      headline = '$currentQuarter report generated — ready to submit to MEC.';
+    } else if (unmatchedReceipts > 0 || unflaggedTx > 0) {
+      stateColor = Colors.orange;
+      stateLabel = 'NEEDS REVIEW';
+      stateIcon = Icons.warning_amber_rounded;
+      final parts = <String>[];
+      if (unmatchedReceipts > 0) {
+        parts.add('$unmatchedReceipts unmatched receipt${unmatchedReceipts == 1 ? '' : 's'}');
+      }
+      if (unflaggedTx > 0) {
+        parts.add('$unflaggedTx transaction${unflaggedTx == 1 ? '' : 's'} without MEC purpose');
+      }
+      headline = '${parts.join(', ')} before $currentQuarter is filable.';
+    } else if (txInQuarter.isEmpty && _receipts.isEmpty) {
+      stateColor = Colors.white54;
+      stateLabel = 'EMPTY';
+      stateIcon = Icons.schedule;
+      headline = 'No data for $currentQuarter yet.';
+    } else {
+      stateColor = BrandColors.momentumBlue;
+      stateLabel = 'CLEAN';
+      stateIcon = Icons.insights;
+      headline = '$currentQuarter: all receipts matched, all transactions categorized.';
+    }
+
+    return BrandedCard(
+      padding: const EdgeInsets.all(14),
+      gradientColors: [
+        stateColor.withOpacity(0.18),
+        BrandColors.unityBlue,
+      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: stateColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(stateIcon, color: stateColor, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Filing Readiness',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: stateColor.withOpacity(0.22),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: stateColor.withOpacity(0.4)),
+                          ),
+                          child: Text(
+                            stateLabel,
+                            style: TextStyle(
+                              color: stateColor,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      headline,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.75),
+                        fontSize: 11,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Quick-jump action row — each tile jumps to the relevant tab.
+          Row(
+            children: [
+              Expanded(
+                child: _readinessMetric(
+                  icon: Icons.receipt_long,
+                  label: 'Q Transactions',
+                  value: '${txInQuarter.length}',
+                  badge: unflaggedTx > 0 ? '$unflaggedTx ✗' : null,
+                  badgeColor: unflaggedTx > 0 ? Colors.orange : null,
+                  onTap: () => _tabController.animateTo(1),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _readinessMetric(
+                  icon: Icons.receipt,
+                  label: 'Receipts',
+                  value: '${_receipts.length}',
+                  badge: unmatchedReceipts > 0 ? '$unmatchedReceipts ✗' : null,
+                  badgeColor:
+                      unmatchedReceipts > 0 ? Colors.orange : null,
+                  onTap: () => _tabController.animateTo(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _readinessMetric(
+                  icon: Icons.description,
+                  label: 'MEC Report',
+                  value: reportStatus == null
+                      ? '—'
+                      : reportStatus.toUpperCase(),
+                  badge: null,
+                  onTap: () => _tabController.animateTo(3),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _readinessMetric({
+    required IconData icon,
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+    String? badge,
+    Color? badgeColor,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withOpacity(0.12)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 13, color: Colors.white.withOpacity(0.6)),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (badge != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: (badgeColor ?? Colors.orange).withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      badge,
+                      style: TextStyle(
+                        color: badgeColor ?? Colors.orange,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Deadline card ──
 
   Widget _buildDeadlineCard() {
@@ -1536,22 +1807,74 @@ class _FinancesPageState extends State<FinancesPage>
       final isMobile = constraints.maxWidth < 600;
       final hPad = isMobile ? 8.0 : 12.0;
 
+      // Filter state awareness — tell the operator what they're looking at
+      // vs the whole set, so "total" row is never misleading.
+      final hasFilter = _searchQuery.isNotEmpty ||
+          _dateRange != null ||
+          _selectedCategories.isNotEmpty;
+
       return Column(
         children: [
           // Search bar
           _buildTransactionSearchBar(),
+
+          // Compact filter-state indicator
+          if (hasFilter)
+            Padding(
+              padding: EdgeInsets.fromLTRB(hPad + 6, 0, hPad + 6, 2),
+              child: Row(
+                children: [
+                  Icon(Icons.filter_alt,
+                      size: 12, color: BrandColors.sunriseGold),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Showing ${filtered.length} of ${_transactions.length} transactions',
+                      style: TextStyle(
+                          color: BrandColors.sunriseGold,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _searchQuery = '';
+                      _searchCtrl.clear();
+                      _dateRange = null;
+                      _selectedCategories.clear();
+                    }),
+                    child: Text(
+                      'Clear all',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // Date range + category filters
           _buildTransactionFilters(),
 
           // Transaction list
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 12),
-              itemCount: filtered.length,
-              itemBuilder: (context, index) =>
-                  _buildTransactionRow(filtered[index]),
-            ),
+            child: filtered.isEmpty
+                ? CandidateUI.emptyState(
+                    Icons.filter_list_off,
+                    'No Matches',
+                    'No transactions match your current filters.',
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 12),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) =>
+                        _buildTransactionRow(filtered[index]),
+                  ),
           ),
 
           // Total row
@@ -2024,7 +2347,85 @@ class _FinancesPageState extends State<FinancesPage>
 
   List<Map<String, dynamic>> get _filteredReceipts {
     if (_receiptFilter == 'all') return _receipts;
+    if (_receiptFilter == 'unmatched') {
+      return _receipts.where((r) {
+        final s = r['match_status'];
+        return s == null || s == '' || s == 'unmatched';
+      }).toList();
+    }
     return _receipts.where((r) => r['match_status'] == _receiptFilter).toList();
+  }
+
+  Widget _receiptStatTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required String subtitle,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            BrandColors.unityBlue.withOpacity(0.95),
+            BrandColors.unityBlue.withOpacity(0.8),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.35)),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 6,
+              offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 14),
+              const SizedBox(width: 6),
+              Text(
+                label.toUpperCase(),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.55),
+              fontSize: 10,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildReceiptsTab() {
@@ -2034,62 +2435,126 @@ class _FinancesPageState extends State<FinancesPage>
       final isMobile = constraints.maxWidth < 600;
       final hPad = isMobile ? 10.0 : 14.0;
 
+      // Stat-strip rollups — sum amounts per bucket so the header shows real
+      // money, not just row counts. Buckets are aligned with the filter chips.
+      double sumAmounts(bool Function(Map<String, dynamic>) pred) {
+        return _receipts.where(pred).fold(
+            0.0, (sum, r) => sum + ((r['amount'] as num?)?.toDouble() ?? 0));
+      }
+
+      final matchedCount = _receipts.where((r) => r['match_status'] == 'matched').length;
+      final matchedSum = sumAmounts((r) => r['match_status'] == 'matched');
+      final unmatchedCount = _receipts.where((r) =>
+          r['match_status'] == null ||
+          r['match_status'] == '' ||
+          r['match_status'] == 'unmatched').length;
+      final unmatchedSum = sumAmounts((r) =>
+          r['match_status'] == null ||
+          r['match_status'] == '' ||
+          r['match_status'] == 'unmatched');
+      final ignoredCount = _receipts.where((r) => r['match_status'] == 'ignored').length;
+      final inkindCount = _receipts.where((r) => r['match_status'] == 'inkind').length;
+      final totalCount = _receipts.length;
+
       return Column(
         children: [
+          // Stat strip — 3 tiles (Matched $, Unmatched $, Ignored #) above
+          // the filter chip row. Gives operators the money picture at a glance.
+          if (totalCount > 0)
+            Padding(
+              padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _receiptStatTile(
+                      icon: Icons.link,
+                      label: 'Matched',
+                      value: '\$${CandidateUI.formatMoney(matchedSum)}',
+                      subtitle: '$matchedCount receipts',
+                      color: BrandColors.success,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _receiptStatTile(
+                      icon: Icons.link_off,
+                      label: 'Unmatched',
+                      value: '\$${CandidateUI.formatMoney(unmatchedSum)}',
+                      subtitle: '$unmatchedCount awaiting review',
+                      color: unmatchedCount > 0
+                          ? BrandColors.sunriseGold
+                          : BrandColors.momentumBlue,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _receiptStatTile(
+                      icon: Icons.block,
+                      label: 'Ignored',
+                      value: '$ignoredCount',
+                      subtitle: '${((ignoredCount / totalCount) * 100).toStringAsFixed(0)}% of total',
+                      color: Colors.white54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // Filter chips
           Padding(
             padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 6),
-            child: Row(
-              children: [
-                ...[
-                  ('all', 'All', Icons.list),
-                  ('unmatched', 'Unmatched', Icons.link_off),
-                  ('matched', 'Matched', Icons.link),
-                  ('inkind', 'In-Kind', Icons.volunteer_activism),
-                ].map((item) {
-                  final (value, label, icon) = item;
-                  final selected = _receiptFilter == value;
-                  final count = value == 'all'
-                      ? _receipts.length
-                      : _receipts.where((r) => r['match_status'] == value).length;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: GestureDetector(
-                      onTap: () => setState(() => _receiptFilter = value),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? BrandColors.momentumBlue.withOpacity(0.2)
-                              : Colors.white.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  ...[
+                    ('all', 'All', Icons.list, totalCount),
+                    ('unmatched', 'Unmatched', Icons.link_off, unmatchedCount),
+                    ('matched', 'Matched', Icons.link, matchedCount),
+                    ('inkind', 'In-Kind', Icons.volunteer_activism, inkindCount),
+                    ('ignored', 'Ignored', Icons.block, ignoredCount),
+                  ].map((item) {
+                    final (value, label, icon, count) = item;
+                    final selected = _receiptFilter == value;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: GestureDetector(
+                        onTap: () => setState(() => _receiptFilter = value),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
                             color: selected
-                                ? BrandColors.momentumBlue.withOpacity(0.5)
-                                : Colors.white.withOpacity(0.1),
+                                ? BrandColors.momentumBlue.withOpacity(0.2)
+                                : Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: selected
+                                  ? BrandColors.momentumBlue.withOpacity(0.5)
+                                  : Colors.white.withOpacity(0.1),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(icon,
+                                  color: selected ? BrandColors.momentumBlue : Colors.white70,
+                                  size: 14),
+                              const SizedBox(width: 4),
+                              Text('$label ($count)',
+                                  style: TextStyle(
+                                    color: selected ? BrandColors.momentumBlue : Colors.white70,
+                                    fontSize: 11,
+                                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                                  )),
+                            ],
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(icon,
-                                color: selected ? BrandColors.momentumBlue : Colors.white70,
-                                size: 14),
-                            const SizedBox(width: 4),
-                            Text('$label ($count)',
-                                style: TextStyle(
-                                  color: selected ? BrandColors.momentumBlue : Colors.white70,
-                                  fontSize: 11,
-                                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                                )),
-                          ],
-                        ),
                       ),
-                    ),
-                  );
-                }),
-              ],
+                    );
+                  }),
+                ],
+              ),
             ),
           ),
 
