@@ -47,6 +47,13 @@ class Candidate {
   final String? memberId;
   final DateTime? dateOfBirth;
 
+  // Location + demographics (round-trip through the form edit dialog)
+  final String? city;
+  final String? stateCode;
+  final String? zip;
+  final String? county;
+  final String? gender;
+
   // Score breakdown fields
   final int scoreParty;
   final int scorePrimary;
@@ -97,6 +104,11 @@ class Candidate {
     this.contactMethod,
     this.memberId,
     this.dateOfBirth,
+    this.city,
+    this.stateCode,
+    this.zip,
+    this.county,
+    this.gender,
     this.scoreParty = 0,
     this.scorePrimary = 0,
     this.scoreContributions = 0,
@@ -156,6 +168,11 @@ class Candidate {
       dateOfBirth: json['date_of_birth'] != null
           ? DateTime.tryParse(json['date_of_birth'] as String)
           : null,
+      city: json['city'] as String?,
+      stateCode: json['state'] as String?,
+      zip: json['zip'] as String?,
+      county: json['county'] as String?,
+      gender: json['gender'] as String?,
       scoreParty: (json['score_party'] as num?)?.toInt() ?? 0,
       scorePrimary: (json['score_primary_history'] as num?)?.toInt() ?? 0,
       scoreContributions: (json['score_contributions'] as num?)?.toInt() ?? 0,
@@ -205,6 +222,11 @@ class Candidate {
         'moyd_contact_method': contactMethod,
         'member_id': memberId,
         'date_of_birth': dateOfBirth?.toIso8601String().split('T').first,
+        'city': city,
+        'state': stateCode,
+        'zip': zip,
+        'county': county,
+        'gender': gender,
         'score_party': scoreParty,
         'score_primary_history': scorePrimary,
         'score_contributions': scoreContributions,
