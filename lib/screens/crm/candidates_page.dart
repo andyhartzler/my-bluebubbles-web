@@ -10,6 +10,7 @@ import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/candidate_new_dialog.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
+import 'package:bluebubbles/screens/crm/candidates_map_fullscreen.dart';
 import 'package:bluebubbles/widgets/crm/missouri_map_widget.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -734,6 +735,19 @@ class _CandidatesPageState extends State<CandidatesPage>
                 _legendDot(BrandColors.republicanRed, 'Rep'),
                 const SizedBox(width: 8),
                 _legendDot(Colors.white70, 'Other'),
+                const SizedBox(width: 12),
+                // Fullscreen button
+                IconButton(
+                  icon: const Icon(Icons.fullscreen, color: BrandColors.sunriseGold, size: 22),
+                  tooltip: 'Expand map to fullscreen',
+                  onPressed: _openFullscreenMap,
+                  style: IconButton.styleFrom(
+                    backgroundColor: BrandColors.sunriseGold.withOpacity(0.12),
+                    padding: const EdgeInsets.all(6),
+                    minimumSize: const Size(36, 36),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
               ],
             ),
           ),
@@ -744,6 +758,32 @@ class _CandidatesPageState extends State<CandidatesPage>
             child: _buildMapSection(desktopHeight: mapHeight),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openFullscreenMap() {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: true,
+        transitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (_, __, ___) => CandidatesMapFullscreen(
+          allCandidates: _allCandidates,
+          houseDistricts: _houseDistrictMap,
+          senateDistricts: _senateDistrictMap,
+          congressionalDistricts: _congressionalDistrictMap,
+        ),
+        transitionsBuilder: (_, animation, __, child) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.98, end: 1.0).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              ),
+              child: child,
+            ),
+          );
+        },
       ),
     );
   }
@@ -1186,18 +1226,33 @@ class _CandidatesPageState extends State<CandidatesPage>
                   '${(_stats.totalCandidates * progress).round()}',
                   'Total Filed',
                   BrandColors.momentumBlue,
+                  isActive: _activeFilterCount == 0,
+                  onTap: () {
+                    _resetAdvancedFilters();
+                    setState(() {});
+                  },
                 ),
                 _statCard(
                   Icons.how_to_vote,
                   '${(_stats.democrats * progress).round()}',
                   'Democrats',
                   BrandColors.democratBlue,
+                  isActive: _partyFilter == 'Democratic',
+                  onTap: () {
+                    setState(() => _partyFilter = _partyFilter == 'Democratic' ? null : 'Democratic');
+                    _applyFilters();
+                  },
                 ),
                 _statCard(
                   Icons.star,
                   '${(_stats.youngDemocrats * progress).round()}',
                   'Young Dems',
                   BrandColors.sunriseGold,
+                  isActive: _ydOnly,
+                  onTap: () {
+                    setState(() => _ydOnly = !_ydOnly);
+                    _applyFilters();
+                  },
                 ),
                 _statCard(
                   Icons.check_circle,
@@ -1218,36 +1273,66 @@ class _CandidatesPageState extends State<CandidatesPage>
                   '${(_stats.endorsed * progress).round()}',
                   'Endorsed',
                   BrandColors.sunriseGold,
+                  isActive: _moydEndorsed,
+                  onTap: () {
+                    setState(() => _moydEndorsed = !_moydEndorsed);
+                    _applyFilters();
+                  },
                 ),
                 _statCard(
                   Icons.phone_in_talk,
                   '${(_stats.contacted * progress).round()}',
                   'Contacted',
                   BrandColors.success,
+                  isActive: _moydContacted,
+                  onTap: () {
+                    setState(() => _moydContacted = !_moydContacted);
+                    _applyFilters();
+                  },
                 ),
                 _statCard(
                   Icons.language,
                   '${(_stats.withWebsite * progress).round()}',
                   'Has Website',
                   BrandColors.steelBlue,
+                  isActive: _hasCampaignWebsite,
+                  onTap: () {
+                    setState(() => _hasCampaignWebsite = !_hasCampaignWebsite);
+                    _applyFilters();
+                  },
                 ),
                 _statCard(
                   Icons.account_balance,
                   '${(_stats.withMecCommittee * progress).round()}',
                   'MEC Filed',
                   BrandColors.steelBlue,
+                  isActive: _hasFinanceFiled,
+                  onTap: () {
+                    setState(() => _hasFinanceFiled = !_hasFinanceFiled);
+                    _applyFilters();
+                  },
                 ),
                 _statCard(
                   Icons.flag,
                   '${(_stats.withFecCandidate * progress).round()}',
                   'FEC Filed',
                   BrandColors.federalBlue,
+                  isActive: _officeLevelFilter == 'federal',
+                  onTap: () {
+                    setState(() => _officeLevelFilter = _officeLevelFilter == 'federal' ? null : 'federal');
+                    _applyFilters();
+                  },
                 ),
                 _statCard(
                   Icons.monetization_on,
                   '${(_stats.withAnyFinance * progress).round()}',
                   'Any Finance',
                   BrandColors.success,
+                  isActive: _hasFinanceFiled,
+                  onTap: () {
+                    setState(() => _hasFinanceFiled = !_hasFinanceFiled);
+                    _applyFilters();
+                  },
                 ),
               ],
             ),
@@ -1257,29 +1342,43 @@ class _CandidatesPageState extends State<CandidatesPage>
     );
   }
 
-  Widget _statCard(IconData icon, String value, String label, Color accent) {
-    return Container(
+  Widget _statCard(
+    IconData icon,
+    String value,
+    String label,
+    Color accent, {
+    VoidCallback? onTap,
+    bool isActive = false,
+  }) {
+    final card = AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
       constraints: const BoxConstraints(minWidth: 100, maxWidth: 140),
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            BrandColors.unityBlue,
-            BrandColors.unityBlue.withOpacity(0.8),
-          ],
+          colors: isActive
+              ? [accent.withOpacity(0.85), accent.withOpacity(0.55)]
+              : [BrandColors.unityBlue, BrandColors.unityBlue.withOpacity(0.8)],
         ),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: accent.withOpacity(0.3)),
+        border: Border.all(
+          color: isActive ? accent : accent.withOpacity(0.3),
+          width: isActive ? 2 : 1,
+        ),
+        boxShadow: isActive
+            ? [BoxShadow(color: accent.withOpacity(0.35), blurRadius: 12, offset: const Offset(0, 3))]
+            : null,
       ),
       child: Column(
         children: [
-          Icon(icon, color: accent, size: 22),
+          Icon(icon, color: isActive ? Colors.white : accent, size: 22),
           const SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: isActive ? Colors.white : Colors.white,
               fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
@@ -1287,10 +1386,22 @@ class _CandidatesPageState extends State<CandidatesPage>
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(color: Colors.white70, fontSize: 11),
+            style: TextStyle(
+                color: isActive ? Colors.white.withOpacity(0.92) : Colors.white70,
+                fontSize: 11),
             textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+
+    if (onTap == null) return card;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: card,
       ),
     );
   }
