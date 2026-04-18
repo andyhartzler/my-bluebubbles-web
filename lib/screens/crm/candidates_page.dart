@@ -1026,24 +1026,34 @@ class _CandidatesPageState extends State<CandidatesPage>
           showLabels: true,
           interactive: true,
           onDistrictTap: (district, type) {
-            setState(() {
-              _selectedMapDistrict = district;
-              // Look up candidates ONLY from the active district type
-              // (prevents mixing House d.1 with Congressional d.1)
-              switch (type) {
-                case DistrictType.house:
-                  _selectedDistrictCandidates = _houseDistrictMap[district];
-                  break;
-                case DistrictType.senate:
-                  _selectedDistrictCandidates = _senateDistrictMap[district];
-                  break;
-                case DistrictType.congressional:
-                  _selectedDistrictCandidates = _congressionalDistrictMap[district];
-                  break;
-              }
-              // Fallback to legacy map if no match
-              _selectedDistrictCandidates ??= _districtMap[district];
-            });
+            // Open the fullscreen map with the tapped district pre-selected so
+            // the candidates list is immediately visible on top of the map
+            // (instead of being hidden below the fold in a popup).
+            Navigator.of(context).push(
+              PageRouteBuilder(
+                opaque: true,
+                transitionDuration: const Duration(milliseconds: 220),
+                pageBuilder: (_, __, ___) => CandidatesMapFullscreen(
+                  allCandidates: _allCandidates,
+                  houseDistricts: _houseDistrictMap,
+                  senateDistricts: _senateDistrictMap,
+                  congressionalDistricts: _congressionalDistrictMap,
+                  initialDistrict: district,
+                  initialType: type,
+                ),
+                transitionsBuilder: (_, animation, __, child) {
+                  return FadeTransition(
+                    opacity: animation,
+                    child: ScaleTransition(
+                      scale: Tween<double>(begin: 0.98, end: 1.0).animate(
+                        CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+                      ),
+                      child: child,
+                    ),
+                  );
+                },
+              ),
+            );
           },
         ),
         // Selected district info popup below the map

@@ -14,6 +14,8 @@ class CandidatesMapFullscreen extends StatefulWidget {
   final Map<String, List<Candidate>> houseDistricts;
   final Map<String, List<Candidate>> senateDistricts;
   final Map<String, List<Candidate>> congressionalDistricts;
+  final String? initialDistrict;
+  final DistrictType? initialType;
 
   const CandidatesMapFullscreen({
     super.key,
@@ -21,6 +23,8 @@ class CandidatesMapFullscreen extends StatefulWidget {
     required this.houseDistricts,
     required this.senateDistricts,
     required this.congressionalDistricts,
+    this.initialDistrict,
+    this.initialType,
   });
 
   @override
@@ -30,6 +34,13 @@ class CandidatesMapFullscreen extends StatefulWidget {
 class _CandidatesMapFullscreenState extends State<CandidatesMapFullscreen> {
   String? _selectedDistrict;
   DistrictType _selectedType = DistrictType.house;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDistrict = widget.initialDistrict;
+    _selectedType = widget.initialType ?? DistrictType.house;
+  }
 
   @override
   Widget build(BuildContext context) {
