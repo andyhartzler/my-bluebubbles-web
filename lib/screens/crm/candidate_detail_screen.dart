@@ -1378,6 +1378,11 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             final mecId = committee['mec_id']?.toString() ?? '';
             final name = committee['committee_name'] as String? ?? 'Unknown Committee';
             final isSelected = mecId == _selectedMecId;
+            final treasurer = committee['treasurer_name'] as String?;
+            final type = committee['committee_type'] as String?;
+            final status = committee['committee_status'] as String?;
+            final party = committee['party_affiliation'] as String?;
+            final terminated = committee['terminated_date'] != null;
 
             return Container(
               margin: const EdgeInsets.only(bottom: 6),
@@ -1388,41 +1393,81 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   color: isSelected ? BrandColors.sunriseGold.withOpacity(0.5) : Colors.white12,
                 ),
               ),
-              child: ListTile(
-                dense: true,
-                leading: Icon(
-                  Icons.account_balance,
-                  color: isSelected ? BrandColors.sunriseGold : Colors.white70,
-                  size: 20,
-                ),
-                title: Text(
-                  name,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.white70,
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
-                subtitle: Text(
-                  'MEC ID: $mecId',
-                  style: const TextStyle(color: Colors.white70, fontSize: 11),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isSelected)
-                      const Icon(Icons.check_circle, color: BrandColors.sunriseGold, size: 18),
-                    IconButton(
-                      icon: const Icon(Icons.link_off, color: Colors.white54, size: 18),
-                      tooltip: 'Detach from candidate',
-                      onPressed: () => _detachMecCommittee(mecId),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ListTile(
+                    dense: true,
+                    leading: Icon(
+                      Icons.account_balance,
+                      color: isSelected ? BrandColors.sunriseGold : Colors.white70,
+                      size: 20,
                     ),
-                  ],
-                ),
-                onTap: () {
-                  setState(() => _selectedMecId = mecId);
-                  _loadFinanceData();
-                },
+                    title: Text(
+                      name,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.white70,
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'MEC ID: $mecId',
+                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isSelected)
+                          const Icon(Icons.check_circle, color: BrandColors.sunriseGold, size: 18),
+                        IconButton(
+                          icon: const Icon(Icons.link_off, color: Colors.white54, size: 18),
+                          tooltip: 'Detach from candidate',
+                          onPressed: () => _detachMecCommittee(mecId),
+                        ),
+                      ],
+                    ),
+                    onTap: () {
+                      setState(() => _selectedMecId = mecId);
+                      _loadFinanceData();
+                    },
+                  ),
+                  if (isSelected && (treasurer != null || type != null || status != null || party != null || terminated))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (treasurer != null && treasurer.isNotEmpty) ...[
+                            Row(
+                              children: [
+                                const Icon(Icons.person_outline, color: Colors.white54, size: 14),
+                                const SizedBox(width: 6),
+                                Text('Treasurer: $treasurer',
+                                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                          ],
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (type != null && type.isNotEmpty) _committeeMetaChip(type, BrandColors.steelBlue),
+                              if (party != null && party.isNotEmpty)
+                                _committeeMetaChip(party,
+                                    party.toLowerCase().contains('rep')
+                                        ? BrandColors.republicanRed
+                                        : BrandColors.democratBlue),
+                              if (status != null && status.isNotEmpty)
+                                _committeeMetaChip(status, Colors.white38),
+                              if (terminated) _committeeMetaChip('Terminated', Colors.orange),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             );
           }),
@@ -1450,6 +1495,19 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _committeeMetaChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.35), width: 0.5),
+      ),
+      child: Text(label,
+          style: TextStyle(color: color.withOpacity(0.9), fontSize: 10, fontWeight: FontWeight.w500)),
     );
   }
 

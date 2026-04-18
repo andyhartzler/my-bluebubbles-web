@@ -29,7 +29,6 @@ class _CandidateEditDialogState extends State<CandidateEditDialog> {
   String? _partyValue;
   String? _officeLevelValue;
   String? _genderValue;
-  bool _saving = false;
 
   // Dropdown options
   static const _partyOptions = [
@@ -216,7 +215,6 @@ class _CandidateEditDialogState extends State<CandidateEditDialog> {
   void _clearDob() => setState(() => _dob = null);
 
   void _save() {
-    if (_saving) return;
     final updates = _buildUpdates();
     Navigator.of(context).pop(updates);
   }
@@ -369,17 +367,15 @@ class _CandidateEditDialogState extends State<CandidateEditDialog> {
       child: Row(
         children: [
           TextButton(
-            onPressed: _saving ? null : () => Navigator.of(context).pop(null),
+            onPressed: () => Navigator.of(context).pop(null),
             style: TextButton.styleFrom(foregroundColor: Colors.white70),
             child: const Text('Cancel'),
           ),
           const Spacer(),
           ElevatedButton.icon(
-            onPressed: _saving ? null : _save,
-            icon: _saving
-                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.save, size: 16),
-            label: Text(_saving ? 'Saving…' : 'Save changes'),
+            onPressed: _save,
+            icon: const Icon(Icons.save, size: 16),
+            label: const Text('Save changes'),
             style: ElevatedButton.styleFrom(
               backgroundColor: BrandColors.success,
               foregroundColor: Colors.white,
