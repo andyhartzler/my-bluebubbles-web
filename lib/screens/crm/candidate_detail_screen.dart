@@ -10,6 +10,7 @@ import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_painters.dart';
 import 'package:bluebubbles/screens/crm/candidate_edit_dialog.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
+import 'package:bluebubbles/screens/crm/mec_committee_picker.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/screens/crm/donor_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/donor_profile_screen.dart';
@@ -1292,25 +1293,13 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         _fecCommittees.isNotEmpty;
 
     if (!hasFinanceData && !hasFecData && _raceComparison.isEmpty) {
+      final empty = _buildUnlinkedFinanceEmptyState();
       if (errorBanner != null) {
         return Column(
-          children: [
-            errorBanner,
-            Expanded(
-              child: _buildEmptyState(
-                Icons.monetization_on,
-                'No Campaign Finance Data',
-                'No Missouri Ethics Commission or FEC records found for ${c.name}.\n\nThis candidate may not have filed a committee yet.',
-              ),
-            ),
-          ],
+          children: [errorBanner, Expanded(child: empty)],
         );
       }
-      return _buildEmptyState(
-        Icons.monetization_on,
-        'No Campaign Finance Data',
-        'No Missouri Ethics Commission or FEC records found for ${c.name}.\n\nThis candidate may not have filed a committee yet.',
-      );
+      return empty;
     }
 
     return ListView(
@@ -1326,8 +1315,8 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           const SizedBox(height: 24),
         ],
 
-        // ── Committee Selector (if multiple) ──
-        if (_mecCommittees.length > 1) ...[
+        // ── Committee Selector — always visible when any committee is linked ──
+        if (_mecCommittees.isNotEmpty) ...[
           _buildCommitteeSelector(),
           const SizedBox(height: 16),
         ],
@@ -1418,9 +1407,18 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   'MEC ID: $mecId',
                   style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
-                trailing: isSelected
-                    ? const Icon(Icons.check_circle, color: BrandColors.sunriseGold, size: 18)
-                    : null,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isSelected)
+                      const Icon(Icons.check_circle, color: BrandColors.sunriseGold, size: 18),
+                    IconButton(
+                      icon: const Icon(Icons.link_off, color: Colors.white54, size: 18),
+                      tooltip: 'Detach from candidate',
+                      onPressed: () => _detachMecCommittee(mecId),
+                    ),
+                  ],
+                ),
                 onTap: () {
                   setState(() => _selectedMecId = mecId);
                   _loadFinanceData();
@@ -1428,7 +1426,189 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               ),
             );
           }),
+          // "Attach another" row
+          Material(
+            color: Colors.white.withOpacity(0.03),
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: _attachMecCommittee,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.add_link, color: BrandColors.momentumBlue, size: 18),
+                    const SizedBox(width: 10),
+                    Text('Attach another committee',
+                        style: TextStyle(
+                            color: BrandColors.momentumBlue.withOpacity(0.9),
+                            fontSize: 13, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  // ─── MEC Committee attach / detach ──────────────────────────────
+
+  Widget _buildUnlinkedFinanceEmptyState() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 40),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: BrandColors.unityBlue.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: BrandColors.steelBlue.withOpacity(0.18),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.account_balance, color: BrandColors.steelBlue, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text('No MEC committee linked',
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Connect ${c.name} to their Missouri Ethics Commission committee '
+                'to pull in contributions, expenditures, and donor history. Search by '
+                'committee name, candidate name, or MEC ID.',
+                style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _attachMecCommittee,
+                icon: const Icon(Icons.add_link, size: 16),
+                label: const Text('Attach MEC committee'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: BrandColors.momentumBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: Text(
+            'No FEC federal record either — edit the candidate profile if this is a federal race.',
+            style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 11),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _attachMecCommittee() async {
+    final existing = _candidate.mecCommitteeIds.toSet();
+    final picked = await showMecCommitteePicker(context, excludeMecIds: existing);
+    if (picked == null) return;
+    final newMecId = picked['mec_id']?.toString();
+    if (newMecId == null || newMecId.isEmpty) return;
+
+    final updated = [...existing, newMecId];
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _repo.updateCandidate(_candidate.id, {'mec_committee_ids': updated});
+    } catch (e) {
+      debugPrint('❌ Error attaching MEC committee: $e');
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Failed to attach committee'), backgroundColor: BrandColors.error),
+      );
+      return;
+    }
+
+    final refreshed = await _repo.fetchCandidate(_candidate.id);
+    if (!mounted) return;
+    if (refreshed != null) {
+      setState(() {
+        _candidate = refreshed;
+        _selectedMecId = newMecId; // switch the view to the newly-linked committee
+      });
+      _loadFinanceData();
+    }
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('✅ Linked ${picked['committee_name'] ?? newMecId}'),
+        backgroundColor: BrandColors.success,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _detachMecCommittee(String mecId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: BrandColors.unityBlue,
+        title: const Text('Detach committee?', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Remove MEC $mecId from ${_candidate.name}? This does NOT delete any MEC data — it just unlinks this committee from this candidate.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Detach', style: TextStyle(color: BrandColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final remaining = _candidate.mecCommitteeIds.where((id) => id != mecId).toList();
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _repo.updateCandidate(_candidate.id, {'mec_committee_ids': remaining});
+    } catch (e) {
+      debugPrint('❌ Error detaching MEC committee: $e');
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Failed to detach committee'), backgroundColor: BrandColors.error),
+      );
+      return;
+    }
+
+    final refreshed = await _repo.fetchCandidate(_candidate.id);
+    if (!mounted) return;
+    if (refreshed != null) {
+      setState(() {
+        _candidate = refreshed;
+        if (_selectedMecId == mecId) {
+          _selectedMecId = remaining.isNotEmpty ? remaining.first : null;
+        }
+      });
+      _loadFinanceData();
+    }
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Unlinked MEC $mecId'),
+        backgroundColor: Colors.orange,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
