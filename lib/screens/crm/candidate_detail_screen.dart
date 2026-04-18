@@ -8,6 +8,7 @@ import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_painters.dart';
+import 'package:bluebubbles/screens/crm/candidate_edit_dialog.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/screens/crm/donor_detail_screen.dart';
@@ -414,6 +415,39 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     }
   }
 
+  // ─── Edit candidate profile ─────────────────────────────────────
+
+  Future<void> _openEditDialog() async {
+    final updates = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => CandidateEditDialog(candidate: _candidate),
+    );
+    if (updates == null || updates.isEmpty) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _repo.updateCandidate(_candidate.id, updates);
+    } catch (e) {
+      debugPrint('❌ Error saving candidate edits: $e');
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Failed to save changes'), backgroundColor: BrandColors.error),
+      );
+      return;
+    }
+    final refreshed = await _repo.fetchCandidate(_candidate.id);
+    if (!mounted) return;
+    if (refreshed != null) {
+      setState(() => _candidate = refreshed);
+    }
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Saved ${updates.length} change${updates.length == 1 ? '' : 's'}'),
+        backgroundColor: BrandColors.success,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   Future<void> _submitContactLog() async {
     CandidateContact? result;
     try {
@@ -666,6 +700,11 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     actions: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.white70),
+                        onPressed: _openEditDialog,
+                        tooltip: 'Edit candidate',
+                      ),
                       IconButton(
                         icon: Icon(
                           c.isEndorsed ? Icons.star : Icons.star_border,
