@@ -1279,7 +1279,10 @@ class _BillDetailScreenState extends State<BillDetailScreen>
         }
         break;
       case 'legislature':
-        // TODO: Construct MO legislature URL
+        // Construct MO legislature URL from bill identifier
+        final id = bill.billIdentifier.replaceAll(' ', '+');
+        final url = 'https://www.senate.mo.gov/BillSearchResults?txtBillNumber=$id&SessionType=R&Session=2026';
+        launchUrl(Uri.parse(url));
         break;
       case 'archive':
         if (bill.isArchived) {
