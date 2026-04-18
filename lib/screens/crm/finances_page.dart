@@ -224,7 +224,7 @@ class _FinancesPageState extends State<FinancesPage>
         _donations = list;
         _donationCount = list.length;
         _donationTotal = list.fold(
-            0.0, (sum, d) => sum + ((d['amount'] as num?)?.toDouble() ?? 0));
+            0.0, (sum, d) => sum + (_asDouble(d['amount'])));
       });
     } catch (_) {}
   }
@@ -294,7 +294,7 @@ class _FinancesPageState extends State<FinancesPage>
         final key = dateStr.substring(0, 7);
         if (_monthlyDonations.containsKey(key)) {
           _monthlyDonations[key] =
-              (_monthlyDonations[key] ?? 0) + ((d['amount'] as num?)?.toDouble() ?? 0);
+              (_monthlyDonations[key] ?? 0) + (_asDouble(d['amount']));
         }
       }
     }
@@ -305,7 +305,7 @@ class _FinancesPageState extends State<FinancesPage>
     // ── Expense categories ──
     _expenseCategories = {};
     for (final t in _transactions) {
-      final amount = (t['amount'] as num?)?.toDouble() ?? 0;
+      final amount = _asDouble(t['amount']);
       if (amount > 0) {
         final cats = t['category'] as List?;
         final cat = (cats != null && cats.isNotEmpty) ? cats.first.toString() : 'Uncategorized';
@@ -319,13 +319,13 @@ class _FinancesPageState extends State<FinancesPage>
       _recentActivity.add({
         'type': 'donation',
         'date': d['donation_date'] ?? '',
-        'amount': (d['amount'] as num?)?.toDouble() ?? 0,
+        'amount': _asDouble(d['amount']),
         'label': 'Contribution received',
         'method': d['payment_method'] ?? '',
       });
     }
     for (final t in _transactions.take(20)) {
-      final amount = (t['amount'] as num?)?.toDouble() ?? 0;
+      final amount = _asDouble(t['amount']);
       if (amount > 0) {
         _recentActivity.add({
           'type': 'expense',
@@ -607,7 +607,7 @@ class _FinancesPageState extends State<FinancesPage>
 
   double get _filteredTotal {
     return _filteredTransactions.fold(
-        0.0, (sum, t) => sum + ((t['amount'] as num?)?.toDouble() ?? 0));
+        0.0, (sum, t) => sum + (_asDouble(t['amount'])));
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -809,8 +809,8 @@ class _FinancesPageState extends State<FinancesPage>
 
   Widget _buildAnimatedStatCards() {
     final expenses = _transactions
-        .where((t) => ((t['amount'] as num?)?.toDouble() ?? 0) > 0)
-        .fold(0.0, (sum, t) => sum + ((t['amount'] as num?)?.toDouble() ?? 0));
+        .where((t) => (_asDouble(t['amount'])) > 0)
+        .fold(0.0, (sum, t) => sum + (_asDouble(t['amount'])));
 
     final balance = _donationTotal - expenses;
 
@@ -818,7 +818,7 @@ class _FinancesPageState extends State<FinancesPage>
       _StatCardData('Contributions', '\$${CandidateUI.formatMoney(_donationTotal)}',
           '$_donationCount donors', BrandColors.success, Icons.volunteer_activism),
       _StatCardData('Expenditures', '\$${CandidateUI.formatMoney(expenses)}',
-          '${_transactions.where((t) => ((t['amount'] as num?)?.toDouble() ?? 0) > 0).length} transactions',
+          '${_transactions.where((t) => (_asDouble(t['amount'])) > 0).length} transactions',
           BrandColors.republicanRed, Icons.payments),
       _StatCardData('Balance', '\$${CandidateUI.formatMoney(balance.abs())}',
           balance >= 0 ? 'Net positive' : 'Net negative',
@@ -1108,7 +1108,7 @@ class _FinancesPageState extends State<FinancesPage>
               final donor = _topDonors[i];
               final name = donor['name'] as String? ?? 'Anonymous';
               final total =
-                  (donor['total_donated'] as num?)?.toDouble() ?? 0;
+                  _asDouble(donor['total_donated']);
               final initials = name.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase();
 
               final medalColors = [
@@ -1300,7 +1300,7 @@ class _FinancesPageState extends State<FinancesPage>
               final isDonation = item['type'] == 'donation';
               final color =
                   isDonation ? BrandColors.success : BrandColors.republicanRed;
-              final amount = (item['amount'] as num?)?.toDouble() ?? 0;
+              final amount = _asDouble(item['amount']);
               final label = item['label'] as String? ?? '';
               final date = item['date'] as String? ?? '';
 
@@ -1471,7 +1471,7 @@ class _FinancesPageState extends State<FinancesPage>
       return !d.isBefore(quarterStart) && !d.isAfter(now);
     }).toList();
     final unflaggedTx = txInQuarter.where((t) {
-      final amt = (t['amount'] as num?)?.toDouble() ?? 0;
+      final amt = _asDouble(t['amount']);
       if (amt <= 0) return false; // outflows only (positive = expense)
       final hasPurpose = (t['mec_purpose'] as String?)?.isNotEmpty ?? false;
       return !hasPurpose;
@@ -2076,7 +2076,7 @@ class _FinancesPageState extends State<FinancesPage>
   }
 
   Widget _buildTransactionRow(Map<String, dynamic> t) {
-    final amount = (t['amount'] as num?)?.toDouble() ?? 0;
+    final amount = _asDouble(t['amount']);
     final isExpense = amount > 0;
     final date = t['date'] as String? ?? '';
     final name =
@@ -2229,12 +2229,12 @@ class _FinancesPageState extends State<FinancesPage>
 
   Widget _buildTransactionTotalRow(List<Map<String, dynamic>> filtered) {
     final totalExpense = filtered
-        .where((t) => ((t['amount'] as num?)?.toDouble() ?? 0) > 0)
-        .fold(0.0, (sum, t) => sum + ((t['amount'] as num?)?.toDouble() ?? 0));
+        .where((t) => (_asDouble(t['amount'])) > 0)
+        .fold(0.0, (sum, t) => sum + (_asDouble(t['amount'])));
     final totalIncome = filtered
-        .where((t) => ((t['amount'] as num?)?.toDouble() ?? 0) < 0)
+        .where((t) => (_asDouble(t['amount'])) < 0)
         .fold(0.0,
-            (sum, t) => sum + ((t['amount'] as num?)?.toDouble() ?? 0).abs());
+            (sum, t) => sum + (_asDouble(t['amount'])).abs());
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -2431,6 +2431,44 @@ class _FinancesPageState extends State<FinancesPage>
   Widget _buildReceiptsTab() {
     if (_receiptsLoading) return CandidateUI.shimmerSkeleton(cardCount: 4);
 
+    // Surface any render error in-place so it's debuggable from the UI
+    // instead of bubbling up to the generic ErrorWidget "An unexpected
+    // error occurred" message that Andrew has been hitting.
+    try {
+      return _buildReceiptsTabInner();
+    } catch (err, stack) {
+      debugPrint('❌ Receipts tab render error: $err');
+      debugPrint(stack.toString());
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.orangeAccent, size: 48),
+              const SizedBox(height: 12),
+              const Text('Receipts tab error',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(
+                err.toString(),
+                style: const TextStyle(color: Colors.orangeAccent, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () => setState(() {}),
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildReceiptsTabInner() {
     return LayoutBuilder(builder: (context, constraints) {
       final isMobile = constraints.maxWidth < 600;
       final hPad = isMobile ? 10.0 : 14.0;
@@ -2439,7 +2477,7 @@ class _FinancesPageState extends State<FinancesPage>
       // money, not just row counts. Buckets are aligned with the filter chips.
       double sumAmounts(bool Function(Map<String, dynamic>) pred) {
         return _receipts.where(pred).fold(
-            0.0, (sum, r) => sum + ((r['amount'] as num?)?.toDouble() ?? 0));
+            0.0, (sum, r) => sum + (_asDouble(r['amount'])));
       }
 
       final matchedCount = _receipts.where((r) => r['match_status'] == 'matched').length;
@@ -2591,7 +2629,7 @@ class _FinancesPageState extends State<FinancesPage>
                 ),
                 const Spacer(),
                 Text(
-                  'Total: \$${CandidateUI.formatMoney(_filteredReceipts.fold(0.0, (sum, r) => sum + ((r['amount'] as num?)?.toDouble() ?? 0)))}',
+                  'Total: \$${CandidateUI.formatMoney(_filteredReceipts.fold(0.0, (sum, r) => sum + (_asDouble(r['amount']))))}',
                   style: const TextStyle(
                       color: BrandColors.sunriseGold,
                       fontSize: 13,
@@ -2606,7 +2644,7 @@ class _FinancesPageState extends State<FinancesPage>
   }
 
   Widget _buildReceiptRow(Map<String, dynamic> r) {
-    final amount = (r['amount'] as num?)?.toDouble() ?? 0;
+    final amount = _asDouble(r['amount']);
     final vendor = r['vendor_name'] as String? ?? 'Unknown Vendor';
     final category = r['category'] as String? ?? '';
     final emailDate = r['email_date'] as String? ?? '';
@@ -2767,7 +2805,7 @@ class _FinancesPageState extends State<FinancesPage>
   }
 
   void _showReceiptDetail(Map<String, dynamic> r) {
-    final amount = (r['amount'] as num?)?.toDouble() ?? 0;
+    final amount = _asDouble(r['amount']);
     final vendor = r['vendor_name'] as String? ?? 'Unknown';
     final category = r['category'] as String? ?? '';
     final description = r['description'] as String? ?? '';
@@ -2933,9 +2971,9 @@ class _FinancesPageState extends State<FinancesPage>
 
   void _showMatchDialog(Map<String, dynamic> receipt) {
     // Show transactions that could match this receipt
-    final receiptAmount = (receipt['amount'] as num?)?.toDouble() ?? 0;
+    final receiptAmount = _asDouble(receipt['amount']);
     final candidateTxns = _transactions.where((t) {
-      final txnAmount = ((t['amount'] as num?)?.toDouble() ?? 0).abs();
+      final txnAmount = (_asDouble(t['amount'])).abs();
       // Match within 10% or $5
       if (receiptAmount <= 0) return true;
       final diff = (txnAmount - receiptAmount).abs();
@@ -2963,7 +3001,7 @@ class _FinancesPageState extends State<FinancesPage>
               else
                 ...candidateTxns.map((t) {
                   final name = t['merchant_name'] as String? ?? t['name'] as String? ?? 'Unknown';
-                  final amount = ((t['amount'] as num?)?.toDouble() ?? 0).abs();
+                  final amount = (_asDouble(t['amount'])).abs();
                   final date = t['date'] as String? ?? '';
                   return ListTile(
                     dense: true,
@@ -3508,7 +3546,7 @@ class _FinancesPageState extends State<FinancesPage>
                   child: Column(
                     children: [
                       Text(
-                          '${_transactions.where((t) => ((t['amount'] as num?)?.toDouble() ?? 0) > 100).length}',
+                          '${_transactions.where((t) => (_asDouble(t['amount'])) > 100).length}',
                           style: const TextStyle(
                               color: BrandColors.republicanRed,
                               fontSize: 20,
@@ -3566,7 +3604,7 @@ class _FinancesPageState extends State<FinancesPage>
 
     // Check for large expenditures missing payee address
     final largeExpMissing = _transactions.where((t) {
-      final amt = (t['amount'] as num?)?.toDouble() ?? 0;
+      final amt = _asDouble(t['amount']);
       final included = t['mec_included'] as bool? ?? true;
       return amt > 100 && included && (t['mec_purpose'] == null || (t['mec_purpose'] as String).isEmpty);
     }).length;
@@ -3663,7 +3701,7 @@ class _FinancesPageState extends State<FinancesPage>
     // Sample expenditures
     final sampleExps = _transactions
         .where((t) =>
-            ((t['amount'] as num?)?.toDouble() ?? 0) > 100 &&
+            (_asDouble(t['amount'])) > 100 &&
             (t['mec_included'] as bool? ?? true))
         .take(5)
         .toList();
@@ -3711,7 +3749,7 @@ class _FinancesPageState extends State<FinancesPage>
                         ),
                       ),
                       Text(
-                        '\$${CandidateUI.formatMoney((d['amount'] as num?)?.toDouble() ?? 0)}',
+                        '\$${CandidateUI.formatMoney(_asDouble(d['amount']))}',
                         style: const TextStyle(
                             color: BrandColors.success,
                             fontSize: 12,
@@ -3766,7 +3804,7 @@ class _FinancesPageState extends State<FinancesPage>
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '\$${CandidateUI.formatMoney((t['amount'] as num?)?.toDouble() ?? 0)}',
+                        '\$${CandidateUI.formatMoney(_asDouble(t['amount']))}',
                         style: const TextStyle(
                             color: BrandColors.republicanRed,
                             fontSize: 12,
@@ -3800,9 +3838,9 @@ class _FinancesPageState extends State<FinancesPage>
     final quarter = r['quarter'] as String? ?? '';
     final status = r['status'] as String? ?? 'draft';
     final total =
-        (r['total_contributions'] as num?)?.toDouble() ?? 0;
+        _asDouble(r['total_contributions']);
     final totalExp =
-        (r['total_expenditures'] as num?)?.toDouble() ?? 0;
+        _asDouble(r['total_expenditures']);
     final cd1aUrl = r['cd1a_csv_url'] as String?;
     final cd3bUrl = r['cd3b_csv_url'] as String?;
 
@@ -4007,6 +4045,18 @@ class _FinancesPageState extends State<FinancesPage>
       return date.toString();
     }
   }
+
+  double _asDouble(dynamic v) => _finNum(v);
+}
+
+/// Coerce a dynamic value to double, tolerating Supabase returning numeric
+/// columns as either String ("32.05") or num (32.05). Casting directly with
+/// `as num?` throws on the String form and crashed the Receipts tab render.
+/// Used by _FinancesPageState and _MerchantDetailScreenState below.
+double _finNum(dynamic v) {
+  if (v == null) return 0;
+  if (v is num) return v.toDouble();
+  return double.tryParse(v.toString()) ?? 0;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -4056,6 +4106,8 @@ class MerchantDetailScreen extends StatefulWidget {
 
 class _MerchantDetailScreenState extends State<MerchantDetailScreen> {
   Map<String, dynamic>? _selectedReceipt;
+
+  double _asDouble(dynamic v) => _finNum(v);
 
   // Normalize vendor name for matching (Facebook = FACEBK, etc.)
   static const _vendorAliases = {
@@ -4121,7 +4173,7 @@ class _MerchantDetailScreenState extends State<MerchantDetailScreen> {
   double get _totalSpent {
     double total = 0;
     for (final t in _merchantTransactions) {
-      final amt = (t['amount'] as num?)?.toDouble() ?? 0;
+      final amt = _asDouble(t['amount']);
       if (amt > 0) total += amt;
     }
     return total;
@@ -4130,7 +4182,7 @@ class _MerchantDetailScreenState extends State<MerchantDetailScreen> {
   double get _totalReceiptAmount {
     double total = 0;
     for (final r in _merchantReceipts) {
-      total += (r['amount'] as num?)?.toDouble() ?? 0;
+      total += _asDouble(r['amount']);
     }
     return total;
   }
@@ -4424,7 +4476,7 @@ class _MerchantDetailScreenState extends State<MerchantDetailScreen> {
             )
           else
             ...txns.map((t) {
-              final amount = ((t['amount'] as num?)?.toDouble() ?? 0).abs();
+              final amount = (_asDouble(t['amount'])).abs();
               final date = t['date'] as String? ?? '';
               final name = t['merchant_name'] as String? ?? t['name'] as String? ?? '';
               return Container(
@@ -4494,7 +4546,7 @@ class _MerchantDetailScreenState extends State<MerchantDetailScreen> {
           else
             ...receipts.map((r) {
               final isSelected = _selectedReceipt?['id'] == r['id'];
-              final amount = (r['amount'] as num?)?.toDouble() ?? 0;
+              final amount = _asDouble(r['amount']);
               final date = r['email_date'] as String? ?? '';
               final subject = r['email_subject'] as String? ?? '';
               return GestureDetector(
