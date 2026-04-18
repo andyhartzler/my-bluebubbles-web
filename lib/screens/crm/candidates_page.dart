@@ -8,6 +8,7 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/candidate_new_dialog.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/widgets/crm/missouri_map_widget.dart';
 
@@ -362,6 +363,54 @@ class _CandidatesPageState extends State<CandidatesPage>
   }
 
   // ═══════════════════════════════════════════════════════════════
+  //  CREATE CANDIDATE
+  // ═══════════════════════════════════════════════════════════════
+
+  Future<void> _createCandidate() async {
+    final data = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => const CandidateNewDialog(),
+    );
+    if (data == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final created = await _repo.createCandidate(data);
+    if (!mounted) return;
+
+    if (created == null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Failed to create candidate'),
+          backgroundColor: BrandColors.error,
+        ),
+      );
+      return;
+    }
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('✅ Created ${created.name} — opening profile to finish'),
+        backgroundColor: BrandColors.success,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    // Refresh list so the new candidate appears once the user returns
+    await _loadData();
+
+    if (!mounted) return;
+    // Push the detail screen so the user can fill in the rest via the edit
+    // dialog.
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CandidateDetailScreen(candidate: created),
+      ),
+    );
+    // After returning from detail, reload in case edits changed anything.
+    if (mounted) await _loadData();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   //  BULK ACTIONS
   // ═══════════════════════════════════════════════════════════════
 
@@ -588,6 +637,18 @@ class _CandidatesPageState extends State<CandidatesPage>
                         'Candidates (${_filteredCandidates.length})',
                         style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
                       ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: _createCandidate,
+                        icon: const Icon(Icons.person_add, size: 16),
+                        label: const Text('Add candidate'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: BrandColors.sunriseGold,
+                          backgroundColor: BrandColors.sunriseGold.withOpacity(0.1),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -747,6 +808,33 @@ class _CandidatesPageState extends State<CandidatesPage>
                     ),
                   ),
                 ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.people, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Candidates (${_filteredCandidates.length})',
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: _createCandidate,
+                        icon: const Icon(Icons.person_add, size: 16),
+                        label: const Text('Add'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: BrandColors.sunriseGold,
+                          backgroundColor: BrandColors.sunriseGold.withOpacity(0.1),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
                 sliver: SliverList(
