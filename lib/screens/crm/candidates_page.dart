@@ -138,10 +138,15 @@ class _CandidatesPageState extends State<CandidatesPage>
       ydIds.add(yd.id);
     }
 
-    // Merge isYoungDem flag: ensure any candidate in the YD list is flagged
+    // Merge isYoungDem flag: ensure any candidate in the YD list is flagged.
+    // Guard: never force-flag a candidate whose estimated age is over 36 —
+    // they can't be a Young Democrat by definition.
     final mergedCandidates = allCandidates.map((c) {
       if (!c.isYoungDem && ydIds.contains(c.id)) {
-        return c.copyWith(isYoungDem: true);
+        final age = c.estimatedAge;
+        if (age == null || age <= 36) {
+          return c.copyWith(isYoungDem: true);
+        }
       }
       return c;
     }).toList();
@@ -1397,7 +1402,7 @@ class _CandidatesPageState extends State<CandidatesPage>
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      'YD ${c.youngDemScore}',
+                      'Match ${c.youngDemScore}%',
                       style: const TextStyle(
                         color: Colors.black87,
                         fontSize: 10,

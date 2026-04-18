@@ -117,6 +117,14 @@ class Candidate {
   });
 
   factory Candidate.fromJson(Map<String, dynamic> json) {
+    // Hard rule: age 37+ is NEVER a Young Democrat, regardless of what
+    // is_young_dem says in the DB. The imputed-age + is_young_dem pipeline
+    // has been known to disagree (see: April 2026 backfill) so we enforce the
+    // ceiling client-side as defense in depth.
+    final age = (json['estimated_age'] as num?)?.toInt();
+    final rawIsYoungDem = json['is_young_dem'] as bool? ?? false;
+    final isYoungDem = rawIsYoungDem && (age == null || age <= 36);
+
     return Candidate(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
@@ -128,8 +136,8 @@ class Candidate {
       district: json['district'] as String?,
       officeLevel: json['office_level'] as String?,
       youngDemScore: (json['young_dem_score'] as num?)?.toInt() ?? 0,
-      estimatedAge: (json['estimated_age'] as num?)?.toInt(),
-      isYoungDem: json['is_young_dem'] as bool? ?? false,
+      estimatedAge: age,
+      isYoungDem: isYoungDem,
       voterMatchId: json['voter_match_id'] as String?,
       mecDonorId: (json['mec_donor_id'] as num?)?.toInt(),
       notes: json['notes'] as String?,

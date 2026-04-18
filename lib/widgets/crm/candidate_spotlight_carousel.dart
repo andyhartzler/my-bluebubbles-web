@@ -259,7 +259,7 @@ class _SpotlightCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      'YD ${c.youngDemScore}',
+                      'Match ${c.youngDemScore}%',
                       style: const TextStyle(
                         color: Colors.black87,
                         fontSize: 10,
