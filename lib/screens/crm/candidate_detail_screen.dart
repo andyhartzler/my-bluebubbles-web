@@ -185,17 +185,16 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     final hasDistrict = c.district != null && c.district!.isNotEmpty;
     final hasMecIds = c.mecCommitteeIds.isNotEmpty;
 
-    // Check cache first (1hr TTL)
-    final cachedMecId = hasMecIds ? c.mecCommitteeIds.first : '';
-    final cached = _repo.getCachedFinanceSummary(cachedMecId);
+    // Check cache first (1hr TTL). Cache is keyed by the committee currently
+    // showing — null == aggregate across all linked committees.
+    final cacheKey = _selectedMecId ?? (hasMecIds ? '__ALL__${c.mecCommitteeIds.join(',')}' : '');
+    final cached = _repo.getCachedFinanceSummary(cacheKey);
     if (cached != null && !_financeTimedOut) {
       _financeSummary = cached;
-      // Still load fresh data in background but show cached immediately
     }
 
     try {
       // Load MEC committees first (needed to know the mec_id for subsequent calls).
-      // Skip the call entirely when the candidate has no known committee IDs.
       bool committeesTimedOut = false;
       final committees = hasMecIds
           ? await _repo.getMECCommittees(c.mecCommitteeIds).timeout(
@@ -209,24 +208,55 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       if (!mounted) return;
       if (committeesTimedOut) _financeTimedOut = true;
 
-      // Build a single parallel batch for EVERYTHING that doesn't depend on the
-      // committees list — FEC calls and race comparison — plus the per-committee
-      // MEC calls once we know the first mec_id. This lets MEC + FEC load
-      // simultaneously instead of sequentially (review feedback #4+5).
-      final mecId = committees.isNotEmpty
-          ? (committees.first['mec_id']?.toString() ?? '')
-          : '';
-      _selectedMecId = mecId.isNotEmpty ? mecId : null;
+      // Determine which committee(s) to load data for:
+      //   * _selectedMecId == null AND candidate has multiple committees
+      //     → aggregate ALL committees ("All committees" mode)
+      //   * _selectedMecId set → that specific committee only
+      //   * first load with one committee → auto-select it
+      final validIds = committees.map((m) => m['mec_id']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+      // If the currently selected committee is no longer in the list (e.g. user
+      // just detached it), fall back to the aggregate view rather than a stale id.
+      if (_selectedMecId != null && !validIds.contains(_selectedMecId)) {
+        _selectedMecId = null;
+      }
+      // For candidates with a SINGLE committee, default to showing it specifically.
+      if (_selectedMecId == null && validIds.length == 1) {
+        _selectedMecId = validIds.first;
+      }
+
+      final bool aggregate = _selectedMecId == null && validIds.isNotEmpty;
+      final String singleId = _selectedMecId ?? '';
+      final List<String> multiIds = aggregate ? validIds : const [];
 
       final futures = <Future<dynamic>>[
-        // MEC data (only if we have a committee)
-        mecId.isNotEmpty ? _repo.getMECContributions(mecId) : Future.value(const <MECContribution>[]),
-        mecId.isNotEmpty ? _repo.getMECTopDonors(mecId) : Future.value(const <Map<String, dynamic>>[]),
-        mecId.isNotEmpty ? _repo.getMECContributionTimeline(mecId) : Future.value(const <Map<String, dynamic>>[]),
-        mecId.isNotEmpty ? _repo.getMECFinanceSummary(mecId) : Future.value(const <String, dynamic>{}),
-        mecId.isNotEmpty ? _repo.getMECExpenditureSummary(mecId) : Future.value(const <String, dynamic>{}),
-        mecId.isNotEmpty ? _repo.getMECTopPayees(mecId) : Future.value(const <Map<String, dynamic>>[]),
-        mecId.isNotEmpty ? _repo.getMECRecentExpenditures(mecId) : Future.value(const <Map<String, dynamic>>[]),
+        // MEC contributions (list)
+        aggregate
+            ? _repo.getMECContributionsMulti(multiIds)
+            : singleId.isNotEmpty ? _repo.getMECContributions(singleId) : Future.value(const <MECContribution>[]),
+        // Top donors
+        aggregate
+            ? _repo.getMECTopDonorsMulti(multiIds)
+            : singleId.isNotEmpty ? _repo.getMECTopDonors(singleId) : Future.value(const <Map<String, dynamic>>[]),
+        // Contribution timeline
+        aggregate
+            ? _repo.getMECContributionTimelineMulti(multiIds)
+            : singleId.isNotEmpty ? _repo.getMECContributionTimeline(singleId) : Future.value(const <Map<String, dynamic>>[]),
+        // Finance summary
+        aggregate
+            ? _repo.getMECFinanceSummaryMulti(multiIds)
+            : singleId.isNotEmpty ? _repo.getMECFinanceSummary(singleId) : Future.value(const <String, dynamic>{}),
+        // Expenditure summary
+        aggregate
+            ? _repo.getMECExpenditureSummaryMulti(multiIds)
+            : singleId.isNotEmpty ? _repo.getMECExpenditureSummary(singleId) : Future.value(const <String, dynamic>{}),
+        // Top payees
+        aggregate
+            ? _repo.getMECTopPayeesMulti(multiIds)
+            : singleId.isNotEmpty ? _repo.getMECTopPayees(singleId) : Future.value(const <Map<String, dynamic>>[]),
+        // Recent expenditures
+        aggregate
+            ? _repo.getMECRecentExpendituresMulti(multiIds)
+            : singleId.isNotEmpty ? _repo.getMECRecentExpenditures(singleId) : Future.value(const <Map<String, dynamic>>[]),
         // Race comparison
         hasDistrict ? _repo.getRaceFinanceComparison(c.office, c.district!) : Future.value(const <Map<String, dynamic>>[]),
         // FEC data (only if federal candidate)
@@ -253,8 +283,8 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       _topDonors = (results[1] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       _contributionTimeline = (results[2] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       _financeSummary = (results[3] as Map<String, dynamic>?) ?? const {};
-      if (_financeSummary.isNotEmpty && cachedMecId.isNotEmpty) {
-        _repo.cacheFinanceSummary(cachedMecId, _financeSummary);
+      if (_financeSummary.isNotEmpty && cacheKey.isNotEmpty) {
+        _repo.cacheFinanceSummary(cacheKey, _financeSummary);
       }
       _expenditureSummary = (results[4] as Map<String, dynamic>?) ?? const {};
       _topPayees = (results[5] as List?)?.cast<Map<String, dynamic>>() ?? const [];
@@ -1367,6 +1397,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   Widget _buildCommitteeSelector() {
+    final hasMultiple = _mecCommittees.length > 1;
     return _card(
       'MEC Committee',
       Icons.account_balance,
@@ -1374,6 +1405,8 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       child: Column(
         children: [
           const SizedBox(height: 8),
+          // "All committees" aggregate option — only shown when >1 committee is linked
+          if (hasMultiple) _buildAllCommitteesPill(),
           ..._mecCommittees.map((committee) {
             final mecId = committee['mec_id']?.toString() ?? '';
             final name = committee['committee_name'] as String? ?? 'Unknown Committee';
@@ -1494,6 +1527,61 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAllCommitteesPill() {
+    final isSelected = _selectedMecId == null;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        gradient: isSelected
+            ? const LinearGradient(
+                colors: [BrandColors.sunriseGold, Color(0xFFF5A000)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        color: isSelected ? null : Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isSelected ? BrandColors.sunriseGold : Colors.white12,
+          width: isSelected ? 0 : 1,
+        ),
+        boxShadow: isSelected
+            ? [BoxShadow(color: BrandColors.sunriseGold.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))]
+            : null,
+      ),
+      child: ListTile(
+        dense: true,
+        leading: Icon(
+          Icons.all_inclusive,
+          color: isSelected ? Colors.black87 : Colors.white70,
+          size: 20,
+        ),
+        title: Text(
+          'All committees',
+          style: TextStyle(
+            color: isSelected ? Colors.black87 : Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        subtitle: Text(
+          'Aggregate across ${_mecCommittees.length} committees',
+          style: TextStyle(
+            color: isSelected ? Colors.black87.withOpacity(0.7) : Colors.white70,
+            fontSize: 11,
+          ),
+        ),
+        trailing: isSelected
+            ? const Icon(Icons.check_circle, color: Colors.black87, size: 18)
+            : null,
+        onTap: () {
+          setState(() => _selectedMecId = null);
+          _loadFinanceData();
+        },
       ),
     );
   }

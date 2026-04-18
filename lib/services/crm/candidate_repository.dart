@@ -823,6 +823,28 @@ class CandidateRepository {
     }
   }
 
+  /// Fetch contributions across multiple committees (aggregated view).
+  /// Used when the candidate has >1 linked MEC committee and the user picks
+  /// "All committees" in the switcher.
+  Future<List<MECContribution>> getMECContributionsMulti(List<String> mecIds, {int limit = 5000}) async {
+    if (!isReady || mecIds.isEmpty) return [];
+    try {
+      final response = await _client
+          .from('mec_contributions')
+          .select()
+          .inFilter('mec_id', mecIds)
+          .order('contribution_date', ascending: false)
+          .limit(limit);
+      return (response as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(MECContribution.fromJson)
+          .toList();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECContributionsMulti error: $e');
+      return [];
+    }
+  }
+
   /// Fetch top donors for a committee (via Postgres function)
   Future<List<Map<String, dynamic>>> getMECTopDonors(String mecId, {int limit = 50}) async {
     if (!isReady) return [];
@@ -881,6 +903,50 @@ class CandidateRepository {
     }
   }
 
+  /// Aggregated finance summary across multiple MEC committees.
+  Future<Map<String, dynamic>> getMECFinanceSummaryMulti(List<String> mecIds) async {
+    if (!isReady || mecIds.isEmpty) return {};
+    try {
+      final response = await _client.rpc('get_mec_finance_summary_multi', params: {
+        'p_mec_ids': mecIds,
+      });
+      if (response is Map<String, dynamic>) return response;
+      return {};
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECFinanceSummaryMulti error: $e');
+      return {};
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getMECTopDonorsMulti(List<String> mecIds, {int limit = 50}) async {
+    if (!isReady || mecIds.isEmpty) return [];
+    try {
+      final response = await _client.rpc('get_mec_top_donors_multi', params: {
+        'p_mec_ids': mecIds,
+        'p_limit': limit,
+      });
+      if (response is List) return response.cast<Map<String, dynamic>>();
+      return [];
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECTopDonorsMulti error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getMECContributionTimelineMulti(List<String> mecIds) async {
+    if (!isReady || mecIds.isEmpty) return [];
+    try {
+      final response = await _client.rpc('get_mec_contribution_timeline_multi', params: {
+        'p_mec_ids': mecIds,
+      });
+      if (response is List) return response.cast<Map<String, dynamic>>();
+      return [];
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECContributionTimelineMulti error: $e');
+      return [];
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   //  MEC EXPENDITURES — Spending data
   // ═══════════════════════════════════════════════════════════════
@@ -901,6 +967,51 @@ class CandidateRepository {
     } catch (e) {
       debugPrint('❌ CandidateRepository.getMECExpenditureSummary error: $e');
       return {};
+    }
+  }
+
+  Future<Map<String, dynamic>> getMECExpenditureSummaryMulti(List<String> mecIds) async {
+    if (!isReady || mecIds.isEmpty) return {};
+    try {
+      final response = await _client.rpc('get_mec_expenditure_summary_multi', params: {
+        'p_mec_ids': mecIds,
+      });
+      if (response is Map<String, dynamic>) return response;
+      return {};
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECExpenditureSummaryMulti error: $e');
+      return {};
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getMECTopPayeesMulti(List<String> mecIds, {int limit = 50}) async {
+    if (!isReady || mecIds.isEmpty) return [];
+    try {
+      final response = await _client.rpc('get_mec_top_payees_multi', params: {
+        'p_mec_ids': mecIds,
+        'p_limit': limit,
+      });
+      if (response is List) return response.cast<Map<String, dynamic>>();
+      return [];
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECTopPayeesMulti error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getMECRecentExpendituresMulti(List<String> mecIds, {int limit = 20}) async {
+    if (!isReady || mecIds.isEmpty) return [];
+    try {
+      final response = await _client
+          .from('mec_expenditures')
+          .select()
+          .inFilter('mec_id', mecIds)
+          .order('expenditure_date', ascending: false)
+          .limit(limit);
+      return (response as List<dynamic>).cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getMECRecentExpendituresMulti error: $e');
+      return [];
     }
   }
 
