@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -57,6 +58,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   // ── State: General ──
   bool _editingNotes = false;
   bool _savingNotes = false;
+  bool _uploadingPhoto = false;
   late Candidate _candidate;
 
   // ── State: Money Tab (contributions + expenditures) ──
@@ -443,6 +445,61 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           duration: const Duration(seconds: 2),
         ),
       );
+    }
+  }
+
+  // ─── Candidate photo upload ─────────────────────────────────────
+
+  Future<void> _pickAndUploadPhoto() async {
+    if (_uploadingPhoto) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+      allowMultiple: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.first;
+    if ((file.bytes == null || file.bytes!.isEmpty) && file.path == null) return;
+
+    setState(() => _uploadingPhoto = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final newUrl = await _repo.uploadCandidatePhoto(
+        candidateId: _candidate.id,
+        file: file,
+      );
+      if (!mounted) return;
+      if (newUrl == null) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Photo upload failed'), backgroundColor: BrandColors.error),
+        );
+        return;
+      }
+      final refreshed = await _repo.fetchCandidate(_candidate.id);
+      if (!mounted) return;
+      if (refreshed != null) {
+        setState(() => _candidate = refreshed);
+      }
+      // Force NetworkImage to bypass cache for the new URL
+      await NetworkImage(newUrl).evict();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('✅ Photo updated'),
+          backgroundColor: BrandColors.success,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ Photo upload error: $e');
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Upload failed: $e'), backgroundColor: BrandColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
     }
   }
 
@@ -927,24 +984,49 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                     ),
                   ),
                 ),
-                // Photo
-                CircleAvatar(
-                  radius: 34,
-                  backgroundColor: BrandColors.navyBlue,
-                  backgroundImage:
-                      c.photoUrl != null && c.photoUrl!.isNotEmpty
-                          ? NetworkImage(c.photoUrl!)
-                          : null,
-                  child: c.photoUrl == null || c.photoUrl!.isEmpty
-                      ? Text(
-                          c.initials,
-                          style: TextStyle(
-                            color: partyColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 22,
+                // Photo — tap to upload / change
+                GestureDetector(
+                  onTap: _pickAndUploadPhoto,
+                  child: Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 34,
+                        backgroundColor: BrandColors.navyBlue,
+                        backgroundImage:
+                            c.photoUrl != null && c.photoUrl!.isNotEmpty
+                                ? NetworkImage(c.photoUrl!)
+                                : null,
+                        child: c.photoUrl == null || c.photoUrl!.isEmpty
+                            ? Text(
+                                c.initials,
+                                style: TextStyle(
+                                  color: partyColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 22,
+                                ),
+                              )
+                            : null,
+                      ),
+                      // Camera badge overlay — signals "tap to change photo"
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: BrandColors.sunriseGold,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: BrandColors.navyBlue, width: 2),
                           ),
-                        )
-                      : null,
+                          child: Icon(
+                            _uploadingPhoto ? Icons.sync : Icons.camera_alt,
+                            color: Colors.black87,
+                            size: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1047,6 +1129,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       children: [
+        // ── Edit profile CTA — always at the top, impossible to miss ──
+        _buildEditProfileCta(),
+        const SizedBox(height: 16),
+
         // ── MOYD Member Badge ──
         if (c.memberId != null) ...[
           _buildMemberBadge(),
@@ -1527,6 +1613,80 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// "Edit profile" CTA at the top of the Profile tab. Highlights what's
+  /// missing so the user knows exactly what to fill in.
+  Widget _buildEditProfileCta() {
+    final missing = <String>[];
+    if (c.dateOfBirth == null) missing.add('DOB');
+    if ((c.email == null || c.email!.isEmpty) && (c.phone == null || c.phone!.isEmpty)) missing.add('contact');
+    if (c.photoUrl == null || c.photoUrl!.isEmpty) missing.add('photo');
+    if (c.bio == null || c.bio!.isEmpty) missing.add('bio');
+    if (c.occupation == null || c.occupation!.isEmpty) missing.add('occupation');
+
+    final subtitle = missing.isEmpty
+        ? 'Tap to fine-tune any detail on this candidate'
+        : 'Missing: ${missing.join(", ")}';
+
+    return InkWell(
+      onTap: _openEditDialog,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              BrandColors.sunriseGold.withOpacity(0.15),
+              BrandColors.momentumBlue.withOpacity(0.15),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: BrandColors.sunriseGold.withOpacity(0.35)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: BrandColors.sunriseGold.withOpacity(0.2),
+                shape: BoxShape.circle,
+                border: Border.all(color: BrandColors.sunriseGold.withOpacity(0.5)),
+              ),
+              child: const Icon(Icons.edit, color: BrandColors.sunriseGold, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Edit profile details',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: missing.isEmpty ? Colors.white70 : BrandColors.sunriseGold.withOpacity(0.9),
+                      fontSize: 12,
+                      fontWeight: missing.isEmpty ? FontWeight.normal : FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white54, size: 22),
+          ],
+        ),
       ),
     );
   }
@@ -5128,6 +5288,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     return Row(
       children: [
         Expanded(
+          child: _actionButton(Icons.edit, 'Edit', BrandColors.sunriseGold, _openEditDialog),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
           child: _actionButton(Icons.phone, 'Contact', BrandColors.momentumBlue, _launchPhone),
         ),
         const SizedBox(width: 10),
@@ -5136,7 +5300,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: _actionButton(Icons.note_add, 'Add Note', BrandColors.sunriseGold, () {
+          child: _actionButton(Icons.note_add, 'Add Note', Colors.purpleAccent, () {
             _tabController.animateTo(3);
             setState(() {
               _intelSegment = 2;

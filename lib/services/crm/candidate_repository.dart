@@ -1,4 +1,9 @@
+import 'dart:io' as io;
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:mime/mime.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -406,6 +411,53 @@ class CandidateRepository {
       debugPrint('❌ CandidateRepository.createCandidate error: $e');
       return null;
     }
+  }
+
+  // ─── Upload candidate photo ────────────────────────────────────
+
+  /// Upload a candidate profile photo to the `candidate-photos` bucket and
+  /// persist the resulting public URL as `candidates.photo_url`.
+  /// Returns the new photo URL (or null on failure).
+  Future<String?> uploadCandidatePhoto({
+    required String candidateId,
+    required PlatformFile file,
+  }) async {
+    if (!isReady) return null;
+
+    try {
+      final bytes = await _resolveFileBytes(file);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final sanitized = _sanitizeFileName(file.name);
+      final path = '$candidateId/$now-$sanitized';
+      final contentType = lookupMimeType(file.name) ?? 'application/octet-stream';
+
+      await _client.storage.from('candidate-photos').uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(contentType: contentType, upsert: true),
+          );
+
+      final publicUrl = _client.storage.from('candidate-photos').getPublicUrl(path);
+      await updateCandidate(candidateId, {'photo_url': publicUrl});
+      return publicUrl;
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.uploadCandidatePhoto error: $e');
+      return null;
+    }
+  }
+
+  Future<Uint8List> _resolveFileBytes(PlatformFile file) async {
+    if (file.bytes != null) return file.bytes!;
+    if (file.path != null && !kIsWeb) {
+      return await io.File(file.path!).readAsBytes();
+    }
+    throw StateError('Selected file has no readable bytes.');
+  }
+
+  String _sanitizeFileName(String name) {
+    final trimmed = name.trim().isEmpty ? 'candidate-photo' : name.trim();
+    final safe = trimmed.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    return safe.replaceAll(RegExp(r'_+'), '_');
   }
 
   // ─── Delete candidate ──────────────────────────────────────────
