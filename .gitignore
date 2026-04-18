@@ -63,3 +63,4 @@ pubspec.lock
 /windows/
 /snap/
 /screenshots/
+.claude/worktrees/
