@@ -17,6 +17,7 @@ import 'package:bluebubbles/screens/crm/donor_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/donor_profile_screen.dart';
 import 'package:bluebubbles/screens/crm/mec_committee_screen.dart';
 import 'package:bluebubbles/screens/crm/mec_donor_screen.dart';
+import 'package:bluebubbles/screens/crm/news_article_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/historical_candidate_screen.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
@@ -3361,7 +3362,13 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     final cleanHeadline = _decodeHtml(news.headline);
 
     return GestureDetector(
-      onTap: news.url != null ? () => _launchUrl(news.url!) : null,
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => NewsArticleDetailScreen(
+          newsId: news.id,
+          fallbackHeadline: cleanHeadline,
+          fallbackSource: news.source,
+        ),
+      )),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
