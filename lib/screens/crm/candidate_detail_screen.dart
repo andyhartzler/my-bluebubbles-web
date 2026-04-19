@@ -15,6 +15,7 @@ import 'package:bluebubbles/screens/crm/mec_committee_picker.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/screens/crm/donor_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/donor_profile_screen.dart';
+import 'package:bluebubbles/screens/crm/mec_committee_screen.dart';
 import 'package:bluebubbles/screens/crm/mec_donor_screen.dart';
 import 'package:bluebubbles/screens/crm/historical_candidate_screen.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -391,17 +392,37 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
-  /// Navigate to MEC donor screen showing full contribution history.
-  /// The donor_id from mec_contributions maps to mec_donors.id (integer).
-  void _openDonorProfile(dynamic donorId) {
-    if (donorId == null) return;
-    final id = donorId is int ? donorId : int.tryParse(donorId.toString());
-    if (id == null) return;
-
+  /// Open MECDonorScreen using natural-key lookup.
+  /// mec_contributions.donor_id is 96% unreliable (points at wrong mec_donors
+  /// rows) so we key on (first_name, last_name, city, state) instead.
+  void _openDonorProfileByKey({
+    required String firstName,
+    required String lastName,
+    String? city,
+    String? state,
+  }) {
+    if (firstName.isEmpty && lastName.isEmpty) return;
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
         builder: (_) => TitleBarWrapper(
-          child: MECDonorScreen(donorId: id),
+          child: MECDonorScreen(
+            firstName: firstName,
+            lastName: lastName,
+            city: city,
+            state: state,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Open the full committee profile page.
+  void _openMecCommittee(String mecId) {
+    if (mecId.isEmpty) return;
+    Navigator.of(context).push(
+      ThemeSwitcher.buildPageRoute(
+        builder: (_) => TitleBarWrapper(
+          child: MECCommitteeScreen(mecId: mecId),
         ),
       ),
     );
@@ -2161,10 +2182,18 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             final location = [city, state].where((s) => s.isNotEmpty).join(', ');
             final barWidth = maxAmount > 0 ? amount / maxAmount : 0.0;
 
-            final donorId = donor['donor_id'] as int?;
+            final donorFirst = donor['first_name'] as String? ?? '';
+            final donorLast  = donor['last_name']  as String? ?? '';
 
             return GestureDetector(
-              onTap: donorId != null ? () => _openDonorProfile(donorId) : null,
+              onTap: (donorFirst.isNotEmpty || donorLast.isNotEmpty)
+                  ? () => _openDonorProfileByKey(
+                        firstName: donorFirst,
+                        lastName: donorLast,
+                        city: city,
+                        state: state,
+                      )
+                  : null,
               child: Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
@@ -2266,8 +2295,17 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           const SizedBox(height: 8),
           ...List.generate(showCount, (i) {
             final contrib = _mecContributions[i];
+            final cFirst = contrib.contributorFirstName ?? '';
+            final cLast  = contrib.contributorLastName  ?? '';
             return GestureDetector(
-              onTap: contrib.donorId != null ? () => _openDonorProfile(contrib.donorId) : null,
+              onTap: (cFirst.isNotEmpty || cLast.isNotEmpty)
+                  ? () => _openDonorProfileByKey(
+                        firstName: cFirst,
+                        lastName: cLast,
+                        city: contrib.contributorCity,
+                        state: contrib.contributorState,
+                      )
+                  : null,
               child: Container(
               margin: const EdgeInsets.only(bottom: 4),
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),

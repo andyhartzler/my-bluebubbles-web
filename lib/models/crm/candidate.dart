@@ -761,11 +761,11 @@ class MECContribution {
       contributionAmount: (json['contribution_amount'] as num?)?.toDouble() ?? 0,
       contributionDate: json['contribution_date'] as String?,
       contributionType: json['contribution_type'] as String?,
-      contributorEmployer: json['contributor_employer'] as String?,
-      contributorOccupation: json['contributor_occupation'] as String?,
-      contributorAddress: json['contributor_address'] as String?,
-      contributorCity: json['contributor_city'] as String?,
-      contributorState: json['contributor_state'] as String?,
+      contributorEmployer: (json['employer'] ?? json['contributor_employer']) as String?,
+      contributorOccupation: (json['occupation'] ?? json['contributor_occupation']) as String?,
+      contributorAddress: (json['address1'] ?? json['contributor_address']) as String?,
+      contributorCity: (json['city'] ?? json['contributor_city']) as String?,
+      contributorState: (json['state'] ?? json['contributor_state']) as String?,
     );
   }
 

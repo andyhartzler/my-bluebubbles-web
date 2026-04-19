@@ -138,28 +138,52 @@ class CandidateUI {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [accent.withOpacity(0.12), accent.withOpacity(0.04)],
+        // Solid dark navy base so the label + value always have enough contrast,
+        // regardless of the page's gradient background. Accent is conveyed
+        // through the border + icon halo, not the body color, so low-saturation
+        // accents (green, teal) don't blend into the blue page.
+        gradient: const LinearGradient(
+          colors: [Color(0xE62A3A5C), Color(0xF21E2E4F)],
           begin: Alignment.topLeft, end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: accent.withOpacity(0.2)),
-        boxShadow: [BoxShadow(color: accent.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 3))],
+        border: Border.all(color: accent.withOpacity(0.55), width: 1.4),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 10, offset: const Offset(0, 3)),
+          BoxShadow(color: accent.withOpacity(0.18), blurRadius: 14, offset: const Offset(0, 2)),
+        ],
       ),
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: accent.withOpacity(0.15), shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: accent.withOpacity(0.25),
+              shape: BoxShape.circle,
+              border: Border.all(color: accent.withOpacity(0.6), width: 1),
+            ),
             child: Icon(icon, color: accent, size: 20),
           ),
           const SizedBox(height: 10),
           FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text(value, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+            ),
           ),
           const SizedBox(height: 3),
-          Text(label, style: TextStyle(color: accent.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+          // Label: near-white so it's readable no matter the accent.
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.85),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.2,
+            ),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
