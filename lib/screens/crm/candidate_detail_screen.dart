@@ -1051,11 +1051,19 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.location_on, color: Colors.white70, size: 13),
-                    const SizedBox(width: 3),
+                    // Arrow icon signals "aspiration" — unambiguous that this is what
+                    // they're running FOR, not what they hold.
+                    Icon(
+                      c.isIncumbent ? Icons.refresh : Icons.arrow_forward,
+                      color: Colors.white70,
+                      size: 13,
+                    ),
+                    const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        c.officeDisplay,
+                        c.isIncumbent
+                            ? 'Re-election: ${c.officeDisplay}'
+                            : 'Running for ${c.officeDisplay}',
                         style: const TextStyle(color: Colors.white70, fontSize: 13),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1068,6 +1076,11 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   spacing: 6,
                   runSpacing: 4,
                   children: [
+                    // Role badge — most important signal, leads the row
+                    if (c.isIncumbent)
+                      _badge('🏛️ INCUMBENT', BrandColors.sunriseGold, textColor: Colors.black87)
+                    else
+                      _badge('CANDIDATE 2026', BrandColors.momentumBlue),
                     _badge(partyLabel, partyColor),
                     if (c.estimatedAge != null)
                       _badge('Age ${c.estimatedAge}', Colors.white30),
@@ -2539,6 +2552,9 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             final spent = (candidate['total_spent'] as num?)?.toDouble() ?? 0;
             final contribs = (candidate['contribution_count'] as num?)?.toInt() ?? 0;
             final isCurrent = candidate['candidate_id'] == c.id;
+            final isIncumbent = candidate['incumbent'] == true;
+            final noCommittee = candidate['no_committee_linked'] == true;
+            final source = candidate['source'] as String? ?? 'MEC';
 
             Color partyColor;
             if (party.contains('democrat')) {
@@ -2611,6 +2627,22 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                                 ),
                               ),
                             ),
+                            if (isIncumbent) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: BrandColors.sunriseGold.withOpacity(0.25),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text('INCUMBENT',
+                                    style: TextStyle(
+                                        color: BrandColors.sunriseGold,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5)),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
                             if (isCurrent)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -2635,16 +2667,38 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Text('\$${_formatMoney(raised)} raised', style: TextStyle(color: partyColor, fontSize: 12, fontWeight: FontWeight.w700)),
-                            const SizedBox(width: 12),
-                            Text('$contribs donors', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                            const Spacer(),
-                            if (spent > 0)
-                              Text('\$${_formatMoney(spent)} spent', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                          ],
-                        ),
+                        if (noCommittee && raised == 0)
+                          Row(children: [
+                            const Icon(Icons.info_outline, color: Colors.white54, size: 13),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                'No MEC or FEC committee on file — not yet reporting',
+                                style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11, fontStyle: FontStyle.italic),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ])
+                        else
+                          Row(
+                            children: [
+                              Text('\$${_formatMoney(raised)} raised', style: TextStyle(color: partyColor, fontSize: 12, fontWeight: FontWeight.w700)),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: Text(source, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 9, fontWeight: FontWeight.w600)),
+                              ),
+                              const SizedBox(width: 12),
+                              Text('$contribs donors', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                              const Spacer(),
+                              if (spent > 0)
+                                Text('\$${_formatMoney(spent)} spent', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                            ],
+                          ),
                       ],
                     ),
                   ),

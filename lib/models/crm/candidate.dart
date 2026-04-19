@@ -54,6 +54,15 @@ class Candidate {
   final String? county;
   final String? gender;
 
+  // True if the candidate is currently holding this exact seat — drives the
+  // INCUMBENT badge and the "Running for re-election" language on the hero.
+  final bool isIncumbent;
+
+  // Link to public.legislation_legislators (only populated for incumbents
+  // of MO state House/Senate). Makes it possible to pull capitol contact,
+  // bio, official portrait, etc. straight from the legislator record.
+  final String? legislatorId;
+
   // Score breakdown fields
   final int scoreParty;
   final int scorePrimary;
@@ -109,6 +118,8 @@ class Candidate {
     this.zip,
     this.county,
     this.gender,
+    this.isIncumbent = false,
+    this.legislatorId,
     this.scoreParty = 0,
     this.scorePrimary = 0,
     this.scoreContributions = 0,
@@ -181,6 +192,8 @@ class Candidate {
       zip: json['zip'] as String?,
       county: json['county'] as String?,
       gender: json['gender'] as String?,
+      isIncumbent: json['incumbent'] as bool? ?? false,
+      legislatorId: json['legislator_id'] as String?,
       scoreParty: (json['score_party'] as num?)?.toInt() ?? 0,
       scorePrimary: (json['score_primary_history'] as num?)?.toInt() ?? 0,
       scoreContributions: (json['score_contributions'] as num?)?.toInt() ?? 0,
@@ -235,6 +248,8 @@ class Candidate {
         'zip': zip,
         'county': county,
         'gender': gender,
+        'incumbent': isIncumbent,
+        'legislator_id': legislatorId,
         'score_party': scoreParty,
         'score_primary_history': scorePrimary,
         'score_contributions': scoreContributions,
