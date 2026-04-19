@@ -584,6 +584,12 @@ class CandidateNews {
   final String? summary;
   final DateTime? publishedAt;
 
+  // AI-digested fields (populated by the news_digest_gemini.py pipeline)
+  final String? aiSummary;         // 1-2 sentence plain-English summary
+  final String? sentimentLabel;    // 'positive' | 'neutral' | 'negative' | 'mixed'
+  final double? sentimentScore;    // -1.0 to +1.0 wrt this candidate
+  final DateTime? validatedAt;     // set when the row passed the relevance check
+
   const CandidateNews({
     required this.id,
     required this.candidateId,
@@ -592,6 +598,10 @@ class CandidateNews {
     this.url,
     this.summary,
     this.publishedAt,
+    this.aiSummary,
+    this.sentimentLabel,
+    this.sentimentScore,
+    this.validatedAt,
   });
 
   factory CandidateNews.fromJson(Map<String, dynamic> json) {
@@ -604,6 +614,12 @@ class CandidateNews {
       summary: json['summary'] as String?,
       publishedAt: json['published_at'] != null
           ? DateTime.tryParse(json['published_at'] as String)
+          : null,
+      aiSummary: json['ai_summary'] as String?,
+      sentimentLabel: json['sentiment_label'] as String?,
+      sentimentScore: (json['sentiment_score'] as num?)?.toDouble(),
+      validatedAt: json['validated_at'] != null
+          ? DateTime.tryParse(json['validated_at'] as String)
           : null,
     );
   }

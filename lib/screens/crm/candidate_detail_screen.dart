@@ -3269,18 +3269,58 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
+  /// Strip HTML entities & tags that leak in from news scrapers (&nbsp;, <br>, &amp;, …).
+  static String _decodeHtml(String s) {
+    var out = s
+        .replaceAll(RegExp(r'&nbsp;'), ' ')
+        .replaceAll(RegExp(r'&amp;'), '&')
+        .replaceAll(RegExp(r'&quot;'), '"')
+        .replaceAll(RegExp(r'&apos;'), "'")
+        .replaceAll(RegExp(r'&#39;'), "'")
+        .replaceAll(RegExp(r'&lt;'), '<')
+        .replaceAll(RegExp(r'&gt;'), '>')
+        .replaceAll(RegExp(r'&mdash;'), '—')
+        .replaceAll(RegExp(r'&ndash;'), '–')
+        .replaceAll(RegExp(r'&hellip;'), '…')
+        .replaceAll(RegExp(r'&#[0-9]+;'), ' ')
+        .replaceAll(RegExp(r'<[^>]+>'), '')  // strip any stray HTML tags
+        .replaceAll(RegExp(r' +'), ' ');
+    return out.trim();
+  }
+
   Widget _buildNewsCard(CandidateNews news) {
-    // Sentiment detection
-    String sentimentEmoji = '⚪';
-    Color sentimentColor = Colors.grey;
-    final headline = news.headline.toLowerCase();
-    if (headline.contains('wins') || headline.contains('endorsed') || headline.contains('support') || headline.contains('victory') || headline.contains('leads')) {
-      sentimentEmoji = '🟢';
-      sentimentColor = BrandColors.success;
-    } else if (headline.contains('loses') || headline.contains('scandal') || headline.contains('contro') || headline.contains('defeat') || headline.contains('accused')) {
-      sentimentEmoji = '🔴';
-      sentimentColor = BrandColors.republicanRed;
+    // Prefer AI-scored sentiment when present; fall back to keyword heuristics.
+    String sentimentEmoji;
+    Color sentimentColor;
+    final aiLabel = news.sentimentLabel?.toLowerCase();
+    if (aiLabel == 'positive') {
+      sentimentEmoji = '🟢'; sentimentColor = BrandColors.success;
+    } else if (aiLabel == 'negative') {
+      sentimentEmoji = '🔴'; sentimentColor = BrandColors.republicanRed;
+    } else if (aiLabel == 'mixed') {
+      sentimentEmoji = '🟡'; sentimentColor = BrandColors.sunriseGold;
+    } else if (aiLabel == 'neutral') {
+      sentimentEmoji = '⚪'; sentimentColor = Colors.grey;
+    } else {
+      sentimentEmoji = '⚪'; sentimentColor = Colors.grey;
+      final headline = news.headline.toLowerCase();
+      if (headline.contains('wins') || headline.contains('endorsed') || headline.contains('support') || headline.contains('victory') || headline.contains('leads')) {
+        sentimentEmoji = '🟢'; sentimentColor = BrandColors.success;
+      } else if (headline.contains('loses') || headline.contains('scandal') || headline.contains('contro') || headline.contains('defeat') || headline.contains('accused')) {
+        sentimentEmoji = '🔴'; sentimentColor = BrandColors.republicanRed;
+      }
     }
+
+    final displaySummary = (news.aiSummary?.trim().isNotEmpty ?? false)
+        ? news.aiSummary!
+        : (news.summary?.trim().isNotEmpty ?? false)
+            ? news.summary!
+            : '';
+    // Hide garbage: legacy [[verified]] markers, exact echoes of the headline.
+    final cleanSummary = (displaySummary == '[[verified]]' || displaySummary.trim() == news.headline.trim())
+        ? ''
+        : _decodeHtml(displaySummary);
+    final cleanHeadline = _decodeHtml(news.headline);
 
     return GestureDetector(
       onTap: news.url != null ? () => _launchUrl(news.url!) : null,
@@ -3308,7 +3348,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    news.headline,
+                    cleanHeadline,
                     style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600, height: 1.3),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
@@ -3316,12 +3356,12 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 ),
               ],
             ),
-            if (news.summary != null && news.summary!.isNotEmpty) ...[
+            if (cleanSummary.isNotEmpty) ...[
               const SizedBox(height: 6),
               Padding(
                 padding: const EdgeInsets.only(left: 20),
                 child: Text(
-                  news.summary!,
+                  cleanSummary,
                   style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 12, height: 1.4),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
