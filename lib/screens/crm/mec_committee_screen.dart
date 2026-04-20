@@ -3,6 +3,7 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/mec_donor_screen.dart';
+import 'package:bluebubbles/screens/crm/mec_payee_screen.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
@@ -384,29 +385,58 @@ class _MECCommitteeScreenState extends State<MECCommitteeScreen> {
     final name = p['payee_name'] as String? ?? 'Unknown';
     final amount = _asDouble(p['total_amount']);
     final count = _asInt(p['payment_count']);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+    final firstName = (p['payee_first_name'] as String? ?? '').trim();
+    final lastName = (p['payee_last_name'] as String? ?? '').trim();
+    final company = (p['payee_company'] as String? ?? '').trim();
+    final city = (p['city'] as String? ?? '').trim();
+    final state = (p['state'] as String? ?? '').trim();
+    final canOpen = company.isNotEmpty || lastName.isNotEmpty;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
         borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(name,
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
-              Text('$count payment${count == 1 ? '' : 's'}',
-                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10)),
-            ],
+        onTap: canOpen
+            ? () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => MECPayeeScreen(
+                    firstName: firstName.isNotEmpty ? firstName : null,
+                    lastName: lastName.isNotEmpty ? lastName : null,
+                    company: company.isNotEmpty ? company : null,
+                    city: city.isNotEmpty ? city : null,
+                    state: state.isNotEmpty ? state : null,
+                  ),
+                ))
+            : null,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(8),
           ),
+          child: Row(children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name,
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text('$count payment${count == 1 ? '' : 's'}',
+                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10)),
+                ],
+              ),
+            ),
+            Text('\$${CandidateUI.formatMoney(amount)}',
+                style: const TextStyle(color: Colors.purpleAccent, fontSize: 13, fontWeight: FontWeight.w600)),
+            if (canOpen) const Padding(
+              padding: EdgeInsets.only(left: 4),
+              child: Icon(Icons.chevron_right, color: Colors.white38, size: 16),
+            ),
+          ]),
         ),
-        Text('\$${CandidateUI.formatMoney(amount)}',
-            style: const TextStyle(color: Colors.purpleAccent, fontSize: 13, fontWeight: FontWeight.w600)),
-      ]),
+      ),
     );
   }
 
