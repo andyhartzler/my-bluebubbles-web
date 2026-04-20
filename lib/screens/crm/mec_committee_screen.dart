@@ -152,6 +152,8 @@ class _MECCommitteeScreenState extends State<MECCommitteeScreen> {
     final expTotals = _data?['expenditure_totals'] as Map<String, dynamic>?;
     final topDonors = (_data?['top_donors'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
     final topPayees = (_data?['top_payees'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    final recentExp = (_data?['recent_expenditures'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    final recentContrib = (_data?['recent_contributions'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
 
     final totalRaised = _asDouble(totals?['total_raised']);
     final totalSpent = _asDouble(expTotals?['total_spent']);
@@ -176,14 +178,173 @@ class _MECCommitteeScreenState extends State<MECCommitteeScreen> {
               ])),
           const SizedBox(height: 16),
         ],
-        if (topPayees.isNotEmpty)
+        if (topPayees.isNotEmpty) ...[
           CandidateUI.card('Top Payees (${topPayees.length})',
               Icons.payments, Colors.purpleAccent,
               child: Column(children: [
                 const SizedBox(height: 8),
                 ...topPayees.map((p) => _payeeRow(p)),
               ])),
+          const SizedBox(height: 16),
+        ],
+        if (recentExp.isNotEmpty) ...[
+          CandidateUI.card('Recent Expenditures (${recentExp.length})',
+              Icons.receipt_long, BrandColors.republicanRed,
+              child: Column(children: [
+                const SizedBox(height: 8),
+                ...recentExp.map(_expenditureRow),
+              ])),
+          const SizedBox(height: 16),
+        ],
+        if (recentContrib.isNotEmpty)
+          CandidateUI.card('Recent Contributions (${recentContrib.length})',
+              Icons.volunteer_activism, BrandColors.success,
+              child: Column(children: [
+                const SizedBox(height: 8),
+                ...recentContrib.map(_contributionRow),
+              ])),
       ],
+    );
+  }
+
+  Widget _expenditureRow(Map<String, dynamic> e) {
+    final amount = _asDouble(e['expenditure_amount']);
+    final date = e['expenditure_date'] as String? ?? '';
+    final purpose = e['expenditure_purpose'] as String? ?? '';
+    final first = (e['payee_first_name'] as String? ?? '').trim();
+    final last = (e['payee_last_name'] as String? ?? '').trim();
+    final company = (e['payee_company'] as String? ?? '').trim();
+    final city = (e['city'] as String? ?? '').trim();
+    final state = (e['state'] as String? ?? '').trim();
+    final displayName = company.isNotEmpty ? company : '${first.isNotEmpty ? '$first ' : ''}$last'.trim();
+    final canOpen = company.isNotEmpty || last.isNotEmpty;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: canOpen
+            ? () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => MECPayeeScreen(
+                    firstName: first.isNotEmpty ? first : null,
+                    lastName: last.isNotEmpty ? last : null,
+                    company: company.isNotEmpty ? company : null,
+                    city: city.isNotEmpty ? city : null,
+                    state: state.isNotEmpty ? state : null,
+                  ),
+                ))
+            : null,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(children: [
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(displayName.isEmpty ? '(no payee)' : displayName,
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text([date, if (purpose.isNotEmpty) purpose].join(' · '),
+                      style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 10),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 80,
+              child: Text(
+                '\$${CandidateUI.formatMoney(amount)}',
+                style: const TextStyle(color: BrandColors.republicanRed, fontSize: 13, fontWeight: FontWeight.w700),
+                textAlign: TextAlign.right,
+              ),
+            ),
+            if (canOpen) const Padding(
+              padding: EdgeInsets.only(left: 2),
+              child: Icon(Icons.chevron_right, color: Colors.white38, size: 16),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _contributionRow(Map<String, dynamic> c) {
+    final amount = _asDouble(c['contribution_amount']);
+    final date = c['contribution_date'] as String? ?? '';
+    final first = (c['contributor_first_name'] as String? ?? '').trim();
+    final last = (c['contributor_last_name'] as String? ?? '').trim();
+    final comm = (c['contributor_committee'] as String? ?? '').trim();
+    final company = (c['contributor_company'] as String? ?? '').trim();
+    final city = (c['city'] as String? ?? '').trim();
+    final state = (c['state'] as String? ?? '').trim();
+    final employer = c['employer'] as String? ?? '';
+    final isIndividual = last.isNotEmpty;
+    final displayName = isIndividual
+        ? '${first.isNotEmpty ? '$first ' : ''}$last'.trim()
+        : (comm.isNotEmpty ? comm : (company.isNotEmpty ? company : '(unknown)'));
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: isIndividual
+            ? () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => MECDonorScreen(
+                    firstName: first,
+                    lastName: last,
+                    city: city.isNotEmpty ? city : null,
+                    state: state.isNotEmpty ? state : null,
+                    employerHint: employer.isNotEmpty ? employer : null,
+                  ),
+                ))
+            : null,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(children: [
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(displayName,
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text([date, if (employer.isNotEmpty) employer].join(' · '),
+                      style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 10),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 80,
+              child: Text(
+                '\$${CandidateUI.formatMoney(amount)}',
+                style: const TextStyle(color: BrandColors.success, fontSize: 13, fontWeight: FontWeight.w700),
+                textAlign: TextAlign.right,
+              ),
+            ),
+            if (isIndividual) const Padding(
+              padding: EdgeInsets.only(left: 2),
+              child: Icon(Icons.chevron_right, color: Colors.white38, size: 16),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 
