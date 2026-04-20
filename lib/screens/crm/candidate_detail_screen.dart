@@ -17,6 +17,7 @@ import 'package:bluebubbles/screens/crm/donor_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/donor_profile_screen.dart';
 import 'package:bluebubbles/screens/crm/mec_committee_screen.dart';
 import 'package:bluebubbles/screens/crm/mec_donor_screen.dart';
+import 'package:bluebubbles/screens/crm/mec_payee_screen.dart';
 import 'package:bluebubbles/screens/crm/news_article_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/historical_candidate_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
@@ -2521,49 +2522,72 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             final city = payee['city'] as String? ?? '';
             final state = payee['state'] as String? ?? '';
             final location = [city, state].where((s) => s.isNotEmpty).join(', ');
+            final firstName = (payee['payee_first_name'] as String? ?? '').trim();
+            final lastName = (payee['payee_last_name'] as String? ?? '').trim();
+            final company = (payee['payee_company'] as String? ?? '').trim();
+            final canOpen = company.isNotEmpty || lastName.isNotEmpty;
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+            return Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
                 borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '#${i + 1}',
-                        style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ),
+                onTap: canOpen
+                    ? () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => MECPayeeScreen(
+                            firstName: firstName.isNotEmpty ? firstName : null,
+                            lastName: lastName.isNotEmpty ? lastName : null,
+                            company: company.isNotEmpty ? company : null,
+                            city: city.isNotEmpty ? city : null,
+                            state: state.isNotEmpty ? state : null,
+                          ),
+                        ))
+                    : null,
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name, style: const TextStyle(color: Colors.white, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        if (location.isNotEmpty)
-                          Text(location, style: const TextStyle(color: Colors.white70, fontSize: 10)),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  child: Row(
                     children: [
-                      Text('\$${_formatMoney(amount)}', style: const TextStyle(color: Colors.amber, fontSize: 14, fontWeight: FontWeight.bold)),
-                      Text('$count payments', style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '#${i + 1}',
+                            style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(name, style: const TextStyle(color: Colors.white, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            if (location.isNotEmpty)
+                              Text(location, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('\$${_formatMoney(amount)}', style: const TextStyle(color: Colors.amber, fontSize: 14, fontWeight: FontWeight.bold)),
+                          Text('$count payments', style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                        ],
+                      ),
+                      if (canOpen) const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
                     ],
                   ),
-                ],
+                ),
               ),
             );
           }),
