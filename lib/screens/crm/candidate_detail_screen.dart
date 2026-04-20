@@ -19,6 +19,8 @@ import 'package:bluebubbles/screens/crm/mec_committee_screen.dart';
 import 'package:bluebubbles/screens/crm/mec_donor_screen.dart';
 import 'package:bluebubbles/screens/crm/news_article_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/historical_candidate_screen.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 
@@ -5104,53 +5106,103 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   //  REUSABLE WIDGETS FROM ORIGINAL
   // ═══════════════════════════════════════════════════════════════
 
+  Future<void> _openMemberProfile() async {
+    if (c.memberId == null) return;
+    // Show spinner while we fetch — the member row is usually <100ms but we
+    // want feedback immediately so the tap feels snappy.
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator(color: BrandColors.sunriseGold)),
+    );
+    try {
+      final member = await MemberRepository().getMemberById(c.memberId!);
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop(); // close spinner
+      if (member == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not load linked member profile'),
+          backgroundColor: Colors.redAccent,
+        ));
+        return;
+      }
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => TitleBarWrapper(child: MemberDetailScreen(member: member)),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error loading member: $e'),
+        backgroundColor: Colors.redAccent,
+      ));
+    }
+  }
+
   Widget _buildMemberBadge() {
-    return CandidateUI.card('MOYD Member', Icons.badge, Colors.amber, child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 12),
-        Row(
+    // Aged-out members still live on the roster but are flagged — surface that
+    // here so the candidate card doesn't mis-advertise them as "Active".
+    final isAgedOut = c.estimatedAge != null && c.estimatedAge! > 36;
+    final title = isAgedOut ? 'MOYD Member — Aged Out' : 'Active MOYD Member';
+    final subtitle = isAgedOut
+        ? 'Registered Missouri Young Democrats member, no longer eligible. Tap to view full profile →'
+        : 'Registered Missouri Young Democrats member. Tap to view full profile →';
+    final primary = isAgedOut ? Colors.orange : Colors.amber;
+
+    return CandidateUI.card('MOYD Member', Icons.badge, primary, child: InkWell(
+      onTap: _openMemberProfile,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.amber.withOpacity(0.3), Colors.orange.withOpacity(0.15)],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [primary.withOpacity(0.3), primary.withOpacity(0.12)],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(isAgedOut ? Icons.schedule : Icons.star, color: primary, size: 24),
                 ),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.star, color: Colors.amber, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: primary.withOpacity(0.8), size: 22),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            if (c.dateOfBirth != null) ...[
+              const SizedBox(height: 10),
+              Row(
                 children: [
-                  const Text('Active MOYD Member', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 2),
+                  Icon(Icons.cake, color: primary.withOpacity(0.6), size: 14),
+                  const SizedBox(width: 6),
                   Text(
-                    'This candidate is a registered Missouri Young Democrats member.',
-                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                    'DOB: ${c.dateOfBirth!.month}/${c.dateOfBirth!.day}/${c.dateOfBirth!.year}',
+                    style: TextStyle(color: primary.withOpacity(0.85), fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
-            ),
+            ],
           ],
         ),
-        if (c.dateOfBirth != null) ...[
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Icon(Icons.cake, color: Colors.amber.withOpacity(0.6), size: 14),
-              const SizedBox(width: 6),
-              Text(
-                'DOB: ${c.dateOfBirth!.month}/${c.dateOfBirth!.day}/${c.dateOfBirth!.year}',
-                style: TextStyle(color: Colors.amber.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w500),
-              ),
-            ],
-          ),
-        ],
-      ],
+      ),
     ));
   }
 

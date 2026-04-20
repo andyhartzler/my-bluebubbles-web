@@ -260,21 +260,58 @@ class _NewsArticleDetailScreenState extends State<NewsArticleDetailScreen> {
               const Divider(color: Colors.white12, height: 1),
               const SizedBox(height: 18),
 
-              // Article body rendered as markdown
+              // Article body rendered as markdown.
               if (fullContent.isNotEmpty)
                 MarkdownBody(
                   data: _decodeHtml(fullContent),
                   selectable: true,
                   styleSheet: _markdownStyle(context),
                 )
-              else
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    "We haven't fetched the full body of this article yet. Tap 'Read original' below.",
-                    style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 13),
+              else ...[
+                // Fallback: render the snippet, then the summary, then
+                // offer an explicit "Fetch now" so the user can force a
+                // digest without leaving the app.
+                if ((r['snippet'] as String? ?? '').trim().isNotEmpty)
+                  Text(
+                    _decodeHtml((r['snippet'] as String).trim()),
+                    style: const TextStyle(color: Colors.white, fontSize: 15.5, height: 1.55),
+                  ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: BrandColors.sunriseGold.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: BrandColors.sunriseGold.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        const Icon(Icons.schedule, color: BrandColors.sunriseGold, size: 16),
+                        const SizedBox(width: 8),
+                        Text('This article hasn\'t been digested yet',
+                            style: TextStyle(
+                                color: BrandColors.sunriseGold.withOpacity(0.95),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3)),
+                      ]),
+                      const SizedBox(height: 6),
+                      Text(
+                        'The AI digest pipeline fetches full article text, extracts sentiment, and pulls key quotes. '
+                        "New articles get processed in rolling batches — there's nothing for this one yet. Tap 'Read original' "
+                        'to see it on the source site.',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              ],
 
               const SizedBox(height: 24),
               if (url != null && url.isNotEmpty)
