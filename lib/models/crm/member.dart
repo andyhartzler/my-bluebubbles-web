@@ -79,6 +79,11 @@ class Member {
   final List<MemberProfilePhoto> profilePhotos;
   final MemberInternalInfo internalInfo;
 
+  // Linkage to public.mo_voter_file (added in 20260421_02 migration).
+  // Read-only from the member detail screen — never used as a source of
+  // truth over the member's self-reported values.
+  final String? moVoterFileId;
+
   Member({
     required this.id,
     this.createdAt,
@@ -150,6 +155,7 @@ class Member {
     this.termExpiration,
     List<MemberProfilePhoto> profilePhotos = const [],
     MemberInternalInfo internalInfo = MemberInternalInfo.empty,
+    this.moVoterFileId,
   }) : profilePhotos = List<MemberProfilePhoto>.unmodifiable(profilePhotos),
        internalInfo = internalInfo;
 
@@ -450,6 +456,7 @@ class Member {
           : null,
       profilePhotos: MemberProfilePhoto.parseList(json['profile_pictures']),
       internalInfo: MemberInternalInfo.fromJson(json['internal_member_info']),
+      moVoterFileId: _normalizeText(json['mo_voter_file_id']),
     );
   }
 
@@ -643,6 +650,7 @@ class Member {
     DateTime? termExpiration,
     List<MemberProfilePhoto>? profilePhotos,
     MemberInternalInfo? internalInfo,
+    String? moVoterFileId,
   }) {
     return Member(
       id: id ?? this.id,
@@ -715,6 +723,7 @@ class Member {
       termExpiration: termExpiration ?? this.termExpiration,
       profilePhotos: profilePhotos ?? this.profilePhotos,
       internalInfo: internalInfo ?? this.internalInfo,
+      moVoterFileId: moVoterFileId ?? this.moVoterFileId,
     );
   }
 

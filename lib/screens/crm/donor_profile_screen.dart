@@ -4,7 +4,11 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/models/crm/donor_enrichment_record.dart';
 import 'package:bluebubbles/models/crm/donor_profile.dart';
+import 'package:bluebubbles/models/crm/voter_file_record.dart';
+import 'package:bluebubbles/screens/crm/voter_file/donor_enrichment_card.dart';
+import 'package:bluebubbles/screens/crm/voter_file/voter_file_card.dart';
 import 'package:bluebubbles/services/crm/donor_profile_repository.dart';
 
 class DonorProfileScreen extends StatefulWidget {
@@ -20,6 +24,8 @@ class _DonorProfileScreenState extends State<DonorProfileScreen>
     with SingleTickerProviderStateMixin {
   final DonorProfileRepository _repository = DonorProfileRepository();
   DonorProfile? _profile;
+  VoterFileRecord? _voterRecord;
+  DonorEnrichmentRecord? _enrichmentRecord;
   bool _loading = true;
   String? _error;
   late TabController _tabController;
@@ -58,6 +64,8 @@ class _DonorProfileScreenState extends State<DonorProfileScreen>
       _error = null;
     });
     try {
+      // Fetch the main profile first so the screen can render promptly,
+      // then kick off the voter-file + enrichment lookups in parallel.
       final profile = await _repository.getFullProfile(widget.profileId);
       if (!mounted) return;
       setState(() {
@@ -65,6 +73,18 @@ class _DonorProfileScreenState extends State<DonorProfileScreen>
         _loading = false;
         if (profile == null) _error = 'Profile not found';
       });
+
+      if (profile != null) {
+        final results = await Future.wait([
+          _repository.fetchVoterRecordForProfile(widget.profileId),
+          _repository.fetchEnrichmentRecord(widget.profileId),
+        ]);
+        if (!mounted) return;
+        setState(() {
+          _voterRecord = results[0] as VoterFileRecord?;
+          _enrichmentRecord = results[1] as DonorEnrichmentRecord?;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -603,6 +623,18 @@ class _DonorProfileScreenState extends State<DonorProfileScreen>
         // VAN Voter Summary
         if (p.vanVoter != null) _buildVanSummaryCard(p),
         if (p.vanVoter != null) const SizedBox(height: 12),
+
+        // MO Voter File
+        if (_voterRecord != null) ...[
+          VoterFileCard(record: _voterRecord!),
+          const SizedBox(height: 12),
+        ],
+
+        // Donor Enrichment (skipped entirely when populatedFields is empty)
+        if (_enrichmentRecord != null && _enrichmentRecord!.hasData) ...[
+          DonorEnrichmentCard(record: _enrichmentRecord!),
+          const SizedBox(height: 12),
+        ],
 
         // Key Badges
         if (p.keyBadges.isNotEmpty) ...[

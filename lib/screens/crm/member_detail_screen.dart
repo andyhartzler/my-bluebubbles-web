@@ -9,8 +9,11 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/models/crm/voter_file_record.dart';
 import 'package:bluebubbles/models/crm/wallet_pass_member.dart';
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
+import 'package:bluebubbles/screens/crm/voter_file/voter_crossref_card.dart';
+import 'package:bluebubbles/services/crm/voter_file_service.dart';
 import 'package:bluebubbles/screens/crm/member_detail/email_history_tab.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/screens/crm/editors/member_edit_sheet.dart';
@@ -136,6 +139,10 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   _DonorProfile? _donorProfile;
   bool _loadingDonorProfile = false;
   String? _donorError;
+
+  // MO voter file cross-reference — lazy, read-only.
+  VoterFileRecord? _voterRecord;
+  bool _loadingVoterRecord = false;
   final NumberFormat _currencyFormat = NumberFormat.simpleCurrency();
 
   // Form submissions, votes, and jobs activity
@@ -190,6 +197,26 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       _loadWalletPassInfo();
       _loadDonorProfile();
       _loadMemberActivity();
+      _loadVoterRecord();
+    }
+  }
+
+  Future<void> _loadVoterRecord() async {
+    if (_loadingVoterRecord) return;
+    final voterId = _member.moVoterFileId;
+    if (voterId == null || voterId.isEmpty) return;
+    setState(() => _loadingVoterRecord = true);
+    try {
+      final record = await VoterFileService.fetchRecord(voterId);
+      if (!mounted) return;
+      setState(() {
+        _voterRecord = record;
+        _loadingVoterRecord = false;
+      });
+    } catch (e) {
+      debugPrint('❌ _loadVoterRecord (member): $e');
+      if (!mounted) return;
+      setState(() => _loadingVoterRecord = false);
     }
   }
 
@@ -607,6 +634,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           unawaited(_loadWalletPassInfo());
         }
         unawaited(_loadDonorProfile());
+        unawaited(_loadVoterRecord());
         if (showFeedback) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Member refreshed')),
@@ -2573,6 +2601,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
     final allSections = <Widget>[
       ...sections,
+      if (_voterRecord != null)
+        VoterCrossRefCard(
+          record: _voterRecord!,
+          memberDateOfBirth: _member.dateOfBirth,
+        ),
       if (internalReportsSection != null) internalReportsSection,
       if (notesSection != null) notesSection,
       if (metadataSection != null) metadataSection,

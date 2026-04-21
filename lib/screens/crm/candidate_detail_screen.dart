@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -8,7 +9,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
+import 'package:bluebubbles/models/crm/voter_file_record.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_painters.dart';
+import 'package:bluebubbles/screens/crm/voter_file/voter_file_card.dart';
 import 'package:bluebubbles/screens/crm/candidate_edit_dialog.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/mec_committee_picker.dart';
@@ -65,6 +68,11 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   bool _savingNotes = false;
   bool _uploadingPhoto = false;
   late Candidate _candidate;
+
+  // ── State: Voter File (loaded on Profile tab first visit) ──
+  VoterFileRecord? _voterRecord;
+  bool _voterLoading = false;
+  bool _voterLoaded = false;
 
   // ── State: Money Tab (contributions + expenditures) ──
   bool _financeLoading = true;
@@ -143,6 +151,34 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     _notesController.text = c.notes ?? '';
     _animController.forward();
 
+    // Profile tab opens immediately, so fetch the voter record right away.
+    _loadVoterRecord();
+  }
+
+  Future<void> _loadVoterRecord() async {
+    if (_voterLoaded || _voterLoading) return;
+    final voterId = c.moVoterFileId;
+    if (voterId == null || voterId.isEmpty) {
+      _voterLoaded = true;
+      return;
+    }
+    setState(() => _voterLoading = true);
+    try {
+      final record = await _repo.fetchVoterRecord(voterId);
+      if (!mounted) return;
+      setState(() {
+        _voterRecord = record;
+        _voterLoading = false;
+        _voterLoaded = true;
+      });
+    } catch (e) {
+      debugPrint('❌ _loadVoterRecord: $e');
+      if (!mounted) return;
+      setState(() {
+        _voterLoading = false;
+        _voterLoaded = true;
+      });
+    }
   }
 
   void _onTabChanged() {
@@ -1196,6 +1232,23 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         // ── Contact Info ──
         if (c.hasContactInfo) ...[
           _buildContactInfo(),
+          const SizedBox(height: 16),
+        ],
+
+        // ── MO Voter File (lazy-loaded, only rendered when a record exists) ──
+        if (_voterLoading) ...[
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ] else if (_voterRecord != null) ...[
+          VoterFileCard(
+            record: _voterRecord!,
+            dobSource: c.dobSource,
+            matchConfidence: c.matchConfidence,
+            matchMethod: c.matchMethod,
+            showDebug: kDebugMode,
+          ),
           const SizedBox(height: 16),
         ],
 

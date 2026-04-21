@@ -1,11 +1,17 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
-import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
+import 'package:bluebubbles/models/crm/donor_enrichment_record.dart';
+import 'package:bluebubbles/models/crm/voter_file_record.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/mec_committee_screen.dart';
-import 'package:bluebubbles/models/crm/candidate.dart';
+import 'package:bluebubbles/screens/crm/voter_file/donor_enrichment_card.dart';
+import 'package:bluebubbles/screens/crm/voter_file/voter_file_card.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
+import 'package:bluebubbles/services/crm/donor_profile_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/services/crm/voter_file_service.dart';
 
 /// Screen showing a donor's full contribution history, identified by the
 /// natural key (first_name, last_name, city, state) rather than the
@@ -38,7 +44,10 @@ class MECDonorScreen extends StatefulWidget {
 class _MECDonorScreenState extends State<MECDonorScreen> {
   final CRMSupabaseService _supabase = CRMSupabaseService();
   final CandidateRepository _candidateRepo = CandidateRepository();
+  final DonorProfileRepository _donorProfileRepo = DonorProfileRepository();
   Map<String, dynamic>? _profile;
+  VoterFileRecord? _voterRecord;
+  DonorEnrichmentRecord? _enrichmentRecord;
   bool _loading = true;
 
   @override
@@ -66,6 +75,31 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
         setState(() {
           _profile = resp is Map<String, dynamic> ? resp : null;
           _loading = false;
+        });
+      }
+
+      // Kick off voter-file + enrichment lookups in parallel after the
+      // base profile is shown. If either key is missing or the query
+      // returns nothing, the corresponding card simply isn't rendered —
+      // this is the primary fix for the "MECDonorScreen is enrichment-blind"
+      // audit finding.
+      final profile = _profile;
+      if (profile != null) {
+        final voterId = profile['mo_voter_file_id'] as String?;
+        final profileId = profile['id'] as String? ?? profile['profile_id'] as String?;
+
+        final futures = <Future<dynamic>>[];
+        futures.add(VoterFileService.fetchRecord(voterId));
+        if (profileId != null && profileId.isNotEmpty) {
+          futures.add(_donorProfileRepo.fetchEnrichmentRecord(profileId));
+        } else {
+          futures.add(Future.value(null));
+        }
+        final results = await Future.wait(futures);
+        if (!mounted) return;
+        setState(() {
+          _voterRecord = results[0] as VoterFileRecord?;
+          _enrichmentRecord = results[1] as DonorEnrichmentRecord?;
         });
       }
     } catch (e) {
@@ -277,6 +311,18 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
               else
                 ...recent.map((contrib) => _contributionRow(contrib)),
             ])),
+
+        // ── MO Voter File (lazy, post-profile) ──
+        if (_voterRecord != null) ...[
+          const SizedBox(height: 16),
+          VoterFileCard(record: _voterRecord!, showDebug: kDebugMode),
+        ],
+
+        // ── Donor Enrichment (skipped entirely when populatedFields empty) ──
+        if (_enrichmentRecord != null && _enrichmentRecord!.hasData) ...[
+          const SizedBox(height: 16),
+          DonorEnrichmentCard(record: _enrichmentRecord!),
+        ],
       ],
     );
   }
