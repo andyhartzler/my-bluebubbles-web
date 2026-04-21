@@ -1389,8 +1389,8 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             _infoRow(Icons.account_balance_wallet, 'FEC ID', c.fecCandidateId!),
           if (c.mecCommitteeIds.isNotEmpty)
             _infoRow(Icons.account_balance_wallet, 'MEC ID', c.mecCommitteeIds.first),
-          if (c.voterMatchId != null && c.voterMatchId!.isNotEmpty)
-            _infoRow(Icons.how_to_reg, 'Voter Match', c.voterMatchId!),
+          if (c.moVoterFileId != null && c.moVoterFileId!.isNotEmpty)
+            _infoRow(Icons.how_to_reg, 'Voter Match', c.moVoterFileId!),
         ],
       ),
     );

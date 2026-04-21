@@ -14,7 +14,11 @@ class Candidate {
   final int youngDemScore;
   final int? estimatedAge;
   final bool isYoungDem;
-  final String? voterMatchId;
+  final String? moVoterFileId;
+  final int? birthYear;
+  final String? dobSource;
+  final num? matchConfidence;
+  final String? matchMethod;
   final int? mecDonorId;
   final String? notes;
   final DateTime? createdAt;
@@ -83,7 +87,11 @@ class Candidate {
     this.youngDemScore = 0,
     this.estimatedAge,
     this.isYoungDem = false,
-    this.voterMatchId,
+    this.moVoterFileId,
+    this.birthYear,
+    this.dobSource,
+    this.matchConfidence,
+    this.matchMethod,
     this.mecDonorId,
     this.notes,
     this.createdAt,
@@ -149,7 +157,11 @@ class Candidate {
       youngDemScore: (json['young_dem_score'] as num?)?.toInt() ?? 0,
       estimatedAge: age,
       isYoungDem: isYoungDem,
-      voterMatchId: json['voter_match_id'] as String?,
+      moVoterFileId: json['mo_voter_file_id'] as String?,
+      birthYear: (json['birth_year'] as num?)?.toInt(),
+      dobSource: json['dob_source'] as String?,
+      matchConfidence: json['match_confidence'] as num?,
+      matchMethod: json['match_method'] as String?,
       mecDonorId: (json['mec_donor_id'] as num?)?.toInt(),
       notes: json['notes'] as String?,
       createdAt: json['created_at'] != null
@@ -215,7 +227,11 @@ class Candidate {
         'young_dem_score': youngDemScore,
         'estimated_age': estimatedAge,
         'is_young_dem': isYoungDem,
-        'voter_match_id': voterMatchId,
+        'mo_voter_file_id': moVoterFileId,
+        'birth_year': birthYear,
+        'dob_source': dobSource,
+        'match_confidence': matchConfidence,
+        'match_method': matchMethod,
         'mec_donor_id': mecDonorId,
         'notes': notes,
         'campaign_website': campaignWebsite,
@@ -403,7 +419,11 @@ class Candidate {
     int? youngDemScore,
     int? estimatedAge,
     bool? isYoungDem,
-    String? voterMatchId,
+    String? moVoterFileId,
+    int? birthYear,
+    String? dobSource,
+    num? matchConfidence,
+    String? matchMethod,
     int? mecDonorId,
     String? notes,
     DateTime? createdAt,
@@ -452,7 +472,11 @@ class Candidate {
       youngDemScore: youngDemScore ?? this.youngDemScore,
       estimatedAge: estimatedAge ?? this.estimatedAge,
       isYoungDem: isYoungDem ?? this.isYoungDem,
-      voterMatchId: voterMatchId ?? this.voterMatchId,
+      moVoterFileId: moVoterFileId ?? this.moVoterFileId,
+      birthYear: birthYear ?? this.birthYear,
+      dobSource: dobSource ?? this.dobSource,
+      matchConfidence: matchConfidence ?? this.matchConfidence,
+      matchMethod: matchMethod ?? this.matchMethod,
       mecDonorId: mecDonorId ?? this.mecDonorId,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
