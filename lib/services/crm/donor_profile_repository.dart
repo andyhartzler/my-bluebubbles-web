@@ -237,6 +237,33 @@ class DonorProfileRepository {
     }
   }
 
+  /// Bulk-fetch the set of donor_profiles (from the given [profileIds])
+  /// that have a non-null `mo_voter_file_id` linkage. Used by the donor
+  /// command center to show a "registered voter" indicator per row
+  /// without refactoring the `search_donor_profiles` RPC.
+  ///
+  /// Returns an empty set on error or when [profileIds] is empty.
+  Future<Set<String>> fetchVoterFileIdsForProfiles(
+      List<String> profileIds) async {
+    if (!isReady || profileIds.isEmpty) return <String>{};
+    try {
+      final rows = await _readClient
+          .from('donor_profiles')
+          .select('id,mo_voter_file_id')
+          .inFilter('id', profileIds)
+          .not('mo_voter_file_id', 'is', null);
+
+      final list = (rows as List<dynamic>? ?? []).whereType<Map<String, dynamic>>();
+      return list
+          .map((r) => r['id'] as String?)
+          .whereType<String>()
+          .toSet();
+    } catch (e) {
+      debugPrint('❌ fetchVoterFileIdsForProfiles: $e');
+      return <String>{};
+    }
+  }
+
   /// Fetch the `donor_enrichment` row for a donor profile. Only selects
   /// the columns mapped by [DonorEnrichmentRecord] — skips the ~100
   /// null-only columns in the table.

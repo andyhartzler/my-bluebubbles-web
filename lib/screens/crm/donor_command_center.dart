@@ -33,6 +33,13 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
   bool _loading = true;
   String? _error;
 
+  /// Set of profile IDs (from the current page of [_results]) that have a
+  /// non-null `donor_profiles.mo_voter_file_id`. Used to render a small
+  /// voter-registration indicator next to each donor row. Fetched in a
+  /// lightweight follow-up query after each [_search] so we don't have to
+  /// modify the `search_donor_profiles` RPC.
+  Set<String> _voterFileIds = <String>{};
+
   // Search
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
@@ -144,7 +151,10 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
           _totalCount = result.totalCount;
           _loading = false;
           _error = null;
+          _voterFileIds = <String>{};
         });
+        // Fire-and-forget: populate voter-file indicator for visible rows.
+        unawaited(_loadVoterFileIndicators());
       }
     } catch (e) {
       if (mounted) {
@@ -153,6 +163,21 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
           _loading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadVoterFileIndicators() async {
+    final ids = _results.map((r) => r.id).whereType<String>().toList();
+    if (ids.isEmpty) return;
+    try {
+      final matched = await _repository.fetchVoterFileIdsForProfiles(ids);
+      if (!mounted) return;
+      // Only apply if the result set hasn't changed underneath us.
+      final currentIds = _results.map((r) => r.id).whereType<String>().toSet();
+      if (!currentIds.containsAll(matched)) return;
+      setState(() => _voterFileIds = matched);
+    } catch (e) {
+      debugPrint('Error loading voter-file indicators: $e');
     }
   }
 
@@ -1004,9 +1029,18 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
                     checkColor: BrandColors.sunriseGold,
                   ),
                 ),
-                DataCell(Text(
-                  r.fullName,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                DataCell(Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      r.fullName,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    if (r.id != null && _voterFileIds.contains(r.id)) ...[
+                      const SizedBox(width: 6),
+                      _buildVoterDot(),
+                    ],
+                  ],
                 )),
                 DataCell(Text(r.city ?? '')),
                 DataCell(_buildTierBadge(r.tier)),
@@ -1065,6 +1099,11 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
                                 ),
                               ),
                             ),
+                            if (r.id != null &&
+                                _voterFileIds.contains(r.id)) ...[
+                              _buildVoterDot(),
+                              const SizedBox(width: 6),
+                            ],
                             _buildTierBadge(r.tier),
                           ],
                         ),
@@ -1303,6 +1342,38 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
       child: Text(
         partyLean,
         style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  /// Small pill indicating this donor is matched to the MO voter file
+  /// (i.e. `donor_profiles.mo_voter_file_id IS NOT NULL`). Keeps the
+  /// voter-file linkage visible at-a-glance alongside each row.
+  Widget _buildVoterDot() {
+    return Tooltip(
+      message: 'Matched to MO voter file',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: BrandColors.success.withOpacity(0.18),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: BrandColors.success.withOpacity(0.5)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.how_to_reg, size: 12, color: BrandColors.success),
+            SizedBox(width: 4),
+            Text(
+              'Voter',
+              style: TextStyle(
+                color: BrandColors.success,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
