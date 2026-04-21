@@ -8,8 +8,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
+import 'package:bluebubbles/models/crm/voter_file_record.dart';
 
 import 'supabase_service.dart';
+import 'voter_file_service.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATE REPOSITORY
@@ -152,6 +154,13 @@ class CandidateRepository {
       return null;
     }
   }
+
+  // ─── Fetch the MO voter-file record for this candidate ─────────
+  //
+  // Delegates to VoterFileService — the single shared PK lookup against
+  // public.mo_voter_file (4.34M rows).
+  Future<VoterFileRecord?> fetchVoterRecord(String? voterId) =>
+      VoterFileService.fetchRecord(voterId);
 
   // ─── Lightweight fetch for analytics (fewer columns → smaller payload) ──
 

@@ -1,8 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/models/crm/donor_enrichment_record.dart';
 import 'package:bluebubbles/models/crm/donor_profile.dart';
+import 'package:bluebubbles/models/crm/voter_file_record.dart';
 import 'supabase_service.dart';
+import 'voter_file_service.dart';
 
 class DonorProfileRepository {
   final CRMSupabaseService _supabase = CRMSupabaseService();
@@ -208,6 +211,57 @@ class DonorProfileRepository {
     } catch (e) {
       debugPrint('❌ Error fetching tags: $e');
       return [];
+    }
+  }
+
+  /// Resolve a donor profile's `mo_voter_file_id`, then fetch the full
+  /// MO voter-file record via [VoterFileService].
+  ///
+  /// Returns null if the profile has no voter-file linkage, or on any
+  /// error (caller should render no card).
+  Future<VoterFileRecord?> fetchVoterRecordForProfile(String profileId) async {
+    if (!isReady) return null;
+    try {
+      final row = await _readClient
+          .from('donor_profiles')
+          .select('mo_voter_file_id')
+          .eq('id', profileId)
+          .maybeSingle();
+      if (row == null) return null;
+      final voterId = row['mo_voter_file_id'] as String?;
+      if (voterId == null || voterId.isEmpty) return null;
+      return VoterFileService.fetchRecord(voterId);
+    } catch (e) {
+      debugPrint('❌ fetchVoterRecordForProfile: $e');
+      return null;
+    }
+  }
+
+  /// Fetch the `donor_enrichment` row for a donor profile. Only selects
+  /// the columns mapped by [DonorEnrichmentRecord] — skips the ~100
+  /// null-only columns in the table.
+  ///
+  /// Returns null if there is no enrichment row or on error. Callers
+  /// should also check [DonorEnrichmentRecord.hasData] before rendering
+  /// — an empty record should not produce a card.
+  Future<DonorEnrichmentRecord?> fetchEnrichmentRecord(String profileId) async {
+    if (!isReady) return null;
+    try {
+      final row = await _readClient
+          .from('donor_enrichment')
+          .select(
+            'id,full_name,gender,age_estimate,party_lean,party_lean_confidence,'
+            'current_city,current_zip,current_county,congressional_district,'
+            'total_political_donations,donation_count,avg_donation,'
+            'donation_frequency,is_homeowner,wealth_score,mo_voter_file_id',
+          )
+          .eq('profile_id', profileId)
+          .maybeSingle();
+      if (row == null) return null;
+      return DonorEnrichmentRecord.fromJson(row);
+    } catch (e) {
+      debugPrint('❌ fetchEnrichmentRecord: $e');
+      return null;
     }
   }
 
