@@ -1796,11 +1796,32 @@ class _DonorProfileScreenState extends State<DonorProfileScreen>
   }
 
   Widget _enrichmentSection(String title, List<Widget> children) {
-    return ExpansionTile(
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      initiallyExpanded: true,
-      childrenPadding: const EdgeInsets.only(bottom: 8),
-      children: children,
+    // Wrap in a Theme that removes the default Material divider + forces
+    // white iconography, so the tile reads correctly on the navy
+    // BrandedBackground this screen uses.
+    return Theme(
+      data: Theme.of(context).copyWith(
+        dividerColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: Colors.white),
+        listTileTheme: const ListTileThemeData(
+          textColor: Colors.white,
+          iconColor: Colors.white,
+        ),
+      ),
+      child: ExpansionTile(
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        iconColor: Colors.white70,
+        collapsedIconColor: Colors.white70,
+        initiallyExpanded: true,
+        childrenPadding: const EdgeInsets.only(bottom: 8),
+        children: children,
+      ),
     );
   }
 
@@ -1811,17 +1832,26 @@ class _DonorProfileScreenState extends State<DonorProfileScreen>
         children: [
           SizedBox(
             width: 120,
-            child: Text(label,
-                style: const TextStyle(color: Colors.grey, fontSize: 13)),
+            child: Text(
+              label,
+              // Muted white instead of default grey — sits legibly on navy.
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
           ),
           Expanded(
             child: value != null && value.isNotEmpty
-                ? Text(value, style: const TextStyle(fontSize: 13))
-                : const Text('Not available',
+                ? Text(
+                    value,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                  )
+                : const Text(
+                    'Not available',
                     style: TextStyle(
-                        color: Colors.grey,
-                        fontStyle: FontStyle.italic,
-                        fontSize: 13)),
+                      color: Colors.white54,
+                      fontStyle: FontStyle.italic,
+                      fontSize: 13,
+                    ),
+                  ),
           ),
         ],
       ),
