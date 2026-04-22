@@ -6,6 +6,9 @@ import 'package:bluebubbles/models/crm/donor_profile.dart';
 import 'package:bluebubbles/services/crm/donor_profile_repository.dart';
 
 import 'package:bluebubbles/screens/crm/donor_profile_screen.dart';
+import 'package:bluebubbles/screens/crm/tabs/mec_research_tab.dart';
+import 'package:bluebubbles/screens/crm/tabs/call_time_tab.dart';
+import 'package:bluebubbles/screens/crm/tabs/committees_tab.dart';
 
 // ---------------------------------------------------------------------------
 // DonorCommandCenter
@@ -20,8 +23,15 @@ class DonorCommandCenter extends StatefulWidget {
   State<DonorCommandCenter> createState() => _DonorCommandCenterState();
 }
 
-class _DonorCommandCenterState extends State<DonorCommandCenter> {
+class _DonorCommandCenterState extends State<DonorCommandCenter>
+    with SingleTickerProviderStateMixin {
   static const _pageSize = 25;
+
+  // 4-tab container: MOYD Donors (current view) / Donor Research (MEC+FEC
+  // research via MecResearchTab) / Call Time / Committees. The main CRM nav's
+  // "Donors" button lands here, so this is the only entry point users have to
+  // these sub-features.
+  late final TabController _tabController;
 
   final DonorProfileRepository _repository = DonorProfileRepository();
 
@@ -81,11 +91,13 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
     _loadInitialData();
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _searchController.dispose();
     _searchDebounce?.cancel();
     super.dispose();
@@ -304,16 +316,17 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
 
   @override
   Widget build(BuildContext context) {
-    final scaffold = LayoutBuilder(
+    // The existing MOYD-donors view (stats + filter sidebar + donor table)
+    // becomes the body of Tab 0. The other 3 tabs reuse the existing
+    // tab-body widgets already designed for donors_list_screen.dart.
+    final moydDonorsBody = LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 900;
 
         return Column(
           children: [
-            // Hero metrics
             _buildHeroMetrics(),
             const SizedBox(height: 8),
-            // Content area
             Expanded(
               child: isWide
                   ? Row(
@@ -329,32 +342,66 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
                     )
                   : _buildMainContent(constraints.maxWidth),
             ),
-            // Bulk action bar
             _buildBulkActionBar(),
           ],
         );
       },
     );
 
-    if (widget.embed) return scaffold;
+    final tabView = TabBarView(
+      controller: _tabController,
+      children: [
+        moydDonorsBody,
+        MecResearchTab(
+          onNavigateToCommittee: (_, __, ___) {
+            // Hop to the Committees tab inside this screen. CommitteesTab
+            // manages its own state, so deep-linking to a specific committee
+            // from here is deferred to future work.
+            _tabController.animateTo(3);
+          },
+        ),
+        const CallTimeTab(),
+        const CommitteesTab(),
+      ],
+    );
+
+    if (widget.embed) {
+      return Column(
+        children: [
+          _buildTabBar(),
+          Expanded(child: tabView),
+        ],
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Donor Command Center'),
+        title: const Text('Donors'),
         backgroundColor: BrandColors.unityBlue,
         foregroundColor: Colors.white,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: _buildTabBar(),
+        ),
         actions: [
           LayoutBuilder(
             builder: (ctx, c) {
-              // Show filter icon only on narrow screens
               return Builder(
                 builder: (innerCtx) {
                   final mq = MediaQuery.of(innerCtx).size.width;
                   if (mq >= 900) return const SizedBox.shrink();
-                  return IconButton(
-                    icon: const Icon(Icons.filter_list),
-                    tooltip: 'Filters',
-                    onPressed: _showMobileFilters,
+                  // Show filter icon only on narrow screens AND only on the
+                  // MOYD Donors tab (the only tab with a filter sidebar).
+                  return AnimatedBuilder(
+                    animation: _tabController,
+                    builder: (_, __) {
+                      if (_tabController.index != 0) return const SizedBox.shrink();
+                      return IconButton(
+                        icon: const Icon(Icons.filter_list),
+                        tooltip: 'Filters',
+                        onPressed: _showMobileFilters,
+                      );
+                    },
                   );
                 },
               );
@@ -362,7 +409,29 @@ class _DonorCommandCenterState extends State<DonorCommandCenter> {
           ),
         ],
       ),
-      body: BrandedBackground(child: scaffold),
+      body: BrandedBackground(child: tabView),
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(colors: BrandColors.tileGradient),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicatorColor: BrandColors.sunriseGold,
+        indicatorWeight: 3,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white70,
+        isScrollable: false,
+        tabs: const [
+          Tab(icon: Icon(Icons.volunteer_activism), text: 'MOYD Donors'),
+          Tab(icon: Icon(Icons.manage_search), text: 'Donor Research'),
+          Tab(icon: Icon(Icons.phone_callback), text: 'Call Time'),
+          Tab(icon: Icon(Icons.account_balance), text: 'Committees'),
+        ],
+      ),
     );
   }
 
