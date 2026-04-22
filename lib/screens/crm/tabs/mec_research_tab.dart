@@ -4,9 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
-import 'package:bluebubbles/models/crm/donor_enrichment_record.dart';
 import 'package:bluebubbles/models/crm/mec_contribution.dart';
-import 'package:bluebubbles/screens/crm/voter_file/donor_enrichment_card.dart';
 import 'package:bluebubbles/services/crm/mec_repository.dart';
 
 class MecResearchTab extends StatefulWidget {
@@ -1028,7 +1026,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
           const SizedBox(height: 16),
 
           // Enrichment sections (personal, contact, employment, political)
-          _buildEnrichmentCard(),
+          _buildEnrichmentSections(),
 
           // Unified MEC contributions section
           _buildMecContributionsSection(),
@@ -1466,23 +1464,282 @@ class _MecResearchTabState extends State<MecResearchTab> {
   // ENRICHMENT SECTIONS
   // ===========================================================================
 
-  /// Builds the shared `DonorEnrichmentCard` by merging whatever enrichment
-  /// source is available (the direct `donor_enrichment` row, the unified
-  /// profile's `donor` sub-object, or the raw `donors` row from the search
-  /// result) into a `DonorEnrichmentRecord`. The card renders nothing when
-  /// no fields are populated.
-  Widget _buildEnrichmentCard() {
-    final enr = _enrichmentData ??
-        (_unifiedProfile?['donor'] as Map<String, dynamic>?);
+  Widget _buildEnrichmentSections() {
+    final enr = _enrichmentData ?? (_unifiedProfile?['donor'] as Map<String, dynamic>?);
     final donorRow = _profileDonorRow;
     if (enr == null && donorRow == null) return const SizedBox.shrink();
 
-    final record = DonorEnrichmentRecord.fromRawMap(enr, donorRow: donorRow);
-    if (!record.hasData) return const SizedBox.shrink();
+    // Collect all enrichment fields
+    final phoneMobile = enr?['phone_mobile'] as String? ??
+        donorRow?['phone_mobile'] as String?;
+    final phoneHome = enr?['phone_home'] as String? ??
+        donorRow?['phone_home'] as String?;
+    final emailPersonal = enr?['email_personal'] as String? ??
+        donorRow?['email_personal'] as String?;
+    final employer = enr?['current_employer'] as String? ??
+        donorRow?['current_employer'] as String?;
+    final jobTitle = enr?['current_job_title'] as String? ??
+        donorRow?['current_job_title'] as String?;
+    final incomeRange = enr?['estimated_income_range'] as String? ??
+        donorRow?['estimated_income_range'] as String?;
+    final partyLean = enr?['party_lean'] as String? ??
+        donorRow?['party_lean'] as String?;
+    final partyLeanConf = (enr?['party_lean_confidence'] as num?)?.toDouble() ??
+        (donorRow?['party_lean_confidence'] as num?)?.toDouble();
+    final givingCapacity = (enr?['giving_capacity_estimate'] as num?)?.toDouble() ??
+        (donorRow?['giving_capacity_estimate'] as num?)?.toDouble();
+    final wealthScore = (enr?['wealth_score'] as num?)?.toDouble() ??
+        (donorRow?['wealth_score'] as num?)?.toDouble();
+    final engagementScore = (enr?['engagement_score'] as num?)?.toDouble() ??
+        (donorRow?['engagement_score'] as num?)?.toDouble();
+    final socialCount = (enr?['social_profile_count'] as num?)?.toInt() ??
+        (donorRow?['social_profile_count'] as num?)?.toInt();
+    final ethnicity = enr?['ethnicity'] as String? ??
+        donorRow?['ethnicity'] as String?;
 
+    // Address fields
+    final addressLine1 = enr?['address_line_1'] as String? ??
+        donorRow?['address_line_1'] as String? ??
+        enr?['address'] as String? ??
+        donorRow?['address'] as String?;
+    final addressLine2 = enr?['address_line_2'] as String? ??
+        donorRow?['address_line_2'] as String?;
+    final addrCity = enr?['city'] as String? ??
+        donorRow?['city'] as String?;
+    final addrState = enr?['state'] as String? ??
+        donorRow?['state'] as String?;
+    final zipCode = enr?['zip_code'] as String? ??
+        donorRow?['zip_code'] as String? ??
+        enr?['zip'] as String? ??
+        donorRow?['zip'] as String?;
+
+    final hasAddress = (addressLine1 != null && addressLine1.isNotEmpty) ||
+        (addrCity != null && addrCity.isNotEmpty);
+
+    final hasContact = (phoneMobile != null && phoneMobile.isNotEmpty) ||
+        (phoneHome != null && phoneHome.isNotEmpty) ||
+        (emailPersonal != null && emailPersonal.isNotEmpty);
+    final hasEmployment = (employer != null && employer.isNotEmpty) ||
+        (jobTitle != null && jobTitle.isNotEmpty) ||
+        (incomeRange != null && incomeRange.isNotEmpty);
+    final hasPolitical = (partyLean != null && partyLean.isNotEmpty) ||
+        givingCapacity != null ||
+        wealthScore != null ||
+        engagementScore != null;
+
+    if (!hasContact && !hasEmployment && !hasPolitical && !hasAddress) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      children: [
+        // Address
+        if (hasAddress) ...[
+          BrandedCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.location_on, color: BrandColors.sunriseGold, size: 18),
+                    SizedBox(width: 8),
+                    Text('Address', style: BrandTextStyles.title),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (addressLine1 != null && addressLine1.isNotEmpty)
+                  _buildDetailRow(Icons.home, 'Street', addressLine1),
+                if (addressLine2 != null && addressLine2.isNotEmpty)
+                  _buildDetailRow(Icons.home_outlined, 'Line 2', addressLine2),
+                if (addrCity != null && addrCity.isNotEmpty || addrState != null && addrState.isNotEmpty) ...[
+                  _buildDetailRow(Icons.place, 'City/State',
+                    [addrCity, addrState].where((s) => s != null && s.isNotEmpty).join(', ')),
+                ],
+                if (zipCode != null && zipCode.isNotEmpty)
+                  _buildDetailRow(Icons.markunread_mailbox, 'ZIP', zipCode),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Contact Information
+        if (hasContact) ...[
+          BrandedCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.contact_phone, color: BrandColors.sunriseGold, size: 18),
+                    SizedBox(width: 8),
+                    Text('Contact Information', style: BrandTextStyles.title),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (phoneMobile != null && phoneMobile.isNotEmpty)
+                  _buildDetailRow(Icons.phone_android, 'Mobile', phoneMobile),
+                if (phoneHome != null && phoneHome.isNotEmpty)
+                  _buildDetailRow(Icons.phone, 'Home', phoneHome),
+                if (emailPersonal != null && emailPersonal.isNotEmpty)
+                  _buildDetailRow(Icons.email_outlined, 'Email', emailPersonal),
+                if (socialCount != null && socialCount > 0)
+                  _buildDetailRow(Icons.share, 'Social Profiles', '$socialCount found'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Employment & Income
+        if (hasEmployment) ...[
+          BrandedCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.work, color: BrandColors.sunriseGold, size: 18),
+                    SizedBox(width: 8),
+                    Text('Employment', style: BrandTextStyles.title),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (employer != null && employer.isNotEmpty)
+                  _buildDetailRow(Icons.business, 'Employer', employer),
+                if (jobTitle != null && jobTitle.isNotEmpty)
+                  _buildDetailRow(Icons.badge, 'Title', jobTitle),
+                if (incomeRange != null && incomeRange.isNotEmpty)
+                  _buildDetailRow(Icons.attach_money, 'Est. Income', incomeRange),
+                if (ethnicity != null && ethnicity.isNotEmpty)
+                  _buildDetailRow(Icons.people, 'Ethnicity', ethnicity),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // Political & Fundraising Profile
+        if (hasPolitical) ...[
+          BrandedCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.how_to_vote, color: BrandColors.sunriseGold, size: 18),
+                    SizedBox(width: 8),
+                    Text('Political & Fundraising Profile', style: BrandTextStyles.title),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (partyLean != null && partyLean.isNotEmpty) ...[
+                  _buildDetailRow(Icons.flag, 'Party Lean', partyLean),
+                  if (partyLeanConf != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 32, bottom: 8),
+                      child: Row(
+                        children: [
+                          Text('Confidence: ', style: BrandTextStyles.caption),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: partyLeanConf,
+                                backgroundColor: Colors.white12,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  _partyLeanColor(partyLean),
+                                ),
+                                minHeight: 6,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${(partyLeanConf * 100).round()}%',
+                            style: BrandTextStyles.caption,
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+                if (givingCapacity != null)
+                  _buildDetailRow(Icons.volunteer_activism, 'Giving Capacity',
+                      _currencyFormat.format(givingCapacity)),
+                if (wealthScore != null)
+                  _buildScoreRow('Wealth Score', wealthScore, BrandColors.sunriseGold),
+                if (engagementScore != null)
+                  _buildScoreRow('Engagement', engagementScore, BrandColors.momentumBlue),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: DonorEnrichmentCard(record: record),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.white70, size: 16),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 90,
+            child: Text(
+              label,
+              style: BrandTextStyles.caption.copyWith(color: Colors.white70),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScoreRow(String label, double score, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 114,
+            child: Text(label, style: BrandTextStyles.caption),
+          ),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: (score / 100).clamp(0.0, 1.0),
+                backgroundColor: Colors.white12,
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+                minHeight: 8,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            score.toStringAsFixed(0),
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
