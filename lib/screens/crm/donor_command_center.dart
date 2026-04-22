@@ -465,7 +465,9 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
         icon: Icons.card_giftcard,
         label: 'Avg Gift',
         value: _currencyFmt.format(_stats?.averageGift ?? 0),
-        gradient: [BrandColors.sunriseGold, BrandColors.warning],
+        // Gold→warning reads as a caution gradient; blend into the brand
+        // palette instead by landing on a deeper gold/amber tone.
+        gradient: const [BrandColors.sunriseGold, Color(0xFFE98A0B)],
       ),
       _MetricDef(
         icon: Icons.trending_up,
@@ -526,6 +528,26 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
   // ---------------------------------------------------------------------------
   // Filter Sidebar
   // ---------------------------------------------------------------------------
+
+  // Sidebar dropdowns live on navy. Default `OutlineInputBorder` is an
+  // invisible grey against the background; white-at-24% gives a readable
+  // edge without screaming. Paired with `dropdownColor: unityBlue` on each
+  // DropdownButtonFormField so the popover menu inherits navy instead of
+  // the Material light default (which was making menu items unreadable
+  // white-on-white).
+  InputDecoration _filterDropdownDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      isDense: true,
+      labelStyle: const TextStyle(color: Colors.white70),
+      enabledBorder: OutlineInputBorder(
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.24)),
+      ),
+      focusedBorder: const OutlineInputBorder(
+        borderSide: BorderSide(color: BrandColors.sunriseGold),
+      ),
+    );
+  }
 
   Widget _buildFilterSidebar() {
     return Container(
@@ -659,11 +681,10 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                   children: [
                     DropdownButtonFormField<String>(
                       value: _selectedCounty,
-                      decoration: const InputDecoration(
-                        labelText: 'County',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: _filterDropdownDecoration('County'),
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      iconEnabledColor: Colors.white70,
+                      dropdownColor: BrandColors.unityBlue,
                       items: [
                         const DropdownMenuItem(value: null, child: Text('All Counties')),
                         ..._buildCountyItems(),
@@ -676,11 +697,10 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
                       value: _selectedCD,
-                      decoration: const InputDecoration(
-                        labelText: 'Congressional District',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
+                      decoration: _filterDropdownDecoration('Congressional District'),
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      iconEnabledColor: Colors.white70,
+                      dropdownColor: BrandColors.unityBlue,
                       items: [
                         const DropdownMenuItem(value: null, child: Text('All CDs')),
                         ..._buildCDItems(),
@@ -745,26 +765,36 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                       'Wealth Score: ${(_minWealthScore ?? 0).round()} - ${(_maxWealthScore ?? 100).round()}',
                       style: const TextStyle(fontSize: 13),
                     ),
-                    RangeSlider(
-                      values: RangeValues(
-                        _minWealthScore ?? 0,
-                        _maxWealthScore ?? 100,
+                    // RangeSlider's value-indicator defaults to white-on-white
+                    // on the dark sidebar — make the pill navy with white text.
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        inactiveTrackColor: Colors.white.withOpacity(0.18),
+                        valueIndicatorColor: BrandColors.momentumBlue,
+                        valueIndicatorTextStyle: const TextStyle(color: Colors.white),
+                        showValueIndicator: ShowValueIndicator.always,
                       ),
-                      min: 0,
-                      max: 100,
-                      divisions: 20,
-                      activeColor: BrandColors.momentumBlue,
-                      labels: RangeLabels(
-                        (_minWealthScore ?? 0).round().toString(),
-                        (_maxWealthScore ?? 100).round().toString(),
+                      child: RangeSlider(
+                        values: RangeValues(
+                          _minWealthScore ?? 0,
+                          _maxWealthScore ?? 100,
+                        ),
+                        min: 0,
+                        max: 100,
+                        divisions: 20,
+                        activeColor: BrandColors.momentumBlue,
+                        labels: RangeLabels(
+                          (_minWealthScore ?? 0).round().toString(),
+                          (_maxWealthScore ?? 100).round().toString(),
+                        ),
+                        onChanged: (range) {
+                          setState(() {
+                            _minWealthScore = range.start == 0 ? null : range.start;
+                            _maxWealthScore = range.end == 100 ? null : range.end;
+                          });
+                        },
+                        onChangeEnd: (_) => onChanged(),
                       ),
-                      onChanged: (range) {
-                        setState(() {
-                          _minWealthScore = range.start == 0 ? null : range.start;
-                          _maxWealthScore = range.end == 100 ? null : range.end;
-                        });
-                      },
-                      onChangeEnd: (_) => onChanged(),
                     ),
                     const SizedBox(height: 8),
                     SwitchListTile(
@@ -1077,9 +1107,12 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
           ),
           dataRowColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
-              return BrandColors.momentumBlue.withOpacity(0.15);
+              return BrandColors.momentumBlue.withOpacity(0.28);
             }
-            return Colors.white.withOpacity(0.07);
+            // White@0.07 put the city/party text at ~2.8:1 contrast against
+            // the page background — below WCAG AA. A deeper navy keeps the
+            // theme and pushes row text past 10:1.
+            return BrandColors.unityBlue.withOpacity(0.35);
           }),
           headingTextStyle: const TextStyle(
             color: Colors.white,
@@ -1526,11 +1559,13 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
             value: value / 100,
             backgroundColor: Colors.white24,
             valueColor: AlwaysStoppedAnimation(
+              // Red reads as "error" — a low wealth score is just low, not
+              // broken. Step through the brand palette instead.
               value >= 70
                   ? BrandColors.success
                   : value >= 40
                       ? BrandColors.sunriseGold
-                      : BrandColors.error,
+                      : BrandColors.slateBlue,
             ),
             minHeight: 6,
             borderRadius: BorderRadius.circular(3),
