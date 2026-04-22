@@ -552,10 +552,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   // ─── Edit candidate profile ─────────────────────────────────────
 
   Future<void> _openEditDialog() async {
-    final updates = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (_) => CandidateEditDialog(candidate: _candidate),
-    );
+    // `showCandidateEditor` picks full-screen vs Dialog based on viewport
+    // width — sub-600px gets a Scaffold-rooted route so the keyboard
+    // doesn't cover fields.
+    final updates = await showCandidateEditor(context, candidate: _candidate);
     if (updates == null || updates.isEmpty) return;
 
     final messenger = ScaffoldMessenger.of(context);

@@ -4,22 +4,65 @@ import 'package:flutter/services.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 
-/// Full-screen edit dialog for a candidate profile.
+/// Responsive edit form for a candidate profile.
 ///
 /// Click pencil → shows all editable fields (including ones that are empty
 /// and hidden on the read view). Save returns a Map<String,dynamic> of
 /// changed fields only, keyed by DB column name, ready to pass to
 /// `CandidateRepository.updateCandidate`. Cancel returns null.
 ///
-/// Kept as a single dialog rather than inline-per-card because the profile
+/// **Presentation rules (mobile-first overhaul 2026-04-22):**
+/// * Width ≥ 600px → rendered inside a centered [Dialog] (legacy behavior)
+/// * Width  < 600px → rendered as a full-screen [Scaffold] route so the
+///   form uses the entire viewport, fields get 48×48 tap targets, and the
+///   on-screen keyboard doesn't cover inputs.
+///
+/// Callers should prefer [showCandidateEditor] which picks the right
+/// presentation automatically based on `MediaQuery.size.width`.
+///
+/// Kept as a single form rather than inline-per-card because the profile
 /// has ~30 editable fields; one scroll is less click-heavy than toggling
 /// each card, and empty fields are trivially visible in one form.
 class CandidateEditDialog extends StatefulWidget {
   final Candidate candidate;
-  const CandidateEditDialog({super.key, required this.candidate});
+
+  /// When true, build a full-screen [Scaffold]-rooted form instead of the
+  /// centered [Dialog]. Set by [showCandidateEditor] for narrow viewports.
+  final bool fullScreen;
+
+  const CandidateEditDialog({
+    super.key,
+    required this.candidate,
+    this.fullScreen = false,
+  });
 
   @override
   State<CandidateEditDialog> createState() => _CandidateEditDialogState();
+}
+
+/// Open the candidate edit form. Picks [Dialog] vs full-screen route based
+/// on the current viewport width. Returns the Map of changed fields (may
+/// be empty) or null if the user cancelled.
+Future<Map<String, dynamic>?> showCandidateEditor(
+  BuildContext context, {
+  required Candidate candidate,
+}) {
+  final width = MediaQuery.of(context).size.width;
+  if (width < 600) {
+    return Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => CandidateEditDialog(
+          candidate: candidate,
+          fullScreen: true,
+        ),
+      ),
+    );
+  }
+  return showDialog<Map<String, dynamic>>(
+    context: context,
+    builder: (_) => CandidateEditDialog(candidate: candidate),
+  );
 }
 
 class _CandidateEditDialogState extends State<CandidateEditDialog> {
@@ -221,6 +264,68 @@ class _CandidateEditDialogState extends State<CandidateEditDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // Full-screen form for mobile viewports — uses Scaffold so the keyboard
+    // avoids fields, the back button is native, and the form gets the entire
+    // height instead of being boxed into a Dialog.
+    if (widget.fullScreen) {
+      return Scaffold(
+        backgroundColor: BrandColors.unityBlue,
+        appBar: AppBar(
+          backgroundColor: BrandColors.unityBlue,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: 'Cancel',
+            onPressed: () => Navigator.of(context).pop(null),
+          ),
+          title: const Text(
+            'Edit candidate',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          ),
+          actions: [
+            // Save button large enough to comfortably tap (≥48×48).
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton.icon(
+                onPressed: _save,
+                icon: const Icon(Icons.save, size: 16, color: Colors.white),
+                label: const Text(
+                  'Save',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor: BrandColors.success,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        body: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            // Give the keyboard a little padding at the bottom so the last
+            // field isn't jammed against the edge when it's focused.
+            padding: EdgeInsets.fromLTRB(
+              16,
+              12,
+              16,
+              MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: _formBody(),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Wide-viewport fallback: classic centered Dialog.
     final mediaQuery = MediaQuery.of(context);
     return Dialog(
       insetPadding: EdgeInsets.symmetric(
@@ -244,73 +349,7 @@ class _CandidateEditDialogState extends State<CandidateEditDialog> {
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _sectionHeader('Identity'),
-                    _twoCol(
-                      _textField('first_name', 'First name'),
-                      _textField('last_name', 'Last name'),
-                    ),
-                    _textField('name', 'Full name (auto-built from first/last if those changed)', hint: 'Leave alone unless you want a different display name'),
-                    _twoCol(
-                      _partyDropdown(),
-                      _textField('office', 'Office'),
-                    ),
-                    _twoCol(
-                      _officeLevelDropdown(),
-                      _textField('district', 'District'),
-                    ),
-
-                    const SizedBox(height: 16),
-                    _sectionHeader('Demographics'),
-                    _dobPicker(),
-                    _twoCol(
-                      _genderDropdown(),
-                      _textField('occupation', 'Occupation'),
-                    ),
-                    _textField('education', 'Education', maxLines: 2),
-                    _textField('bio', 'Bio', maxLines: 4),
-
-                    const SizedBox(height: 16),
-                    _sectionHeader('Location'),
-                    _textField('address', 'Address'),
-                    _twoCol(
-                      _textField('city', 'City'),
-                      _textField('county', 'County'),
-                    ),
-                    _twoCol(
-                      _textField('state', 'State', maxLength: 2),
-                      _textField('zip', 'ZIP', maxLength: 10),
-                    ),
-
-                    const SizedBox(height: 16),
-                    _sectionHeader('Campaign'),
-                    _textField('campaign_website', 'Campaign website', hint: 'https://…'),
-                    _twoCol(
-                      _textField('campaign_email', 'Campaign email'),
-                      _textField('campaign_phone', 'Campaign phone'),
-                    ),
-                    _textField('campaign_issues', 'Campaign issues', maxLines: 3, hint: 'Comma or newline separated'),
-                    _textField('endorsements', 'Endorsements', maxLines: 3),
-                    _textField('photo_url', 'Photo URL', hint: 'https://…'),
-
-                    const SizedBox(height: 16),
-                    _sectionHeader('Social & Profiles'),
-                    _twoCol(
-                      _textField('social_twitter', 'Twitter / X'),
-                      _textField('social_instagram', 'Instagram'),
-                    ),
-                    _twoCol(
-                      _textField('social_facebook', 'Facebook'),
-                      _textField('social_linkedin', 'LinkedIn'),
-                    ),
-                    _twoCol(
-                      _textField('social_tiktok', 'TikTok'),
-                      _textField('ballotpedia_url', 'Ballotpedia'),
-                    ),
-                    _textField('fec_candidate_id', 'FEC candidate ID', hint: 'Only for federal races'),
-
-                    const SizedBox(height: 24),
-                  ],
+                  children: _formBody(),
                 ),
               ),
             ),
@@ -320,6 +359,78 @@ class _CandidateEditDialogState extends State<CandidateEditDialog> {
         ),
       ),
     );
+  }
+
+  /// Shared form body used by both presentations. Extracted so the mobile
+  /// full-screen route and the legacy Dialog render identical field order.
+  List<Widget> _formBody() {
+    return [
+      _sectionHeader('Identity'),
+      _twoCol(
+        _textField('first_name', 'First name'),
+        _textField('last_name', 'Last name'),
+      ),
+      _textField('name', 'Full name (auto-built from first/last if those changed)', hint: 'Leave alone unless you want a different display name'),
+      _twoCol(
+        _partyDropdown(),
+        _textField('office', 'Office'),
+      ),
+      _twoCol(
+        _officeLevelDropdown(),
+        _textField('district', 'District'),
+      ),
+
+      const SizedBox(height: 16),
+      _sectionHeader('Demographics'),
+      _dobPicker(),
+      _twoCol(
+        _genderDropdown(),
+        _textField('occupation', 'Occupation'),
+      ),
+      _textField('education', 'Education', maxLines: 2),
+      _textField('bio', 'Bio', maxLines: 4),
+
+      const SizedBox(height: 16),
+      _sectionHeader('Location'),
+      _textField('address', 'Address'),
+      _twoCol(
+        _textField('city', 'City'),
+        _textField('county', 'County'),
+      ),
+      _twoCol(
+        _textField('state', 'State', maxLength: 2),
+        _textField('zip', 'ZIP', maxLength: 10),
+      ),
+
+      const SizedBox(height: 16),
+      _sectionHeader('Campaign'),
+      _textField('campaign_website', 'Campaign website', hint: 'https://…'),
+      _twoCol(
+        _textField('campaign_email', 'Campaign email'),
+        _textField('campaign_phone', 'Campaign phone'),
+      ),
+      _textField('campaign_issues', 'Campaign issues', maxLines: 3, hint: 'Comma or newline separated'),
+      _textField('endorsements', 'Endorsements', maxLines: 3),
+      _textField('photo_url', 'Photo URL', hint: 'https://…'),
+
+      const SizedBox(height: 16),
+      _sectionHeader('Social & Profiles'),
+      _twoCol(
+        _textField('social_twitter', 'Twitter / X'),
+        _textField('social_instagram', 'Instagram'),
+      ),
+      _twoCol(
+        _textField('social_facebook', 'Facebook'),
+        _textField('social_linkedin', 'LinkedIn'),
+      ),
+      _twoCol(
+        _textField('social_tiktok', 'TikTok'),
+        _textField('ballotpedia_url', 'Ballotpedia'),
+      ),
+      _textField('fec_candidate_id', 'FEC candidate ID', hint: 'Only for federal races'),
+
+      const SizedBox(height: 24),
+    ];
   }
 
   Widget _header() {
