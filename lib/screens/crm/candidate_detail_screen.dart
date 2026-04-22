@@ -687,7 +687,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   hintText: 'Endorser name (org or individual)',
                   hintStyle: const TextStyle(color: Colors.white70),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.08),
+                  fillColor: Colors.white.withOpacity(0.12),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -809,127 +809,334 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     }
   }
 
+  // ── SMS launcher (staff → candidate). Used by FAB speed-dial. ──
+  Future<void> _launchSMS() async {
+    final phone = c.phone;
+    if (phone == null || phone.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No phone number on file'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+    await _launchUrl('sms:$phone');
+  }
+
+  // ── Copy the candidate-specific endorsement questionnaire link. ──
+  void _copyQuestionnaireLink() {
+    final link =
+        'https://forms.moyoungdemocrats.org/endorsement-questionnaire-2026?candidate_id=${c.id}';
+    _copyToClipboard(link, 'Questionnaire link');
+  }
+
+  // ── Share profile (deep link if wired, plain-text summary otherwise). ──
+  //
+  // Flutter deep links aren't wired yet for candidate URLs — no
+  // `/candidates/:id` route is registered on any platform as of
+  // 2026-04-22. For now, this copies a human-readable summary to the
+  // clipboard. When deep links land, swap `summary` for a real URL.
+  void _shareProfile() {
+    final district = (c.district != null && c.district!.isNotEmpty)
+        ? ' (District ${c.district})'
+        : '';
+    final summary =
+        '${c.name} — ${c.officeDisplay}$district\nParty: ${c.party}'
+        '${c.isYoungDem ? "\n⭐ Young Democrat" : ""}'
+        '${c.isEndorsed ? "\n✅ MOYD Endorsed" : ""}';
+    _copyToClipboard(summary, 'Profile summary');
+  }
+
+  /// Jump to the Intel tab and open the "Log Contact" form. Used by the
+  /// mobile FAB speed-dial ("Log Contact" entry).
+  void _quickLogContact() {
+    _tabController.animateTo(3);
+    setState(() {
+      _intelSegment = 2;
+      _showContactForm = true;
+    });
+  }
+
+  /// Jump to the Intel tab and focus the Notes field. Used by the mobile
+  /// FAB speed-dial ("Add Note" entry).
+  void _quickAddNote() {
+    _tabController.animateTo(3);
+    setState(() {
+      _intelSegment = 2;
+      _editingNotes = true;
+    });
+  }
+
+  // ── Refresh handlers for RefreshIndicator — one per tab. ──
+  Future<void> _refreshCurrentTab() async {
+    final idx = _tabController.index;
+    switch (idx) {
+      case 0:
+        // Profile: re-fetch the candidate (covers edited fields) + voter.
+        final refreshed = await _repo.fetchCandidate(c.id);
+        if (!mounted) return;
+        setState(() {
+          if (refreshed != null) _candidate = refreshed;
+          _voterLoaded = false;
+        });
+        await _loadVoterRecord();
+        break;
+      case 1:
+        await _loadFinanceData();
+        break;
+      case 2:
+        await _loadRaceData();
+        break;
+      case 3:
+        await _loadIntelData();
+        break;
+      case 4:
+        // Questionnaire panel owns its own fetch; nothing to do at this
+        // level. Pull-to-refresh still resolves after ~250ms so the user
+        // gets a visible completion.
+        await Future.delayed(const Duration(milliseconds: 250));
+        break;
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   //  BUILD — Main scaffold with tab bar
   // ═══════════════════════════════════════════════════════════════
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: BrandedBackground(
-        child: SafeArea(
-          child: FadeTransition(
-            opacity: _fadeIn,
-            child: SlideTransition(
-              position: _slideUp,
-              child: NestedScrollView(
-                controller: _scrollController,
-                headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                  // ── App Bar ──
-                  SliverAppBar(
-                    backgroundColor: Colors.transparent,
-                    elevation: 0,
-                    leading: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    actions: [
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.white70),
-                        onPressed: _openEditDialog,
-                        tooltip: 'Edit candidate',
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          c.isEndorsed ? Icons.star : Icons.star_border,
-                          color: c.isEndorsed ? BrandColors.sunriseGold : Colors.white70,
+    // Mobile-first revamp (2026-04-22): use LayoutBuilder to pick a
+    // chip-based tab row on narrow viewports (<600px) and keep the
+    // classic TabBar on tablet/desktop. Body is wrapped in
+    // RefreshIndicator so pull-to-refresh works on every tab.
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+        return Scaffold(
+          body: BrandedBackground(
+            child: SafeArea(
+              child: FadeTransition(
+                opacity: _fadeIn,
+                child: SlideTransition(
+                  position: _slideUp,
+                  child: NestedScrollView(
+                    controller: _scrollController,
+                    headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                      // ── App Bar ──
+                      SliverAppBar(
+                        backgroundColor: Colors.transparent,
+                        elevation: 0,
+                        leading: IconButton(
+                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          onPressed: () => Navigator.of(context).pop(),
+                          tooltip: 'Back',
                         ),
-                        onPressed: _toggleMOYDEndorsed,
-                        tooltip: 'Toggle MOYD Endorsement',
+                        actions: _buildAppBarActions(isMobile: isMobile),
+                        expandedHeight: 0,
+                        pinned: true,
                       ),
-                      PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert, color: Colors.white),
-                        color: BrandColors.unityBlue,
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(value: 'copy_name', child: Text('Copy Name', style: TextStyle(color: Colors.white))),
-                          if (c.email != null) const PopupMenuItem(value: 'copy_email', child: Text('Copy Email', style: TextStyle(color: Colors.white))),
-                          if (c.phone != null) const PopupMenuItem(value: 'copy_phone', child: Text('Copy Phone', style: TextStyle(color: Colors.white))),
-                          const PopupMenuItem(value: 'share', child: Text('Share Profile', style: TextStyle(color: Colors.white))),
-                        ],
-                        onSelected: (val) {
-                          switch (val) {
-                            case 'copy_name':
-                              _copyToClipboard(c.name, 'Name');
-                              break;
-                            case 'copy_email':
-                              _copyToClipboard(c.email ?? '', 'Email');
-                              break;
-                            case 'copy_phone':
-                              _copyToClipboard(c.phone ?? '', 'Phone');
-                              break;
-                            case 'share':
-                              _copyToClipboard(
-                                '${c.name} — ${c.officeDisplay}\n${c.party}',
-                                'Profile',
-                              );
-                              break;
-                          }
-                        },
+
+                      // ── Hero Profile Card ──
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            isMobile ? 12 : 16,
+                            0,
+                            isMobile ? 12 : 16,
+                            8,
+                          ),
+                          child: _buildCompactHero(isMobile: isMobile),
+                        ),
+                      ),
+
+                      // ── Tab Navigation ──
+                      //
+                      // Mobile: horizontal scrollable chip row (bigger tap
+                      // targets, clearer selection state).
+                      // Desktop: classic underlined TabBar.
+                      SliverPersistentHeader(
+                        pinned: true,
+                        delegate: CandidateTabBarDelegate(
+                          tabBar: isMobile ? _buildMobileTabChips() : _buildDesktopTabBar(),
+                        ),
                       ),
                     ],
-                    expandedHeight: 0,
-                    pinned: true,
-                  ),
-
-                  // ── Hero Profile Card ──
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      child: _buildCompactHero(),
+                    body: TabBarView(
+                      controller: _tabController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        _refreshable(_buildOverviewTab()),
+                        _refreshable(_buildMoneyTab()),
+                        _refreshable(_buildRaceTab()),
+                        _refreshable(_buildIntelTab()),
+                        _refreshable(CandidateQuestionnairePanel(candidateId: c.id)),
+                      ],
                     ),
                   ),
-
-                  // ── Tab Bar ──
-                  SliverPersistentHeader(
-                    pinned: true,
-                    delegate: CandidateTabBarDelegate(
-                      tabBar: TabBar(
-                        controller: _tabController,
-                        isScrollable: true,
-                        tabAlignment: TabAlignment.start,
-                        labelColor: BrandColors.sunriseGold,
-                        unselectedLabelColor: Colors.white70,
-                        indicatorColor: BrandColors.sunriseGold,
-                        indicatorWeight: 3,
-                        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                        unselectedLabelStyle: const TextStyle(fontSize: 13),
-                        tabs: const [
-                          Tab(text: 'Profile'),
-                          Tab(text: 'Money'),
-                          Tab(text: 'District'),
-                          Tab(text: 'Intel'),
-                          Tab(text: 'Questionnaire'),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                body: TabBarView(
-                  controller: _tabController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    _buildOverviewTab(),
-                    _buildMoneyTab(),
-                    _buildRaceTab(),
-                    _buildIntelTab(),
-                    CandidateQuestionnairePanel(candidateId: c.id),
-                  ],
                 ),
               ),
             ),
           ),
-        ),
+          // Mobile staff-action speed-dial — hidden on wide screens where
+          // users have more chrome and the hero already exposes Email/Call.
+          floatingActionButton: isMobile ? _buildStaffFab() : null,
+        );
+      },
+    );
+  }
+
+  // ── AppBar actions: share button surfaces at top-level on every
+  // viewport; secondary actions stay in the overflow menu. ──
+  List<Widget> _buildAppBarActions({required bool isMobile}) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.ios_share, color: Colors.white70),
+        onPressed: _shareProfile,
+        tooltip: 'Share profile',
       ),
+      IconButton(
+        icon: const Icon(Icons.edit, color: Colors.white70),
+        onPressed: _openEditDialog,
+        tooltip: 'Edit candidate',
+      ),
+      IconButton(
+        icon: Icon(
+          c.isEndorsed ? Icons.star : Icons.star_border,
+          color: c.isEndorsed ? BrandColors.sunriseGold : Colors.white70,
+        ),
+        onPressed: _toggleMOYDEndorsed,
+        tooltip: 'Toggle MOYD Endorsement',
+      ),
+      PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert, color: Colors.white),
+        color: BrandColors.unityBlue,
+        itemBuilder: (context) => [
+          const PopupMenuItem(value: 'copy_name', child: Text('Copy Name', style: TextStyle(color: Colors.white))),
+          if (c.email != null) const PopupMenuItem(value: 'copy_email', child: Text('Copy Email', style: TextStyle(color: Colors.white))),
+          if (c.phone != null) const PopupMenuItem(value: 'copy_phone', child: Text('Copy Phone', style: TextStyle(color: Colors.white))),
+          const PopupMenuItem(value: 'copy_questionnaire', child: Text('Copy Questionnaire Link', style: TextStyle(color: Colors.white))),
+        ],
+        onSelected: (val) {
+          switch (val) {
+            case 'copy_name':
+              _copyToClipboard(c.name, 'Name');
+              break;
+            case 'copy_email':
+              _copyToClipboard(c.email ?? '', 'Email');
+              break;
+            case 'copy_phone':
+              _copyToClipboard(c.phone ?? '', 'Phone');
+              break;
+            case 'copy_questionnaire':
+              _copyQuestionnaireLink();
+              break;
+          }
+        },
+      ),
+    ];
+  }
+
+  // ── Desktop tab bar (≥600px) ──
+  TabBar _buildDesktopTabBar() {
+    return TabBar(
+      controller: _tabController,
+      isScrollable: true,
+      tabAlignment: TabAlignment.start,
+      labelColor: BrandColors.sunriseGold,
+      unselectedLabelColor: Colors.white70,
+      indicatorColor: BrandColors.sunriseGold,
+      indicatorWeight: 3,
+      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      unselectedLabelStyle: const TextStyle(fontSize: 13),
+      tabs: const [
+        Tab(text: 'Profile'),
+        Tab(text: 'Money'),
+        Tab(text: 'District'),
+        Tab(text: 'Intel'),
+        Tab(text: 'Questionnaire'),
+      ],
+    );
+  }
+
+  // ── Mobile chip-style tab nav (<600px) ──
+  //
+  // Rendered inside the same SliverPersistentHeader slot as the desktop
+  // TabBar so pinning + shouldRebuild work. We still provide a TabBar —
+  // it's just styled with full-bleed pill indicators and larger tap
+  // targets (the row height is clamped to `_tabBarDelegate.preferredSize`
+  // via the surrounding SizedBox in the delegate). Each tab wraps its
+  // label in a padded InkWell to guarantee ≥48×48 tap area.
+  TabBar _buildMobileTabChips() {
+    const tabLabels = ['Profile', 'Money', 'District', 'Intel', 'Q&A'];
+    const tabIcons = [
+      Icons.person_outline,
+      Icons.attach_money,
+      Icons.map_outlined,
+      Icons.insights,
+      Icons.fact_check_outlined,
+    ];
+    return TabBar(
+      controller: _tabController,
+      isScrollable: true,
+      tabAlignment: TabAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      labelColor: BrandColors.sunriseGold,
+      unselectedLabelColor: Colors.white70,
+      indicatorSize: TabBarIndicatorSize.tab,
+      // Transparent default indicator — the chips render their own fill
+      // (see _MobileTabChip). Setting a transparent BoxDecoration keeps
+      // the TabController happy without painting a line under the chip.
+      indicator: const BoxDecoration(),
+      dividerColor: Colors.transparent,
+      splashFactory: NoSplash.splashFactory,
+      tabs: [
+        for (int i = 0; i < tabLabels.length; i++)
+          Tab(
+            height: 44,
+            child: AnimatedBuilder(
+              animation: _tabController,
+              builder: (_, __) {
+                final selected = _tabController.index == i;
+                return _MobileTabChip(
+                  label: tabLabels[i],
+                  icon: tabIcons[i],
+                  selected: selected,
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ── Wrap any tab body in a RefreshIndicator with the tab's reloader. ──
+  //
+  // The inner `ListView`/panel child already uses its own scroll controller
+  // — this works because RefreshIndicator intercepts the overscroll and
+  // the inner list exposes the scroll position via Scrollable.
+  Widget _refreshable(Widget child) {
+    return RefreshIndicator(
+      onRefresh: _refreshCurrentTab,
+      color: BrandColors.sunriseGold,
+      backgroundColor: BrandColors.unityBlue,
+      child: child,
+    );
+  }
+
+  // ── Mobile FAB speed-dial for the 4 most-used staff actions. ──
+  //
+  // Kept simple on purpose: a stateful widget that animates a column of
+  // mini-FABs above the main FAB when tapped. No external dep required.
+  Widget _buildStaffFab() {
+    return _CandidateStaffFab(
+      onLogContact: _quickLogContact,
+      onAddNote: _quickAddNote,
+      onCopyQuestionnaireLink: _copyQuestionnaireLink,
+      onSendSms: _launchSMS,
     );
   }
 
@@ -937,7 +1144,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   //  COMPACT HERO — Persistent header above tabs
   // ═══════════════════════════════════════════════════════════════
 
-  Widget _buildCompactHero() {
+  Widget _buildCompactHero({bool isMobile = false}) {
     Color partyColor;
     String partyLabel;
     if (c.isDemocrat) {
@@ -966,8 +1173,18 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     if (c.ballotpediaUrl != null && c.ballotpediaUrl!.isNotEmpty) filled++;
     final completeness = filled / total;
 
+    // Mobile summary: "Challenging X in District Y" / "Running for …"
+    // Shown beneath the party + role chip row so it lives right where the
+    // user's eye lands after reading the name.
+    String? snippet;
+    if (c.district != null && c.district!.isNotEmpty) {
+      snippet = c.isIncumbent
+          ? 'Incumbent • ${c.officeDisplay}, District ${c.district}'
+          : '${c.officeDisplay}, District ${c.district}';
+    }
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isMobile ? 14 : 20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -979,7 +1196,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           end: Alignment.bottomRight,
           stops: const [0.0, 0.6, 1.0],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(isMobile ? 18 : 24),
         border: Border.all(color: partyColor.withOpacity(0.15)),
         boxShadow: [
           BoxShadow(
@@ -1140,25 +1357,42 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                     _badge('${(completeness * 100).toInt()}%', completeness >= 0.7 ? BrandColors.success : Colors.white30),
                   ],
                 ),
+                // One-line snippet on mobile — saves the reader a scroll
+                // to the Race tab to figure out the district context.
+                if (isMobile && snippet != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    snippet,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.82),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
             ),
           ),
-          // Quick actions column
-          Column(
-            children: [
-              _quickActionIcon(Icons.email, 'Email', _launchEmail, BrandColors.momentumBlue),
-              const SizedBox(height: 6),
-              _quickActionIcon(Icons.phone, 'Call', _launchPhone, BrandColors.success),
-              const SizedBox(height: 6),
-              _quickActionIcon(Icons.note_add, 'Note', () {
-                _tabController.animateTo(3);
-                setState(() {
-                  _intelSegment = 2;
-                  _editingNotes = true;
-                });
-              }, BrandColors.sunriseGold),
-            ],
-          ),
+          // Quick actions column — desktop only. On mobile, the speed-dial
+          // FAB covers Email/Call/Note/SMS without eating hero width.
+          if (!isMobile)
+            Column(
+              children: [
+                _quickActionIcon(Icons.email, 'Email', _launchEmail, BrandColors.momentumBlue),
+                const SizedBox(height: 6),
+                _quickActionIcon(Icons.phone, 'Call', _launchPhone, BrandColors.success),
+                const SizedBox(height: 6),
+                _quickActionIcon(Icons.note_add, 'Note', () {
+                  _tabController.animateTo(3);
+                  setState(() {
+                    _intelSegment = 2;
+                    _editingNotes = true;
+                  });
+                }, BrandColors.sunriseGold),
+              ],
+            ),
         ],
       ),
     );
@@ -4048,7 +4282,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       hintText: hint,
       hintStyle: const TextStyle(color: Colors.white30),
       filled: true,
-      fillColor: Colors.white.withOpacity(0.08),
+      fillColor: Colors.white.withOpacity(0.12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide.none,

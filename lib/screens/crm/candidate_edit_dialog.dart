@@ -547,7 +547,7 @@ class _CandidateEditDialogState extends State<CandidateEditDialog> {
           hintText: hint,
           hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 12),
           filled: true,
-          fillColor: Colors.white.withOpacity(0.05),
+          fillColor: Colors.white.withOpacity(0.12),
           counterStyle: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
@@ -585,7 +585,7 @@ class _CandidateEditDialogState extends State<CandidateEditDialog> {
           labelText: label,
           labelStyle: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
           filled: true,
-          fillColor: Colors.white.withOpacity(0.05),
+          fillColor: Colors.white.withOpacity(0.12),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),

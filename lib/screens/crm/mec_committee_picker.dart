@@ -184,7 +184,7 @@ class _MecCommitteePickerState extends State<MecCommitteePicker> {
                 )
               : null,
           filled: true,
-          fillColor: Colors.white.withOpacity(0.05),
+          fillColor: Colors.white.withOpacity(0.12),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),

@@ -2533,7 +2533,7 @@ class _BulkAssignDialogState extends State<_BulkAssignDialog> {
                 hintText: 'Enter team member name',
                 hintStyle: const TextStyle(color: Colors.white70),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.08),
+                fillColor: Colors.white.withOpacity(0.12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
