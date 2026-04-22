@@ -33,7 +33,15 @@ class _SurveysScreenState extends State<SurveysScreen>
   // Filtering
   // ---------------------------------------------------------------------------
 
-  List<Survey> get _filteredSurveys {
+  // Status filters per tab index; null = "all".
+  static const List<String?> _tabStatusFilters = [
+    null,
+    'active',
+    'draft',
+    'completed',
+  ];
+
+  List<Survey> _surveysForTab(int tabIndex) {
     var filtered = _allSurveys;
 
     // Text search
@@ -45,13 +53,14 @@ class _SurveysScreenState extends State<SurveysScreen>
     }
 
     // Tab filter: 0=All, 1=Active, 2=Drafts, 3=Completed
-    final tabFilter = const [null, 'active', 'draft', 'completed'][_tabController.index];
+    final tabFilter = _tabStatusFilters[tabIndex];
     if (tabFilter != null) {
       filtered = filtered.where((s) => s.status == tabFilter).toList();
     }
 
     return filtered;
   }
+
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -228,7 +237,10 @@ class _SurveysScreenState extends State<SurveysScreen>
                     : TabBarView(
                         controller: _tabController,
                         physics: const NeverScrollableScrollPhysics(),
-                        children: List.generate(4, (_) => _buildSurveyList()),
+                        children: List.generate(
+                          4,
+                          (tabIndex) => _buildSurveyList(tabIndex),
+                        ),
                       ),
           ),
         ),
@@ -375,8 +387,8 @@ class _SurveysScreenState extends State<SurveysScreen>
   // Survey list (per tab)
   // ---------------------------------------------------------------------------
 
-  Widget _buildSurveyList() {
-    final surveys = _filteredSurveys;
+  Widget _buildSurveyList(int tabIndex) {
+    final surveys = _surveysForTab(tabIndex);
 
     if (surveys.isEmpty) {
       return _buildEmptyState();
