@@ -180,44 +180,52 @@ class _DonorProfileScreenState extends State<DonorProfileScreen>
   Future<void> _addTag() async {
     final allTags = await _repository.getAllTags();
     if (!mounted) return;
+    // Mirror of the Autocomplete field's text so the Save button has a value
+    // to read regardless of whether the user typed free-form or picked a
+    // suggestion. Disposed in the finally block below — never from inside
+    // fieldViewBuilder (which rebuilds on every keystroke).
     final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Tag'),
-        content: Autocomplete<String>(
-          optionsBuilder: (value) {
-            if (value.text.isEmpty) return allTags;
-            return allTags.where(
-              (t) => t.toLowerCase().contains(value.text.toLowerCase()),
-            );
-          },
-          fieldViewBuilder: (ctx, textCtrl, focusNode, onSubmit) {
-            controller.dispose();
-            return TextField(
-              controller: textCtrl,
-              focusNode: focusNode,
-              decoration: const InputDecoration(hintText: 'Tag name...'),
-              onSubmitted: (_) => onSubmit(),
-            );
-          },
-          onSelected: (val) => controller.text = val,
+    try {
+      final result = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Add Tag'),
+          content: Autocomplete<String>(
+            optionsBuilder: (value) {
+              if (value.text.isEmpty) return allTags;
+              return allTags.where(
+                (t) => t.toLowerCase().contains(value.text.toLowerCase()),
+              );
+            },
+            fieldViewBuilder: (ctx, textCtrl, focusNode, onSubmit) {
+              return TextField(
+                controller: textCtrl,
+                focusNode: focusNode,
+                decoration: const InputDecoration(hintText: 'Tag name...'),
+                onChanged: (v) => controller.text = v,
+                onSubmitted: (_) => onSubmit(),
+              );
+            },
+            onSelected: (val) => controller.text = val,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Add'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-    if (result != null && result.isNotEmpty) {
-      await _repository.addTag(widget.profileId, result);
-      await _load();
+      );
+      if (result != null && result.isNotEmpty) {
+        await _repository.addTag(widget.profileId, result);
+        await _load();
+      }
+    } finally {
+      controller.dispose();
     }
   }
 

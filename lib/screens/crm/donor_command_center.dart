@@ -1132,9 +1132,14 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
           ],
           rows: _results.map((r) {
             final selected = _selectedIds.contains(r.id);
+            // `DataRow.onSelectChanged` fires for BOTH cell taps AND checkbox
+            // taps, which double-fired with the cell's own Checkbox and made
+            // the checkbox effectively non-selectable (every click also
+            // navigated). Navigation now lives on each non-checkbox DataCell
+            // via `onTap`, and the checkbox manages selection alone.
+            final navigate = r.id == null ? null : () => _navigateToProfile(r.id);
             return DataRow(
               selected: selected,
-              onSelectChanged: (_) => _navigateToProfile(r.id),
               cells: [
                 DataCell(
                   Checkbox(
@@ -1152,29 +1157,38 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                     checkColor: BrandColors.sunriseGold,
                   ),
                 ),
-                DataCell(Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      r.fullName,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    if (r.id != null && _voterFileIds.contains(r.id)) ...[
-                      const SizedBox(width: 6),
-                      _buildVoterDot(),
+                DataCell(
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        r.fullName,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      if (r.id != null && _voterFileIds.contains(r.id)) ...[
+                        const SizedBox(width: 6),
+                        _buildVoterDot(),
+                      ],
                     ],
-                  ],
-                )),
-                DataCell(Text(r.city ?? '')),
-                DataCell(_buildTierBadge(r.tier)),
-                DataCell(_buildPartyBadge(r.partyLean)),
-                DataCell(Text(_currencyFmt.format(r.totalDonatedMoyd ?? 0))),
-                DataCell(_buildWealthIndicator(r.wealthScore)),
-                DataCell(Text(
-                  r.lastDonationDate != null
-                      ? _dateFmt.format(r.lastDonationDate!)
-                      : '--',
-                )),
+                  ),
+                  onTap: navigate,
+                ),
+                DataCell(Text(r.city ?? ''), onTap: navigate),
+                DataCell(_buildTierBadge(r.tier), onTap: navigate),
+                DataCell(_buildPartyBadge(r.partyLean), onTap: navigate),
+                DataCell(
+                  Text(_currencyFmt.format(r.totalDonatedMoyd ?? 0)),
+                  onTap: navigate,
+                ),
+                DataCell(_buildWealthIndicator(r.wealthScore), onTap: navigate),
+                DataCell(
+                  Text(
+                    r.lastDonationDate != null
+                        ? _dateFmt.format(r.lastDonationDate!)
+                        : '--',
+                  ),
+                  onTap: navigate,
+                ),
               ],
             );
           }).toList(),

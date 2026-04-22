@@ -248,12 +248,22 @@ class _MecResearchTabState extends State<MecResearchTab> {
         (donor['contributor_first_name'] as String?);
     final company = (donor['company_name'] as String?) ??
         (donor['contributor_company'] as String?);
+    final donorName = (donor['donor_name'] as String?)?.trim();
     final donorId = (donor['donor_id'] as num?)?.toInt();
 
-    if (lastName.isEmpty && (company == null || company.isEmpty)) return;
+    // search_donors_v3 returns rows where last_name/company are NULL but
+    // donor_name is populated (unified MEC+FEC records whose source row
+    // only had a display name). Bail only when we truly have nothing to
+    // open — no id AND no identifier of any kind.
+    if (donorId == null &&
+        lastName.isEmpty &&
+        (company == null || company.isEmpty) &&
+        (donorName == null || donorName.isEmpty)) {
+      return;
+    }
 
     // Build display name
-    final displayName = (donor['donor_name'] as String?) ??
+    final displayName = donorName ??
         (() {
           if (company != null && company.isNotEmpty && lastName.isEmpty) {
             return company;
@@ -371,11 +381,13 @@ class _MecResearchTabState extends State<MecResearchTab> {
   // ===========================================================================
 
   Widget _buildSearchMode() {
-    return BrandedBackground(
-      child: ListView(
-        controller: _scrollController,
-        padding: const EdgeInsets.all(24),
-        children: [
+    // Host screens (DonorCommandCenter, DonorsListScreen) already provide the
+    // BrandedBackground around this tab. Wrapping again stacks a second 18%
+    // white overlay and washes the navy into a milky grey.
+    return ListView(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(24),
+      children: [
           // Hero banner
           _buildHeroBanner(),
           const SizedBox(height: 16),
@@ -428,7 +440,6 @@ class _MecResearchTabState extends State<MecResearchTab> {
           if (!_loading && _error == null && !_hasSearched)
             _buildInitialState(),
         ],
-      ),
     );
   }
 
@@ -1046,10 +1057,10 @@ class _MecResearchTabState extends State<MecResearchTab> {
   // ===========================================================================
 
   Widget _buildProfileMode() {
-    return BrandedBackground(
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
+    // Host screens already wrap in BrandedBackground; avoid double overlay.
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
           // Back button
           Align(
             alignment: Alignment.centerLeft,
@@ -1096,7 +1107,6 @@ class _MecResearchTabState extends State<MecResearchTab> {
               _buildContributionsTimeline(),
           ],
         ],
-      ),
     );
   }
 
