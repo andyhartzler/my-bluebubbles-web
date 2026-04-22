@@ -318,10 +318,20 @@ class BrandedStatCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
+                  // White70/60 drop below 3:1 on the sunriseGold gradient
+                  // (Avg Gift tile). Bump to full white and add a subtle
+                  // shadow so the title stays legible on any gradient.
                   style: const TextStyle(
-                    color: Colors.white70,
+                    color: Colors.white,
                     fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
+                    shadows: [
+                      Shadow(
+                        color: Color(0x66000000),
+                        offset: Offset(0, 1),
+                        blurRadius: 2,
+                      ),
+                    ],
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -335,13 +345,30 @@ class BrandedStatCard extends StatelessWidget {
               color: Colors.white,
               fontSize: 32,
               fontWeight: FontWeight.bold,
+              shadows: [
+                Shadow(
+                  color: Color(0x66000000),
+                  offset: Offset(0, 1),
+                  blurRadius: 2,
+                ),
+              ],
             ),
           ),
           if (subtitle != null) ...[
             const SizedBox(height: 4),
             Text(
               subtitle!,
-              style: const TextStyle(color: Colors.white60, fontSize: 12),
+              style: const TextStyle(
+                color: Color(0xE6FFFFFF),
+                fontSize: 12,
+                shadows: [
+                  Shadow(
+                    color: Color(0x66000000),
+                    offset: Offset(0, 1),
+                    blurRadius: 2,
+                  ),
+                ],
+              ),
             ),
           ],
         ],

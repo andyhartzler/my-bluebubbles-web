@@ -51,6 +51,11 @@ class _MecResearchTabState extends State<MecResearchTab> {
   bool _profileLoading = false;
   String _profileName = '';
   Map<String, dynamic>? _profileDonorRow;
+  // Monotonic token bumped on every profile-open. Background work stamps its
+  // local copy; a late-arriving result whose token no longer matches is
+  // discarded so rapid back-and-forth taps don't paint Donor A's data onto
+  // Donor B's screen.
+  int _profileLoadToken = 0;
 
   // US states list
   static const List<String> _usStates = [
@@ -274,6 +279,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
           return parts.join(', ');
         })();
 
+    final token = ++_profileLoadToken;
     setState(() {
       _inProfileMode = true;
       _profileLoading = true;
@@ -288,7 +294,8 @@ class _MecResearchTabState extends State<MecResearchTab> {
       // Try unified profile first if we have a donorId
       if (donorId != null) {
         final profileResult = await _repository.getDonorUnifiedProfile(donorId);
-        if (profileResult != null && mounted) {
+        if (!mounted || token != _profileLoadToken) return;
+        if (profileResult != null) {
           setState(() {
             _profileData = {
               'contributions': <MecContribution>[],
@@ -317,7 +324,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
 
       final results = await Future.wait(futures);
 
-      if (!mounted) return;
+      if (!mounted || token != _profileLoadToken) return;
       setState(() {
         _profileData = results[0] as Map<String, dynamic>;
         if (donorId != null && results.length > 1) {
@@ -326,7 +333,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
         _profileLoading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || token != _profileLoadToken) return;
       setState(() {
         _profileLoading = false;
         _error = 'Failed to load profile: $e';
