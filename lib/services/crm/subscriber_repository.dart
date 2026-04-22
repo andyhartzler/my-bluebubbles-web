@@ -38,7 +38,7 @@ class SubscriberRepository {
       return const SubscriberFetchResult(subscribers: [], totalCount: 0);
     }
 
-    postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query =
+    postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> filterQuery =
         _readClient
             .from('subscribers')
             .select('''
@@ -47,8 +47,8 @@ class SubscriberRepository {
       ''')
           ..filter('member_id', 'is', null);
 
-    query = _applyFilters(
-      query,
+    filterQuery = _applyFilters(
+      filterQuery,
       searchQuery: searchQuery,
       subscribed: subscribed,
       source: source,
@@ -59,10 +59,15 @@ class SubscriberRepository {
       optInEnd: optInEnd,
     );
 
-    query.order('created_at', ascending: false);
+    // PostgREST's fluent builder is NOT mutate-in-place; `.order()` / `.range()`
+    // return a new builder (and promote the type from Filter → Transform).
+    // Previously the returned builders were dropped on the floor, so every
+    // subscriber fetch ran UNSORTED and UNPAGINATED against the full table.
+    postgrest.PostgrestTransformBuilder<List<Map<String, dynamic>>> query =
+        filterQuery.order('created_at', ascending: false);
 
     if (limit > 0) {
-      query.range(offset, offset + limit - 1);
+      query = query.range(offset, offset + limit - 1);
     }
 
     final postgrest.PostgrestResponse response = fetchTotalCount

@@ -907,109 +907,49 @@ class _MecResearchTabState extends State<MecResearchTab> {
       if (initials.length >= 2) break;
     }
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: BrandedCard(
-        onTap: () => _openProfileFromDonor(donor),
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Leading: 40x40 unityBlue circle with initials or icon
-            Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(
-                color: BrandColors.unityBlue,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: initials.isNotEmpty
-                  ? Text(
-                      initials,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    )
-                  : const Icon(Icons.person, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 12),
+    // Secondary line shows location when available; tertiary shows the
+    // employer/occupation roll-up. BrandedActivityFeedItem enforces its
+    // own ellipsis + typography so we drop the hand-rolled styling.
+    final chips = <Widget>[
+      if (dataSources.contains('MEC'))
+        _buildSourceBadge('MEC', BrandColors.democratBlue),
+      if (dataSources.contains('FEC'))
+        _buildSourceBadge('FEC', BrandColors.momentumBlue),
+    ];
 
-            // Center: name + city/state + employer
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (location.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      location,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  if (employerLine != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      employerLine,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
+    return BrandedActivityFeedItem(
+      primaryText: name,
+      secondaryText: location.isNotEmpty ? location : '—',
+      tertiaryText: employerLine,
+      avatarInitials: initials.isNotEmpty ? initials : null,
+      leadingIcon: initials.isEmpty ? Icons.person : null,
+      onTap: () => _openProfileFromDonor(donor),
+      // Right edge = big-dollar amount on top, data-source chips below.
+      trailing: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _currencyFormat.format(totalAmount),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
             ),
-            const SizedBox(width: 12),
-
-            // Right: total + source pills
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+          ),
+          if (chips.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  _currencyFormat.format(totalAmount),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (dataSources.contains('MEC'))
-                      _buildSourceBadge('MEC', BrandColors.democratBlue),
-                    if (dataSources.contains('MEC') &&
-                        dataSources.contains('FEC'))
-                      const SizedBox(width: 4),
-                    if (dataSources.contains('FEC'))
-                      _buildSourceBadge('FEC', BrandColors.momentumBlue),
-                  ],
-                ),
+                for (var i = 0; i < chips.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 4),
+                  chips[i],
+                ],
               ],
             ),
           ],
-        ),
+        ],
       ),
     );
   }

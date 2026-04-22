@@ -252,7 +252,11 @@ class UserSessionProvider extends ChangeNotifier {
     );
   }
 
-  /// Get the tools available for a specific committee
+  /// Get the tools available for a specific committee. Callers MUST check
+  /// `hasAccessToCommittee` first; if the user isn't on the committee this
+  /// returns an empty list. Previously the `orElse` default silently granted
+  /// `overview/members/slack/meetings` for committees the user didn't belong
+  /// to, which meant skipping the membership check opened those tools up.
   List<String> getToolsForCommittee(String committeeName) {
     final normalizedName = committeeName.toLowerCase().trim();
     final committee = _userCommittees.firstWhere(
@@ -261,7 +265,7 @@ class UserSessionProvider extends ChangeNotifier {
         id: '',
         name: '',
         slug: '',
-        tools: ['overview', 'members', 'slack', 'meetings'],
+        tools: <String>[],
       ),
     );
     return committee.tools;

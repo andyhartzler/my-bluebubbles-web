@@ -1261,111 +1261,58 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
 
   Widget _buildMobileList() {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       itemCount: _results.length,
       itemBuilder: (context, index) {
         final r = _results[index];
         final selected = _selectedIds.contains(r.id);
 
-        // Card defaults to `elevation: 1`, which on navy paints a subtle
-        // dark shadow under every row — the list reads as "floating tiles on
-        // a slightly darker navy" instead of a clean list. Kill the
-        // elevation and switch to a navy fill so rows sit flat on the page.
-        return Card(
-          color: BrandColors.unityBlue.withOpacity(0.40),
-          elevation: 0,
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => _navigateToProfile(r.id),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                r.fullName,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                            if (r.id != null &&
-                                _voterFileIds.contains(r.id)) ...[
-                              _buildVoterDot(),
-                              const SizedBox(width: 6),
-                            ],
-                            _buildTierBadge(r.tier),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            if (r.city != null && r.city!.isNotEmpty)
-                              Expanded(
-                                child: Text(
-                                  r.city!,
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            _buildPartyBadge(r.partyLean),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Text(
-                              _currencyFmt.format(r.totalDonatedMoyd ?? 0),
-                              style: const TextStyle(
-                                color: BrandColors.sunriseGold,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              r.lastDonationDate != null
-                                  ? _dateFmt.format(r.lastDonationDate!)
-                                  : '--',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  Checkbox(
-                    value: selected,
-                    onChanged: (v) {
-                      setState(() {
-                        if (v == true && r.id != null) {
-                          _selectedIds.add(r.id!);
-                        } else if (r.id != null) {
-                          _selectedIds.remove(r.id);
-                        }
-                      });
-                    },
-                    fillColor: WidgetStateProperty.all(Colors.white24),
-                    checkColor: BrandColors.sunriseGold,
-                  ),
-                ],
-              ),
-            ),
+        // Compose secondary + tertiary lines that mirror the previous row
+        // layout:  <name>                [voter][tier]   |  <city>
+        //          $total · <last gift>                  |  (checkbox trailing)
+        final city = (r.city ?? '').isNotEmpty ? r.city! : '—';
+        final totalText = _currencyFmt.format(r.totalDonatedMoyd ?? 0);
+        final lastGift = r.lastDonationDate != null
+            ? _dateFmt.format(r.lastDonationDate!)
+            : '--';
+
+        final chips = <Widget>[
+          if (r.id != null && _voterFileIds.contains(r.id)) _buildVoterDot(),
+          if (r.tier != null && r.tier!.isNotEmpty) _buildTierBadge(r.tier),
+          if (r.partyLean != null && r.partyLean!.isNotEmpty)
+            _buildPartyBadge(r.partyLean),
+        ];
+
+        // Compact avatar initials from the donor's name so the row has a
+        // consistent leading affordance even when the profile has no photo.
+        String initials = '';
+        for (final w in r.fullName.trim().split(RegExp(r'[\s,]+'))) {
+          if (w.isEmpty) continue;
+          initials += w[0].toUpperCase();
+          if (initials.length >= 2) break;
+        }
+
+        return BrandedActivityFeedItem(
+          primaryText: r.fullName,
+          secondaryText: city,
+          tertiaryText: '$totalText  ·  $lastGift',
+          avatarInitials: initials.isNotEmpty ? initials : null,
+          leadingIcon: initials.isEmpty ? Icons.person : null,
+          onTap: () => _navigateToProfile(r.id),
+          trailingChips: chips.isEmpty ? null : chips,
+          trailing: Checkbox(
+            value: selected,
+            onChanged: (v) {
+              setState(() {
+                if (v == true && r.id != null) {
+                  _selectedIds.add(r.id!);
+                } else if (r.id != null) {
+                  _selectedIds.remove(r.id);
+                }
+              });
+            },
+            fillColor: WidgetStateProperty.all(Colors.white24),
+            checkColor: BrandColors.sunriseGold,
           ),
         );
       },

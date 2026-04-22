@@ -368,7 +368,10 @@ class Member {
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
-      name: _normalizeText(json['name']) ?? (json['name'] as String),
+      // Prior code had `(json['name'] as String)` as the final fallback,
+      // which crashes the whole member page if the row comes back with a
+      // null name (possible via certain RPC shapes). Default to empty.
+      name: _normalizeText(json['name']) ?? '',
       email: _normalizeText(json['email']),
       phone: _normalizeText(json['phone']),
       phoneE164: _normalizeText(json['phone_e164']),

@@ -732,22 +732,16 @@ class _CallTimeTabState extends State<CallTimeTab> {
     final statusLabel =
         _statusLabels[item.callStatus] ?? item.callStatus;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: BrandedCard(
-        padding: EdgeInsets.zero,
-        child: _ExpandableItemTile(
-          item: item,
-          location: location,
-          employer: employer,
-          party: party,
-          statusLabel: statusLabel,
-          statusColor: statusColor,
-          onSave: (status, notes, pledged) =>
-              _saveItem(item, status, notes, pledged),
-          onCall: () => _launchCall(item),
-        ),
-      ),
+    return _ExpandableItemTile(
+      item: item,
+      location: location,
+      employer: employer,
+      party: party,
+      statusLabel: statusLabel,
+      statusColor: statusColor,
+      onSave: (status, notes, pledged) =>
+          _saveItem(item, status, notes, pledged),
+      onCall: () => _launchCall(item),
     );
   }
 
@@ -1086,166 +1080,149 @@ class _ExpandableItemTileState extends State<_ExpandableItemTile> {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => setState(() => _expanded = !_expanded),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Main row
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Party indicator dot
-                if (widget.party != null && widget.party!.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4, right: 8),
-                    child: _buildPartyDot(widget.party!),
-                  ),
-                ],
-                // Left: donor info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.item.displayName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (widget.location.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(widget.location,
-                            style: BrandTextStyles.bodySecondary),
-                      ],
-                      if (widget.employer.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(widget.employer,
-                            style: BrandTextStyles.caption),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Right: suggested ask + status
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (widget.item.suggestedAsk != null)
-                      Text(
-                        _currencyFormat.format(widget.item.suggestedAsk),
-                        style: const TextStyle(
-                          color: BrandColors.sunriseGold,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    const SizedBox(height: 4),
-                    _buildCallStatusChip(
-                        widget.statusLabel, widget.statusColor),
-                  ],
-                ),
-              ],
+    final hasParty = widget.party != null && widget.party!.isNotEmpty;
+
+    // Secondary line = location (fallback "—"), tertiary = employer.
+    // The call-time row intentionally doesn't show a chevron since onTap
+    // toggles inline expansion rather than navigating.
+    final secondary = widget.location.isNotEmpty ? widget.location : '—';
+    final tertiary = widget.employer.isNotEmpty ? widget.employer : null;
+
+    final trailing = Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.item.suggestedAsk != null)
+          Text(
+            _currencyFormat.format(widget.item.suggestedAsk),
+            style: const TextStyle(
+              color: BrandColors.sunriseGold,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
+          ),
+        const SizedBox(height: 4),
+        _buildCallStatusChip(widget.statusLabel, widget.statusColor),
+      ],
+    );
 
-            // Expanded section
-            if (_expanded) ...[
-              const SizedBox(height: 16),
-              const Divider(color: Colors.white24, height: 1),
-              const SizedBox(height: 12),
+    final expansion = _expanded ? _buildExpansion() : null;
 
-              // Status dropdown
-              DropdownButtonFormField<String>(
-                value: _selectedStatus,
-                dropdownColor: BrandColors.unityBlue,
-                style: const TextStyle(color: Colors.white),
-                decoration: _expandedInputDecoration('Call Status'),
-                items: _callStatuses
-                    .map((s) => DropdownMenuItem(
-                          value: s,
-                          child: Text(
-                            _statusLabels[s] ?? s,
-                            style: TextStyle(color: _statusColor(s)),
+    return BrandedActivityFeedItem(
+      primaryText: widget.item.displayName,
+      secondaryText: secondary,
+      tertiaryText: tertiary,
+      leadingWidget: hasParty
+          ? Padding(
+              padding: const EdgeInsets.only(top: 2, right: 0),
+              child: _buildPartyDot(widget.party!),
+            )
+          : null,
+      leadingIcon: hasParty ? null : Icons.person,
+      onTap: () => setState(() => _expanded = !_expanded),
+      showChevron: false,
+      trailing: trailing,
+      expansion: expansion,
+    );
+  }
+
+  /// Inline editor rendered below the main row when the tile is expanded.
+  /// Factored out so [build] stays focused on the collapsed affordance.
+  Widget _buildExpansion() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Divider(color: Colors.white24, height: 1),
+          const SizedBox(height: 12),
+
+          // Status dropdown
+          DropdownButtonFormField<String>(
+            value: _selectedStatus,
+            dropdownColor: BrandColors.unityBlue,
+            style: const TextStyle(color: Colors.white),
+            decoration: _expandedInputDecoration('Call Status'),
+            items: _callStatuses
+                .map((s) => DropdownMenuItem(
+                      value: s,
+                      child: Text(
+                        _statusLabels[s] ?? s,
+                        style: TextStyle(color: _statusColor(s)),
+                      ),
+                    ))
+                .toList(),
+            onChanged: (val) {
+              if (val != null) setState(() => _selectedStatus = val);
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          // Notes
+          TextField(
+            controller: _notesController,
+            style: const TextStyle(color: Colors.white),
+            decoration: _expandedInputDecoration('Notes'),
+            maxLines: 2,
+          ),
+
+          // Pledged amount (only when pledged)
+          if (_selectedStatus == 'pledged') ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _pledgedController,
+              style: const TextStyle(color: Colors.white),
+              decoration: _expandedInputDecoration('Pledged Amount (\$)'),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+            ),
+          ],
+
+          const SizedBox(height: 12),
+
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _saving ? null : _handleSave,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
                           ),
-                        ))
-                    .toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedStatus = val);
-                },
-              ),
-
-              const SizedBox(height: 12),
-
-              // Notes
-              TextField(
-                controller: _notesController,
-                style: const TextStyle(color: Colors.white),
-                decoration: _expandedInputDecoration('Notes'),
-                maxLines: 2,
-              ),
-
-              // Pledged amount (only when pledged)
-              if (_selectedStatus == 'pledged') ...[
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _pledgedController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _expandedInputDecoration('Pledged Amount (\$)'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                        )
+                      : const Icon(Icons.save, size: 18),
+                  label: const Text('Save'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: BrandColors.momentumBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                 ),
-              ],
-
-              const SizedBox(height: 12),
-
-              // Action buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _saving ? null : _handleSave,
-                      icon: _saving
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.save, size: 18),
-                      label: const Text('Save'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: BrandColors.momentumBlue,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: widget.onCall,
+                icon: const Icon(Icons.phone, size: 18),
+                label: const Text('Call'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: BrandColors.success,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    onPressed: widget.onCall,
-                    icon: const Icon(Icons.phone, size: 18),
-                    label: const Text('Call'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: BrandColors.success,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
