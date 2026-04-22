@@ -10,6 +10,7 @@ import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/candidate_new_dialog.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
+import 'package:bluebubbles/screens/crm/candidates/candidates_split_page.dart';
 import 'package:bluebubbles/screens/crm/candidates_map_fullscreen.dart';
 import 'package:bluebubbles/widgets/crm/missouri_map_widget.dart';
 
@@ -565,8 +566,13 @@ class _CandidatesPageState extends State<CandidatesPage>
     }
 
     return LayoutBuilder(builder: (context, constraints) {
-      final isDesktop = constraints.maxWidth >= 900;
-      return isDesktop ? _buildDesktopLayout(constraints) : _buildMobileLayout();
+      // Desktop ≥1200px → the new split-screen page (list + sticky map).
+      // Tablet / mobile → retain the existing single-panel mobile stack.
+      final isWide = constraints.maxWidth >= 1200;
+      if (isWide) {
+        return const CandidatesSplitPage();
+      }
+      return _buildMobileLayout();
     });
   }
 
@@ -821,8 +827,6 @@ class _CandidatesPageState extends State<CandidatesPage>
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: _buildStatsBar(),
               )),
-              if (_youngDems.isNotEmpty)
-                SliverToBoxAdapter(child: _buildYdSpotlight()),
               SliverToBoxAdapter(child: _buildAnalyticsToggle()),
               if (_showAnalytics)
                 SliverToBoxAdapter(
