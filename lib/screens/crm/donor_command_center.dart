@@ -527,36 +527,89 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
 
   Widget _buildFilterSidebar() {
     return Container(
-      color: Colors.white,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Filters',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                TextButton(
-                  onPressed: _clearFilters,
-                  child: const Text('Clear'),
-                ),
-              ],
-            ),
+      // Dark navy-blue sidebar that matches the rest of the CRM theme.
+      // Previously had a stark white background that looked disconnected
+      // from the navy app chrome.
+      decoration: BoxDecoration(
+        color: BrandColors.unityBlue.withOpacity(0.55),
+        border: Border(
+          right: BorderSide(color: Colors.white.withOpacity(0.12)),
+        ),
+      ),
+      child: Theme(
+        // Apply a dark sub-theme so ExpansionTiles, dividers, text, and
+        // default FilterChips render in white-on-navy rather than black-on-
+        // white. Scoped: only this subtree, doesn't leak to the rest of the
+        // screen.
+        data: Theme.of(context).copyWith(
+          brightness: Brightness.dark,
+          dividerColor: Colors.white.withOpacity(0.12),
+          iconTheme: const IconThemeData(color: Colors.white70),
+          textTheme: Theme.of(context).textTheme.apply(
+                bodyColor: Colors.white,
+                displayColor: Colors.white,
+              ),
+          listTileTheme: const ListTileThemeData(
+            iconColor: Colors.white70,
+            textColor: Colors.white,
           ),
-          const Divider(height: 1),
-          Expanded(
-            child: _buildFilterContent(
-              onChanged: () {
-                setState(() {});
-                _currentPage = 0;
-                _search();
-              },
-            ),
+          expansionTileTheme: ExpansionTileThemeData(
+            iconColor: Colors.white70,
+            collapsedIconColor: Colors.white70,
+            textColor: Colors.white,
+            collapsedTextColor: Colors.white,
           ),
-        ],
+          colorScheme: Theme.of(context).colorScheme.copyWith(
+                onSurface: Colors.white,
+              ),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.tune, color: Colors.white, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Filters',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  TextButton(
+                    onPressed: _clearFilters,
+                    style: TextButton.styleFrom(
+                      foregroundColor: BrandColors.sunriseGold,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    ),
+                    child: const Text(
+                      'Clear',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: Colors.white.withOpacity(0.12)),
+            Expanded(
+              child: _buildFilterContent(
+                onChanged: () {
+                  setState(() {});
+                  _currentPage = 0;
+                  _search();
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -846,17 +899,19 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
   Widget _buildMainContent(double availableWidth) {
     return Column(
       children: [
-        // Search bar
+        // Search bar — dark Slack-style input against the navy background.
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
           child: TextField(
             controller: _searchController,
+            style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: 'Search donors by name, email, city...',
-              prefixIcon: const Icon(Icons.search),
+              hintStyle: TextStyle(color: Colors.white.withOpacity(0.55)),
+              prefixIcon: const Icon(Icons.search, color: Colors.white70),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear),
+                      icon: const Icon(Icons.clear, color: Colors.white70),
                       onPressed: () {
                         _searchController.clear();
                         _onSearchChanged('');
@@ -864,12 +919,12 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                     )
                   : null,
               filled: true,
-              fillColor: Colors.white,
+              fillColor: BrandColors.unityBlue.withOpacity(0.6),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
             onChanged: _onSearchChanged,
           ),
