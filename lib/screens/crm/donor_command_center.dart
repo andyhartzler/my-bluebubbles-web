@@ -350,6 +350,8 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
 
     final tabView = TabBarView(
       controller: _tabController,
+      // Disable swipe-to-change-tab. Andrew's rule: tabs are clickable only.
+      physics: const NeverScrollableScrollPhysics(),
       children: [
         moydDonorsBody,
         MecResearchTab(
@@ -537,12 +539,12 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
         ),
       ),
       child: Theme(
-        // Apply a dark sub-theme so ExpansionTiles, dividers, text, and
-        // default FilterChips render in white-on-navy rather than black-on-
-        // white. Scoped: only this subtree, doesn't leak to the rest of the
-        // screen.
+        // Override only the style bits we need (text/icon colors, expansion
+        // tile + list tile colors, divider). Avoid `brightness: dark` or
+        // `colorScheme.copyWith` — those combinations crash ExpansionTile
+        // rendering in this codebase's Theme chain ("An unexpected error
+        // occurred when rendering" appeared as a result).
         data: Theme.of(context).copyWith(
-          brightness: Brightness.dark,
           dividerColor: Colors.white.withOpacity(0.12),
           iconTheme: const IconThemeData(color: Colors.white70),
           textTheme: Theme.of(context).textTheme.apply(
@@ -553,15 +555,12 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
             iconColor: Colors.white70,
             textColor: Colors.white,
           ),
-          expansionTileTheme: ExpansionTileThemeData(
+          expansionTileTheme: const ExpansionTileThemeData(
             iconColor: Colors.white70,
             collapsedIconColor: Colors.white70,
             textColor: Colors.white,
             collapsedTextColor: Colors.white,
           ),
-          colorScheme: Theme.of(context).colorScheme.copyWith(
-                onSurface: Colors.white,
-              ),
         ),
         child: Column(
           children: [
