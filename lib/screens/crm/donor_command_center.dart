@@ -907,14 +907,9 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
   }
 
   List<DropdownMenuItem<String>> _buildCDItems() {
-    // Use known CDs from results or provide a static set
-    final cds = _results
-        .map((r) => r.county) // Note: search result doesn't have CD; fallback
-        .where((c) => c != null && c.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
-    // In practice, congressional districts come from stats or a dedicated list.
+    // Missouri has 8 congressional districts. Search results don't carry a
+    // CD field today, so render the static list; wire to a real CD column
+    // on donor_profiles once that data lands.
     return [
       for (int i = 1; i <= 8; i++)
         DropdownMenuItem(value: 'MO-$i', child: Text('MO-$i')),

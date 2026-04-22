@@ -1209,9 +1209,9 @@ class _MecResearchTabState extends State<MecResearchTab> {
                 if (partyLean != null && partyLean.isNotEmpty)
                   _buildEnrichmentChip(partyLean, _partyLeanColor(partyLean)),
                 if (ageEstimate != null)
-                  _buildEnrichmentChip('Age ~$ageEstimate', Colors.white70),
+                  _buildEnrichmentChip('Age ~$ageEstimate', BrandColors.slateBlue),
                 if (gender != null && gender.isNotEmpty)
-                  _buildEnrichmentChip(gender, Colors.white70),
+                  _buildEnrichmentChip(gender, BrandColors.slateBlue),
                 if (generation != null && generation.isNotEmpty)
                   _buildEnrichmentChip(generation, Colors.tealAccent),
                 if (isHomeowner == true)
@@ -1407,9 +1407,9 @@ class _MecResearchTabState extends State<MecResearchTab> {
               if (partyLean != null && partyLean.isNotEmpty)
                 _buildEnrichmentChip(partyLean, _partyLeanColor(partyLean)),
               if (ageEstimate != null)
-                _buildEnrichmentChip('Age ~$ageEstimate', Colors.white70),
+                _buildEnrichmentChip('Age ~$ageEstimate', BrandColors.slateBlue),
               if (gender != null && gender.isNotEmpty)
-                _buildEnrichmentChip(gender, Colors.white70),
+                _buildEnrichmentChip(gender, BrandColors.slateBlue),
               if (generation != null && generation.isNotEmpty)
                 _buildEnrichmentChip(generation, Colors.tealAccent),
               if (isHomeowner == true)

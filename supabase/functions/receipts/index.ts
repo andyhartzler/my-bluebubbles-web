@@ -17,7 +17,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const AI_ENDPOINT = "https://ai.hartzler.app/v1";
-const AI_API_KEY = Deno.env.get("AI_API_KEY") ?? "7231d4a948bdd737e1a9861060a72a3fb3c647e773e132b74b0883c789bb0eae";
+const AI_API_KEY = Deno.env.get("AI_API_KEY") ?? "";
+if (!AI_API_KEY) {
+  console.warn("[receipts] AI_API_KEY is not set — receipt analysis will fail until configured via `supabase secrets set`.");
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "https://moyd.app",
