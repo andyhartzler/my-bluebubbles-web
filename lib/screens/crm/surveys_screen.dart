@@ -711,9 +711,17 @@ class _SurveysScreenState extends State<SurveysScreen>
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: _loadSurveys,
+              // Translucent pill on the navy error backdrop; matches the
+              // command-center's chip style instead of a harsh solid-white
+              // rectangle.
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: BrandColors.unityBlue,
+                backgroundColor: Colors.white.withOpacity(0.15),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(color: Colors.white.withOpacity(0.28)),
+                ),
               ),
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),

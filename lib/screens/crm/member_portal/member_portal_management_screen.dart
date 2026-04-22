@@ -941,14 +941,26 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                               ? const SizedBox(
                                   height: 18,
                                   width: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
                                 )
-                              : const Icon(Icons.save),
-                          label: Text(_savingMeeting ? 'Saving...' : 'Save changes'),
+                              : const Icon(Icons.save, color: Colors.white),
+                          label: Text(
+                            _savingMeeting ? 'Saving...' : 'Save changes',
+                            style: const TextStyle(color: Colors.white),
+                          ),
                           onPressed: _savingMeeting ? null : () => _saveMeeting(meeting),
+                          // Translucent pill on navy, matches command-center chip style.
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: _unityBlue,
+                            backgroundColor: Colors.white.withOpacity(0.15),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              side: BorderSide(color: Colors.white.withOpacity(0.25)),
+                            ),
                           ),
                         ),
                       ],
@@ -2807,7 +2819,9 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       return CircleAvatar(
         radius: 20,
         backgroundImage: NetworkImage(imageUrl),
-        backgroundColor: Colors.white,
+        // Subtle translucent backdrop instead of solid white — prevents a
+        // harsh halo while a NetworkImage is loading on navy surfaces.
+        backgroundColor: Colors.white.withOpacity(0.1),
       );
     }
 

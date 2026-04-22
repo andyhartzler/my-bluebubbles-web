@@ -3284,10 +3284,17 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     children.add(
       Align(
         alignment: Alignment.centerRight,
+        // Translucent white pill + white foreground blends with the wallet
+        // gradient instead of stamping a harsh solid-white rectangle on it.
         child: ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: _walletAccentColor,
+            backgroundColor: Colors.white.withOpacity(0.18),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: Colors.white.withOpacity(0.28)),
+            ),
           ),
           onPressed: canSendPush && !_sendingWalletPush ? _sendWalletPushToMember : null,
           icon: _sendingWalletPush
@@ -3296,7 +3303,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                   width: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.4,
-                    valueColor: AlwaysStoppedAnimation<Color>(_walletAccentColor),
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 )
               : const Icon(Icons.notifications_active_outlined),
