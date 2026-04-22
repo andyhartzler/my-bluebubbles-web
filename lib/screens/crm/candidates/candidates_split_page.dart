@@ -202,7 +202,7 @@ class _CandidatesSplitPageState extends State<CandidatesSplitPage> {
             onAddCandidate: _onAddCandidate,
           ),
         ),
-        Container(width: 1, color: Colors.white10),
+        Container(width: 2, color: Colors.white10),
         // RIGHT: sticky map (40%)
         Expanded(
           flex: 4,

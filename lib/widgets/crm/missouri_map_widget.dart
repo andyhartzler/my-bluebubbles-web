@@ -103,7 +103,6 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   // Parsed GeoJSON polygons per type
   final Map<DistrictType, List<_DistrictPolygon>> _polygonsByType = {};
   final Set<DistrictType> _loadedTypes = {};
-  bool _geoJsonLoaded = false; // true once the initial (house) load finishes
   String? _hoveredDistrict;
   String? _goldRingDistrict;
 
@@ -312,7 +311,6 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
       setState(() {
         _polygonsByType[type] = polygons;
         _loadedTypes.add(type);
-        _geoJsonLoaded = true;
         _rebuildPolygonColors();
       });
 

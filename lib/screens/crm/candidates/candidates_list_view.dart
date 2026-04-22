@@ -209,7 +209,8 @@ class _PartyBadge extends StatelessWidget {
         border: Border.all(color: bg.withOpacity(0.5)),
       ),
       child: Center(
-        child: Text(candidate.partyShort,
+        child: Text(
+            candidate.partyShort.isEmpty ? '?' : candidate.partyShort,
             style: TextStyle(
                 color: bg, fontSize: 13, fontWeight: FontWeight.bold)),
       ),

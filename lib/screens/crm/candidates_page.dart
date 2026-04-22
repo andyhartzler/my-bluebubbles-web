@@ -44,7 +44,6 @@ class _CandidatesPageState extends State<CandidatesPage>
   // ── Data ──
   List<Candidate> _allCandidates = [];
   List<Candidate> _filteredCandidates = [];
-  List<Candidate> _youngDems = [];
   CandidateStats _stats = const CandidateStats();
   Map<String, List<Candidate>> _districtMap = {};
   Map<String, List<Candidate>> _houseDistrictMap = {};
@@ -78,7 +77,6 @@ class _CandidatesPageState extends State<CandidatesPage>
 
   // ── Analytics ──
   bool _showAnalytics = false;
-  Map<String, Map<String, int>> _partyBreakdown = {};
   Map<String, int> _contestationBreakdown = {};
 
   // ── State ──
@@ -89,7 +87,6 @@ class _CandidatesPageState extends State<CandidatesPage>
   // ── Animation ──
   late AnimationController _statsAnimController;
   late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
@@ -102,9 +99,6 @@ class _CandidatesPageState extends State<CandidatesPage>
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
     _loadData();
   }
 
@@ -190,7 +184,6 @@ class _CandidatesPageState extends State<CandidatesPage>
 
     setState(() {
       _allCandidates = mergedCandidates;
-      _youngDems = youngDems;
       _stats = stats;
       _districtMap = districtMap;
       _houseDistrictMap = houseMap;
@@ -208,14 +201,10 @@ class _CandidatesPageState extends State<CandidatesPage>
 
   Future<void> _loadAnalytics() async {
     try {
-      final results = await Future.wait([
-        _repo.fetchPartyBreakdown(),
-        _repo.fetchContestationBreakdown(),
-      ]);
+      final contestation = await _repo.fetchContestationBreakdown();
       if (mounted) {
         setState(() {
-          _partyBreakdown = results[0] as Map<String, Map<String, int>>;
-          _contestationBreakdown = results[1] as Map<String, int>;
+          _contestationBreakdown = contestation;
           _analyticsLoading = false;
         });
       }
@@ -1033,86 +1022,6 @@ class _CandidatesPageState extends State<CandidatesPage>
   // ═══════════════════════════════════════════════════════════════
   //  STATS BAR
   // ═══════════════════════════════════════════════════════════════
-
-  // ── Desktop: Stats grid with clickable filter cards ──
-  Widget _buildStatsGrid() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        _clickableStatCard(Icons.people, '${_stats.totalCandidates}', 'Total',
-            onTap: _resetAdvancedFilters),
-        _clickableStatCard(Icons.groups, '${_stats.democrats}', 'Democrats',
-            isActive: _partyFilter == 'Democratic',
-            onTap: () { setState(() { _partyFilter = _partyFilter == 'Democratic' ? null : 'Democratic'; }); _applyFilters(); }),
-        _clickableStatCard(Icons.groups_outlined, '${_stats.republicans}', 'Republicans',
-            isActive: _partyFilter == 'Republican',
-            onTap: () { setState(() { _partyFilter = _partyFilter == 'Republican' ? null : 'Republican'; }); _applyFilters(); }),
-        _clickableStatCard(Icons.star, '${_stats.youngDemocrats}', 'Young Dems',
-            isActive: _ydOnly,
-            onTap: () { setState(() { _ydOnly = !_ydOnly; }); _applyFilters(); }),
-        _clickableStatCard(Icons.gavel, '${_stats.uncontestedDemSeats}', 'Uncontested (D)',
-            isActive: _partyFilter == 'Democratic' && _officeLevelFilter == 'state',
-            onTap: () { setState(() {
-              if (_partyFilter == 'Democratic' && _officeLevelFilter == 'state') {
-                _partyFilter = null; _officeLevelFilter = null;
-              } else {
-                _partyFilter = 'Democratic'; _officeLevelFilter = 'state';
-              }
-            }); _applyFilters(); }),
-        _clickableStatCard(Icons.thumb_up, '${_stats.endorsed}', 'Endorsed',
-            isActive: _moydEndorsed,
-            onTap: () { setState(() { _moydEndorsed = !_moydEndorsed; }); _applyFilters(); }),
-        _clickableStatCard(Icons.phone_in_talk, '${_stats.contacted}', 'Contacted',
-            isActive: _moydContacted,
-            onTap: () { setState(() { _moydContacted = !_moydContacted; }); _applyFilters(); }),
-        _clickableStatCard(Icons.language, '${_stats.withWebsite}', 'Has Website',
-            isActive: _hasCampaignWebsite,
-            onTap: () { setState(() { _hasCampaignWebsite = !_hasCampaignWebsite; }); _applyFilters(); }),
-        _clickableStatCard(Icons.attach_money, '${_stats.withMecCommittee}', 'MEC Filed',
-            isActive: _hasFinanceFiled,
-            onTap: () { setState(() { _hasFinanceFiled = !_hasFinanceFiled; }); _applyFilters(); }),
-      ],
-    );
-  }
-
-  Widget _clickableStatCard(IconData icon, String value, String label, {bool isActive = false, VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: 120,
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: isActive
-                ? [BrandColors.sunriseGold.withOpacity(0.2), BrandColors.sunriseGold.withOpacity(0.08)]
-                : [Colors.white.withOpacity(0.06), Colors.white.withOpacity(0.02)],
-          ),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isActive ? BrandColors.sunriseGold.withOpacity(0.5) : Colors.white.withOpacity(0.08),
-            width: isActive ? 1.5 : 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: isActive ? BrandColors.sunriseGold : Colors.white.withOpacity(0.5), size: 18),
-            const SizedBox(height: 6),
-            Text(value, style: TextStyle(
-              color: isActive ? BrandColors.sunriseGold : Colors.white,
-              fontSize: 18, fontWeight: FontWeight.w800,
-            )),
-            const SizedBox(height: 2),
-            Text(label, style: TextStyle(
-              color: isActive ? BrandColors.sunriseGold.withOpacity(0.8) : Colors.white.withOpacity(0.5),
-              fontSize: 10, fontWeight: FontWeight.w500,
-            ), textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildStatsBar() {
     return Container(

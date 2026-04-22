@@ -17,9 +17,6 @@ import 'package:bluebubbles/screens/crm/candidate_edit_dialog.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/mec_committee_picker.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
-import 'package:bluebubbles/screens/crm/donor_detail_screen.dart';
-import 'package:bluebubbles/screens/crm/donor_profile_screen.dart';
-import 'package:bluebubbles/screens/crm/mec_committee_screen.dart';
 import 'package:bluebubbles/screens/crm/mec_donor_screen.dart';
 import 'package:bluebubbles/screens/crm/mec_payee_screen.dart';
 import 'package:bluebubbles/screens/crm/news_article_detail_screen.dart';
@@ -88,7 +85,6 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   // Expenditures (NEW)
   Map<String, dynamic> _expenditureSummary = {};
   List<Map<String, dynamic>> _topPayees = [];
-  List<Map<String, dynamic>> _recentExpenditures = [];
   List<Map<String, dynamic>> _raceComparison = [];
   // FEC federal finance (for federal candidates)
   Map<String, dynamic> _fecSummary = {};
@@ -332,7 +328,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       }
       _expenditureSummary = (results[4] as Map<String, dynamic>?) ?? const {};
       _topPayees = (results[5] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-      _recentExpenditures = (results[6] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      // results[6] (recent expenditures) intentionally skipped — not rendered
       _raceComparison = (results[7] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       _fecSummary = (results[8] as Map<String, dynamic>?) ?? const {};
       _fecTopDonors = (results[9] as List?)?.cast<Map<String, dynamic>>() ?? const [];
@@ -452,18 +448,6 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             city: city,
             state: state,
           ),
-        ),
-      ),
-    );
-  }
-
-  /// Open the full committee profile page.
-  void _openMecCommittee(String mecId) {
-    if (mecId.isEmpty) return;
-    Navigator.of(context).push(
-      ThemeSwitcher.buildPageRoute(
-        builder: (_) => TitleBarWrapper(
-          child: MECCommitteeScreen(mecId: mecId),
         ),
       ),
     );
