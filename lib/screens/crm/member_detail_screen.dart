@@ -2115,6 +2115,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                   Expanded(
                     child: BrandedBackground(
                       child: TabBarView(
+                        physics: const NeverScrollableScrollPhysics(),
                         children: [
                           _buildOverviewTab(context),
                           EmailHistoryTab(

@@ -295,6 +295,7 @@ class _DonorProfileScreenState extends State<DonorProfileScreen>
         ],
         body: TabBarView(
           controller: _tabController,
+          physics: const NeverScrollableScrollPhysics(),
           children: [
             _buildOverviewTab(p),
             _buildGivingTab(p),

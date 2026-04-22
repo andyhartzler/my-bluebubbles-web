@@ -937,6 +937,7 @@ class _FindMyPageState extends OptimizedState<FindMyPage> with SingleTickerProvi
                       width: 500,
                       child: TabBarView(
                         controller: tabController,
+                        physics: const NeverScrollableScrollPhysics(),
                         children: [
                           ScrollbarWrapper(
                             controller: controller1,

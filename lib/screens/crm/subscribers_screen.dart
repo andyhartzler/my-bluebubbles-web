@@ -263,6 +263,7 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
               ),
               Expanded(
                 child: TabBarView(
+                  physics: const NeverScrollableScrollPhysics(),
                   children: [
                     SubscribersOverviewTab(
                       onNavigateToSubscribers: () => tabController.animateTo(1),

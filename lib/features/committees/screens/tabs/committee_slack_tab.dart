@@ -331,6 +331,7 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
         Expanded(
           child: TabBarView(
             controller: _tabController,
+            physics: const NeverScrollableScrollPhysics(),
             children: [_buildMainChannelView(), _buildMohsdaChannelView()],
           ),
         ),

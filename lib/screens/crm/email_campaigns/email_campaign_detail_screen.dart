@@ -196,6 +196,7 @@ class _EmailCampaignDetailScreenState extends State<EmailCampaignDetailScreen>
         Expanded(
           child: TabBarView(
             controller: _tabController,
+            physics: const NeverScrollableScrollPhysics(),
             children: [
               _buildOverviewTab(theme),
               CampaignRecipientsList(

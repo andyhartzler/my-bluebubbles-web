@@ -377,6 +377,7 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
               ? _buildErrorState(theme, colorScheme)
               : TabBarView(
                   controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
                   children: [
                     _buildResultsTab(theme, colorScheme),
                     if (!widget.isMemberView) VoteAnalyticsTab(formId: widget.voteId),

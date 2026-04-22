@@ -653,6 +653,7 @@ class _TemplateEditorScreenState extends State<_TemplateEditorScreen>
         key: _formKey,
         child: TabBarView(
           controller: _tabController,
+          physics: const NeverScrollableScrollPhysics(),
           children: [
             // Settings Tab
             _buildSettingsTab(theme),

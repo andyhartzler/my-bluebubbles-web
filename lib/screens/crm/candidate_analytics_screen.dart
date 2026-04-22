@@ -114,6 +114,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
                         opacity: _fadeIn,
                         child: TabBarView(
                           controller: _tabController,
+                          physics: const NeverScrollableScrollPhysics(),
                           children: [
                             _buildOverviewTab(),
                             _buildCompetitivenessTab(),

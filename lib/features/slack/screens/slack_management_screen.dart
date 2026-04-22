@@ -99,6 +99,7 @@ class _SlackManagementScreenState extends State<SlackManagementScreen>
           child: BrandedBackground(
             child: TabBarView(
               controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(),
               children: [
                 ChannelsTab(initialChannelId: widget.initialChannelId),
                 UnmatchedUsersTab(

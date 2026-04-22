@@ -349,6 +349,7 @@ class _DonorExportDialogState extends State<DonorExportDialog>
             Expanded(
               child: TabBarView(
                 controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildFieldsTab(theme),
                   _buildFiltersTab(theme),

@@ -369,6 +369,7 @@ Missouri Young Democrats''',
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
                   children: [
                     _buildComposeTab(),
                     _buildTemplatesTab(),

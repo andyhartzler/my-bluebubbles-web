@@ -227,6 +227,7 @@ class _SurveysScreenState extends State<SurveysScreen>
                     ? _buildErrorState()
                     : TabBarView(
                         controller: _tabController,
+                        physics: const NeverScrollableScrollPhysics(),
                         children: List.generate(4, (_) => _buildSurveyList()),
                       ),
           ),

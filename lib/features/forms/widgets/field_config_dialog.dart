@@ -192,6 +192,7 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
                 key: _formKey,
                 child: TabBarView(
                   controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
                   children: [
                     _buildBasicTab(isMobile: isMobile),
                     _buildPropertiesTab(isMobile: isMobile),

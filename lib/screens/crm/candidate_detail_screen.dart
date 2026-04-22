@@ -930,6 +930,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 ],
                 body: TabBarView(
                   controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
                   children: [
                     _buildOverviewTab(),
                     _buildMoneyTab(),
