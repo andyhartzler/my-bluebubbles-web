@@ -1,17 +1,3 @@
--- ⚠️ DRAFT — NOT YET APPLIED TO PRODUCTION DB as of 2026-04-22
--- Written by the mec_donors dedup agent but paused for review before apply.
--- Before running against production:
---   1. Spot-check the merge logic on a handful of known (firstname+lastname+city) pairs
---   2. Verify the canonical-id selection rule (prefers row with more FK links, then
---      the row with mo_voter_file_id populated)
---   3. Review the NOT IN exclusion list (#N/A, UNKNOWN, blank names)
---   4. Run inside a DB snapshot window with a rollback plan
--- See docs/superpowers/plans/2026-04-22-donor-schema-audit.md section 10 for
--- the data-integrity issues this migration is intended to fix.
---
--- Migration: 20260421_19_mec_donors_dedup.sql
--- Purpose:   Unify MEC + FEC donor identities inside public.mec_donors by
---            (1) marking unusable junk rows (#N/A, UNKNOWN, etc.) as not_applicable,
 --            (2) back-filling empty `sources` arrays from FK contribution evidence,
 --            (3) collapsing duplicate identities per donor_type and reassigning FK
 --                rows (mec_contributions, fec_contributions, donor_enrichment,
@@ -146,8 +132,11 @@ CREATE UNLOGGED TABLE public._mec_merge_plan_skipped (
   reason     text
 );
 
--- Normalized donor rows (excluding junk/not_applicable and rows that can't
--- be keyed at all).
+-- Materialize the ranked candidates into a temp table so the two INSERTs below
+-- (skipped-groups + merge-plan) can both scan it. CTEs are per-statement; temp
+-- table persists across statements until COMMIT.
+DROP TABLE IF EXISTS _ranked_candidates;
+CREATE TEMP TABLE _ranked_candidates ON COMMIT DROP AS
 WITH norm AS (
   SELECT d.id,
          d.donor_type,
@@ -216,32 +205,27 @@ candidates AS (
     FROM keyed k
     JOIN groups g USING (merge_key, donor_type)
     LEFT JOIN fk_counts fc ON fc.id = k.id
-),
-ranked AS (
-  SELECT *,
-         ROW_NUMBER() OVER (
-           PARTITION BY merge_key
-           ORDER BY (mo_voter_file_id IS NOT NULL) DESC,
-                    (COALESCE(mec_link_cnt,0) + COALESCE(fec_link_cnt,0)) DESC,
-                    (COALESCE(total_contributed,0) + COALESCE(fec_total_contributed,0)) DESC,
-                    id ASC
-         ) AS rnk
-    FROM candidates
-),
-voter_conflicts AS (
-  SELECT merge_key,
-         MAX(donor_type) AS donor_type,
-         ARRAY_AGG(id) AS ids,
-         ARRAY_AGG(DISTINCT mo_voter_file_id) FILTER (WHERE mo_voter_file_id IS NOT NULL) AS voter_ids
-    FROM candidates
-   GROUP BY merge_key
-  HAVING COUNT(DISTINCT mo_voter_file_id) FILTER (WHERE mo_voter_file_id IS NOT NULL) > 1
 )
--- Store skipped groups (ambiguous voter file ids).
+SELECT *,
+       ROW_NUMBER() OVER (
+         PARTITION BY merge_key
+         ORDER BY (mo_voter_file_id IS NOT NULL) DESC,
+                  (COALESCE(mec_link_cnt,0) + COALESCE(fec_link_cnt,0)) DESC,
+                  (COALESCE(total_contributed,0) + COALESCE(fec_total_contributed,0)) DESC,
+                  id ASC
+       ) AS rnk
+  FROM candidates;
+
+-- Store skipped groups (groups where >1 distinct mo_voter_file_id — ambiguous).
 INSERT INTO public._mec_merge_plan_skipped (donor_type, merge_key, ids, voter_ids, reason)
-SELECT donor_type, merge_key, ids, voter_ids,
-       'multiple distinct mo_voter_file_id values in group'
-  FROM voter_conflicts;
+SELECT MAX(donor_type) AS donor_type,
+       merge_key,
+       ARRAY_AGG(id) AS ids,
+       ARRAY_AGG(DISTINCT mo_voter_file_id) FILTER (WHERE mo_voter_file_id IS NOT NULL) AS voter_ids,
+       'multiple distinct mo_voter_file_id values in group' AS reason
+  FROM _ranked_candidates
+ GROUP BY merge_key
+HAVING COUNT(DISTINCT mo_voter_file_id) FILTER (WHERE mo_voter_file_id IS NOT NULL) > 1;
 
 -- Build the merge plan (exclude skipped groups).
 INSERT INTO public._mec_merge_plan (canonical_id, merged_id, donor_type, merge_key, mec_link_cnt, fec_link_cnt)
@@ -251,8 +235,8 @@ SELECT r_canonical.id    AS canonical_id,
        r_canonical.merge_key,
        r_other.mec_link_cnt,
        r_other.fec_link_cnt
-  FROM ranked r_canonical
-  JOIN ranked r_other
+  FROM _ranked_candidates r_canonical
+  JOIN _ranked_candidates r_other
     ON r_canonical.merge_key = r_other.merge_key
    AND r_canonical.rnk = 1
    AND r_other.rnk > 1
