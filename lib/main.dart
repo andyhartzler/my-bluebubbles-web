@@ -515,17 +515,6 @@ class Main extends StatelessWidget {
                       }
                     }
                   }
-                  // CRITICAL: SelectionArea wrapping the entire app causes
-                  // gesture arena conflicts on iOS Safari PWA. The text
-                  // selection gesture detector intercepts the first tap,
-                  // making navigation buttons unresponsive until something
-                  // else (like a dashboard tile) receives focus first.
-                  // Only wrap in SelectionArea on desktop where text
-                  // selection is expected. On mobile web, skip it entirely.
-                  // Use shortestSide instead of width so landscape iPhones
-                  // (width > 600) still skip SelectionArea on mobile web.
-                  final bool isMobileWeb = kIsWeb &&
-                      MediaQuery.of(context).size.shortestSide < 600;
                   Widget gateChild = SecureGate(
                         blurr: 5,
                         opacity: 0,
@@ -627,13 +616,13 @@ class Main extends StatelessWidget {
                         child: child ?? Container(),
                   );
 
-                  // Wrap in SelectionArea only on desktop/tablet
-                  // (not on mobile web where it causes iOS Safari PWA issues)
-                  final wrappedGate = isMobileWeb
-                      ? gateChild
-                      : SelectionArea(child: gateChild);
-
-                  return TitleBarWrapper(child: wrappedGate);
+                  // Previously wrapped gateChild in SelectionArea here, but
+                  // that sits ABOVE the Navigator/Overlay tree so its internal
+                  // SelectableRegion can't find an Overlay ancestor — the app
+                  // crashes at first render with "No Overlay widget found."
+                  // Screens that genuinely need text selection should wrap
+                  // themselves in SelectionArea (e.g. candidate detail cards).
+                  return TitleBarWrapper(child: gateChild);
                 },
               ),
             ),
