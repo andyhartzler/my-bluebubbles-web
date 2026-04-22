@@ -346,7 +346,11 @@ flutter:
     - assets/badges/badge-8.ico
     - assets/badges/badge-9.ico
     - assets/badges/badge-10.ico
-    - .env
+  # .env is intentionally NOT an asset — Flutter web builds bundle assets
+  # into the shipped build directory, so any secrets inside .env (especially
+  # SUPABASE_SERVICE_ROLE_KEY) would be downloadable by any browser.
+  # Pass environment values at build time via `--dart-define=` instead, or
+  # rely on user-authenticated sessions + RLS for privileged operations.
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware.
   # For details regarding adding assets from package dependencies, see

@@ -64,3 +64,8 @@ pubspec.lock
 /snap/
 /screenshots/
 .claude/worktrees/
+
+# Local secrets — never commit
+.env
+.env.local
+.env.*.local
