@@ -102,7 +102,7 @@ class _DonorsListScreenState extends State<DonorsListScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Donors & Research',
+          'Donors',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
         elevation: 0,
