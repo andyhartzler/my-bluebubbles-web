@@ -32,6 +32,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
   bool _loadingMore = false;
   bool _hasMore = true;
   bool _hasSearched = false;
+  bool _isDefaultView = false;
   String? _error;
   int _yearFrom = DateTime.now().year - 1;
   int _yearTo = DateTime.now().year;
@@ -75,6 +76,67 @@ class _MecResearchTabState extends State<MecResearchTab> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    // Kick off the default "Top 50 Democrat Donors" fetch after the first
+    // frame so initState stays non-blocking and the hero banner renders
+    // immediately.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadDefaultResults();
+    });
+  }
+
+  /// Default landing view: top 50 Democrat donors (MEC + FEC) sorted by
+  /// total_amount descending. Runs once on mount. The repository RPC has no
+  /// sort parameter, so we sort client-side. If the user runs a real search
+  /// via [_performSearch], the default-view flag is cleared.
+  Future<void> _loadDefaultResults() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+      _hasSearched = true;
+      _isDefaultView = true;
+      _donors = [];
+      _hasMore = false;
+    });
+
+    try {
+      final results = await _repository.searchDonorsUnified(
+        // No name query — we want the raw top-givers list.
+        state: _selectedState.isNotEmpty ? _selectedState : null,
+        yearFrom: _yearFrom,
+        yearTo: _yearTo,
+        party: 'democrat',
+        source: 'both',
+        // Pull a larger slice so client-side sort has room to find the
+        // actual top 50 by total_amount (the RPC's native order may not
+        // match total_amount desc).
+        limit: 200,
+        offset: 0,
+      );
+
+      // Client-side sort by total_amount descending (RPC has no sortBy param).
+      final sorted = List<Map<String, dynamic>>.from(results)
+        ..sort((a, b) {
+          final aTotal = (a['total_amount'] as num?)?.toDouble() ?? 0.0;
+          final bTotal = (b['total_amount'] as num?)?.toDouble() ?? 0.0;
+          return bTotal.compareTo(aTotal);
+        });
+
+      final top = sorted.take(50).toList();
+
+      if (!mounted) return;
+      setState(() {
+        _donors = top;
+        _hasMore = false;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Failed to load top donors: $e';
+        _loading = false;
+      });
+    }
   }
 
   @override
@@ -142,6 +204,7 @@ class _MecResearchTabState extends State<MecResearchTab> {
       _loading = true;
       _error = null;
       _hasSearched = true;
+      _isDefaultView = false;
       _donors = [];
       _hasMore = true;
     });
@@ -746,12 +809,15 @@ class _MecResearchTabState extends State<MecResearchTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Result count header
+        // Result count header (default view gets a distinct label so users
+        // know this isn't a specific search result).
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
-            'Showing ${_donors.length} donor${_donors.length == 1 ? '' : 's'}'
-            '${_hasMore ? ' (scroll for more)' : ''}',
+            _isDefaultView
+                ? 'Top ${_donors.length} Democrat Donors'
+                : 'Showing ${_donors.length} donor${_donors.length == 1 ? '' : 's'}'
+                    '${_hasMore ? ' (scroll for more)' : ''}',
             style: BrandTextStyles.subtitle,
           ),
         ),
@@ -777,7 +843,9 @@ class _MecResearchTabState extends State<MecResearchTab> {
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Center(
               child: Text(
-                'All ${_donors.length} results loaded',
+                _isDefaultView
+                    ? 'Use the filters above to search for specific donors'
+                    : 'All ${_donors.length} results loaded',
                 style: BrandTextStyles.caption,
               ),
             ),
