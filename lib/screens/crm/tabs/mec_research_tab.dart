@@ -531,45 +531,51 @@ class _MecResearchTabState extends State<MecResearchTab> {
   }
 
   Widget _buildStatTiles() {
-    final tiles = <Widget>[
-      SizedBox(
-        width: 260,
-        child: const BrandedStatCard(
-          title: 'MEC Research Database',
-          value: '1.02M',
-          subtitle: 'Missouri Ethics Commission donors',
-          icon: Icons.account_balance,
-          gradientColors: [Color(0xFF10B981), Color(0xFF059669)],
-        ),
-      ),
-      SizedBox(
-        width: 260,
-        child: const BrandedStatCard(
-          title: 'FEC Research Database',
-          value: '1.76M',
-          subtitle: 'Federal Election Commission donors',
-          icon: Icons.flag_outlined,
-          gradientColors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
-        ),
-      ),
-    ];
-    if (_hasSearched && _donors.isNotEmpty) {
-      tiles.add(
-        SizedBox(
-          width: 260,
-          child: BrandedStatCard(
-            title: 'Results',
-            value: '${_donors.length}',
-            subtitle: 'Matching your search',
-            icon: Icons.people_outline,
+    // Use LayoutBuilder so the tiles share the available width evenly on
+    // wide panes and drop to 2-up / 1-up cleanly on narrow ones. The prior
+    // `SizedBox(width: 260)` forced a fixed width that wrapped awkwardly at
+    // mid-widths (third card alone on its own row).
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tileDefs = <BrandedStatCard>[
+          const BrandedStatCard(
+            title: 'MEC Research Database',
+            value: '1.02M',
+            subtitle: 'Missouri Ethics Commission donors',
+            icon: Icons.account_balance,
+            gradientColors: [Color(0xFF10B981), Color(0xFF059669)],
           ),
-        ),
-      );
-    }
-    return Wrap(
-      spacing: 16,
-      runSpacing: 16,
-      children: tiles,
+          const BrandedStatCard(
+            title: 'FEC Research Database',
+            value: '1.76M',
+            subtitle: 'Federal Election Commission donors',
+            icon: Icons.flag_outlined,
+            gradientColors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+          ),
+          if (_hasSearched && _donors.isNotEmpty)
+            BrandedStatCard(
+              title: 'Results',
+              value: '${_donors.length}',
+              subtitle: 'Matching your search',
+              icon: Icons.people_outline,
+            ),
+        ];
+        const spacing = 16.0;
+        final perRow = constraints.maxWidth >= 900
+            ? tileDefs.length
+            : constraints.maxWidth >= 560
+                ? 2
+                : 1;
+        final tileWidth = (constraints.maxWidth - spacing * (perRow - 1)) / perRow;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final tile in tileDefs)
+              SizedBox(width: tileWidth, child: tile),
+          ],
+        );
+      },
     );
   }
 

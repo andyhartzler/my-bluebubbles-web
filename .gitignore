@@ -51,7 +51,6 @@ pubspec.lock
 
 #private keys
 *.env
-!.env
 .vscode/launch.json
 /lib/database/html/giphy.dart
 

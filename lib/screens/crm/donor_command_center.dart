@@ -417,8 +417,16 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
 
   Widget _buildTabBar() {
     return Container(
+      // Default `LinearGradient` begins at topLeft → bottomRight, which puts
+      // the top edge on a different color than the unityBlue AppBar above
+      // — a visible diagonal seam. Run the gradient horizontally so the
+      // top edge stays uniform and flows cleanly from the AppBar.
       decoration: const BoxDecoration(
-        gradient: LinearGradient(colors: BrandColors.tileGradient),
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
       ),
       child: TabBar(
         controller: _tabController,
@@ -833,14 +841,17 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                         onChanged();
                       },
                     ),
-                    FilterChip(
-                      label: const Text('VAN'),
-                      selected: _hasVan == true,
-                      selectedColor: BrandColors.success.withOpacity(0.25),
-                      onSelected: (sel) {
-                        _hasVan = sel ? true : null;
-                        onChanged();
-                      },
+                    Tooltip(
+                      message: 'VAN voter file record attached',
+                      child: FilterChip(
+                        label: const Text('VAN'),
+                        selected: _hasVan == true,
+                        selectedColor: BrandColors.success.withOpacity(0.25),
+                        onSelected: (sel) {
+                          _hasVan = sel ? true : null;
+                          onChanged();
+                        },
+                      ),
                     ),
                     FilterChip(
                       label: const Text('Property'),
@@ -1237,8 +1248,13 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
         final r = _results[index];
         final selected = _selectedIds.contains(r.id);
 
+        // Card defaults to `elevation: 1`, which on navy paints a subtle
+        // dark shadow under every row — the list reads as "floating tiles on
+        // a slightly darker navy" instead of a clean list. Kill the
+        // elevation and switch to a navy fill so rows sit flat on the page.
         return Card(
-          color: Colors.white.withOpacity(0.12),
+          color: BrandColors.unityBlue.withOpacity(0.40),
+          elevation: 0,
           margin: const EdgeInsets.symmetric(vertical: 4),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: InkWell(
@@ -1378,14 +1394,20 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
   // ---------------------------------------------------------------------------
 
   Widget _buildBulkActionBar() {
+    final hasSelection = _selectedIds.isNotEmpty;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
-      height: _selectedIds.isNotEmpty ? 56 : 0,
+      height: hasSelection ? 56 : 0,
       curve: Curves.easeInOut,
-      decoration: const BoxDecoration(
-        color: BrandColors.unityBlue,
-        boxShadow: [BoxShadow(blurRadius: 8, color: Colors.black26)],
-      ),
+      // The shadow still paints at height=0, leaving a black line under the
+      // results grid even when nothing is selected. Suppress the whole
+      // decoration when the bar is collapsed.
+      decoration: hasSelection
+          ? const BoxDecoration(
+              color: BrandColors.unityBlue,
+              boxShadow: [BoxShadow(blurRadius: 8, color: Colors.black26)],
+            )
+          : null,
       child: _selectedIds.isNotEmpty
           ? Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),

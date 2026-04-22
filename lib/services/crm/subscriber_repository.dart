@@ -266,10 +266,11 @@ class SubscriberRepository {
     String id, {
     required Map<String, dynamic> data,
   }) async {
-    if (!_supabase.hasServiceRole) {
-      throw Exception('Insufficient permissions to update subscribers');
-    }
-
+    // Previously short-circuited with "Insufficient permissions" when the
+    // service-role client was missing. That blocked the supported path where
+    // an authenticated user (or the public-update RLS policy) can write
+    // directly. Let the update run and let Postgres raise a real RLS error
+    // if the caller isn't entitled.
     final payload = Map<String, dynamic>.from(data)
       ..removeWhere((_, value) => value == null);
 
