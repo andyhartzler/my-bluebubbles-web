@@ -210,6 +210,50 @@ class CandidateRepository {
     }
   }
 
+  // ─── YD primarying-incumbent-Democrat detection ────────────────
+
+  /// Fetch every (Young Dem challenger, incumbent Dem) pair running in
+  /// the same seat via the `get_yd_primary_challengers()` RPC. Authoritative
+  /// source for the Candidates-page primary-challenger view.
+  Future<List<Map<String, dynamic>>> fetchPrimaryChallengePairs() async {
+    if (!isReady) return const [];
+    try {
+      final data = await _client.rpc('get_yd_primary_challengers');
+      return (data as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.fetchPrimaryChallengePairs error: $e');
+      return const [];
+    }
+  }
+
+  /// Fetch every candidate running for a specific (office, district). Used by
+  /// the district-sidebar panel on the split-screen candidates page so the
+  /// right-side widget can list the seat's field without re-slicing the
+  /// main results list.
+  Future<List<Candidate>> fetchCandidatesForDistrict({
+    required String office,
+    required String district,
+  }) async {
+    if (!isReady) return const [];
+    try {
+      final data = await _client
+          .from('candidates')
+          .select()
+          .eq('office', office)
+          .eq('district', district)
+          .order('incumbent', ascending: false)
+          .order('name');
+      return (data as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>()
+          .map(Candidate.fromJson)
+          .toList();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.fetchCandidatesForDistrict error: $e');
+      return const [];
+    }
+  }
+
   // ─── Paginated fetch for infinite scroll ──────────────────────
 
   Future<List<Candidate>> fetchPage({
