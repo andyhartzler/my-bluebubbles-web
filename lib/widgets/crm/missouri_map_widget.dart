@@ -6,6 +6,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -223,7 +224,10 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
       _goldRingDistrict = district;
     });
 
-    _mapController.move(match.centroid, 8.0);
+    // Congressional districts are much larger — zoom out a bit so the whole
+    // district is visible. State house/senate get a tighter zoom.
+    final zoomLevel = type == DistrictType.congressional ? 7.5 : 9.0;
+    _mapController.move(match.centroid, zoomLevel);
   }
 
   // ── District map for active type ─────────────────────────
@@ -595,7 +599,9 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
     }
 
     // Gold-ring overlay for the candidate-driven selection from the list panel.
-    // Drawn LAST so it sits on top of the base polygon fill/border.
+    // External widget.highlightedDistrict prop wins; internal tap-driven
+    // _goldRingDistrict is the fallback. Drawn LAST so it sits on top of the
+    // base polygon fill/border.
     final goldRing = widget.highlightedDistrict ?? _goldRingDistrict;
     if (goldRing != null) {
       for (final dp in polygons) {
@@ -603,10 +609,10 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
         mapPolygons.add(Polygon(
           points: dp.rings.first,
           holePointsList: dp.rings.length > 1 ? dp.rings.sublist(1) : null,
-          color: const Color(0x22FDB813),
-          borderColor: const Color(0xFFFDB813),
+          color: Colors.transparent,
+          borderColor: BrandColors.sunriseGold,
           borderStrokeWidth: 3.5,
-          isFilled: true,
+          isFilled: false,
         ));
         break;
       }
