@@ -1937,13 +1937,17 @@ class _FinancesPageState extends State<FinancesPage>
                     lastDate: DateTime.now(),
                     initialDateRange: _dateRange,
                     builder: (context, child) {
+                      // Use parent context's theme + only override accent colors,
+                      // so ColorScheme fields (error, outline, etc.) aren't left null
+                      // and internal range-picker widgets don't crash.
                       return Theme(
-                        data: ThemeData.dark().copyWith(
-                          colorScheme: const ColorScheme.dark(
-                            primary: BrandColors.momentumBlue,
-                            onPrimary: Colors.white,
-                            surface: Color(0xFF1E3A5F),
-                          ),
+                        data: Theme.of(context).copyWith(
+                          colorScheme:
+                              Theme.of(context).colorScheme.copyWith(
+                                    primary: BrandColors.momentumBlue,
+                                    onPrimary: Colors.white,
+                                    surface: const Color(0xFF1E3A5F),
+                                  ),
                         ),
                         child: child!,
                       );

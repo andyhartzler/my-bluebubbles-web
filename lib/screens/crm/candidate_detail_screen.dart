@@ -3975,12 +3975,15 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 firstDate: DateTime.now(),
                 lastDate: DateTime.now().add(const Duration(days: 365)),
                 builder: (context, child) {
+                  // Use parent context's theme + only override accent colors,
+                  // so ColorScheme fields (error, outline, etc.) aren't left null
+                  // and internal date-picker widgets don't crash.
                   return Theme(
-                    data: ThemeData.dark().copyWith(
-                      colorScheme: const ColorScheme.dark(
-                        primary: BrandColors.sunriseGold,
-                        surface: BrandColors.unityBlue,
-                      ),
+                    data: Theme.of(context).copyWith(
+                      colorScheme: Theme.of(context).colorScheme.copyWith(
+                            primary: BrandColors.sunriseGold,
+                            surface: BrandColors.unityBlue,
+                          ),
                     ),
                     child: child!,
                   );
