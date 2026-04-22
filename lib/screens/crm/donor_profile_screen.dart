@@ -77,7 +77,7 @@ class _DonorProfileScreenState extends State<DonorProfileScreen>
       if (profile != null) {
         final results = await Future.wait([
           _repository.fetchVoterRecordForProfile(widget.profileId),
-          _repository.fetchEnrichmentRecord(widget.profileId),
+          _repository.fetchEnrichmentRecordByProfileUuid(widget.profileId),
         ]);
         if (!mounted) return;
         setState(() {

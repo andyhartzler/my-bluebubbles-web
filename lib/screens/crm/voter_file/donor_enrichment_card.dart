@@ -114,16 +114,21 @@ class _DonorEnrichmentCardState extends State<DonorEnrichmentCard> {
         : fields.length;
 
     // Render, stopping at `visibleCount` total rows across sections.
+    // Pre-compute which sections will contribute at least one row so we never
+    // emit an orphan header (header + spacer with zero fields under it).
     int rendered = 0;
     final children = <Widget>[];
     for (final entry in ordered) {
       if (rendered >= visibleCount) break;
-      children.add(_sectionHeader(entry.key));
+      final sectionFields = <Widget>[];
       for (final f in entry.value) {
         if (rendered >= visibleCount) break;
-        children.add(_fieldRow(f.label, f.value));
+        sectionFields.add(_fieldRow(f.label, f.value));
         rendered++;
       }
+      if (sectionFields.isEmpty) continue;
+      children.add(_sectionHeader(entry.key));
+      children.addAll(sectionFields);
       children.add(const SizedBox(height: 8));
     }
 

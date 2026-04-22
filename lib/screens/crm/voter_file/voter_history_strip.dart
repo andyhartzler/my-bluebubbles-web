@@ -56,12 +56,14 @@ class VoterHistoryStrip extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          height: 28,
+          // Taller to support a 32×32 tap target around each dot per
+          // Material accessibility guidelines. The dot itself stays 10px.
+          height: 40,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             shrinkWrap: true,
             itemCount: toShow.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 6),
+            separatorBuilder: (_, __) => const SizedBox(width: 2),
             itemBuilder: (context, i) {
               final e = toShow[i];
               return InkWell(
@@ -74,31 +76,36 @@ class VoterHistoryStrip extends StatelessWidget {
                     ),
                   );
                 },
-                borderRadius: BorderRadius.circular(8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: BrandColors.steelBlue,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: BrandColors.steelBlue.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 32,
+                  height: 40,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: BrandColors.steelBlue,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: BrandColors.steelBlue.withOpacity(0.6),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      e.typeAbbreviation,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.55),
-                        fontSize: 8,
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(height: 2),
+                      Text(
+                        e.typeAbbreviation,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.55),
+                          fontSize: 8,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             },

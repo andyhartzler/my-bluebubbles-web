@@ -5271,7 +5271,12 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   Icon(Icons.cake, color: primary.withOpacity(0.6), size: 14),
                   const SizedBox(width: 6),
                   Text(
-                    'DOB: ${c.dateOfBirth!.month}/${c.dateOfBirth!.day}/${c.dateOfBirth!.year}',
+                    // MO voter file only releases birth year — never synthesize a
+                    // fake month/day for voter_file-sourced DOBs. Self-reported and
+                    // AI-estimated sources keep the full date display.
+                    c.dobSource == 'voter_file'
+                        ? 'Born ${c.birthYear ?? c.dateOfBirth!.year}'
+                        : 'DOB: ${c.dateOfBirth!.month}/${c.dateOfBirth!.day}/${c.dateOfBirth!.year}',
                     style: TextStyle(color: primary.withOpacity(0.85), fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ],

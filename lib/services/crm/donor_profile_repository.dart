@@ -271,7 +271,34 @@ class DonorProfileRepository {
   /// Returns null if there is no enrichment row or on error. Callers
   /// should also check [DonorEnrichmentRecord.hasData] before rendering
   /// — an empty record should not produce a card.
-  Future<DonorEnrichmentRecord?> fetchEnrichmentRecord(String profileId) async {
+  /// Fetch enrichment using a `donor_profiles.id` UUID as the anchor.
+  /// Routes: donor_profiles.mec_donor_id → mec_donors.id → donor_enrichment.donor_id.
+  /// Used by [DonorProfileScreen], which only has a donor_profiles UUID.
+  Future<DonorEnrichmentRecord?> fetchEnrichmentRecordByProfileUuid(
+    String profileUuid,
+  ) async {
+    if (!isReady) return null;
+    try {
+      final profile = await _readClient
+          .from('donor_profiles')
+          .select('mec_donor_id')
+          .eq('id', profileUuid)
+          .maybeSingle();
+      final mecDonorId = profile?['mec_donor_id'];
+      if (mecDonorId == null) return null;
+      return await fetchEnrichmentRecord(mecDonorId.toString());
+    } catch (e) {
+      debugPrint('❌ fetchEnrichmentRecordByProfileUuid: $e');
+      return null;
+    }
+  }
+
+  /// Fetch a donor_enrichment row keyed by `mec_donors.id` (the canonical donor
+  /// identity). [donorId] is the bigint PK from `public.mec_donors`. Call with
+  /// a string (e.g. from an RPC payload) — we cast server-side.
+  ///
+  /// Returns null if there is no enrichment row or on error.
+  Future<DonorEnrichmentRecord?> fetchEnrichmentRecord(String donorId) async {
     if (!isReady) return null;
     try {
       final row = await _readClient
@@ -280,9 +307,13 @@ class DonorProfileRepository {
             'id,full_name,gender,age_estimate,party_lean,party_lean_confidence,'
             'current_city,current_zip,current_county,congressional_district,'
             'total_political_donations,donation_count,avg_donation,'
-            'donation_frequency,is_homeowner,wealth_score,mo_voter_file_id',
+            'donation_frequency,is_homeowner,wealth_score,mo_voter_file_id,'
+            'generation,ethnicity,current_address_line1,current_address_line2,'
+            'current_state,phone_mobile,phone_home,email_personal,'
+            'social_profile_count,current_employer,current_job_title,'
+            'estimated_income_range,engagement_score,giving_capacity_estimate',
           )
-          .eq('profile_id', profileId)
+          .eq('donor_id', donorId)
           .maybeSingle();
       if (row == null) return null;
       return DonorEnrichmentRecord.fromJson(row);

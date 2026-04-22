@@ -533,6 +533,7 @@ class Member {
       'term_expiration': termExpiration?.toIso8601String().split('T').first,
       'profile_pictures': profilePhotos.map((photo) => photo.toJson()).toList(),
       'internal_member_info': internalInfo.toJson(),
+      'mo_voter_file_id': moVoterFileId,
     };
   }
 
