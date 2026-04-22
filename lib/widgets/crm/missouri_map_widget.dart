@@ -96,6 +96,10 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   late final MapController _mapController;
   late AnimationController _entranceController;
   late Animation<double> _entranceAnimation;
+  late AnimationController _pulseController;
+  late AnimationController _cameraController;
+  Animation<LatLng>? _cameraCenterAnim;
+  Animation<double>? _cameraZoomAnim;
 
   // Current district type selection
   DistrictType _activeType = DistrictType.house;
@@ -104,6 +108,7 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   final Map<DistrictType, List<_DistrictPolygon>> _polygonsByType = {};
   final Set<DistrictType> _loadedTypes = {};
   String? _hoveredDistrict;
+  Offset? _hoverLocalPosition;
   String? _goldRingDistrict;
 
   // Missouri bounds
@@ -141,6 +146,27 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
       curve: Curves.easeOutCubic,
     );
 
+    // Pulse loop: drives both YD marker glow AND the gold-ring pulse.
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+
+    // Smooth camera flight controller — drives animated move() instead of
+    // the hard jump the old MapController.move() did.
+    _cameraController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    );
+    _cameraController.addListener(() {
+      if (_cameraCenterAnim != null && _cameraZoomAnim != null) {
+        _mapController.move(
+          _cameraCenterAnim!.value,
+          _cameraZoomAnim!.value,
+        );
+      }
+    });
+
     _loadGeoJson(_activeType);
   }
 
@@ -164,8 +190,27 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   void dispose() {
     widget.controller?._detach(this);
     _entranceController.dispose();
+    _pulseController.dispose();
+    _cameraController.dispose();
     _mapController.dispose();
     super.dispose();
+  }
+
+  // Smooth-fly the camera to [target] at [zoom] over ~650ms using an
+  // easeInOutCubic curve. Replaces MapController.move() for nicer UX.
+  void _flyTo(LatLng target, double zoom) {
+    final camera = _mapController.camera;
+    final fromCenter = camera.center;
+    final fromZoom = camera.zoom;
+
+    _cameraController.stop();
+    _cameraCenterAnim = LatLngTween(begin: fromCenter, end: target).animate(
+      CurvedAnimation(parent: _cameraController, curve: Curves.easeInOutCubic),
+    );
+    _cameraZoomAnim = Tween<double>(begin: fromZoom, end: zoom).animate(
+      CurvedAnimation(parent: _cameraController, curve: Curves.easeInOutCubic),
+    );
+    _cameraController.forward(from: 0);
   }
 
   // ── Programmatic controller actions ──────────────────────
@@ -226,7 +271,7 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
     // Congressional districts are much larger — zoom out a bit so the whole
     // district is visible. State house/senate get a tighter zoom.
     final zoomLevel = type == DistrictType.congressional ? 7.5 : 9.0;
-    _mapController.move(match.centroid, zoomLevel);
+    _flyTo(match.centroid, zoomLevel);
   }
 
   // ── District map for active type ─────────────────────────
@@ -336,21 +381,41 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
     final districtMap = _activeDistrictMap;
     final polygons = _activePolygons;
 
+    // First pass: compute max YD count so we can normalize the heatmap.
+    int maxYd = 1;
     for (final dp in polygons) {
       final candidates = districtMap[dp.district];
+      if (candidates == null) continue;
+      final ydCount = candidates.where((c) => c.isYoungDem).length;
+      if (ydCount > maxYd) maxYd = ydCount;
+    }
+
+    for (final dp in polygons) {
+      final candidates = districtMap[dp.district];
+      dp.candidateCount = candidates?.length ?? 0;
+      dp.ydCount = candidates?.where((c) => c.isYoungDem).length ?? 0;
+
       if (candidates == null || candidates.isEmpty) {
-        // Gray with solid 0.30 opacity — visible, not invisible
-        dp.fillColor = Colors.grey.withOpacity(0.30);
-        dp.borderColor = Colors.grey.withOpacity(0.50);
+        // "No Democrat running" gets a subtle warning red-gray tint so it
+        // pops visually as a gap the party should fill.
+        dp.fillColor = const Color(0xFF6b7280).withOpacity(0.22);
+        dp.borderColor = const Color(0xFF6b7280).withOpacity(0.45);
         dp.status = _DistrictStatus.noData;
       } else {
-        final hasYd = candidates.any((c) => c.isYoungDem);
+        final hasYd = dp.ydCount > 0;
         final hasDem = candidates.any((c) => c.isDemocrat);
         final hasRep = candidates.any((c) => c.isRepublican);
 
         if (hasYd) {
-          dp.fillColor = const Color(0xFF0b4db8).withOpacity(0.55);
-          dp.borderColor = const Color(0xFF0b4db8).withOpacity(0.85);
+          // Heatmap: districts with more YDs get a brighter gold-saturated
+          // glow. Clamp to avoid a pure white burnout on districts with 3+ YDs.
+          final intensity = (dp.ydCount / maxYd).clamp(0.4, 1.0);
+          dp.fillColor = Color.lerp(
+            const Color(0xFF0b4db8).withOpacity(0.40),
+            const Color(0xFFFDB813).withOpacity(0.55),
+            intensity * 0.65,
+          )!;
+          dp.borderColor = const Color(0xFFFDB813).withOpacity(0.85);
           dp.status = _DistrictStatus.youngDem;
         } else if (hasDem && hasRep) {
           dp.fillColor = const Color(0xFF8b5cf6).withOpacity(0.40);
@@ -361,7 +426,7 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
           dp.borderColor = const Color(0xFF3b82f6).withOpacity(0.70);
           dp.status = _DistrictStatus.dem;
         } else {
-          dp.fillColor = const Color(0xFFef4444).withOpacity(0.40);
+          dp.fillColor = const Color(0xFFef4444).withOpacity(0.38);
           dp.borderColor = const Color(0xFFef4444).withOpacity(0.65);
           dp.status = _DistrictStatus.republican;
         }
@@ -382,9 +447,10 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
 
   // ── Tap handler ──────────────────────────────────────────
 
-  void _onDistrictTap(_DistrictPolygon dp) {
+  void _onDistrictTap(_DistrictPolygon dp, [Offset? localPos]) {
     setState(() {
       _hoveredDistrict = dp.district;
+      _hoverLocalPosition = localPos ?? _hoverLocalPosition ?? Offset.zero;
     });
     widget.onDistrictTap?.call(dp.district, _activeType);
   }
@@ -451,7 +517,7 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
           // Reset zoom button
           GestureDetector(
             onTap: () {
-              _mapController.move(_moCenter, _initialZoom);
+              _flyTo(_moCenter, _initialZoom);
             },
             child: Container(
               padding:
@@ -624,36 +690,73 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
           districtMap[dp.district]!.isNotEmpty;
 
       if (dp.status == _DistrictStatus.youngDem) {
-        // Young Dem districts get a prominent blue circle marker
+        // Young Dem districts get a pulsing gold ring + bold navy center.
+        // The pulse is driven by _pulseController (repeat reverse, 1.8s).
         markers.add(Marker(
           point: dp.centroid,
-          width: 28,
-          height: 28,
+          width: 40,
+          height: 40,
           child: GestureDetector(
             onTap: () => _onDistrictTap(dp),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF0b4db8),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.25),
-                    blurRadius: 4,
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Text(
-                  dp.district,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                    height: 1,
-                  ),
-                ),
-              ),
+            child: AnimatedBuilder(
+              animation: _pulseController,
+              builder: (context, _) {
+                // 0..1 -> 0.85..1.15 ring scale, 0.55..0.15 ring opacity
+                final t = _pulseController.value;
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Outer pulsing ring
+                    Transform.scale(
+                      scale: 0.85 + t * 0.35,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: BrandColors.sunriseGold.withOpacity(0.55 - t * 0.4),
+                            width: 2.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Solid center badge
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [BrandColors.sunriseGold, Color(0xFFE89B00)],
+                        ),
+                        border: Border.all(
+                            color: Colors.white.withOpacity(0.9), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: BrandColors.sunriseGold.withOpacity(0.55),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          dp.district,
+                          style: const TextStyle(
+                            color: Color(0xFF1a1a2e),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ));
@@ -691,45 +794,131 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
       }
     }
 
+    // Hover tooltip content — only painted when _hoveredDistrict is set.
+    _DistrictPolygon? hoveredDp;
+    if (_hoveredDistrict != null) {
+      for (final dp in polygons) {
+        if (dp.district == _hoveredDistrict) {
+          hoveredDp = dp;
+          break;
+        }
+      }
+    }
+
     return SizedBox(
       height: widget.height,
       child: ClipRRect(
         borderRadius: widget.compactMode
             ? BorderRadius.circular(12)
             : const BorderRadius.vertical(bottom: Radius.circular(12)),
-        child: GestureDetector(
-          onTapUp: (details) => _handleMapTapGesture(details),
-          child: FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _moCenter,
-              initialZoom: _initialZoom,
-              minZoom: 5.5,
-              maxZoom: 12.0,
-              interactionOptions: InteractionOptions(
-                flags: widget.interactive
-                    ? InteractiveFlag.all
-                    : InteractiveFlag.none,
+        child: Stack(
+          children: [
+            GestureDetector(
+              onTapUp: (details) => _handleMapTapGesture(details),
+              child: FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: _moCenter,
+                  initialZoom: _initialZoom,
+                  minZoom: 5.5,
+                  maxZoom: 12.0,
+                  interactionOptions: InteractionOptions(
+                    flags: widget.interactive
+                        ? InteractiveFlag.all
+                        : InteractiveFlag.none,
+                  ),
+                  backgroundColor: const Color(0xFFf0f0f0),
+                ),
+                children: [
+                  // Light tile layer (CartoDB Positron)
+                  TileLayer(
+                    urlTemplate:
+                        'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+                    subdomains: const ['a', 'b', 'c', 'd'],
+                    userAgentPackageName: 'org.moyoungdemocrats.crm',
+                    maxZoom: 18,
+                  ),
+                  // District polygons
+                  PolygonLayer(
+                    polygons: mapPolygons,
+                    polygonCulling: true,
+                  ),
+                  // Markers / labels
+                  MarkerLayer(
+                    markers: markers,
+                  ),
+                ],
               ),
-              backgroundColor: const Color(0xFFf0f0f0),
             ),
+            // Floating hover/tap tooltip
+            if (hoveredDp != null && _hoverLocalPosition != null)
+              _buildHoverTooltip(hoveredDp),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Floating dark pill in the top-left of the map showing district name +
+  /// candidate count. Appears when a district is tapped; dismisses automatically
+  /// on next tap.
+  Widget _buildHoverTooltip(_DistrictPolygon dp) {
+    final typeLabel = _typeLabels[_activeType] ?? '';
+    final titleText = '$typeLabel District ${dp.district}';
+    String subtitle;
+    if (dp.status == _DistrictStatus.noData) {
+      subtitle = 'No candidates filed yet';
+    } else if (dp.ydCount > 0) {
+      subtitle =
+          '${dp.ydCount} Young Dem${dp.ydCount == 1 ? '' : 's'} · ${dp.candidateCount} total';
+    } else {
+      subtitle =
+          '${dp.candidateCount} candidate${dp.candidateCount == 1 ? '' : 's'}';
+    }
+    return Positioned(
+      left: 12,
+      top: 12,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 160),
+        opacity: 1,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: BrandColors.unityBlue.withOpacity(0.94),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+                color: BrandColors.sunriseGold.withOpacity(0.55), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Light tile layer (CartoDB Positron)
-              TileLayer(
-                urlTemplate:
-                    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                userAgentPackageName: 'org.moyoungdemocrats.crm',
-                maxZoom: 18,
+              Text(
+                titleText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.2,
+                ),
               ),
-              // District polygons
-              PolygonLayer(
-                polygons: mapPolygons,
-                polygonCulling: true,
-              ),
-              // Markers / labels
-              MarkerLayer(
-                markers: markers,
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: dp.ydCount > 0
+                      ? BrandColors.sunriseGold
+                      : Colors.white.withOpacity(0.75),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -748,10 +937,15 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
 
     for (final dp in polygons) {
       if (_isPointInPolygon(tapLatLng, dp.rings.first)) {
-        _onDistrictTap(dp);
+        _onDistrictTap(dp, details.localPosition);
         return;
       }
     }
+    // Tap on empty map area — dismiss tooltip.
+    setState(() {
+      _hoveredDistrict = null;
+      _hoverLocalPosition = null;
+    });
   }
 
   /// Ray-casting point-in-polygon test
@@ -809,13 +1003,13 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
       child: Row(
         children: [
           _legendChip(
-              const Color(0xFF0b4db8), 'Young Dem', ydDistricts),
+              BrandColors.sunriseGold, 'Young Dem', ydDistricts),
           _legendChip(
               const Color(0xFF3b82f6), 'Democrat', demDistricts),
           _legendChip(const Color(0xFF8b5cf6), 'Contested', contested),
           _legendChip(
               const Color(0xFFef4444), 'Republican', repDistricts),
-          _legendChip(Colors.grey, 'No Cand.', noData),
+          _legendChip(const Color(0xFF6b7280), 'No Cand.', noData),
         ],
       ),
     );
@@ -824,12 +1018,20 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   Widget _legendChip(Color color, String label, int count) {
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 3),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(8),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                color.withOpacity(0.22),
+                color.withOpacity(0.10),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withOpacity(0.45), width: 1),
           ),
           child: Column(
             children: [
@@ -838,28 +1040,40 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 8,
-                    height: 8,
+                    width: 9,
+                    height: 9,
                     decoration: BoxDecoration(
                       color: color,
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withOpacity(0.55),
+                          blurRadius: 6,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 5),
                   Text(
                     '$count',
                     style: TextStyle(
                       color: color,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.3,
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 2),
               Text(
                 label,
-                style:
-                    TextStyle(color: Colors.grey.shade500, fontSize: 9),
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.1,
+                ),
               ),
             ],
           ),
@@ -882,6 +1096,8 @@ class _DistrictPolygon {
   Color fillColor;
   Color borderColor;
   _DistrictStatus status;
+  int candidateCount;
+  int ydCount;
 
   _DistrictPolygon({
     required this.district,
@@ -890,7 +1106,27 @@ class _DistrictPolygon {
     this.fillColor = Colors.transparent,
     this.borderColor = Colors.transparent,
     this.status = _DistrictStatus.noData,
+    this.candidateCount = 0,
+    this.ydCount = 0,
   });
+}
+
+/// Tween that linearly interpolates two LatLng coordinates. Used by the
+/// smooth camera flyTo() so we can animate center + zoom over an
+/// easeInOutCubic curve instead of the hard jump MapController.move() does.
+class LatLngTween extends Tween<LatLng> {
+  LatLngTween({required LatLng begin, required LatLng end})
+      : super(begin: begin, end: end);
+
+  @override
+  LatLng lerp(double t) {
+    final b = begin!;
+    final e = end!;
+    return LatLng(
+      b.latitude + (e.latitude - b.latitude) * t,
+      b.longitude + (e.longitude - b.longitude) * t,
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
