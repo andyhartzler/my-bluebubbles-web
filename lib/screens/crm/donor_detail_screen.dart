@@ -132,7 +132,26 @@ class _DonorDetailScreenState extends State<DonorDetailScreen> {
     }
 
     if (_donor == null) {
-      return const Center(child: Text('Unable to load donor.'));
+      // Matches the error-state UX above so a silent null doesn't leave the
+      // user stranded with no retry affordance.
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.search_off, color: Colors.grey, size: 48),
+            const SizedBox(height: 12),
+            const Text(
+              'Unable to load donor.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _load,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
     }
 
     final donor = _donor!;
