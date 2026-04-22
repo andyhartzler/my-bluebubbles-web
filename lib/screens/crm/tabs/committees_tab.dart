@@ -356,6 +356,7 @@ class CommitteesTabState extends State<CommitteesTab> {
   Widget _buildSearchView() {
     return Column(
       children: [
+        _buildHeroBanner(),
         _buildSearchBar(),
         _buildFilterChips(),
         Expanded(
@@ -386,6 +387,85 @@ class CommitteesTabState extends State<CommitteesTab> {
                     ),
         ),
       ],
+    );
+  }
+
+  Widget _buildHeroBanner() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      child: BrandedCard(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.account_balance, color: Colors.white, size: 28),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Committees',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Browse 18,627 MEC + FEC committees',
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+            // Source filter pills (MEC / FEC / Both)
+            _buildSourcePill('Both', _sourceFilter == 'both', () {
+              setState(() => _sourceFilter = 'both');
+              _performSearch();
+            }),
+            const SizedBox(width: 6),
+            _buildSourcePill('MEC', _sourceFilter == 'mec', () {
+              setState(() => _sourceFilter = 'mec');
+              _performSearch();
+            }),
+            const SizedBox(width: 6),
+            _buildSourcePill('FEC', _sourceFilter == 'fec', () {
+              setState(() => _sourceFilter = 'fec');
+              _performSearch();
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSourcePill(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? BrandColors.unityBlue : Colors.white,
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
     );
   }
 
@@ -481,28 +561,27 @@ class CommitteesTabState extends State<CommitteesTab> {
   }
 
   Widget _buildFilterChip(String label, bool selected, VoidCallback onTap, {Color? color}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected
-              ? (color ?? BrandColors.sunriseGold)
-              : BrandColors.unityBlue.withOpacity(0.4),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? Colors.white24 : Colors.transparent,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.white70,
-            fontSize: 12,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-          ),
-        ),
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      backgroundColor: Colors.white.withOpacity(0.15),
+      selectedColor: Colors.white,
+      checkmarkColor: BrandColors.unityBlue,
+      labelStyle: TextStyle(
+        color: selected ? BrandColors.unityBlue : Colors.white,
+        fontSize: 12,
+        fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
       ),
+      side: BorderSide(
+        color: selected ? Colors.white : Colors.white.withOpacity(0.3),
+        width: 1,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
     );
   }
 
@@ -915,69 +994,117 @@ class CommitteesTabState extends State<CommitteesTab> {
   // ============================================================
 
   Widget _buildDonorSection(NumberFormat currencyFormat) {
-    return BrandedCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    // Build ranked items from _donors state; progressFraction normalized to the
+    // top donor's total so the #1 row always fills the bar.
+    final double maxTotal = _donors.isEmpty
+        ? 0
+        : _donors
+            .map((d) => (d['total'] as num?)?.toDouble() ?? 0)
+            .fold<double>(0, (a, b) => a > b ? a : b);
+
+    final rankedItems = _donors.map((donor) {
+      final name = donor['name'] as String? ?? '';
+      final total = (donor['total'] as num?)?.toDouble() ?? 0;
+      final count = (donor['count'] as num?)?.toInt() ?? 0;
+      final city = donor['city'] as String? ?? '';
+      final state = donor['state'] as String? ?? '';
+
+      final locParts = <String>[];
+      if (city.isNotEmpty) {
+        locParts.add(state.isNotEmpty ? '$city, $state' : city);
+      } else if (state.isNotEmpty) {
+        locParts.add(state);
+      }
+      locParts.add('$count contribution${count == 1 ? '' : 's'}');
+      final sublabel = locParts.join(' · ');
+
+      return BrandedRankedItem(
+        label: name,
+        valueLabel: currencyFormat.format(total),
+        progressFraction: maxTotal > 0 ? (total / maxTotal) : 0,
+        sublabel: sublabel,
+      );
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Sort chips row inside its own BrandedCard header strip
+        BrandedCard(
+          padding: const EdgeInsets.all(12),
+          child: Row(
             children: [
+              const Icon(Icons.sort, color: Colors.white70, size: 18),
+              const SizedBox(width: 8),
+              const Text(
+                'Sort:',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  'Donors (${_donors.length}${_hasMoreDonors ? '+' : ''})',
-                  style: BrandTextStyles.title,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildSortChip('Total', 'total'),
+                      const SizedBox(width: 6),
+                      _buildSortChip('Count', 'count'),
+                      const SizedBox(width: 6),
+                      _buildSortChip('Name', 'name'),
+                      const SizedBox(width: 6),
+                      _buildSortChip('Last Date', 'last_date'),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          // Sort chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildSortChip('Total', 'total'),
-                const SizedBox(width: 6),
-                _buildSortChip('Count', 'count'),
-                const SizedBox(width: 6),
-                _buildSortChip('Name', 'name'),
-                const SizedBox(width: 6),
-                _buildSortChip('Last Date', 'last_date'),
-              ],
+        ),
+        const SizedBox(height: 8),
+        BrandedRankedListCard(
+          title: 'Donors (${_donors.length}${_hasMoreDonors ? '+' : ''})',
+          icon: Icons.people,
+          items: rankedItems,
+          emptyLabel: _loadingMoreDonors ? 'Loading...' : 'No donor data available',
+          onItemTap: (index) {
+            final donor = _donors[index];
+            final name = donor['name'] as String? ?? '';
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Opening donor profile for $name...'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+        if (_hasMoreDonors && !_loadingMoreDonors)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Center(
+              child: TextButton(
+                onPressed: _loadMoreDonors,
+                child: const Text(
+                  'Load more donors...',
+                  style: TextStyle(color: BrandColors.sunriseGold),
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          if (_donors.isEmpty && !_loadingMoreDonors)
-            Text('No donor data available', style: BrandTextStyles.bodySecondary),
-          ...List.generate(_donors.length, (i) => _buildDonorRow(_donors[i], currencyFormat, i)),
-          if (_hasMoreDonors && !_loadingMoreDonors)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Center(
-                child: TextButton(
-                  onPressed: _loadMoreDonors,
-                  child: const Text(
-                    'Load more donors...',
-                    style: TextStyle(color: BrandColors.sunriseGold),
-                  ),
+        if (_loadingMoreDonors)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: BrandColors.sunriseGold,
+                  strokeWidth: 2,
                 ),
               ),
             ),
-          if (_loadingMoreDonors)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    color: BrandColors.sunriseGold,
-                    strokeWidth: 2,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -1009,6 +1136,7 @@ class CommitteesTabState extends State<CommitteesTab> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildDonorRow(Map<String, dynamic> donor, NumberFormat fmt, int index) {
     final name = donor['name'] as String? ?? '';
     final total = (donor['total'] as num?)?.toDouble() ?? 0;
