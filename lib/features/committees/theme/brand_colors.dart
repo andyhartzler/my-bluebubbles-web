@@ -577,10 +577,13 @@ class BrandedActivityFeedItem extends StatelessWidget {
     this.actionLabel,
     this.actionColor,
     this.leadingIcon,
+    this.leadingWidget,
     this.avatarInitials,
     this.onTap,
     this.showChevron = true,
     this.trailingChips,
+    this.trailing,
+    this.expansion,
   });
 
   /// Top line (white, w600, 14).
@@ -602,6 +605,11 @@ class BrandedActivityFeedItem extends StatelessWidget {
   /// [avatarInitials].
   final IconData? leadingIcon;
 
+  /// Optional fully custom leading widget. Takes precedence over
+  /// [leadingIcon] and [avatarInitials]. Use when the row needs a
+  /// non-circular leading affordance (e.g. a status dot or party indicator).
+  final Widget? leadingWidget;
+
   /// Optional initials (1-2 chars) when no [leadingIcon] is set.
   final String? avatarInitials;
 
@@ -614,7 +622,22 @@ class BrandedActivityFeedItem extends StatelessWidget {
   /// Optional chip widgets rendered in a [Wrap] below the texts.
   final List<Widget>? trailingChips;
 
+  /// Optional trailing widget rendered in place of the default
+  /// action-pill + chevron (e.g. a Checkbox for bulk selection or a
+  /// stack of amount + status chip). When supplied, [actionLabel] and
+  /// [showChevron] are ignored so the caller owns the right edge.
+  final Widget? trailing;
+
+  /// Optional expandable content rendered below the main row inside the
+  /// same pill. Use for inline editors (call-time notes, quick-edit forms)
+  /// so the call site can keep its stateful expand-on-tap behavior while
+  /// still inheriting the branded row chrome.
+  final Widget? expansion;
+
   Widget _buildAvatar() {
+    if (leadingWidget != null) {
+      return leadingWidget!;
+    }
     if (leadingIcon != null) {
       return Container(
         width: 36,
@@ -660,6 +683,102 @@ class BrandedActivityFeedItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final row = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildAvatar(),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                primaryText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                secondaryText,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (tertiaryText != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  tertiaryText!,
+                  style: const TextStyle(
+                    color: Colors.white60,
+                    fontSize: 11,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              if (trailingChips != null && trailingChips!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: trailingChips!,
+                ),
+              ],
+            ],
+          ),
+        ),
+        // When the caller supplies a custom `trailing` widget it owns the
+        // right edge entirely — ignore actionLabel + chevron so the row
+        // doesn't end up with a checkbox AND a chevron AND a pill stacked.
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          trailing!,
+        ] else ...[
+          if (actionLabel != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: actionColor ?? Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                actionLabel!.toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+          if (showChevron) ...[
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.chevron_right,
+              color: Colors.white54,
+              size: 18,
+            ),
+          ],
+        ],
+      ],
+    );
+
+    final body = expansion == null
+        ? row
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [row, expansion!],
+          );
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -672,86 +791,7 @@ class BrandedActivityFeedItem extends StatelessWidget {
             color: Colors.white.withOpacity(0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildAvatar(),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      primaryText,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      secondaryText,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (tertiaryText != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        tertiaryText!,
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 11,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    if (trailingChips != null && trailingChips!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 4,
-                        runSpacing: 4,
-                        children: trailingChips!,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (actionLabel != null) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: actionColor ?? Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    actionLabel!.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-              if (showChevron) ...[
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.chevron_right,
-                  color: Colors.white54,
-                  size: 18,
-                ),
-              ],
-            ],
-          ),
+          child: body,
         ),
       ),
     );
