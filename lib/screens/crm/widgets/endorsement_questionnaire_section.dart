@@ -15,7 +15,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 
 class EndorsementQuestionnaireSection extends StatefulWidget {
   final String candidateId;

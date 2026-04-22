@@ -12,7 +12,7 @@ import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/models/crm/voter_file_record.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_painters.dart';
 import 'package:bluebubbles/screens/crm/voter_file/voter_file_card.dart';
-import 'package:bluebubbles/screens/crm/widgets/endorsement_questionnaire_section.dart';
+import 'package:bluebubbles/screens/crm/widgets/candidate_questionnaire_panel.dart';
 import 'package:bluebubbles/screens/crm/candidate_edit_dialog.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/mec_committee_picker.dart';
@@ -144,9 +144,9 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       curve: const Interval(0.2, 1.0, curve: Curves.easeOut),
     ));
     _tabController = TabController(
-      length: 4,
+      length: 5,
       vsync: this,
-      initialIndex: widget.initialTab.clamp(0, 3),
+      initialIndex: widget.initialTab.clamp(0, 4),
     );
     _tabController.addListener(_onTabChanged);
     _notesController.text = c.notes ?? '';
@@ -924,6 +924,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                           Tab(text: 'Money'),
                           Tab(text: 'District'),
                           Tab(text: 'Intel'),
+                          Tab(text: 'Questionnaire'),
                         ],
                       ),
                     ),
@@ -937,6 +938,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                     _buildMoneyTab(),
                     _buildRaceTab(),
                     _buildIntelTab(),
+                    CandidateQuestionnairePanel(candidateId: c.id),
                   ],
                 ),
               ),
@@ -3245,8 +3247,6 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         if (_intelSegment == 0) ...[
           _buildNewsSection(),
         ] else if (_intelSegment == 1) ...[
-          EndorsementQuestionnaireSection(candidateId: c.id),
-          const SizedBox(height: 12),
           _buildEndorsementSection(),
           const SizedBox(height: 12),
           // Ballotpedia endorsements from profile
