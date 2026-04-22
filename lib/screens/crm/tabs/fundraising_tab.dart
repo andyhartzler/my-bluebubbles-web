@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/donation.dart';
 import 'package:bluebubbles/models/crm/donation_thank_you.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
@@ -21,12 +22,6 @@ import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/event_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/screens/crm/dialogs/donor_export_dialog.dart';
-
-const _unityBlue = Color(0xFF273351);
-const _momentumBlue = Color(0xFF32A6DE);
-const _sunriseGold = Color(0xFFFDB813);
-const _grassrootsGreen = Color(0xFF43A047);
-const _justicePurple = Color(0xFF6A1B9A);
 
 enum _DonationSearchResultType { donor, member, attendee }
 
@@ -397,72 +392,63 @@ class _FundraisingTabState extends State<FundraisingTab> {
     }
   }
 
-  Widget _buildHeroCard({
+  Widget _buildStatCard({
     required String title,
     required String value,
-    required Color color,
-    IconData? icon,
+    required IconData icon,
     String? subtitle,
+    List<Color>? gradientColors,
   }) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [color.withOpacity(0.9), color.withOpacity(0.7)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return BrandedStatCard(
+      title: title,
+      value: value,
+      icon: icon,
+      subtitle: subtitle,
+      gradientColors: gradientColors,
+    );
+  }
+
+  Widget _buildTopDonorsCard() {
+    final currency = NumberFormat.simpleCurrency();
+    final sorted = [..._donors]
+      ..sort(
+        (a, b) => (b.totalDonated ?? 0).compareTo(a.totalDonated ?? 0),
+      );
+    final top = sorted.take(5).toList();
+    final maxTotal = _totalRaised > 0
+        ? _totalRaised
+        : (top.isNotEmpty ? (top.first.totalDonated ?? 0) : 0);
+
+    final items = top.map((donor) {
+      final total = donor.totalDonated ?? 0;
+      final fraction = maxTotal > 0 ? (total / maxTotal).clamp(0.0, 1.0) : 0.0;
+      return BrandedRankedItem(
+        label: donor.name ?? 'Unknown donor',
+        valueLabel: currency.format(total),
+        progressFraction: fraction,
+        sublabel: '${donor.donationCount} gifts',
+      );
+    }).toList();
+
+    return BrandedRankedListCard(
+      title: 'Top Donors',
+      icon: Icons.emoji_events,
+      items: items,
+      emptyLabel: 'No donors yet',
+      onItemTap: (index) {
+        final donor = top[index];
+        if (donor.id == null) return;
+        Navigator.of(context).push(
+          ThemeSwitcher.buildPageRoute(
+            builder: (_) => TitleBarWrapper(
+              child: DonorDetailScreen(
+                donorId: donor.id!,
+                initialDonor: donor,
+              ),
+            ),
           ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            if (icon != null)
-              CircleAvatar(
-                backgroundColor: Colors.white.withOpacity(0.2),
-                child: Icon(icon, color: Colors.white),
-              )
-            else
-              const SizedBox(
-                height: 40,
-              ), // Placeholder to maintain consistent height
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Colors.white.withOpacity(0.9),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: Text(
-                subtitle ?? '',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withOpacity(0.8),
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -557,56 +543,122 @@ class _FundraisingTabState extends State<FundraisingTab> {
           width: 260,
           child: TextField(
             controller: _searchController,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              labelText: 'Search donors',
+            style: const TextStyle(color: Colors.white),
+            cursorColor: Colors.white,
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search, color: Colors.white70),
+              hintText: 'Search donors',
+              hintStyle: const TextStyle(color: Colors.white70),
+              filled: true,
+              fillColor: BrandColors.unityBlue.withOpacity(0.6),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
             ),
           ),
         ),
-        DropdownButton<bool?>(
-          value: _recurringFilter,
-          underline: const SizedBox.shrink(),
-          onChanged: (value) {
-            setState(() => _recurringFilter = value);
-            _applyFilters();
-          },
-          items: const [
-            DropdownMenuItem(value: null, child: Text('All gifts')),
-            DropdownMenuItem(value: true, child: Text('Recurring donors')),
-            DropdownMenuItem(value: false, child: Text('One-time donors')),
-          ],
-        ),
-        DropdownButton<bool?>(
-          value: _linkedFilter,
-          underline: const SizedBox.shrink(),
-          onChanged: (value) {
-            setState(() => _linkedFilter = value);
-            _applyFilters();
-          },
-          items: const [
-            DropdownMenuItem(value: null, child: Text('All profiles')),
-            DropdownMenuItem(value: true, child: Text('Linked members')),
-            DropdownMenuItem(value: false, child: Text('Guests only')),
-          ],
-        ),
+        _buildRecurringChip('All gifts', null),
+        _buildRecurringChip('Recurring', true),
+        _buildRecurringChip('One-time', false),
+        _buildLinkedChip('All profiles', null),
+        _buildLinkedChip('Linked members', true),
+        _buildLinkedChip('Guests only', false),
         SizedBox(
           width: 140,
           child: TextField(
             controller: _minTotalController,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Min total',
+            style: const TextStyle(color: Colors.white),
+            cursorColor: Colors.white,
+            decoration: InputDecoration(
+              hintText: 'Min total',
+              hintStyle: const TextStyle(color: Colors.white70),
               prefixText: r'$ ',
+              prefixStyle: const TextStyle(color: Colors.white70),
+              filled: true,
+              fillColor: BrandColors.unityBlue.withOpacity(0.6),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
             ),
             onChanged: (_) => _applyFilters(),
           ),
         ),
-        TextButton.icon(
-          onPressed: _loadData,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Refresh'),
-        ),
       ],
+    );
+  }
+
+  Widget _buildRecurringChip(String label, bool? value) {
+    final isSelected = _recurringFilter == value;
+    return FilterChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? BrandColors.unityBlue : Colors.white,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (_) {
+        setState(() => _recurringFilter = value);
+        _applyFilters();
+      },
+      backgroundColor: Colors.white.withOpacity(0.15),
+      selectedColor: Colors.white,
+      checkmarkColor: BrandColors.unityBlue,
+      side: BorderSide(
+        color: isSelected ? Colors.white : Colors.white.withOpacity(0.3),
+      ),
+    );
+  }
+
+  Widget _buildLinkedChip(String label, bool? value) {
+    final isSelected = _linkedFilter == value;
+    return FilterChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? BrandColors.unityBlue : Colors.white,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+      selected: isSelected,
+      onSelected: (_) {
+        setState(() => _linkedFilter = value);
+        _applyFilters();
+      },
+      backgroundColor: Colors.white.withOpacity(0.15),
+      selectedColor: Colors.white,
+      checkmarkColor: BrandColors.unityBlue,
+      side: BorderSide(
+        color: isSelected ? Colors.white : Colors.white.withOpacity(0.3),
+      ),
     );
   }
 
@@ -666,9 +718,6 @@ class _FundraisingTabState extends State<FundraisingTab> {
           );
         }
 
-        final phoneDisplay = _formatPhoneDisplay(
-          donor.phoneE164 ?? donor.phone ?? donation.donorPhone,
-        );
         final county = donor.county;
         final district = donor.congressionalDistrict;
         final age = _calculateAge(donor.dateOfBirth);
@@ -680,97 +729,54 @@ class _FundraisingTabState extends State<FundraisingTab> {
           if (age != null) 'Age: $age',
         ].where((value) => (value ?? '').isNotEmpty).join(' • ');
 
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: () {
-              if (donor.id != null) {
-                Navigator.of(context).push(
-                  ThemeSwitcher.buildPageRoute(
-                    builder: (_) => TitleBarWrapper(
-                      child: DonorDetailScreen(
-                        donorId: donor.id!,
-                        initialDonor: donor,
-                      ),
+        final displayName =
+            donor.name ?? donation.donorName ?? 'Unknown Donor';
+        final initials = _initialsFor(displayName);
+        final isRecurring = donor.isRecurringDonor == true;
+
+        return BrandedActivityFeedItem(
+          primaryText: displayName,
+          secondaryText:
+              '${currency.format(donation.amount ?? 0)} • ${donation.paymentMethodLabel}',
+          tertiaryText: headerLine.isEmpty ? null : headerLine,
+          actionLabel: isRecurring ? 'RECURRING' : null,
+          actionColor: isRecurring
+              ? BrandColors.success.withOpacity(0.8)
+              : null,
+          avatarInitials: initials,
+          trailingChips: subtitleChips,
+          onTap: () {
+            if (donor.id != null) {
+              Navigator.of(context).push(
+                ThemeSwitcher.buildPageRoute(
+                  builder: (_) => TitleBarWrapper(
+                    child: DonorDetailScreen(
+                      donorId: donor.id!,
+                      initialDonor: donor,
                     ),
                   ),
-                );
-              }
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [_unityBlue, _momentumBlue],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          headerLine,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: Colors.white70),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          donor.name ?? donation.donorName ?? 'Unknown Donor',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          currency.format(donation.amount ?? 0),
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          alignment: WrapAlignment.end,
-                          children: subtitleChips,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+              );
+            }
+          },
         );
       },
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, __) => const SizedBox.shrink(),
       itemCount: _recentDonations.length,
     );
+  }
+
+  String _initialsFor(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return '?';
+    final parts = trimmed
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return trimmed.substring(0, 1).toUpperCase();
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
+        .toUpperCase();
   }
 
   void _updateSort(String field, {bool? ascending}) {
@@ -1325,7 +1331,6 @@ class _FundraisingTabState extends State<FundraisingTab> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final supabaseReady =
         CRMConfig.crmEnabled && CRMSupabaseService().isInitialized;
 
@@ -1338,7 +1343,9 @@ class _FundraisingTabState extends State<FundraisingTab> {
     }
 
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: BrandColors.momentumBlue),
+      );
     }
 
     if (_error != null) {
@@ -1352,65 +1359,101 @@ class _FundraisingTabState extends State<FundraisingTab> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Fundraising',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+          BrandedCard(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Track donor relationships and giving performance.',
-                    style: theme.textTheme.bodyMedium,
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.volunteer_activism,
+                    color: Colors.white,
+                    size: 28,
                   ),
-                ],
-              ),
-              IconButton(
-                tooltip: 'Refresh donors',
-                icon: const Icon(Icons.refresh),
-                onPressed: _loadData,
-              ),
-            ],
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'MOYD Donors',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$_totalDonors people who have given to MOYD directly',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _loadData,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Refresh'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: BrandColors.sunriseGold,
+                    foregroundColor: BrandColors.unityBlue,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 18),
           LayoutBuilder(
             builder: (context, constraints) {
               final isWide = constraints.maxWidth > 900;
               final cards = [
-                _buildHeroCard(
+                _buildStatCard(
                   title: 'Total Raised',
                   value: currency.format(_totalRaised),
                   subtitle: 'Across $_totalDonors donors',
-                  color: _momentumBlue,
                   icon: Icons.volunteer_activism,
                 ),
-                _buildHeroCard(
+                _buildStatCard(
                   title: 'Recurring Donors',
                   value: _recurringCount.toString(),
                   subtitle:
                       '${((_recurringCount / (_totalDonors == 0 ? 1 : _totalDonors)) * 100).toStringAsFixed(1)}% of base • ${currency.format(_recurringTotal)} lifetime',
-                  color: _grassrootsGreen,
                   icon: Icons.autorenew,
+                  gradientColors: const [
+                    Color(0xFF10B981),
+                    Color(0xFF059669),
+                  ],
                 ),
-                _buildHeroCard(
+                _buildStatCard(
                   title: 'Linked to CRM',
                   value: _linkedCount.toString(),
                   subtitle: 'Connected to member profiles',
-                  color: _justicePurple,
                   icon: Icons.hub_outlined,
+                  gradientColors: const [
+                    Color(0xFF8B5CF6),
+                    Color(0xFF7C3AED),
+                  ],
                 ),
-                _buildHeroCard(
+                _buildStatCard(
                   title: 'Average Gift',
                   value: currency.format(averageGift),
                   subtitle: 'Per donor lifetime total',
-                  color: _sunriseGold,
                   icon: Icons.attach_money,
+                  gradientColors: const [
+                    Color(0xFFF59E0B),
+                    Color(0xFFD97706),
+                  ],
                 ),
               ];
 
@@ -1474,6 +1517,8 @@ class _FundraisingTabState extends State<FundraisingTab> {
             },
           ),
           const SizedBox(height: 24),
+          _buildTopDonorsCard(),
+          const SizedBox(height: 24),
           _buildFilters(),
           const SizedBox(height: 12),
           Row(
@@ -1486,8 +1531,8 @@ class _FundraisingTabState extends State<FundraisingTab> {
                 icon: const Icon(Icons.file_download_outlined),
                 label: const Text('Export'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: _unityBlue,
-                  side: const BorderSide(color: _unityBlue),
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1496,21 +1541,46 @@ class _FundraisingTabState extends State<FundraisingTab> {
                 icon: const Icon(Icons.add),
                 label: const Text('Add manual donation'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _unityBlue,
-                  foregroundColor: Colors.white,
+                  backgroundColor: BrandColors.sunriseGold,
+                  foregroundColor: BrandColors.unityBlue,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 18),
-          Card(
-            elevation: 3,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: _buildDonationList(context),
+          BrandedCard(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.receipt_long,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Recent Gifts',
+                        style: BrandTextStyles.title,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildDonationList(context),
+              ],
             ),
           ),
         ],
