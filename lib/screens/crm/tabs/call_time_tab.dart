@@ -178,36 +178,113 @@ class _CallTimeTabState extends State<CallTimeTab> {
   // ===========================================================================
 
   Widget _buildListsView() {
+    // Compute aggregate stats for the hero banner stat tiles.
+    final activeCount = _lists.where((l) => l.status == 'active').length;
+    final totalContacts =
+        _lists.fold<int>(0, (sum, l) => sum + l.totalItems);
+    // TODO: list model has totalPledged (dollar amount) and totalCalled but
+    // no per-list "pledged count" field. Using 0 until the model/SQL is
+    // updated to expose a pledged-count aggregate.
+    const pledgesCount = 0;
+
     return Column(
       children: [
-        // Header row
+        // Hero banner
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Row(
-            children: [
-              Text(
-                'Call Time Lists',
-                style: BrandTextStyles.titleLarge,
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.refresh, color: Colors.white70),
-                onPressed: _loadLists,
-                tooltip: 'Refresh',
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                onPressed: _showCreateListDialog,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('New List'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: BrandColors.unityBlue,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          child: BrandedCard(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.phone_in_talk,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Call Time',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Manage call lists and track pledge activity',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _showCreateListDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text('New List'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: BrandColors.sunriseGold,
+                    foregroundColor: BrandColors.unityBlue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Stat tiles
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: [
+              SizedBox(
+                width: 220,
+                child: BrandedStatCard(
+                  title: 'Active Lists',
+                  value: activeCount.toString(),
+                  icon: Icons.list_alt,
+                ),
+              ),
+              SizedBox(
+                width: 220,
+                child: BrandedStatCard(
+                  title: 'Total Contacts',
+                  value: totalContacts.toString(),
+                  icon: Icons.people,
+                  gradientColors: const [
+                    Color(0xFF10B981),
+                    Color(0xFF059669),
+                  ],
+                ),
+              ),
+              SizedBox(
+                width: 220,
+                child: BrandedStatCard(
+                  title: 'Pledges',
+                  value: pledgesCount.toString(),
+                  icon: Icons.handshake_outlined,
+                  gradientColors: const [
+                    Color(0xFFF59E0B),
+                    Color(0xFFD97706),
+                  ],
                 ),
               ),
             ],
@@ -262,8 +339,9 @@ class _CallTimeTabState extends State<CallTimeTab> {
       label: Text(
         label,
         style: TextStyle(
-          color: isSelected ? Colors.white : Colors.white70,
+          color: isSelected ? BrandColors.unityBlue : Colors.white,
           fontSize: 13,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
         ),
       ),
       selected: isSelected,
@@ -271,15 +349,13 @@ class _CallTimeTabState extends State<CallTimeTab> {
         setState(() => _statusFilter = value);
         _loadLists();
       },
-      selectedColor: BrandColors.momentumBlue,
-      backgroundColor: BrandColors.unityBlue.withOpacity(0.6),
-      checkmarkColor: Colors.white,
+      selectedColor: Colors.white,
+      backgroundColor: Colors.white.withOpacity(0.15),
+      checkmarkColor: BrandColors.unityBlue,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
         side: BorderSide(
-          color: isSelected
-              ? BrandColors.momentumBlue
-              : Colors.white24,
+          color: isSelected ? Colors.white : Colors.white24,
         ),
       ),
     );
@@ -475,39 +551,81 @@ class _CallTimeTabState extends State<CallTimeTab> {
         return b.priority.compareTo(a.priority);
       });
 
+    final statusColor = _listStatusColor(list.status);
+
     return Column(
       children: [
-        // Header
+        // Hero header
         Padding(
-          padding: const EdgeInsets.fromLTRB(8, 12, 16, 0),
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () {
-                  setState(() => _selectedList = null);
-                  _loadLists();
-                },
-              ),
-              Expanded(
-                child: Text(
-                  list.name,
-                  style: BrandTextStyles.titleLarge,
-                  overflow: TextOverflow.ellipsis,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          child: BrandedCard(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () {
+                    setState(() => _selectedList = null);
+                    _loadLists();
+                  },
+                  tooltip: 'Back',
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh, color: Colors.white70),
-                onPressed: () => _loadListDetail(list.id),
-                tooltip: 'Refresh',
-              ),
-            ],
+                const SizedBox(width: 4),
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.phone_in_talk,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        list.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${list.totalItems} contact'
+                        '${list.totalItems == 1 ? '' : 's'}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _buildStatusChip(list.status, statusColor),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.white70),
+                  onPressed: () => _loadListDetail(list.id),
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
           ),
         ),
 
         // Stats bar
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Row(
             children: [
               _buildStatCard('Total', list.totalItems.toString()),
