@@ -61,13 +61,14 @@ class _MecResearchTabState extends State<MecResearchTab> {
     'DC',
   ];
 
-  // Party options with colors
+  // Party filter options (label/value only; Slack-style chips ignore per-party
+  // colors in favor of white-selected / white-15%-unselected).
   static const List<_PartyOption> _partyOptions = [
-    _PartyOption(label: 'All', value: null, color: Colors.white70),
-    _PartyOption(label: 'Democrat', value: 'democrat', color: Colors.blue),
-    _PartyOption(label: 'Republican', value: 'republican', color: Colors.red),
-    _PartyOption(label: 'Progressive', value: 'progressive', color: Colors.green),
-    _PartyOption(label: 'Conservative', value: 'conservative', color: Colors.orange),
+    _PartyOption(label: 'All', value: null),
+    _PartyOption(label: 'Democrat', value: 'democrat'),
+    _PartyOption(label: 'Republican', value: 'republican'),
+    _PartyOption(label: 'Progressive', value: 'progressive'),
+    _PartyOption(label: 'Conservative', value: 'conservative'),
   ];
 
   @override
@@ -275,21 +276,6 @@ class _MecResearchTabState extends State<MecResearchTab> {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  Color _partyColor(String party) {
-    switch (party.toLowerCase()) {
-      case 'democrat':
-        return Colors.blue;
-      case 'republican':
-        return Colors.red;
-      case 'progressive':
-        return Colors.green;
-      case 'conservative':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
-  }
-
   String _donorDisplayName(Map<String, dynamic> donor) {
     final lastName = (donor['contributor_last_name'] as String?) ?? '';
     final firstName = (donor['contributor_first_name'] as String?) ?? '';
@@ -322,55 +308,194 @@ class _MecResearchTabState extends State<MecResearchTab> {
   // ===========================================================================
 
   Widget _buildSearchMode() {
-    return ListView(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(24),
-      children: [
-        // Name search
-        _buildSearchBar(),
-        const SizedBox(height: 12),
+    return BrandedBackground(
+      child: ListView(
+        controller: _scrollController,
+        padding: const EdgeInsets.all(24),
+        children: [
+          // Hero banner
+          _buildHeroBanner(),
+          const SizedBox(height: 16),
 
-        // State dropdown + year range row
-        _buildFilterRow(),
-        const SizedBox(height: 12),
+          // Stat tiles (MEC / FEC scale + optional results count)
+          _buildStatTiles(),
+          const SizedBox(height: 16),
 
-        // Party filter chips
-        _buildPartyChips(),
-        const SizedBox(height: 8),
+          // Name search
+          _buildSearchBar(),
+          const SizedBox(height: 12),
 
-        // Source filter chips
-        _buildSourceChips(),
-        const SizedBox(height: 16),
+          // State dropdown + year range row
+          _buildFilterRow(),
+          const SizedBox(height: 12),
 
-        // Search button
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _performSearch,
-            icon: const Icon(Icons.search, color: Colors.white),
-            label: const Text('Search Donor Database',
-                style: TextStyle(color: Colors.white)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: BrandColors.unityBlue,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          // Party filter chips
+          _buildPartyChips(),
+          const SizedBox(height: 16),
+
+          // Search button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _performSearch,
+              icon: const Icon(Icons.search, color: BrandColors.unityBlue),
+              label: const Text('Search Donor Database',
+                  style: TextStyle(
+                    color: BrandColors.unityBlue,
+                    fontWeight: FontWeight.w700,
+                  )),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: BrandColors.sunriseGold,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 20),
+          const SizedBox(height: 20),
 
-        // Results section
-        if (_loading) _buildLoadingIndicator(),
-        if (_error != null) _buildErrorMessage(),
-        if (!_loading && _error == null && _hasSearched && _donors.isNotEmpty)
-          _buildResultsSection(),
-        if (!_loading && _error == null && _hasSearched && _donors.isEmpty)
-          _buildEmptyState(),
-        if (!_loading && _error == null && !_hasSearched)
-          _buildInitialState(),
-      ],
+          // Results section
+          if (_loading) _buildLoadingIndicator(),
+          if (_error != null) _buildErrorMessage(),
+          if (!_loading && _error == null && _hasSearched && _donors.isNotEmpty)
+            _buildResultsSection(),
+          if (!_loading && _error == null && _hasSearched && _donors.isEmpty)
+            _buildEmptyState(),
+          if (!_loading && _error == null && !_hasSearched)
+            _buildInitialState(),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Hero banner + stat tiles (Slack-style)
+  // ---------------------------------------------------------------------------
+
+  Widget _buildHeroBanner() {
+    return BrandedCard(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.manage_search,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Donor Research',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Explore every MO political donor — 1M+ records',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Source toggle pills (MEC / FEC / Both)
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _buildSourcePill('Both', 'both'),
+              _buildSourcePill('MEC', 'mec'),
+              _buildSourcePill('FEC', 'fec'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourcePill(String label, String value) {
+    final isSelected = _selectedSource == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedSource = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? BrandColors.sunriseGold
+              : Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? BrandColors.unityBlue : Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatTiles() {
+    final tiles = <Widget>[
+      SizedBox(
+        width: 260,
+        child: const BrandedStatCard(
+          title: 'MEC Research Database',
+          value: '1.02M',
+          subtitle: 'Missouri Ethics Commission donors',
+          icon: Icons.account_balance,
+          gradientColors: [Color(0xFF10B981), Color(0xFF059669)],
+        ),
+      ),
+      SizedBox(
+        width: 260,
+        child: const BrandedStatCard(
+          title: 'FEC Research Database',
+          value: '1.76M',
+          subtitle: 'Federal Election Commission donors',
+          icon: Icons.flag_outlined,
+          gradientColors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+        ),
+      ),
+    ];
+    if (_hasSearched && _donors.isNotEmpty) {
+      tiles.add(
+        SizedBox(
+          width: 260,
+          child: BrandedStatCard(
+            title: 'Results',
+            value: '${_donors.length}',
+            subtitle: 'Matching your search',
+            icon: Icons.people_outline,
+          ),
+        ),
+      );
+    }
+    return Wrap(
+      spacing: 16,
+      runSpacing: 16,
+      children: tiles,
     );
   }
 
@@ -379,22 +504,24 @@ class _MecResearchTabState extends State<MecResearchTab> {
       controller: _searchController,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.person_search, color: Colors.white70),
-        labelText: 'Search by donor name',
-        labelStyle: const TextStyle(color: Colors.white70),
+        prefixIcon: const Icon(Icons.person_search, color: Colors.white),
+        hintText: 'Search donors by name',
+        hintStyle: const TextStyle(color: Colors.white70),
         filled: true,
-        fillColor: BrandColors.unityBlue.withOpacity(0.7),
+        fillColor: BrandColors.unityBlue.withOpacity(0.6),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(12),
         ),
         enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide.none,
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.white24),
         ),
         focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide.none,
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: BrandColors.momentumBlue, width: 2),
         ),
       ),
       onSubmitted: (_) => _performSearch(),
@@ -516,68 +643,29 @@ class _MecResearchTabState extends State<MecResearchTab> {
       runSpacing: 8,
       children: _partyOptions.map((option) {
         final isSelected = _selectedParty == option.value;
-        return ChoiceChip(
+        return FilterChip(
           label: Text(
             option.label,
             style: TextStyle(
-              color: isSelected ? Colors.white : option.color,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected ? BrandColors.unityBlue : Colors.white,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               fontSize: 13,
             ),
           ),
           selected: isSelected,
-          selectedColor: option.value == null
-              ? BrandColors.momentumBlue
-              : option.color.withOpacity(0.8),
-          backgroundColor: BrandColors.unityBlue.withOpacity(0.7),
-          side: BorderSide(
-            color: isSelected ? Colors.transparent : option.color.withOpacity(0.5),
+          showCheckmark: true,
+          checkmarkColor: BrandColors.unityBlue,
+          selectedColor: Colors.white,
+          backgroundColor: Colors.white.withOpacity(0.15),
+          side: BorderSide.none,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
           onSelected: (_) {
             setState(() => _selectedParty = option.value);
           },
         );
       }).toList(),
-    );
-  }
-
-  Widget _buildSourceChips() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          const Text('Source: ', style: BrandTextStyles.caption),
-          const SizedBox(width: 8),
-          _buildSourceChip('Both', 'both', BrandColors.sunriseGold),
-          const SizedBox(width: 6),
-          _buildSourceChip('MEC', 'mec', BrandColors.momentumBlue),
-          const SizedBox(width: 6),
-          _buildSourceChip('FEC', 'fec', BrandColors.success),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSourceChip(String label, String value, Color color) {
-    final isSelected = _selectedSource == value;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedSource = value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? color : BrandColors.unityBlue.withOpacity(0.4),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? Colors.white24 : Colors.transparent),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.white70,
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-          ),
-        ),
-      ),
     );
   }
 
@@ -701,260 +789,152 @@ class _MecResearchTabState extends State<MecResearchTab> {
   Widget _buildDonorCard(Map<String, dynamic> donor) {
     final name = donor['donor_name'] as String? ?? _donorDisplayName(donor);
     final totalAmount = (donor['total_amount'] as num?)?.toDouble() ?? 0.0;
-    final contributionCount = (donor['contribution_count'] as num?)?.toInt() ?? 0;
     final city = donor['city'] as String?;
     final state = donor['state'] as String?;
-    final employer = (donor['current_employer'] as String?) ?? (donor['employer'] as String?);
-    final occupation = (donor['current_job_title'] as String?) ?? (donor['occupation'] as String?);
-    final firstYear = (donor['first_year'] as num?)?.toInt();
-    final lastYear = (donor['last_year'] as num?)?.toInt();
-    final avgAmount = (donor['avg_amount'] as num?)?.toDouble();
-    final parties = (donor['parties'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [];
-    final committees = (donor['committees'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        [];
-
-    // Source data from unified search
+    final employer = (donor['current_employer'] as String?) ??
+        (donor['employer'] as String?);
+    final occupation = (donor['current_job_title'] as String?) ??
+        (donor['occupation'] as String?);
     final dataSources = donor['data_sources'] as String? ?? 'MEC';
-    final mecTotal = (donor['mec_total'] as num?)?.toDouble() ?? 0.0;
-    final fecTotal = (donor['fec_total'] as num?)?.toDouble() ?? 0.0;
-
-    // Enrichment data from search_donors_v2
-    final partyLean = donor['party_lean'] as String?;
-    final ageEstimate = (donor['age_estimate'] as num?)?.toInt();
-    final gender = donor['gender'] as String?;
-    final phoneMobile = donor['phone_mobile'] as String?;
-    final phoneHome = donor['phone_home'] as String?;
-    final hasPhone = (phoneMobile != null && phoneMobile.isNotEmpty) ||
-        (phoneHome != null && phoneHome.isNotEmpty);
 
     final location = [city, state]
         .where((s) => s != null && s.isNotEmpty)
         .join(', ');
+    final employerLine = (employer != null && employer.isNotEmpty)
+        ? (occupation != null && occupation.isNotEmpty
+            ? '$employer — $occupation'
+            : employer)
+        : null;
+
+    // Compute avatar initials from display name
+    String initials = '';
+    final words = name.trim().split(RegExp(r'[\s,]+'));
+    for (final w in words) {
+      if (w.isEmpty) continue;
+      initials += w[0].toUpperCase();
+      if (initials.length >= 2) break;
+    }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: BrandedCard(
         onTap: () => _openProfileFromDonor(donor),
         padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Top row: name + total amount
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ),
-                          if (dataSources.contains('FEC'))
-                            Container(
-                              margin: const EdgeInsets.only(left: 6),
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: BrandColors.success.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: BrandColors.success.withOpacity(0.5), width: 0.5),
-                              ),
-                              child: const Text('FEC', style: TextStyle(color: BrandColors.success, fontSize: 9, fontWeight: FontWeight.w700)),
-                            ),
-                          if (dataSources.contains('MEC'))
-                            Container(
-                              margin: const EdgeInsets.only(left: 6),
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: BrandColors.momentumBlue.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: BrandColors.momentumBlue.withOpacity(0.5), width: 0.5),
-                              ),
-                              child: const Text('MEC', style: TextStyle(color: BrandColors.momentumBlue, fontSize: 9, fontWeight: FontWeight.w700)),
-                            ),
-                        ],
-                      ),
-                      // Enrichment badges row
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          if (partyLean != null && partyLean.isNotEmpty)
-                            _buildEnrichmentChip(
-                              partyLean,
-                              _partyLeanColor(partyLean),
-                            ),
-                          if (ageEstimate != null)
-                            _buildEnrichmentChip(
-                              'Age ~$ageEstimate',
-                              Colors.white70,
-                            ),
-                          if (gender != null && gender.isNotEmpty)
-                            _buildEnrichmentChip(
-                              gender,
-                              Colors.white70,
-                            ),
-                          if (hasPhone)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: BrandColors.success.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: BrandColors.success.withOpacity(0.5),
-                                  width: 0.5,
-                                ),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.phone, size: 11, color: BrandColors.success),
-                                  SizedBox(width: 3),
-                                  Text(
-                                    'Phone',
-                                    style: TextStyle(
-                                      color: BrandColors.success,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      _currencyFormat.format(totalAmount),
+            // Leading: 40x40 unityBlue circle with initials or icon
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: BrandColors.unityBlue,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: initials.isNotEmpty
+                  ? Text(
+                      initials,
                       style: const TextStyle(
-                        color: BrandColors.sunriseGold,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 17,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
                       ),
+                    )
+                  : const Icon(Icons.person, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+
+            // Center: name + city/state + employer
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (location.isNotEmpty) ...[
+                    const SizedBox(height: 2),
                     Text(
-                      '$contributionCount contribution${contributionCount == 1 ? '' : 's'}',
-                      style: BrandTextStyles.caption,
-                    ),
-                    if (mecTotal > 0 && fecTotal > 0) ...[
-                      Text('MEC: ${_currencyFormat.format(mecTotal)}', style: BrandTextStyles.caption.copyWith(fontSize: 10)),
-                      Text('FEC: ${_currencyFormat.format(fecTotal)}', style: BrandTextStyles.caption.copyWith(fontSize: 10, color: BrandColors.success)),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Location + employer/occupation
-            if (location.isNotEmpty || (employer != null && employer.isNotEmpty))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  children: [
-                    if (location.isNotEmpty) ...[
-                      const Icon(Icons.location_on, size: 14, color: Colors.white70),
-                      const SizedBox(width: 4),
-                      Text(location, style: BrandTextStyles.caption),
-                    ],
-                    if (location.isNotEmpty && employer != null && employer.isNotEmpty)
-                      const Text('  |  ', style: BrandTextStyles.caption),
-                    if (employer != null && employer.isNotEmpty) ...[
-                      const Icon(Icons.business, size: 14, color: Colors.white70),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          occupation != null && occupation.isNotEmpty
-                              ? '$employer ($occupation)'
-                              : employer,
-                          style: BrandTextStyles.caption,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      location,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
                       ),
-                    ],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
-                ),
+                  if (employerLine != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      employerLine,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
               ),
+            ),
+            const SizedBox(width: 12),
 
-            // Year range + avg amount
-            Row(
+            // Right: total + source pills
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                if (firstYear != null && lastYear != null) ...[
-                  const Icon(Icons.calendar_today, size: 13, color: Colors.white70),
-                  const SizedBox(width: 4),
-                  Text(
-                    firstYear == lastYear ? '$firstYear' : '$firstYear - $lastYear',
-                    style: BrandTextStyles.caption,
+                Text(
+                  _currencyFormat.format(totalAmount),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
                   ),
-                  const SizedBox(width: 12),
-                ],
-                if (avgAmount != null) ...[
-                  Text(
-                    'Avg: ${_currencyFormat.format(avgAmount)}',
-                    style: BrandTextStyles.caption,
-                  ),
-                  const SizedBox(width: 12),
-                ],
-                if (committees.isNotEmpty)
-                  Text(
-                    '${committees.length} committee${committees.length == 1 ? '' : 's'}',
-                    style: BrandTextStyles.caption,
-                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (dataSources.contains('MEC'))
+                      _buildSourceBadge('MEC', BrandColors.democratBlue),
+                    if (dataSources.contains('MEC') &&
+                        dataSources.contains('FEC'))
+                      const SizedBox(width: 4),
+                    if (dataSources.contains('FEC'))
+                      _buildSourceBadge('FEC', BrandColors.momentumBlue),
+                  ],
+                ),
               ],
             ),
-
-            // Party chips
-            if (parties.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: parties.map((party) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _partyColor(party).withOpacity(0.25),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _partyColor(party).withOpacity(0.6),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      party[0].toUpperCase() + party.substring(1),
-                      style: TextStyle(
-                        color: _partyColor(party),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSourceBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -998,55 +978,57 @@ class _MecResearchTabState extends State<MecResearchTab> {
   // ===========================================================================
 
   Widget _buildProfileMode() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        // Back button
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: _closeProfile,
-            icon: const Icon(Icons.arrow_back, color: Colors.white70),
-            label: const Text('Back to search',
-                style: TextStyle(color: Colors.white70)),
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        if (_profileLoading)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(48),
-              child: CircularProgressIndicator(color: BrandColors.momentumBlue),
+    return BrandedBackground(
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          // Back button
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _closeProfile,
+              icon: const Icon(Icons.arrow_back, color: Colors.white70),
+              label: const Text('Back to search',
+                  style: TextStyle(color: Colors.white70)),
             ),
-          )
-        else ...[
-          // Header card
-          _buildProfileHeader(),
-          const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 8),
 
-          // Enrichment sections (personal, contact, employment, political)
-          _buildEnrichmentSections(),
+          if (_profileLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(48),
+                child: CircularProgressIndicator(color: BrandColors.momentumBlue),
+              ),
+            )
+          else ...[
+            // Header card
+            _buildProfileHeader(),
+            const SizedBox(height: 16),
 
-          // Unified MEC contributions section
-          _buildMecContributionsSection(),
-          const SizedBox(height: 12),
+            // Enrichment sections (personal, contact, employment, political)
+            _buildEnrichmentSections(),
 
-          // Unified FEC contributions section
-          _buildFecContributionsSection(),
-          const SizedBox(height: 16),
+            // Unified MEC contributions section
+            _buildMecContributionsSection(),
+            const SizedBox(height: 12),
 
-          // Legacy committees section (fallback when _unifiedProfile is null)
-          if (_unifiedProfile == null) ...[
-            _buildCommitteesSection(),
-            const SizedBox(height: 24),
+            // Unified FEC contributions section
+            _buildFecContributionsSection(),
+            const SizedBox(height: 16),
+
+            // Legacy committees section (fallback when _unifiedProfile is null)
+            if (_unifiedProfile == null) ...[
+              _buildCommitteesSection(),
+              const SizedBox(height: 24),
+            ],
+
+            // Legacy contributions timeline (fallback when _unifiedProfile is null)
+            if (_unifiedProfile == null)
+              _buildContributionsTimeline(),
           ],
-
-          // Legacy contributions timeline (fallback when _unifiedProfile is null)
-          if (_unifiedProfile == null)
-            _buildContributionsTimeline(),
         ],
-      ],
+      ),
     );
   }
 
@@ -2260,11 +2242,9 @@ class _MecResearchTabState extends State<MecResearchTab> {
 class _PartyOption {
   final String label;
   final String? value;
-  final Color color;
 
   const _PartyOption({
     required this.label,
     required this.value,
-    required this.color,
   });
 }
