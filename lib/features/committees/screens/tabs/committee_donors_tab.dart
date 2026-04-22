@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 
-import 'package:bluebubbles/screens/crm/donors_list_screen.dart';
+import 'package:bluebubbles/screens/crm/donor_command_center.dart';
 
-/// Donors tab for the Fundraising committee
-/// Embeds the full DonorsListScreen
+/// Donors tab for the Fundraising committee workspace.
+///
+/// Embeds the canonical DonorCommandCenter in embed mode so the committee
+/// workspace gets the full donors UI (MOYD Donors / Fundraising / Donor
+/// Research / Call Time / Committees) without duplicating tab scaffolding.
 class CommitteeDonorsTab extends StatelessWidget {
   const CommitteeDonorsTab({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Embed the full donors screen with embed mode
-    return const DonorsListScreen(embed: true);
+    return const DonorCommandCenter(embed: true);
   }
 }

@@ -388,9 +388,9 @@ class _MecResearchTabState extends State<MecResearchTab> {
   // ===========================================================================
 
   Widget _buildSearchMode() {
-    // Host screens (DonorCommandCenter, DonorsListScreen) already provide the
-    // BrandedBackground around this tab. Wrapping again stacks a second 18%
-    // white overlay and washes the navy into a milky grey.
+    // Host screen (DonorCommandCenter) already provides the BrandedBackground
+    // around this tab. Wrapping again stacks a second 18% white overlay and
+    // washes the navy into a milky grey.
     return ListView(
       controller: _scrollController,
       padding: const EdgeInsets.all(24),
