@@ -68,3 +68,4 @@ pubspec.lock
 .env
 .env.local
 .env.*.local
+supabase/.temp/

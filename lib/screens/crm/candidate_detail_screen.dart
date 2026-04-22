@@ -12,6 +12,7 @@ import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/models/crm/voter_file_record.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_painters.dart';
 import 'package:bluebubbles/screens/crm/voter_file/voter_file_card.dart';
+import 'package:bluebubbles/screens/crm/widgets/endorsement_questionnaire_section.dart';
 import 'package:bluebubbles/screens/crm/candidate_edit_dialog.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/mec_committee_picker.dart';
@@ -3244,6 +3245,8 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         if (_intelSegment == 0) ...[
           _buildNewsSection(),
         ] else if (_intelSegment == 1) ...[
+          EndorsementQuestionnaireSection(candidateId: c.id),
+          const SizedBox(height: 12),
           _buildEndorsementSection(),
           const SizedBox(height: 12),
           // Ballotpedia endorsements from profile
