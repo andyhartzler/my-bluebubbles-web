@@ -19,6 +19,37 @@ import 'package:bluebubbles/models/crm/candidate.dart';
 /// Which set of district boundaries to display.
 enum DistrictType { house, senate, congressional }
 
+/// Public controller for [MissouriMapWidget] — lets the containing page
+/// drive the map imperatively (zoom-to-district on candidate selection,
+/// programmatic highlight, etc).
+class MissouriMapController {
+  _MissouriMapWidgetState? _state;
+
+  void _attach(_MissouriMapWidgetState state) {
+    _state = state;
+  }
+
+  void _detach(_MissouriMapWidgetState state) {
+    if (identical(_state, state)) _state = null;
+  }
+
+  /// Animate the map to the centroid of the given district and paint a gold
+  /// selection ring on its polygon. [office] picks which GeoJSON layer
+  /// ("State Representative" → house, "State Senator" → senate, etc).
+  /// Pass null [districtNum] to clear the selection.
+  Future<void> zoomToDistrict({
+    required String office,
+    required String? districtNum,
+  }) async {
+    await _state?._zoomToDistrictFromOffice(office: office, district: districtNum);
+  }
+
+  /// Clear the gold selection ring without moving the map.
+  void clearHighlight() {
+    _state?._clearHighlight();
+  }
+}
+
 class MissouriMapWidget extends StatefulWidget {
   final Map<String, List<Candidate>> houseDistrictMap;
   final Map<String, List<Candidate>> senateDistrictMap;
@@ -27,6 +58,8 @@ class MissouriMapWidget extends StatefulWidget {
   /// Passes (districtNumber, activeDistrictType) so the caller can scope the lookup.
   final void Function(String district, DistrictType type)? onDistrictTap;
   final String? selectedDistrict;
+  final String? highlightedDistrict;
+  final MissouriMapController? controller;
   final double height;
   final bool showLabels;
   final bool showLegend;
@@ -42,6 +75,8 @@ class MissouriMapWidget extends StatefulWidget {
     Map<String, List<Candidate>>? congressionalDistrictMap,
     this.onDistrictTap,
     this.selectedDistrict,
+    this.highlightedDistrict,
+    this.controller,
     this.height = 320,
     this.showLabels = true,
     this.showLegend = true,
@@ -69,6 +104,7 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   final Set<DistrictType> _loadedTypes = {};
   bool _geoJsonLoaded = false; // true once the initial (house) load finishes
   String? _hoveredDistrict;
+  String? _goldRingDistrict;
 
   // Missouri bounds
   static final _moCenter = LatLng(38.35, -92.45);
@@ -94,6 +130,7 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   void initState() {
     super.initState();
     _mapController = MapController();
+    widget.controller?._attach(this);
 
     _entranceController = AnimationController(
       vsync: this,
@@ -110,6 +147,10 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   @override
   void didUpdateWidget(MissouriMapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      oldWidget.controller?._detach(this);
+      widget.controller?._attach(this);
+    }
     if (oldWidget.houseDistrictMap != widget.houseDistrictMap ||
         oldWidget.senateDistrictMap != widget.senateDistrictMap ||
         oldWidget.congressionalDistrictMap !=
@@ -121,9 +162,68 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
 
   @override
   void dispose() {
+    widget.controller?._detach(this);
     _entranceController.dispose();
     _mapController.dispose();
     super.dispose();
+  }
+
+  // ── Programmatic controller actions ──────────────────────
+
+  void _clearHighlight() {
+    if (!mounted) return;
+    setState(() {
+      _goldRingDistrict = null;
+    });
+  }
+
+  Future<void> _zoomToDistrictFromOffice({
+    required String office,
+    required String? district,
+  }) async {
+    if (!mounted) return;
+    if (district == null || district.isEmpty) {
+      _clearHighlight();
+      return;
+    }
+
+    final o = office.toLowerCase();
+    DistrictType type;
+    if (o.contains('congress') || o.contains('u.s. rep') || o.contains('us rep')) {
+      type = DistrictType.congressional;
+    } else if (o.contains('state senate') || o.contains('state senator')) {
+      type = DistrictType.senate;
+    } else if (o.contains('state rep') || o.contains('representative') || o.contains('house')) {
+      type = DistrictType.house;
+    } else {
+      type = DistrictType.house;
+    }
+
+    // Switch layer if needed (will lazy-load the GeoJSON the first time).
+    if (_activeType != type) {
+      setState(() => _activeType = type);
+      await _loadGeoJson(type);
+    }
+
+    final polygons = _activePolygons;
+    _DistrictPolygon? match;
+    for (final p in polygons) {
+      if (p.district == district) {
+        match = p;
+        break;
+      }
+    }
+    if (match == null) {
+      _clearHighlight();
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _goldRingDistrict = district;
+    });
+
+    _mapController.move(match.centroid, 8.0);
   }
 
   // ── District map for active type ─────────────────────────
@@ -492,6 +592,24 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
         borderStrokeWidth: isSelected ? 2.5 : 0.8,
         isFilled: true,
       ));
+    }
+
+    // Gold-ring overlay for the candidate-driven selection from the list panel.
+    // Drawn LAST so it sits on top of the base polygon fill/border.
+    final goldRing = widget.highlightedDistrict ?? _goldRingDistrict;
+    if (goldRing != null) {
+      for (final dp in polygons) {
+        if (dp.district != goldRing) continue;
+        mapPolygons.add(Polygon(
+          points: dp.rings.first,
+          holePointsList: dp.rings.length > 1 ? dp.rings.sublist(1) : null,
+          color: const Color(0x22FDB813),
+          borderColor: const Color(0xFFFDB813),
+          borderStrokeWidth: 3.5,
+          isFilled: true,
+        ));
+        break;
+      }
     }
 
     // Build markers — show labels on districts with candidates
