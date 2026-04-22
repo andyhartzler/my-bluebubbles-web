@@ -31,9 +31,14 @@ class _DonorEnrichmentCardState extends State<DonorEnrichmentCard> {
   static const _identityLabels = {
     'Gender',
     'Age (est.)',
+    'Generation',
+    'Ethnicity',
   };
   static const _geographyLabels = {
+    'Street',
+    'Street 2',
     'Current City',
+    'Current State',
     'Current Zip',
     'Current County',
     'Congressional District',
@@ -47,13 +52,33 @@ class _DonorEnrichmentCardState extends State<DonorEnrichmentCard> {
     'Gift Count',
     'Average Gift',
     'Giving Frequency',
+    'Giving Capacity',
+  };
+  static const _contactLabels = {
+    'Mobile',
+    'Home Phone',
+    'Email',
+    'Social Profiles',
+  };
+  static const _employmentLabels = {
+    'Employer',
+    'Job Title',
+    'Est. Income',
+  };
+  static const _wealthLabels = {
+    'Homeowner',
+    'Wealth Score',
+    'Engagement Score',
   };
 
   String _sectionFor(String label) {
     if (_identityLabels.contains(label)) return 'Identity';
+    if (_contactLabels.contains(label)) return 'Contact';
     if (_geographyLabels.contains(label)) return 'Geography';
+    if (_employmentLabels.contains(label)) return 'Employment';
     if (_politicsLabels.contains(label)) return 'Politics';
     if (_givingLabels.contains(label)) return 'Giving';
+    if (_wealthLabels.contains(label)) return 'Wealth';
     return 'Other';
   }
 
@@ -68,7 +93,16 @@ class _DonorEnrichmentCardState extends State<DonorEnrichmentCard> {
       grouped.putIfAbsent(_sectionFor(f.label), () => []).add(f);
     }
 
-    final sectionOrder = ['Identity', 'Geography', 'Politics', 'Giving', 'Other'];
+    final sectionOrder = [
+      'Identity',
+      'Contact',
+      'Geography',
+      'Employment',
+      'Politics',
+      'Giving',
+      'Wealth',
+      'Other',
+    ];
     final ordered = [
       for (final s in sectionOrder)
         if (grouped[s] != null && grouped[s]!.isNotEmpty) MapEntry(s, grouped[s]!),
