@@ -196,33 +196,75 @@ class _EndorsementQuestionnaireSectionState
         .where((e) => e.value != null && e.value.toString().isNotEmpty)
         .toList();
 
-    return ExpansionTile(
-      tilePadding: EdgeInsets.zero,
-      title: const Text('Full response',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-      iconColor: Colors.white70,
-      collapsedIconColor: Colors.white70,
-      childrenPadding: const EdgeInsets.only(top: 8),
-      children: entries.map((e) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_humanize(e.key),
-                  style: const TextStyle(
-                    color: Colors.white60,
+    return Theme(
+      // Remove the default list-tile splash behavior so the header taps
+      // cleanly on mobile without the Material ripple extending past the
+      // rounded corners.
+      data: Theme.of(context).copyWith(
+        dividerColor: Colors.transparent,
+        splashColor: Colors.transparent,
+      ),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        // Clip the expansion content so long answers don't overflow
+        // horizontally past the card's rounded border on narrow screens.
+        clipBehavior: Clip.antiAlias,
+        title: Row(
+          children: [
+            const Text('Full response',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: BrandColors.sunriseGold.withOpacity(0.16),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '${entries.length}',
+                style: const TextStyle(
+                    color: BrandColors.sunriseGold,
                     fontSize: 11,
-                    letterSpacing: 0.4,
-                    fontWeight: FontWeight.w600,
-                  )),
-              const SizedBox(height: 2),
-              Text(e.value.toString(),
-                  style: const TextStyle(color: Colors.white, fontSize: 14)),
-            ],
-          ),
-        );
-      }).toList(),
+                    fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        iconColor: Colors.white70,
+        collapsedIconColor: Colors.white70,
+        childrenPadding: const EdgeInsets.only(top: 8),
+        children: entries.map((e) {
+          final value = e.value.toString();
+          final isLong = value.length > 180;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_humanize(e.key),
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 11,
+                      letterSpacing: 0.4,
+                      fontWeight: FontWeight.w600,
+                    )),
+                const SizedBox(height: 2),
+                // Long free-text answers collapse to 3 lines by default
+                // with a "Show more" toggle. Short answers render
+                // inline so the reader doesn't have to tap through
+                // every chip/yes-no to see its value.
+                isLong
+                    ? _ExpandableAnswer(text: value)
+                    : Text(
+                        value,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 14, height: 1.4),
+                      ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -266,4 +308,71 @@ class _EndorsementQuestionnaireSectionState
 
   String _formatDate(DateTime d) =>
       '${d.month}/${d.day}/${d.year}';
+}
+
+/// Collapsible free-text answer: shows 3 lines by default with a
+/// "Show more" / "Show less" toggle at the bottom. Used for long-form
+/// questionnaire answers so the full response card doesn't balloon to
+/// 4 screen-heights tall on mobile when the candidate writes a novel.
+class _ExpandableAnswer extends StatefulWidget {
+  final String text;
+  const _ExpandableAnswer({required this.text});
+
+  @override
+  State<_ExpandableAnswer> createState() => _ExpandableAnswerState();
+}
+
+class _ExpandableAnswerState extends State<_ExpandableAnswer> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedSize(
+          duration: MediaQuery.of(context).disableAnimations
+              ? Duration.zero
+              : const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topLeft,
+          child: Text(
+            widget.text,
+            style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+            maxLines: _expanded ? null : 3,
+            overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(height: 4),
+        InkWell(
+          onTap: () => setState(() => _expanded = !_expanded),
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            // Padding gets the tap area up to a comfortable 44×~28 — still
+            // small but paired with the large adjacent text it's reliable.
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _expanded ? 'Show less' : 'Show more',
+                  style: const TextStyle(
+                    color: BrandColors.sunriseGold,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  _expanded ? Icons.expand_less : Icons.expand_more,
+                  color: BrandColors.sunriseGold,
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
