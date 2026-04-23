@@ -232,49 +232,97 @@ class _PrimaryPairCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: _Side(
-                    title: 'Challenger',
-                    name: pair.challengerName,
-                    subtitle: 'Young Democrat',
-                    accent: BrandColors.sunriseGold,
-                    candidate: challenger,
-                    selected: challenger?.id == selectedCandidateId,
-                    onTap: () {
-                      if (challenger != null) onSelect(challenger!);
-                    },
-                    onOpen: onOpen == null || challenger == null
-                        ? null
-                        : () => onOpen!(challenger!),
-                  ),
+          // On mobile (<600px), the side-by-side challenger/incumbent
+          // pair squishes into a 140-pixel column per side — photo +
+          // name get chopped. Stack vertically with a "VS" divider
+          // between them instead. Desktop keeps the IntrinsicHeight
+          // Row so the cards grow to match the taller one's text.
+          LayoutBuilder(
+            builder: (ctx, constraints) {
+              final isMobile = constraints.maxWidth < 560;
+
+              final challengerSide = _Side(
+                title: 'Challenger',
+                name: pair.challengerName,
+                subtitle: 'Young Democrat',
+                accent: BrandColors.sunriseGold,
+                candidate: challenger,
+                selected: challenger?.id == selectedCandidateId,
+                fullWidth: isMobile,
+                onTap: () {
+                  if (challenger != null) onSelect(challenger!);
+                },
+                onOpen: onOpen == null || challenger == null
+                    ? null
+                    : () => onOpen!(challenger!),
+              );
+
+              final incumbentSide = _Side(
+                title: 'Incumbent',
+                name: pair.incumbentName,
+                subtitle: 'Sitting Democrat',
+                accent: BrandColors.democratBlue,
+                candidate: incumbent,
+                selected: incumbent?.id == selectedCandidateId,
+                fullWidth: isMobile,
+                onTap: () {
+                  if (incumbent != null) onSelect(incumbent!);
+                },
+                onOpen: onOpen == null || incumbent == null
+                    ? null
+                    : () => onOpen!(incumbent!),
+              );
+
+              if (isMobile) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    challengerSide,
+                    // VS divider — pill between the two cards makes it
+                    // read as a versus matchup rather than two unrelated
+                    // stacked cards.
+                    Center(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.35),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                              color: Colors.white.withOpacity(0.15)),
+                        ),
+                        child: const Text(
+                          'VS',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.4,
+                          ),
+                        ),
+                      ),
+                    ),
+                    incumbentSide,
+                  ],
+                );
+              }
+
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: challengerSide),
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
+                      width: 1,
+                      color: Colors.white24,
+                    ),
+                    Expanded(child: incumbentSide),
+                  ],
                 ),
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 6),
-                  width: 1,
-                  color: Colors.white24,
-                ),
-                Expanded(
-                  child: _Side(
-                    title: 'Incumbent',
-                    name: pair.incumbentName,
-                    subtitle: 'Sitting Democrat',
-                    accent: BrandColors.democratBlue,
-                    candidate: incumbent,
-                    selected: incumbent?.id == selectedCandidateId,
-                    onTap: () {
-                      if (incumbent != null) onSelect(incumbent!);
-                    },
-                    onOpen: onOpen == null || incumbent == null
-                        ? null
-                        : () => onOpen!(incumbent!),
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         ],
       ),
@@ -292,6 +340,11 @@ class _Side extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onOpen;
 
+  /// When true, render a taller/wider hero-style layout for the mobile
+  /// stacked presentation. Photo doubles in radius and age/office lines
+  /// are allowed to show.
+  final bool fullWidth;
+
   const _Side({
     required this.title,
     required this.name,
@@ -301,12 +354,24 @@ class _Side extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.onOpen,
+    this.fullWidth = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final initials = candidate?.initials ??
         (name.isNotEmpty ? name.substring(0, 1) : '?');
+
+    // Office summary — only surfaced in the mobile full-width layout.
+    String? officeLine;
+    if (fullWidth && candidate != null) {
+      final c = candidate!;
+      officeLine = c.officeDisplay +
+          (c.district != null && c.district!.isNotEmpty
+              ? ' • District ${c.district}'
+              : '');
+    }
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -314,7 +379,7 @@ class _Side extends StatelessWidget {
         onDoubleTap: onOpen,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.all(10),
+          padding: EdgeInsets.all(fullWidth ? 14 : 10),
           decoration: BoxDecoration(
             color:
                 selected ? accent.withOpacity(0.20) : Colors.black.withOpacity(0.25),
@@ -333,11 +398,13 @@ class _Side extends StatelessWidget {
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.8)),
-              const SizedBox(height: 8),
+              SizedBox(height: fullWidth ? 10 : 8),
               Row(
                 children: [
                   CircleAvatar(
-                    radius: 20,
+                    // Bigger photo on mobile — dedicated space should
+                    // translate into a more confident visual hierarchy.
+                    radius: fullWidth ? 28 : 20,
                     backgroundColor: accent.withOpacity(0.3),
                     backgroundImage: (candidate?.photoUrl != null &&
                             candidate!.photoUrl!.isNotEmpty)
@@ -347,24 +414,45 @@ class _Side extends StatelessWidget {
                             candidate!.photoUrl!.isEmpty)
                         ? Text(initials,
                             style: TextStyle(
-                                color: accent, fontWeight: FontWeight.w700))
+                                color: accent,
+                                fontWeight: FontWeight.w700,
+                                fontSize: fullWidth ? 18 : 14))
                         : null,
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: fullWidth ? 14 : 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(name,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 14,
+                                fontSize: fullWidth ? 16 : 14,
                                 fontWeight: FontWeight.w700),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 2),
                         Text(subtitle,
-                            style: const TextStyle(
-                                color: Colors.white70, fontSize: 11)),
+                            style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: fullWidth ? 12 : 11)),
+                        if (officeLine != null) ...[
+                          const SizedBox(height: 2),
+                          Text(officeLine,
+                              style: TextStyle(
+                                  color: Colors.white.withOpacity(0.6),
+                                  fontSize: 12),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                        if (fullWidth && candidate?.estimatedAge != null) ...[
+                          const SizedBox(height: 2),
+                          Text('Age ${candidate!.estimatedAge}',
+                              style: TextStyle(
+                                  color: accent.withOpacity(0.85),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600)),
+                        ],
                       ],
                     ),
                   ),
