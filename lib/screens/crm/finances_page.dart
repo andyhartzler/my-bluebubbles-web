@@ -85,6 +85,16 @@ class _FinancesPageState extends State<FinancesPage>
   bool _receiptsLoading = true;
   String _receiptFilter = 'all'; // 'all', 'unmatched', 'matched', 'inkind'
 
+  // ── Double-tap guards for mutating handlers ──
+  // Per-scope flags so concurrent edits on different rows don't serialize
+  // unnecessarily; the guard only blocks re-entry into the same handler.
+  bool _togglingInclusion = false;
+  bool _updatingMecPurpose = false;
+  bool _togglingReportFiled = false;
+  bool _updatingReceiptStatus = false;
+  bool _matchingReceipt = false;
+  bool _savingMerchantStatus = false;
+
   // ── Donations / donors state ──
   List<Map<String, dynamic>> _donations = [];
   List<Map<String, dynamic>> _donors = [];
@@ -513,8 +523,10 @@ class _FinancesPageState extends State<FinancesPage>
   }
 
   Future<void> _toggleMecInclusion(Map<String, dynamic> txn, bool value) async {
+    if (_togglingInclusion) return;
     final id = txn['id'];
     if (id == null) return;
+    setState(() => _togglingInclusion = true);
     try {
       await _supabase.privilegedClient
           .from('bank_transactions')
@@ -526,12 +538,16 @@ class _FinancesPageState extends State<FinancesPage>
         content: Text('Failed to update MEC inclusion: $e'),
         backgroundColor: Colors.red,
       ));
+    } finally {
+      if (mounted) setState(() => _togglingInclusion = false);
     }
   }
 
   Future<void> _updateMecPurpose(Map<String, dynamic> txn, String purpose) async {
+    if (_updatingMecPurpose) return;
     final id = txn['id'];
     if (id == null) return;
+    setState(() => _updatingMecPurpose = true);
     try {
       await _supabase.privilegedClient
           .from('bank_transactions')
@@ -543,14 +559,18 @@ class _FinancesPageState extends State<FinancesPage>
         content: Text('Failed to update purpose: $e'),
         backgroundColor: Colors.red,
       ));
+    } finally {
+      if (mounted) setState(() => _updatingMecPurpose = false);
     }
   }
 
   Future<void> _toggleReportFiled(Map<String, dynamic> report) async {
+    if (_togglingReportFiled) return;
     final id = report['id'];
     if (id == null) return;
     final current = report['status'] as String? ?? 'draft';
     final newStatus = current == 'filed' ? 'ready' : 'filed';
+    setState(() => _togglingReportFiled = true);
     try {
       await _supabase.privilegedClient
           .from('mec_reports')
@@ -562,6 +582,8 @@ class _FinancesPageState extends State<FinancesPage>
         content: Text('Failed to update report status: $e'),
         backgroundColor: Colors.red,
       ));
+    } finally {
+      if (mounted) setState(() => _togglingReportFiled = false);
     }
   }
 
@@ -2128,7 +2150,9 @@ class _FinancesPageState extends State<FinancesPage>
             height: 24,
             child: Checkbox(
               value: included,
-              onChanged: (v) => _toggleMecInclusion(t, v ?? true),
+              onChanged: _togglingInclusion
+                  ? null
+                  : (v) => _toggleMecInclusion(t, v ?? true),
               activeColor: BrandColors.success,
               side: BorderSide(color: Colors.white.withOpacity(0.3)),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -2333,10 +2357,13 @@ class _FinancesPageState extends State<FinancesPage>
                       : Colors.white30,
                   size: 18,
                 ),
-                onTap: () {
-                  _updateMecPurpose(t, p);
-                  Navigator.pop(ctx);
-                },
+                enabled: !_updatingMecPurpose,
+                onTap: _updatingMecPurpose
+                    ? null
+                    : () {
+                        _updateMecPurpose(t, p);
+                        Navigator.pop(ctx);
+                      },
               );
             }).toList(),
           ),
@@ -2767,12 +2794,20 @@ class _FinancesPageState extends State<FinancesPage>
         initialReceipt: initialReceipt,
         initialTransaction: initialTransaction,
         onDelete: (receiptId) async {
-          await _deleteReceipt(receiptId);
-          if (mounted) setState(() {
-            _receipts.removeWhere((r) => r['id'] == receiptId);
-          });
+          if (_savingMerchantStatus) return;
+          setState(() => _savingMerchantStatus = true);
+          try {
+            await _deleteReceipt(receiptId);
+            if (mounted) setState(() {
+              _receipts.removeWhere((r) => r['id'] == receiptId);
+            });
+          } finally {
+            if (mounted) setState(() => _savingMerchantStatus = false);
+          }
         },
         onUpdateStatus: (receiptId, status) async {
+          if (_savingMerchantStatus) return;
+          setState(() => _savingMerchantStatus = true);
           try {
             await _supabase.privilegedClient
                 .from('receipts')
@@ -2782,7 +2817,10 @@ class _FinancesPageState extends State<FinancesPage>
               final r = _receipts.firstWhere((r) => r['id'] == receiptId, orElse: () => {});
               if (r.isNotEmpty) r['match_status'] = status;
             });
-          } catch (_) {}
+          } catch (_) {
+          } finally {
+            if (mounted) setState(() => _savingMerchantStatus = false);
+          }
         },
       ),
     ));
@@ -2957,8 +2995,10 @@ class _FinancesPageState extends State<FinancesPage>
   }
 
   Future<void> _updateReceiptStatus(Map<String, dynamic> r, String status) async {
+    if (_updatingReceiptStatus) return;
     final id = r['id'];
     if (id == null) return;
+    setState(() => _updatingReceiptStatus = true);
     try {
       await _supabase.privilegedClient
           .from('receipts')
@@ -2970,6 +3010,8 @@ class _FinancesPageState extends State<FinancesPage>
         content: Text('Failed to update: $e'),
         backgroundColor: Colors.red,
       ));
+    } finally {
+      if (mounted) setState(() => _updatingReceiptStatus = false);
     }
   }
 
@@ -3009,42 +3051,15 @@ class _FinancesPageState extends State<FinancesPage>
                   final date = t['date'] as String? ?? '';
                   return ListTile(
                     dense: true,
+                    enabled: !_matchingReceipt,
                     title: Text(name,
                         style: const TextStyle(color: Colors.white, fontSize: 13)),
                     subtitle: Text('$date • \$${CandidateUI.formatMoney(amount)}',
                         style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
                     trailing: Icon(Icons.link, color: BrandColors.success.withOpacity(0.7), size: 18),
-                    onTap: () async {
-                      Navigator.pop(ctx);
-                      final receiptId = receipt['id'];
-                      final txnId = t['id']?.toString();
-                      if (receiptId == null || txnId == null) return;
-                      try {
-                        await _supabase.privilegedClient
-                            .from('receipts')
-                            .update({
-                              'transaction_id': txnId,
-                              'match_status': 'matched',
-                              'updated_at': DateTime.now().toIso8601String(),
-                            })
-                            .eq('id', receiptId);
-                        if (mounted) setState(() {
-                          receipt['match_status'] = 'matched';
-                          receipt['transaction_id'] = txnId;
-                        });
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text('Receipt matched to $name'),
-                            backgroundColor: BrandColors.success,
-                          ));
-                        }
-                      } catch (e) {
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text('Match failed: $e'),
-                          backgroundColor: Colors.red,
-                        ));
-                      }
-                    },
+                    onTap: _matchingReceipt
+                        ? null
+                        : () => _handleMatchReceiptToTxn(ctx, receipt, t, name),
                   );
                 }),
             ],
@@ -3052,6 +3067,47 @@ class _FinancesPageState extends State<FinancesPage>
         ),
       ),
     );
+  }
+
+  Future<void> _handleMatchReceiptToTxn(
+    BuildContext dialogCtx,
+    Map<String, dynamic> receipt,
+    Map<String, dynamic> txn,
+    String name,
+  ) async {
+    if (_matchingReceipt) return;
+    final receiptId = receipt['id'];
+    final txnId = txn['id']?.toString();
+    if (receiptId == null || txnId == null) return;
+    setState(() => _matchingReceipt = true);
+    Navigator.pop(dialogCtx);
+    try {
+      await _supabase.privilegedClient
+          .from('receipts')
+          .update({
+            'transaction_id': txnId,
+            'match_status': 'matched',
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', receiptId);
+      if (mounted) setState(() {
+        receipt['match_status'] = 'matched';
+        receipt['transaction_id'] = txnId;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Receipt matched to $name'),
+          backgroundColor: BrandColors.success,
+        ));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Match failed: $e'),
+        backgroundColor: Colors.red,
+      ));
+    } finally {
+      if (mounted) setState(() => _matchingReceipt = false);
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -3895,7 +3951,7 @@ class _FinancesPageState extends State<FinancesPage>
               const Spacer(),
               // Filed toggle
               GestureDetector(
-                onTap: () => _toggleReportFiled(r),
+                onTap: _togglingReportFiled ? null : () => _toggleReportFiled(r),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 5),

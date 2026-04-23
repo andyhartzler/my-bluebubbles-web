@@ -1063,26 +1063,31 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
             content: SizedBox(
               width: double.maxFinite,
               child: StatefulBuilder(
-                builder: (context, setDialogState) => ListView(
-                  shrinkWrap: true,
-                  children: [
-                    // "All High School Members" option
-                    CheckboxListTile(
-                      title: const Text('All High School Members'),
-                      subtitle: const Text('Any member with a high school listed'),
-                      value: tempAnyHighSchool,
-                      onChanged: (checked) {
-                        setDialogState(() {
-                          tempAnyHighSchool = checked == true;
-                          if (tempAnyHighSchool) {
-                            tempSelected.clear();
-                          }
-                        });
-                      },
-                    ),
-                    const Divider(),
-                    // Individual high schools
-                    ..._highSchools.map((school) {
+                builder: (context, setDialogState) {
+                  // Header (all-of row + divider) counts as 2 leading items;
+                  // items map 1:1 to _highSchools after that.
+                  const headerCount = 2;
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: headerCount + _highSchools.length,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return CheckboxListTile(
+                          title: const Text('All High School Members'),
+                          subtitle: const Text('Any member with a high school listed'),
+                          value: tempAnyHighSchool,
+                          onChanged: (checked) {
+                            setDialogState(() {
+                              tempAnyHighSchool = checked == true;
+                              if (tempAnyHighSchool) {
+                                tempSelected.clear();
+                              }
+                            });
+                          },
+                        );
+                      }
+                      if (index == 1) return const Divider();
+                      final school = _highSchools[index - headerCount];
                       final isSelected = tempSelected.contains(school);
                       return CheckboxListTile(
                         title: Text(school),
@@ -1100,9 +1105,9 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
                                 });
                               },
                       );
-                    }),
-                  ],
-                ),
+                    },
+                  );
+                },
               ),
             ),
             actions: [
@@ -1154,9 +1159,11 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
             content: SizedBox(
               width: double.maxFinite,
               child: StatefulBuilder(
-                builder: (context, setDialogState) => ListView(
+                builder: (context, setDialogState) => ListView.builder(
                   shrinkWrap: true,
-                  children: _colleges.map((college) {
+                  itemCount: _colleges.length,
+                  itemBuilder: (context, index) {
+                    final college = _colleges[index];
                     final isSelected = tempSelected.contains(college);
                     return CheckboxListTile(
                       title: Text(college),
@@ -1171,7 +1178,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
                         });
                       },
                     );
-                  }).toList(),
+                  },
                 ),
               ),
             ),
@@ -1325,9 +1332,11 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
             content: SizedBox(
               width: double.maxFinite,
               child: StatefulBuilder(
-                builder: (context, setDialogState) => ListView(
+                builder: (context, setDialogState) => ListView.builder(
                   shrinkWrap: true,
-                  children: _committees.map((committee) {
+                  itemCount: _committees.length,
+                  itemBuilder: (context, index) {
+                    final committee = _committees[index];
                     final isSelected = tempSelected.contains(committee);
                     return CheckboxListTile(
                       title: Text(committee),
@@ -1342,7 +1351,7 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
                         });
                       },
                     );
-                  }).toList(),
+                  },
                 ),
               ),
             ),
