@@ -5861,3 +5861,242 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   String _formatDate(DateTime date) => CandidateUI.formatDate(date);
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  MOBILE TAB CHIP — pill-style tab chip for <600px layouts
+// ═══════════════════════════════════════════════════════════════
+
+class _MobileTabChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+
+  const _MobileTabChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = selected
+        ? BrandColors.sunriseGold.withOpacity(0.18)
+        : Colors.white.withOpacity(0.04);
+    final border = selected
+        ? BrandColors.sunriseGold.withOpacity(0.65)
+        : Colors.white.withOpacity(0.10);
+    final fg = selected ? BrandColors.sunriseGold : Colors.white70;
+    return Container(
+      // 44px chip height keeps each tap target comfortably above the
+      // Material 48×48 minimum once the outer Tab's hit slop is added.
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: border, width: selected ? 1.4 : 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: fg),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: fg,
+              fontSize: 13,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STAFF FAB — Mobile speed-dial for most-used staff actions
+//
+//  Tap the primary FAB → reveals a stack of mini-FABs above it for
+//  "Log Contact" / "Add Note" / "Copy Questionnaire Link" / "Send SMS".
+//  The reveal uses a short (180ms) animation so the interaction feels
+//  instant. When a user has `prefers-reduced-motion` set (exposed via
+//  MediaQuery.disableAnimations), the animation collapses to 0ms.
+// ═══════════════════════════════════════════════════════════════
+
+class _CandidateStaffFab extends StatefulWidget {
+  final VoidCallback onLogContact;
+  final VoidCallback onAddNote;
+  final VoidCallback onCopyQuestionnaireLink;
+  final VoidCallback onSendSms;
+
+  const _CandidateStaffFab({
+    required this.onLogContact,
+    required this.onAddNote,
+    required this.onCopyQuestionnaireLink,
+    required this.onSendSms,
+  });
+
+  @override
+  State<_CandidateStaffFab> createState() => _CandidateStaffFabState();
+}
+
+class _CandidateStaffFabState extends State<_CandidateStaffFab>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  bool _open = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _open = !_open);
+    // Honor reduced-motion by skipping the animation entirely.
+    final reducedMotion = MediaQuery.of(context).disableAnimations;
+    if (reducedMotion) {
+      _ctrl.value = _open ? 1 : 0;
+    } else {
+      if (_open) {
+        _ctrl.forward();
+      } else {
+        _ctrl.reverse();
+      }
+    }
+  }
+
+  void _run(VoidCallback cb) {
+    _toggle();
+    // Let the close animation kick off before the tab switch so the
+    // user's thumb doesn't feel like it jumped. Small delay, reduced
+    // to 0 when animations are disabled.
+    final delay = MediaQuery.of(context).disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 120);
+    Future.delayed(delay, cb);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // Mini FABs, animated in on open.
+        _buildMiniFab(
+          label: 'Log Contact',
+          icon: Icons.assignment_turned_in_outlined,
+          color: BrandColors.momentumBlue,
+          onTap: () => _run(widget.onLogContact),
+        ),
+        _buildMiniFab(
+          label: 'Add Note',
+          icon: Icons.note_add_outlined,
+          color: BrandColors.sunriseGold,
+          onTap: () => _run(widget.onAddNote),
+        ),
+        _buildMiniFab(
+          label: 'Send SMS',
+          icon: Icons.sms_outlined,
+          color: BrandColors.success,
+          onTap: () => _run(widget.onSendSms),
+        ),
+        _buildMiniFab(
+          label: 'Copy Q&A Link',
+          icon: Icons.link,
+          color: Colors.deepPurpleAccent,
+          onTap: () => _run(widget.onCopyQuestionnaireLink),
+        ),
+        const SizedBox(height: 8),
+        // Primary FAB — rotates 45deg when open (× icon).
+        FloatingActionButton(
+          heroTag: 'candidate-staff-fab',
+          backgroundColor: BrandColors.sunriseGold,
+          foregroundColor: Colors.black87,
+          onPressed: _toggle,
+          child: AnimatedRotation(
+            turns: _open ? 0.125 : 0,
+            duration: const Duration(milliseconds: 180),
+            child: const Icon(Icons.add),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniFab({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    // Size transition keeps the column reflowing smoothly; the chip
+    // label is rendered alongside the button so labels are discoverable
+    // without a long-press tooltip (thumb-only users never see tooltips).
+    return SizeTransition(
+      sizeFactor: CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic),
+      axisAlignment: 1,
+      child: FadeTransition(
+        opacity: _ctrl,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Tappable label pill (same onTap as the icon so the label
+              // is a tap target too).
+              Material(
+                color: BrandColors.unityBlue,
+                borderRadius: BorderRadius.circular(8),
+                elevation: 3,
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    // 40px height, but the tappable InkWell extends a
+                    // few extra px at each edge — total tap area clears
+                    // 48px with the adjacent mini FAB.
+                    height: 40,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              FloatingActionButton.small(
+                heroTag: 'fab-$label',
+                backgroundColor: color,
+                foregroundColor: Colors.white,
+                onPressed: onTap,
+                child: Icon(icon, size: 18),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
