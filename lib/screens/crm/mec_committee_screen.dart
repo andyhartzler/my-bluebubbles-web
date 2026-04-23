@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
@@ -88,6 +89,26 @@ class _MECCommitteeScreenState extends State<MECCommitteeScreen> {
     ));
   }
 
+  Future<void> _refresh() async {
+    setState(() {
+      _loading = true;
+      _data = null;
+    });
+    await _load();
+  }
+
+  void _copyMecId() {
+    Clipboard.setData(ClipboardData(text: widget.mecId));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('MEC ID ${widget.mecId} copied'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: BrandColors.momentumBlue,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -104,12 +125,31 @@ class _MECCommitteeScreenState extends State<MECCommitteeScreen> {
             children: [
               _header(),
               Expanded(
-                child: _loading
-                    ? CandidateUI.shimmerSkeleton(cardCount: 4)
-                    : _data == null
-                        ? CandidateUI.emptyState(Icons.search_off, 'Not Found',
-                            'No committee data found for ${widget.mecId}.')
-                        : _content(),
+                child: RefreshIndicator(
+                  onRefresh: _refresh,
+                  color: BrandColors.sunriseGold,
+                  backgroundColor: BrandColors.unityBlue,
+                  child: _loading
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [CandidateUI.shimmerSkeleton(cardCount: 4)],
+                        )
+                      : _data == null
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.6,
+                                  child: CandidateUI.emptyState(
+                                    Icons.search_off,
+                                    'Not Found',
+                                    'No committee data found for ${widget.mecId}.',
+                                  ),
+                                ),
+                              ],
+                            )
+                          : _content(),
+                ),
               ),
             ],
           ),
@@ -122,11 +162,17 @@ class _MECCommitteeScreenState extends State<MECCommitteeScreen> {
     final committee = _data?['committee'] as Map<String, dynamic>?;
     final name = committee?['committee_name'] as String? ?? 'Committee';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
       child: Row(children: [
-        IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+        // 48×48 back button (Material minimum).
+        SizedBox(
+          width: 48,
+          height: 48,
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+            tooltip: 'Back',
+          ),
         ),
         const SizedBox(width: 4),
         Expanded(
@@ -139,6 +185,15 @@ class _MECCommitteeScreenState extends State<MECCommitteeScreen> {
               Text('MEC ${widget.mecId}',
                   style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11)),
             ],
+          ),
+        ),
+        SizedBox(
+          width: 48,
+          height: 48,
+          child: IconButton(
+            icon: const Icon(Icons.copy_all, color: Colors.white70),
+            onPressed: _copyMecId,
+            tooltip: 'Copy MEC ID',
           ),
         ),
       ]),
@@ -160,8 +215,10 @@ class _MECCommitteeScreenState extends State<MECCommitteeScreen> {
     final count = _asInt(totals?['contribution_count']);
     final uniqueDonors = _asInt(totals?['unique_donors']);
 
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(isMobile ? 12 : 16, 8, isMobile ? 12 : 16, 40),
       children: [
         _heroCard(committee, totalRaised, count, uniqueDonors, totalSpent),
         if (candidate != null) ...[

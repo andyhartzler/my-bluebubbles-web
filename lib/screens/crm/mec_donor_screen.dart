@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/donor_enrichment_record.dart';
 import 'package:bluebubbles/models/crm/voter_file_record.dart';
@@ -135,6 +136,31 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
     ));
   }
 
+  Future<void> _refresh() async {
+    setState(() {
+      _loading = true;
+      _profile = null;
+    });
+    await _load();
+  }
+
+  void _copyDonorName() {
+    final name = '${widget.firstName} ${widget.lastName}'.trim();
+    final loc = [widget.city, widget.state]
+        .where((s) => s != null && s.isNotEmpty)
+        .join(', ');
+    final full = loc.isEmpty ? name : '$name ($loc)';
+    Clipboard.setData(ClipboardData(text: full));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Donor identity copied: $full'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: BrandColors.momentumBlue,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -151,11 +177,31 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
             children: [
               _header(),
               Expanded(
-                child: _loading
-                    ? CandidateUI.shimmerSkeleton(cardCount: 4)
-                    : _profile == null
-                        ? CandidateUI.emptyState(Icons.person_off, 'Not Found', 'No donor data found.')
-                        : _content(),
+                child: RefreshIndicator(
+                  onRefresh: _refresh,
+                  color: BrandColors.sunriseGold,
+                  backgroundColor: BrandColors.unityBlue,
+                  child: _loading
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [CandidateUI.shimmerSkeleton(cardCount: 4)],
+                        )
+                      : _profile == null
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.6,
+                                  child: CandidateUI.emptyState(
+                                    Icons.person_off,
+                                    'Not Found',
+                                    'No donor data found.',
+                                  ),
+                                ),
+                              ],
+                            )
+                          : _content(),
+                ),
               ),
             ],
           ),
@@ -167,12 +213,17 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
   Widget _header() {
     final name = '${widget.firstName} ${widget.lastName}'.trim();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+              tooltip: 'Back',
+            ),
           ),
           const SizedBox(width: 4),
           Expanded(
@@ -188,6 +239,15 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
                     style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
                   ),
               ],
+            ),
+          ),
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: IconButton(
+              icon: const Icon(Icons.ios_share, color: Colors.white70),
+              onPressed: _profile == null ? null : _copyDonorName,
+              tooltip: 'Copy donor identity',
             ),
           ),
         ],
@@ -211,8 +271,10 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
     final byCandidate = (p['by_candidate'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
     final recent = (p['recent_contributions'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
 
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(isMobile ? 12 : 16, 12, isMobile ? 12 : 16, 40),
       children: [
         // ── Hero ──
         Container(

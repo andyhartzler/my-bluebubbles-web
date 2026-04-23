@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
@@ -110,6 +111,26 @@ class _MECPayeeScreenState extends State<MECPayeeScreen> {
     ));
   }
 
+  Future<void> _refresh() async {
+    setState(() {
+      _loading = true;
+      _profile = null;
+    });
+    await _load();
+  }
+
+  void _copyPayeeIdentity() {
+    Clipboard.setData(ClipboardData(text: _displayName));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Copied: $_displayName'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: BrandColors.momentumBlue,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,13 +147,31 @@ class _MECPayeeScreenState extends State<MECPayeeScreen> {
             children: [
               _header(),
               Expanded(
-                child: _loading
-                    ? CandidateUI.shimmerSkeleton(cardCount: 4)
-                    : _profile == null
-                        ? CandidateUI.emptyState(
-                            Icons.storefront_outlined, 'Not Found',
-                            'No expenditure records found for this payee.')
-                        : _content(),
+                child: RefreshIndicator(
+                  onRefresh: _refresh,
+                  color: BrandColors.sunriseGold,
+                  backgroundColor: BrandColors.unityBlue,
+                  child: _loading
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [CandidateUI.shimmerSkeleton(cardCount: 4)],
+                        )
+                      : _profile == null
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.6,
+                                  child: CandidateUI.emptyState(
+                                    Icons.storefront_outlined,
+                                    'Not Found',
+                                    'No expenditure records found for this payee.',
+                                  ),
+                                ),
+                              ],
+                            )
+                          : _content(),
+                ),
               ),
             ],
           ),
@@ -143,12 +182,17 @@ class _MECPayeeScreenState extends State<MECPayeeScreen> {
 
   Widget _header() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+              tooltip: 'Back',
+            ),
           ),
           const SizedBox(width: 4),
           Expanded(
@@ -164,6 +208,15 @@ class _MECPayeeScreenState extends State<MECPayeeScreen> {
                     style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
                   ),
               ],
+            ),
+          ),
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: IconButton(
+              icon: const Icon(Icons.ios_share, color: Colors.white70),
+              onPressed: _profile == null ? null : _copyPayeeIdentity,
+              tooltip: 'Copy payee identity',
             ),
           ),
         ],
@@ -188,8 +241,10 @@ class _MECPayeeScreenState extends State<MECPayeeScreen> {
     final heroColor = _isCompany ? BrandColors.sunriseGold : BrandColors.momentumBlue;
     final heroIcon = _isCompany ? Icons.storefront : Icons.person_outline;
 
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(isMobile ? 12 : 16, 12, isMobile ? 12 : 16, 40),
       children: [
         Container(
           padding: const EdgeInsets.all(16),
