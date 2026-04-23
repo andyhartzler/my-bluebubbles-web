@@ -236,14 +236,14 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
 
       final validCommittees = validationResponse as List<dynamic>? ?? [];
 
-      // Check if user exists in members table (either as executive or committee member)
+      // Check if user exists in members table (either as executive or committee member).
+      // Routed through SECURITY DEFINER RPC so it survives the Phase 2 RLS
+      // revocation of anon SELECT on `members`. Returns only 3 booleans — no PII.
       final memberCheck = await client
-          .from('members')
-          .select('id, executive_committee')
-          .or('email.eq.$email,school_email.eq.$email')
+          .rpc('members_preauth_check', params: {'p_email': email})
           .maybeSingle();
 
-      if (memberCheck == null) {
+      if (memberCheck == null || memberCheck['found'] != true) {
         // User not found in members table at all
         if (!mounted) return;
         setState(() {
