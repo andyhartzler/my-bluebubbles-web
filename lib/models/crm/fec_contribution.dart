@@ -38,7 +38,7 @@ class FecContribution {
 
   factory FecContribution.fromJson(Map<String, dynamic> json) {
     return FecContribution(
-      id: json['id'] as int,
+      id: (json['id'] as num?)?.toInt() ?? 0,
       cmteId: json['cmte_id'] as String?,
       committeeName: json['committee_name'] as String?,
       contributorName: json['contributor_name'] as String?,

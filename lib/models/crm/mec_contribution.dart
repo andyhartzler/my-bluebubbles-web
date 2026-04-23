@@ -53,7 +53,7 @@ class MecContribution {
 
   factory MecContribution.fromJson(Map<String, dynamic> json) {
     return MecContribution(
-      id: json['id'] as int,
+      id: (json['id'] as num?)?.toInt() ?? 0,
       mecId: json['mec_id'] as String?,
       committeeName: json['committee_name'] as String?,
       report: json['report'] as String?,

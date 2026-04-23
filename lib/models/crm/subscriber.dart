@@ -92,7 +92,7 @@ class Subscriber {
       donor: json['donor'] == null
           ? null
           : Donor.fromJson(json['donor'] as Map<String, dynamic>),
-      eventAttendanceCount: json['event_attendance_count'] as int? ?? 0,
+      eventAttendanceCount: (json['event_attendance_count'] as num?)?.toInt() ?? 0,
     );
   }
 

@@ -482,7 +482,7 @@ class EmailCampaignLinkClick {
 
   factory EmailCampaignLinkClick.fromJson(Map<String, dynamic> json) {
     return EmailCampaignLinkClick(
-      id: json['id'] as int,
+      id: (json['id'] as num?)?.toInt() ?? 0,
       createdAt: _parseDate(json['created_at']),
       campaignId: json['campaign_id'] as String,
       linkId: json['link_id'] as String?,

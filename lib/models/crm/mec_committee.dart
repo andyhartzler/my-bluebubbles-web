@@ -45,7 +45,7 @@ class MecCommittee {
 
   factory MecCommittee.fromJson(Map<String, dynamic> json) {
     return MecCommittee(
-      id: json['id'] as int,
+      id: (json['id'] as num?)?.toInt() ?? 0,
       mecId: json['mec_id'] as String?,
       committeeName: json['committee_name'] as String?,
       committeeType: json['committee_type'] as String?,
