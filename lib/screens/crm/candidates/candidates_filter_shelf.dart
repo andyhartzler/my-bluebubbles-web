@@ -14,7 +14,7 @@ import 'candidate_view_mode.dart';
 /// Designed to replace `_buildFiltersSection` + `_buildAdvancedFilters` on the
 /// old monolithic page. Every interaction fires a callback — the parent
 /// (CandidatesMobilePage) owns the filter state.
-class CandidatesFilterShelf extends StatelessWidget {
+class CandidatesFilterShelf extends StatefulWidget {
   // Primary filters
   final String searchQuery;
   final ValueChanged<String> onSearchChanged;
@@ -89,6 +89,40 @@ class CandidatesFilterShelf extends StatelessWidget {
   });
 
   @override
+  State<CandidatesFilterShelf> createState() => _CandidatesFilterShelfState();
+}
+
+class _CandidatesFilterShelfState extends State<CandidatesFilterShelf> {
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController(text: widget.searchQuery);
+  }
+
+  @override
+  void didUpdateWidget(covariant CandidatesFilterShelf oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Keep the controller in sync when the parent clears the query
+    // programmatically (e.g. "Clear all" button) without clobbering the
+    // cursor on every keystroke.
+    if (widget.searchQuery != _searchController.text) {
+      _searchController.value = TextEditingValue(
+        text: widget.searchQuery,
+        selection:
+            TextSelection.collapsed(offset: widget.searchQuery.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -98,7 +132,7 @@ class CandidatesFilterShelf extends StatelessWidget {
         _buildChipRail(context),
         const SizedBox(height: 8),
         _buildCountStrip(context),
-        if (expanded) _buildAdvancedPanel(context),
+        if (widget.expanded) _buildAdvancedPanel(context),
       ],
     );
   }
@@ -110,10 +144,8 @@ class CandidatesFilterShelf extends StatelessWidget {
         children: [
           Expanded(
             child: TextField(
-              onChanged: onSearchChanged,
-              controller: TextEditingController(text: searchQuery)
-                ..selection = TextSelection.fromPosition(
-                    TextPosition(offset: searchQuery.length)),
+              controller: _searchController,
+              onChanged: widget.onSearchChanged,
               style: const TextStyle(color: Colors.white, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Search by name, district, office…',
@@ -121,9 +153,12 @@ class CandidatesFilterShelf extends StatelessWidget {
                     const TextStyle(color: Colors.white54, fontSize: 13),
                 prefixIcon: const Icon(Icons.search,
                     color: Colors.white70, size: 18),
-                suffixIcon: searchQuery.isNotEmpty
+                suffixIcon: widget.searchQuery.isNotEmpty
                     ? IconButton(
-                        onPressed: () => onSearchChanged(''),
+                        onPressed: () {
+                          _searchController.clear();
+                          widget.onSearchChanged('');
+                        },
                         icon: const Icon(Icons.clear,
                             color: Colors.white70, size: 18),
                         splashRadius: 18,
@@ -152,7 +187,7 @@ class CandidatesFilterShelf extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          _ViewModeMenu(mode: mode, onChanged: onModeChanged),
+          _ViewModeMenu(mode: widget.mode, onChanged: widget.onModeChanged),
         ],
       ),
     );
@@ -166,40 +201,40 @@ class CandidatesFilterShelf extends StatelessWidget {
         children: [
           _PrimaryChip(
             label: 'All',
-            selected: partyFilter == null && !ydOnly,
+            selected: widget.partyFilter == null && !widget.ydOnly,
             onTap: () {
-              onPartyFilterChanged(null);
-              if (ydOnly) onToggleYdOnly();
+              widget.onPartyFilterChanged(null);
+              if (widget.ydOnly) widget.onToggleYdOnly();
             },
           ),
           _PrimaryChip(
             label: 'Democrats',
-            selected: partyFilter == 'Democratic',
+            selected: widget.partyFilter == 'Democratic',
             color: BrandColors.democratBlue,
-            onTap: () => onPartyFilterChanged(
-                partyFilter == 'Democratic' ? null : 'Democratic'),
+            onTap: () => widget.onPartyFilterChanged(
+                widget.partyFilter == 'Democratic' ? null : 'Democratic'),
           ),
           _PrimaryChip(
             label: 'Republicans',
-            selected: partyFilter == 'Republican',
+            selected: widget.partyFilter == 'Republican',
             color: BrandColors.republicanRed,
-            onTap: () => onPartyFilterChanged(
-                partyFilter == 'Republican' ? null : 'Republican'),
+            onTap: () => widget.onPartyFilterChanged(
+                widget.partyFilter == 'Republican' ? null : 'Republican'),
           ),
           _PrimaryChip(
             label: 'Young Dems',
             icon: Icons.star_rounded,
-            selected: ydOnly,
+            selected: widget.ydOnly,
             color: BrandColors.sunriseGold,
-            onTap: onToggleYdOnly,
+            onTap: widget.onToggleYdOnly,
           ),
           const SizedBox(width: 6),
           Container(width: 1, height: 22, color: Colors.white24),
           const SizedBox(width: 6),
           _MoreFiltersButton(
-            expanded: expanded,
-            onTap: onToggleExpanded,
-            activeAdvanced: activeFilterCount,
+            expanded: widget.expanded,
+            onTap: widget.onToggleExpanded,
+            activeAdvanced: widget.activeFilterCount,
           ),
         ],
       ),
@@ -207,13 +242,13 @@ class CandidatesFilterShelf extends StatelessWidget {
   }
 
   Widget _buildCountStrip(BuildContext context) {
-    if (activeFilterCount == 0) {
+    if (widget.activeFilterCount == 0) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
         child: Row(
           children: [
             Text(
-              '$filteredCount candidates',
+              '${widget.filteredCount} candidates',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.5),
                 fontSize: 11,
@@ -232,7 +267,7 @@ class CandidatesFilterShelf extends StatelessWidget {
               size: 14, color: BrandColors.sunriseGold.withOpacity(0.85)),
           const SizedBox(width: 4),
           Text(
-            '$filteredCount of $totalCount',
+            '${widget.filteredCount} of ${widget.totalCount}',
             style: TextStyle(
               color: BrandColors.sunriseGold.withOpacity(0.9),
               fontSize: 11,
@@ -243,7 +278,7 @@ class CandidatesFilterShelf extends StatelessWidget {
           Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: onClearAll,
+              onTap: widget.onClearAll,
               borderRadius: BorderRadius.circular(999),
               child: Container(
                 padding:
@@ -309,19 +344,19 @@ class CandidatesFilterShelf extends StatelessWidget {
               'Green',
               'Constitution'
             ].map((p) {
-              final sel = partyMultiSelect.contains(p);
+              final sel = widget.partyMultiSelect.contains(p);
               return _TogglePill(
                 label: p,
                 selected: sel,
                 color: _partyColor(p),
                 onTap: () {
-                  final next = Set<String>.from(partyMultiSelect);
+                  final next = Set<String>.from(widget.partyMultiSelect);
                   if (sel) {
                     next.remove(p);
                   } else {
                     next.add(p);
                   }
-                  onPartyMultiSelectChanged(next);
+                  widget.onPartyMultiSelectChanged(next);
                 },
               );
             }).toList(),
@@ -333,26 +368,27 @@ class CandidatesFilterShelf extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: ['state', 'federal', 'statewide', 'judicial'].map((l) {
-              final sel = officeLevelMultiSelect.contains(l);
+              final sel = widget.officeLevelMultiSelect.contains(l);
               return _TogglePill(
                 label: l.substring(0, 1).toUpperCase() + l.substring(1),
                 selected: sel,
                 color: BrandColors.momentumBlue,
                 onTap: () {
-                  final next = Set<String>.from(officeLevelMultiSelect);
+                  final next =
+                      Set<String>.from(widget.officeLevelMultiSelect);
                   if (sel) {
                     next.remove(l);
                   } else {
                     next.add(l);
                   }
-                  onOfficeLevelMultiSelectChanged(next);
+                  widget.onOfficeLevelMultiSelectChanged(next);
                 },
               );
             }).toList(),
           ),
           const SizedBox(height: 14),
           _subsectionLabel(
-              'Age range · ${ageRange.start.round()} — ${ageRange.end.round()}'),
+              'Age range · ${widget.ageRange.start.round()} — ${widget.ageRange.end.round()}'),
           SliderTheme(
             data: SliderThemeData(
               activeTrackColor: BrandColors.sunriseGold,
@@ -364,11 +400,11 @@ class CandidatesFilterShelf extends StatelessWidget {
                   const RoundRangeSliderThumbShape(enabledThumbRadius: 7),
             ),
             child: RangeSlider(
-              values: ageRange,
+              values: widget.ageRange,
               min: 18,
               max: 90,
               divisions: 72,
-              onChanged: onAgeRangeChanged,
+              onChanged: widget.onAgeRangeChanged,
             ),
           ),
           const SizedBox(height: 8),
@@ -381,30 +417,33 @@ class CandidatesFilterShelf extends StatelessWidget {
               _TogglePill(
                 label: 'Endorsed',
                 icon: Icons.verified_rounded,
-                selected: moydEndorsed,
+                selected: widget.moydEndorsed,
                 color: BrandColors.success,
-                onTap: () => onMoydEndorsedChanged(!moydEndorsed),
+                onTap: () => widget.onMoydEndorsedChanged(!widget.moydEndorsed),
               ),
               _TogglePill(
                 label: 'Contacted',
                 icon: Icons.phone_in_talk_rounded,
-                selected: moydContacted,
+                selected: widget.moydContacted,
                 color: BrandColors.momentumBlue,
-                onTap: () => onMoydContactedChanged(!moydContacted),
+                onTap: () =>
+                    widget.onMoydContactedChanged(!widget.moydContacted),
               ),
               _TogglePill(
                 label: 'Has website',
                 icon: Icons.language_rounded,
-                selected: hasCampaignWebsite,
+                selected: widget.hasCampaignWebsite,
                 color: BrandColors.steelBlue,
-                onTap: () => onHasCampaignWebsiteChanged(!hasCampaignWebsite),
+                onTap: () => widget
+                    .onHasCampaignWebsiteChanged(!widget.hasCampaignWebsite),
               ),
               _TogglePill(
                 label: 'MEC / FEC filed',
                 icon: Icons.account_balance_rounded,
-                selected: hasFinanceFiled,
+                selected: widget.hasFinanceFiled,
                 color: BrandColors.federalBlue,
-                onTap: () => onHasFinanceFiledChanged(!hasFinanceFiled),
+                onTap: () =>
+                    widget.onHasFinanceFiledChanged(!widget.hasFinanceFiled),
               ),
             ],
           ),
