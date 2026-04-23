@@ -399,19 +399,16 @@ class _CandidatesMobilePageState extends State<CandidatesMobilePage>
           // HEADER STRIP above list
           SliverToBoxAdapter(child: _buildListHeader(filtered.length)),
           // ─── BODY ──
-          SliverToBoxAdapter(
-            child: SizedBox(
-              // Give the list a tall enough sliver to be scrollable inside
-              // the CustomScrollView. 80vh works well on phones.
-              height:
-                  (constraints.maxHeight * 0.82).clamp(320.0, 1200.0),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: _buildBody(filtered),
-              ),
+          // SliverFillRemaining gives the body widget the rest of the
+          // viewport below the stats/filter/header. The inner List/Grid/
+          // Table/YD view owns its own scroll controller.
+          SliverFillRemaining(
+            hasScrollBody: true,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: _buildBody(filtered),
             ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
       );
     });
