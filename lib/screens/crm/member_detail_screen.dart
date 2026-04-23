@@ -182,7 +182,6 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     end: Alignment.bottomRight,
   );
 
-  static const Color _walletAccentColor = Color(0xFF0F4C75);
 
   @override
   void initState() {
