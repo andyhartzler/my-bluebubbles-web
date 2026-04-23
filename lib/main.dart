@@ -396,14 +396,25 @@ class Main extends StatelessWidget {
           ),
           getPages: [
             GetPage(name: '/auth/callback', page: AuthCallbackScreen.new),
-            GetPage(name: '/crm/donors', page: () => const DonorCommandCenter()),
+            GetPage(
+              name: '/crm/donors',
+              page: () => const _AuthenticatedRouteGuard(
+                requireExecutive: true,
+                child: DonorCommandCenter(),
+              ),
+            ),
             GetPage(
               name: '/ai-assistant',
-              page: () => const AIAssistantScreen(),
+              page: () => const _AuthenticatedRouteGuard(
+                child: AIAssistantScreen(),
+              ),
             ),
             GetPage(
               name: '/ai-assistant/admin',
-              page: () => const KnowledgeAdminScreen(),
+              page: () => const _AuthenticatedRouteGuard(
+                requireExecutive: true,
+                child: KnowledgeAdminScreen(),
+              ),
             ),
           ],
           home: SupabaseAuthGate(child: const AuthenticatedApp()),
@@ -2094,6 +2105,112 @@ class _NoAccessScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Guard widget for route-level GetPage entries that bypass the main
+/// `AuthenticatedApp` widget tree.
+///
+/// Wraps the target page in:
+///   1. `SupabaseAuthGate` — redirects unauthenticated users to the magic-link
+///      login, and re-renders this guard (i.e. the originally-requested route)
+///      on successful auth, so deep links survive the login round-trip.
+///   2. A role check driven by `UserSessionProvider` — ensures the session is
+///      loaded and the user has the required role before showing the child.
+///
+/// If `requireExecutive` is true, only executive-committee members may view
+/// the route. Otherwise, any user with valid access (executive or committee
+/// member) may view it.
+class _AuthenticatedRouteGuard extends StatelessWidget {
+  final Widget child;
+  final bool requireExecutive;
+
+  const _AuthenticatedRouteGuard({
+    required this.child,
+    this.requireExecutive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SupabaseAuthGate(
+      child: _RoleGuardedContent(
+        requireExecutive: requireExecutive,
+        child: child,
+      ),
+    );
+  }
+}
+
+/// Inner role-check wrapper for `_AuthenticatedRouteGuard`. Loads the
+/// `UserSessionProvider` (if not already loaded) and gates rendering on the
+/// user's role. This mirrors the logic in `AuthenticatedApp` so sibling
+/// `GetPage` routes cannot bypass it via direct URL entry.
+class _RoleGuardedContent extends StatefulWidget {
+  final Widget child;
+  final bool requireExecutive;
+
+  const _RoleGuardedContent({
+    required this.child,
+    required this.requireExecutive,
+  });
+
+  @override
+  State<_RoleGuardedContent> createState() => _RoleGuardedContentState();
+}
+
+class _RoleGuardedContentState extends State<_RoleGuardedContent> {
+  bool _hasLoadedSession = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserSession();
+  }
+
+  Future<void> _loadUserSession() async {
+    final provider = context.read<UserSessionProvider>();
+    await provider.loadUserSession();
+    if (mounted) {
+      setState(() {
+        _hasLoadedSession = true;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<UserSessionProvider>(
+      builder: (context, session, _) {
+        if (!_hasLoadedSession || session.isLoading) {
+          return const _SessionLoadingScreen();
+        }
+
+        if (session.error != null && !session.hasValidAccess) {
+          return _SessionErrorScreen(
+            error: session.error!,
+            onRetry: () async {
+              setState(() => _hasLoadedSession = false);
+              await _loadUserSession();
+            },
+          );
+        }
+
+        final authorized = widget.requireExecutive
+            ? session.isExecutive
+            : session.hasValidAccess;
+
+        if (!authorized) {
+          return _NoAccessScreen(
+            onLogout: () async {
+              await Supabase.instance.client.auth.signOut();
+              session.clearSession();
+            },
+          );
+        }
+
+        return widget.child;
+      },
     );
   }
 }
