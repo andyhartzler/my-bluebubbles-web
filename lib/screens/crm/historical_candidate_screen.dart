@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
@@ -35,8 +36,39 @@ class _HistoricalCandidateScreenState extends State<HistoricalCandidateScreen> {
     }
   }
 
+  Future<void> _refresh() async {
+    setState(() {
+      _loading = true;
+      _profile = null;
+    });
+    await _loadProfile();
+  }
+
+  void _copyShareSummary() {
+    final profile = _profile?['candidate'] as Map<String, dynamic>? ?? {};
+    final party = profile['party'] as String? ?? '';
+    final office = profile['office'] as String? ?? '';
+    final district = profile['district'] as String? ?? '';
+    final summary = [
+      widget.candidateName,
+      if (party.isNotEmpty) party,
+      if (office.isNotEmpty) office + (district.isNotEmpty ? ' (D $district)' : ''),
+    ].join(' • ');
+    Clipboard.setData(ClipboardData(text: summary));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Summary copied to clipboard'),
+          duration: Duration(seconds: 2),
+          backgroundColor: BrandColors.momentumBlue,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -51,11 +83,35 @@ class _HistoricalCandidateScreenState extends State<HistoricalCandidateScreen> {
             children: [
               _buildHeader(),
               Expanded(
-                child: _loading
-                    ? CandidateUI.shimmerSkeleton(cardCount: 4)
-                    : _profile == null
-                        ? CandidateUI.emptyState(Icons.person_off, 'Not Found', 'No data found for ${widget.candidateName}')
-                        : _buildContent(),
+                // Pull-to-refresh works in every state — a loading screen
+                // that refuses to retry on pull is maddening.
+                child: RefreshIndicator(
+                  onRefresh: _refresh,
+                  color: BrandColors.sunriseGold,
+                  backgroundColor: BrandColors.unityBlue,
+                  child: _loading
+                      ? ListView(
+                          // ListView so the RefreshIndicator's overscroll
+                          // still works while the skeleton is visible.
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [CandidateUI.shimmerSkeleton(cardCount: 4)],
+                        )
+                      : _profile == null
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.6,
+                                  child: CandidateUI.emptyState(
+                                    Icons.person_off,
+                                    'Not Found',
+                                    'No data found for ${widget.candidateName}',
+                                  ),
+                                ),
+                              ],
+                            )
+                          : _buildContent(isMobile: isMobile),
+                ),
               ),
             ],
           ),
@@ -66,14 +122,20 @@ class _HistoricalCandidateScreenState extends State<HistoricalCandidateScreen> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
+          // 48×48 tap target (Material minimum).
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+              tooltip: 'Back',
+            ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           Expanded(
             child: Text(
               widget.candidateName,
@@ -82,12 +144,21 @@ class _HistoricalCandidateScreenState extends State<HistoricalCandidateScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: IconButton(
+              icon: const Icon(Icons.ios_share, color: Colors.white70),
+              onPressed: _profile == null ? null : _copyShareSummary,
+              tooltip: 'Share',
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent({bool isMobile = false}) {
     final candidate = _profile!['candidate'] as Map<String, dynamic>? ?? {};
     final races = (_profile!['races'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final finance = (_profile!['finance'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -99,17 +170,55 @@ class _HistoricalCandidateScreenState extends State<HistoricalCandidateScreen> {
     final office = candidate['office'] as String? ?? '';
 
     Color partyColor;
-    if (party.contains('Dem')) partyColor = BrandColors.democratBlue;
-    else if (party.contains('Rep')) partyColor = BrandColors.republicanRed;
-    else if (party.contains('Lib')) partyColor = Colors.amber;
-    else partyColor = Colors.grey;
+    if (party.contains('Dem')) {
+      partyColor = BrandColors.democratBlue;
+    } else if (party.contains('Rep')) {
+      partyColor = BrandColors.republicanRed;
+    } else if (party.contains('Lib')) {
+      partyColor = Colors.amber;
+    } else {
+      partyColor = Colors.grey;
+    }
+
+    // Hero info block — shared by the mobile (vertically stacked) and
+    // desktop (side-by-side) hero layouts.
+    final info = Column(
+      crossAxisAlignment:
+          isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      children: [
+        Text(widget.candidateName,
+            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+            textAlign: isMobile ? TextAlign.center : TextAlign.start),
+        const SizedBox(height: 4),
+        Text('$party • $office${district.isNotEmpty ? " d.$district" : ""}',
+            style: TextStyle(color: partyColor.withOpacity(0.9), fontSize: 13),
+            textAlign: isMobile ? TextAlign.center : TextAlign.start),
+        const SizedBox(height: 4),
+        Text('${races.length} races on record',
+            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+            textAlign: isMobile ? TextAlign.center : TextAlign.start),
+      ],
+    );
+
+    final avatar = CircleAvatar(
+      radius: isMobile ? 44 : 36,
+      backgroundColor: partyColor.withOpacity(0.3),
+      backgroundImage: photo != null && photo.isNotEmpty ? NetworkImage(photo) : null,
+      child: photo == null || photo.isEmpty
+          ? Text(widget.candidateName.isNotEmpty ? widget.candidateName[0] : '?',
+              style: TextStyle(color: partyColor, fontSize: isMobile ? 32 : 28, fontWeight: FontWeight.bold))
+          : null,
+    );
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+      // AlwaysScrollable lets RefreshIndicator trigger even when content
+      // is short enough to fit without scrolling.
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(isMobile ? 12 : 16, 12, isMobile ? 12 : 16, 40),
       children: [
-        // Hero card
+        // Hero card — stacks vertically on mobile, side-by-side otherwise.
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isMobile ? 18 : 16),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [partyColor.withOpacity(0.15), Colors.white.withOpacity(0.05)],
@@ -117,33 +226,21 @@ class _HistoricalCandidateScreenState extends State<HistoricalCandidateScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: partyColor.withOpacity(0.3)),
           ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 36,
-                backgroundColor: partyColor.withOpacity(0.3),
-                backgroundImage: photo != null && photo.isNotEmpty ? NetworkImage(photo) : null,
-                child: photo == null || photo.isEmpty
-                    ? Text(widget.candidateName.isNotEmpty ? widget.candidateName[0] : '?',
-                        style: TextStyle(color: partyColor, fontSize: 28, fontWeight: FontWeight.bold))
-                    : null,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: isMobile
+              ? Column(
                   children: [
-                    Text(widget.candidateName, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text('$party • $office${district.isNotEmpty ? " d.$district" : ""}',
-                        style: TextStyle(color: partyColor.withOpacity(0.9), fontSize: 13)),
-                    const SizedBox(height: 4),
-                    Text('${races.length} races on record', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                    avatar,
+                    const SizedBox(height: 12),
+                    info,
+                  ],
+                )
+              : Row(
+                  children: [
+                    avatar,
+                    const SizedBox(width: 16),
+                    Expanded(child: info),
                   ],
                 ),
-              ),
-            ],
-          ),
         ),
         const SizedBox(height: 12),
 

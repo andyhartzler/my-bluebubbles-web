@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -337,11 +338,17 @@ class _NewsArticleDetailScreenState extends State<NewsArticleDetailScreen> {
 
   Widget _topBar(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
       child: Row(children: [
-        IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+        // 48×48 tap target per Material guidelines.
+        SizedBox(
+          width: 48,
+          height: 48,
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+            tooltip: 'Back',
+          ),
         ),
         const SizedBox(width: 4),
         Expanded(
@@ -349,6 +356,29 @@ class _NewsArticleDetailScreenState extends State<NewsArticleDetailScreen> {
               style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
               maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
+        // Source URL share — copies the original article URL so the user
+        // can paste it into Slack/iMessage without typing.
+        if (_row != null && (_row!['url'] as String?) != null && (_row!['url'] as String).isNotEmpty)
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: IconButton(
+              icon: const Icon(Icons.ios_share, color: Colors.white70),
+              onPressed: () async {
+                final url = _row!['url'] as String;
+                await Clipboard.setData(ClipboardData(text: url));
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Article URL copied'),
+                    duration: Duration(seconds: 2),
+                    backgroundColor: BrandColors.momentumBlue,
+                  ),
+                );
+              },
+              tooltip: 'Copy article URL',
+            ),
+          ),
       ]),
     );
   }
