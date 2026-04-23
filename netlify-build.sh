@@ -106,6 +106,8 @@ function write_flutter_env() {
     NEXT_PUBLIC_SUPABASE_URL
     NEXT_PUBLIC_SUPABASE_ANON_KEY
     NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY
+    MAPKIT_TOKEN_MOYD
+    MAPKIT_TOKEN_NETLIFY
   )
 
   local has_value=false
@@ -165,7 +167,9 @@ for var in \
   SUPABASE_SERVICE_ROLE_KEY \
   NEXT_PUBLIC_SUPABASE_URL \
   NEXT_PUBLIC_SUPABASE_ANON_KEY \
-  NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY; do
+  NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY \
+  MAPKIT_TOKEN_MOYD \
+  MAPKIT_TOKEN_NETLIFY; do
   if [[ -n "${!var:-}" ]]; then
     dart_define_args+=("--dart-define=${var}=${!var}")
   fi

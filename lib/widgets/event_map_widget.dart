@@ -141,6 +141,12 @@ class _EventMapWidgetState extends State<EventMapWidget> with AutomaticKeepAlive
 
     try {
       final token = MapKitTokenManager.getToken();
+      if (token == null || token.isEmpty) {
+        throw Exception(
+          'MapKit token not configured for this domain — '
+          'pass --dart-define=MAPKIT_TOKEN_MOYD / MAPKIT_TOKEN_NETLIFY at build time',
+        );
+      }
       print('[EventMap] Initializing MapKit with token: ${token.substring(0, 20)}...');
 
       final mapkit = js.context['mapkit'];
