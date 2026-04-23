@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/utils/postgrest_filters.dart';
 
 enum GlobalSearchItemType { member, meeting, transcript, document }
 
@@ -184,11 +185,10 @@ class GlobalSearchService {
       return GlobalSearchResults(query: query);
     }
 
-    final sanitized = _escapeForIlike(query);
     final futures = await Future.wait<List<Object>>([
-      _searchMembers(sanitized),
-      _searchMeetings(sanitized),
-      _searchTranscripts(sanitized),
+      _searchMembers(query),
+      _searchMeetings(query),
+      _searchTranscripts(query),
       _enumerateDocuments(query),
     ]);
 
@@ -206,21 +206,16 @@ class GlobalSearchService {
     );
   }
 
-  Future<List<Object>> _searchMembers(String ilikeTerm) async {
+  Future<List<Object>> _searchMembers(String rawQuery) async {
     if (!isReady) return const [];
 
     try {
       final client = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
-      final pattern = '%$ilikeTerm%';
       var query = client.from('members').select();
-      query = query.or([
-        'name.ilike.$pattern',
-        'email.ilike.$pattern',
-        'phone.ilike.$pattern',
-        'phone_e164.ilike.$pattern',
-        'county.ilike.$pattern',
-        'chapter_name.ilike.$pattern',
-      ].join(','));
+      query = query.or(buildIlikeOrClauses(
+        const ['name', 'email', 'phone', 'phone_e164', 'county', 'chapter_name'],
+        rawQuery,
+      ));
       final response = await query.limit(25);
       final rows = _coerceList(response);
       final members = rows
@@ -234,21 +229,23 @@ class GlobalSearchService {
     }
   }
 
-  Future<List<Object>> _searchMeetings(String ilikeTerm) async {
+  Future<List<Object>> _searchMeetings(String rawQuery) async {
     if (!isReady) return const [];
 
     try {
       final client = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
-      final pattern = '%$ilikeTerm%';
       var query = client.from('meetings').select('*');
-      query = query.or([
-        'meeting_title.ilike.$pattern',
-        'action_items.ilike.$pattern',
-        'executive_recap.ilike.$pattern',
-        'discussion_highlights.ilike.$pattern',
-        'decisions_rationales.ilike.$pattern',
-        'risks_open_questions.ilike.$pattern',
-      ].join(','));
+      query = query.or(buildIlikeOrClauses(
+        const [
+          'meeting_title',
+          'action_items',
+          'executive_recap',
+          'discussion_highlights',
+          'decisions_rationales',
+          'risks_open_questions',
+        ],
+        rawQuery,
+      ));
       final response = await query.limit(25);
       final rows = _coerceList(response);
       final meetings = rows
@@ -262,18 +259,16 @@ class GlobalSearchService {
     }
   }
 
-  Future<List<Object>> _searchTranscripts(String ilikeTerm) async {
+  Future<List<Object>> _searchTranscripts(String rawQuery) async {
     if (!isReady) return const [];
 
     try {
       final client = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
-      final pattern = '%$ilikeTerm%';
       var query = client.from('meeting_transcripts').select('*');
-      query = query.or([
-        'title.ilike.$pattern',
-        'summary.ilike.$pattern',
-        'meeting_title.ilike.$pattern',
-      ].join(','));
+      query = query.or(buildIlikeOrClauses(
+        const ['title', 'summary', 'meeting_title'],
+        rawQuery,
+      ));
       final response = await query.limit(25);
       final rows = _coerceList(response);
       final transcripts = rows
@@ -354,14 +349,6 @@ class GlobalSearchService {
     });
 
     return results.take(30).toList();
-  }
-
-  static String _escapeForIlike(String input) {
-    return input
-        .replaceAll('\\', r'\\')
-        .replaceAll('%', r'\%')
-        .replaceAll('_', r'\_')
-        .trim();
   }
 
   static List<Map<String, dynamic>> _coerceList(dynamic response) {

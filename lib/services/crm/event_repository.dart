@@ -11,6 +11,7 @@ import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/services/crm/phone_normalizer.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
+import 'package:bluebubbles/utils/postgrest_filters.dart';
 import 'package:path/path.dart' as p;
 import 'package:mime/mime.dart';
 import 'package:uuid/uuid.dart';

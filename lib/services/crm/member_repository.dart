@@ -9,6 +9,7 @@ import 'package:postgrest/postgrest.dart'
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/phone_normalizer.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
+import 'package:bluebubbles/utils/postgrest_filters.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mime_type/mime_type.dart';
 import 'package:universal_io/io.dart' as io;
@@ -273,23 +274,20 @@ class MemberRepository {
 
     final trimmedQuery = searchQuery?.trim();
     if (trimmedQuery != null && trimmedQuery.isNotEmpty) {
-      final sanitized = _escapeFilterValue(_escapeLikePattern(trimmedQuery));
-      final pattern = '%$sanitized%';
-      final clauses = [
-        'name.ilike.$pattern',
-        'phone.ilike.$pattern',
-        'phone_e164.ilike.$pattern',
-        'email.ilike.$pattern',
-        'school_email.ilike.$pattern',
-        'county.ilike.$pattern',
-        'congressional_district.ilike.$pattern',
-        'chapter_name.ilike.$pattern',
-        'chapter_position.ilike.$pattern',
-        'community_type.ilike.$pattern',
-        'current_chapter_member.ilike.$pattern',
-        'notes.ilike.$pattern',
-      ];
-      query = query.or(clauses.join(','));
+      query = query.or(buildIlikeOrClauses(const [
+        'name',
+        'phone',
+        'phone_e164',
+        'email',
+        'school_email',
+        'county',
+        'congressional_district',
+        'chapter_name',
+        'chapter_position',
+        'community_type',
+        'current_chapter_member',
+        'notes',
+      ], trimmedQuery));
     }
 
     return query;
@@ -334,18 +332,6 @@ class MemberRepository {
       age--;
     }
     return age >= 0 ? age : null;
-  }
-
-  String _escapeLikePattern(String value) {
-    return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
-  }
-
-  String _escapeFilterValue(String value) {
-    return value
-        .replaceAll('\\', '\\\\')
-        .replaceAll(',', '\\,')
-        .replaceAll('(', '\\(')
-        .replaceAll(')', '\\)');
   }
 
   List<dynamic> _coerceList(dynamic response) {
@@ -406,9 +392,9 @@ class MemberRepository {
     try {
       final filters = <String>[];
       for (final candidate in candidates) {
-        final escaped = candidate.replaceAll(',', '\\,');
-        filters.add('phone_e164.eq.$escaped');
-        filters.add('phone.eq.$escaped');
+        final safe = escapeForOr(candidate);
+        filters.add('phone_e164.eq.$safe');
+        filters.add('phone.eq.$safe');
       }
 
       var query = _readClient.from('members').select();
@@ -1333,7 +1319,7 @@ class MemberRepository {
           .from('members')
           .select()
           .eq('membership_eligible', true)
-          .or('name.ilike.%$query%,phone.ilike.%$query%,phone_e164.ilike.%$query%');
+          .or(buildIlikeOrClauses(const ['name', 'phone', 'phone_e164'], query));
 
       return (response as List<dynamic>)
           .map((json) => Member.fromJson(json as Map<String, dynamic>))

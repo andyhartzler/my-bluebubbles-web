@@ -216,7 +216,7 @@ class EventRepository {
     final response = await _readClient
         .from('event_attendees')
         .select('*, members:member_id(*)')
-        .or('guest_name.ilike.%$query%,guest_email.ilike.%$query%,guest_phone.ilike.%$query%')
+        .or(buildIlikeOrClauses(const ['guest_name', 'guest_email', 'guest_phone'], query))
         .order('rsvp_at', ascending: false)
         .limit(limit);
 
@@ -275,7 +275,7 @@ class EventRepository {
       final data = await _readClient
           .from('members')
           .select('id,name,email,phone,phone_e164,date_joined')
-          .or('phone.eq.$candidate,phone_e164.eq.$candidate')
+          .or(buildEqOrClauses(const ['phone', 'phone_e164'], candidate))
           .limit(1);
       if (data is List && data.isNotEmpty) {
         return Member.fromJson(data.first as Map<String, dynamic>);
@@ -377,7 +377,7 @@ class EventRepository {
       final data = await _readClient
           .from('members')
           .select('id,name,email,phone,date_joined')
-          .or('phone.eq.$candidate,phone_e164.eq.$candidate')
+          .or(buildEqOrClauses(const ['phone', 'phone_e164'], candidate))
           .limit(1);
       if (data is List && data.isNotEmpty) {
         memberRow = data.first as Map<String, dynamic>;

@@ -4,6 +4,7 @@ import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/fec_contribution.dart';
 import 'package:bluebubbles/models/crm/mec_contribution.dart';
 import 'package:bluebubbles/models/crm/mec_committee.dart';
+import 'package:bluebubbles/utils/postgrest_filters.dart';
 
 import 'supabase_service.dart';
 
@@ -131,14 +132,17 @@ class MecRepository {
     // Free-text search: OR across contributor name / company / committee fields
     if (query != null && query.trim().isNotEmpty) {
       final terms = query.trim().split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+      const searchColumns = <String>[
+        'contributor_last_name',
+        'contributor_first_name',
+        'contributor_company',
+        'contributor_committee',
+        'committee_name',
+      ];
       final conditions = <String>[];
 
       for (final term in terms) {
-        conditions.add('contributor_last_name.ilike.%$term%');
-        conditions.add('contributor_first_name.ilike.%$term%');
-        conditions.add('contributor_company.ilike.%$term%');
-        conditions.add('contributor_committee.ilike.%$term%');
-        conditions.add('committee_name.ilike.%$term%');
+        conditions.add(buildIlikeOrClauses(searchColumns, term));
       }
 
       builder = builder.or(conditions.join(','));
