@@ -46,7 +46,7 @@ class CandidatesListView extends StatelessWidget {
   }
 }
 
-class _CandidateRow extends StatelessWidget {
+class _CandidateRow extends StatefulWidget {
   final Candidate candidate;
   final bool selected;
   final VoidCallback onTap;
@@ -60,124 +60,190 @@ class _CandidateRow extends StatelessWidget {
   });
 
   @override
+  State<_CandidateRow> createState() => _CandidateRowState();
+}
+
+class _CandidateRowState extends State<_CandidateRow> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final c = candidate;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
-        color: selected
-            ? BrandColors.sunriseGold.withOpacity(0.20)
-            : BrandColors.unityBlue.withOpacity(0.92),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: selected
-              ? BrandColors.sunriseGold.withOpacity(0.70)
-              : Colors.white.withOpacity(0.08),
-          width: selected ? 1.4 : 1,
+    final c = widget.candidate;
+    final selected = widget.selected;
+    final partyColor = c.isDemocrat
+        ? BrandColors.democratBlue
+        : c.isRepublican
+            ? BrandColors.republicanRed
+            : Colors.amber;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        margin: const EdgeInsets.only(bottom: 7),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: selected
+                ? [
+                    BrandColors.sunriseGold.withOpacity(0.22),
+                    BrandColors.unityBlue.withOpacity(0.92),
+                  ]
+                : _hovered
+                    ? [
+                        BrandColors.unityBlue.withOpacity(0.96),
+                        BrandColors.momentumBlue.withOpacity(0.28),
+                      ]
+                    : [
+                        BrandColors.unityBlue.withOpacity(0.92),
+                        BrandColors.unityBlue.withOpacity(0.80),
+                      ],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected
+                ? BrandColors.sunriseGold.withOpacity(0.70)
+                : _hovered
+                    ? BrandColors.sunriseGold.withOpacity(0.25)
+                    : Colors.white.withOpacity(0.08),
+            width: selected ? 1.4 : 1,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: BrandColors.sunriseGold.withOpacity(0.22),
+                    blurRadius: 12,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 7,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  color: BrandColors.sunriseGold.withOpacity(0.18),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          onDoubleTap: onOpen,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-            child: Row(
-              children: [
-                _PartyBadge(candidate: c),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              c.name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap,
+            onDoubleTap: widget.onOpen,
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
+              child: Row(
+                children: [
+                  _Avatar(candidate: c, partyColor: partyColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                c.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.2,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          if (c.isYoungDem) ...[
-                            const SizedBox(width: 6),
-                            const _YdBadge(),
+                            if (c.isYoungDem) ...[
+                              const SizedBox(width: 6),
+                              const _YdBadge(),
+                            ],
+                            if (c.isIncumbent) ...[
+                              const SizedBox(width: 4),
+                              const _IncBadge(),
+                            ],
+                            if (c.isEndorsed) ...[
+                              const SizedBox(width: 4),
+                              const Icon(Icons.verified_rounded,
+                                  color: BrandColors.success, size: 14),
+                            ],
                           ],
-                          if (c.isIncumbent) ...[
-                            const SizedBox(width: 4),
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            // Party pill
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 5, vertical: 1),
                               decoration: BoxDecoration(
-                                color: Colors.white10,
+                                color: partyColor.withOpacity(0.18),
                                 borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: Colors.white24),
                               ),
-                              child: const Text(
-                                'INC',
+                              child: Text(
+                                c.partyShort.isEmpty
+                                    ? c.party
+                                    : c.partyShort,
                                 style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700),
+                                  color: partyColor,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                c.officeDisplay,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.72),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        c.officeDisplay,
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 12),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                if (c.estimatedAge != null)
-                  Container(
-                    margin: const EdgeInsets.only(left: 6),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(8),
+                        ),
+                      ],
                     ),
-                    child: Text('${c.estimatedAge}',
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 12)),
                   ),
-                IconButton(
-                  onPressed: onOpen,
-                  icon: const Icon(Icons.open_in_new,
-                      size: 16, color: Colors.white70),
-                  tooltip: 'Open profile',
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
+                  if (c.estimatedAge != null) ...[
+                    Container(
+                      margin: const EdgeInsets.only(left: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 9, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                            color: Colors.white.withOpacity(0.10)),
+                      ),
+                      child: Text(
+                        '${c.estimatedAge}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                  IconButton(
+                    onPressed: widget.onOpen,
+                    icon: const Icon(Icons.open_in_new_rounded,
+                        size: 16, color: Colors.white70),
+                    tooltip: 'Open profile',
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -186,33 +252,70 @@ class _CandidateRow extends StatelessWidget {
   }
 }
 
-class _PartyBadge extends StatelessWidget {
+/// Avatar: network photo if present, party-initials fallback with subtle
+/// colored ring otherwise. Small enough to keep the row compact.
+class _Avatar extends StatelessWidget {
   final Candidate candidate;
-  const _PartyBadge({required this.candidate});
+  final Color partyColor;
+  const _Avatar({required this.candidate, required this.partyColor});
 
   @override
   Widget build(BuildContext context) {
-    Color bg;
-    if (candidate.isDemocrat) {
-      bg = BrandColors.democratBlue;
-    } else if (candidate.isRepublican) {
-      bg = BrandColors.republicanRed;
-    } else {
-      bg = Colors.amber;
-    }
+    final hasPhoto =
+        candidate.photoUrl != null && candidate.photoUrl!.isNotEmpty;
     return Container(
-      width: 28,
-      height: 28,
+      width: 38,
+      height: 38,
       decoration: BoxDecoration(
-        color: bg.withOpacity(0.25),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: bg.withOpacity(0.5)),
+        shape: BoxShape.circle,
+        color: partyColor.withOpacity(0.22),
+        border: Border.all(color: partyColor.withOpacity(0.55), width: 1.5),
       ),
-      child: Center(
-        child: Text(
-            candidate.partyShort.isEmpty ? '?' : candidate.partyShort,
-            style: TextStyle(
-                color: bg, fontSize: 13, fontWeight: FontWeight.bold)),
+      clipBehavior: Clip.antiAlias,
+      child: hasPhoto
+          ? Image.network(
+              candidate.photoUrl!,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _fallback(),
+            )
+          : _fallback(),
+    );
+  }
+
+  Widget _fallback() {
+    return Center(
+      child: Text(
+        candidate.initials,
+        style: TextStyle(
+          color: partyColor,
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _IncBadge extends StatelessWidget {
+  const _IncBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.white.withOpacity(0.25)),
+      ),
+      child: const Text(
+        'INC',
+        style: TextStyle(
+          color: Colors.white70,
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.4,
+        ),
       ),
     );
   }
