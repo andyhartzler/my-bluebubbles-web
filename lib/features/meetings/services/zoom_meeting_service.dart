@@ -58,8 +58,7 @@ class ZoomMeetingService {
 
   bool get isReady => _supabase.isInitialized;
 
-  SupabaseClient get _client =>
-      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+  SupabaseClient get _client => _supabase.client;
 
   /// Creates a Zoom meeting via the edge function and saves it to the database
   Future<ScheduledMeeting> createMeeting({

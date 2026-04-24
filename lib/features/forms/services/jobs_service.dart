@@ -52,17 +52,11 @@ class JobsService {
     // If not initialized after 5 seconds, continue with regular client
   }
 
-  /// Get privileged client for bypassing RLS when reading/writing jobs
-  SupabaseClient get _privilegedClient =>
-      _crmService.isInitialized && _crmService.hasServiceRole
-          ? _crmService.privilegedClient
-          : _supabase;
+  /// Client for reading/writing jobs (RLS enforced via user JWT on anon client)
+  SupabaseClient get _writeClient => _supabase;
 
-  /// Get privileged client for bypassing RLS when writing jobs
-  SupabaseClient get _writeClient => _privilegedClient;
-
-  /// Get privileged client for bypassing RLS when reading jobs
-  SupabaseClient get _readClient => _privilegedClient;
+  /// Client for reading jobs (RLS enforced via user JWT on anon client)
+  SupabaseClient get _readClient => _supabase;
 
   Stream<List<Job>> watchJobs(String statusFilter) {
     // Use a polling approach with the privileged client to bypass RLS

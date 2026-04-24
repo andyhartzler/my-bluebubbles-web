@@ -3,7 +3,6 @@ import 'package:uuid/uuid.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:bluebubbles/services/crm/supabase_service.dart';
 import '../../../../utils/quill_html_converter.dart';
 import '../../../../utils/markdown_quill_loader.dart';
 import '../../models/voting_form.dart';
@@ -22,7 +21,6 @@ class VoteBuilderScreen extends StatefulWidget {
 class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
   final _votesService = VotesService();
   final _supabase = Supabase.instance.client;
-  final _crmService = CRMSupabaseService();
   final _uuid = const Uuid();
   final _titleController = TextEditingController();
   final _slugController = TextEditingController();
@@ -962,10 +960,8 @@ class _VoteBuilderScreenState extends State<VoteBuilderScreen> {
           break;
       }
 
-      // Upload to Supabase storage using privileged client to bypass RLS
-      final storageClient = _crmService.isInitialized && _crmService.hasServiceRole
-          ? _crmService.privilegedClient
-          : _supabase;
+      // Upload to Supabase storage (RLS enforced via user JWT on anon client)
+      final storageClient = _supabase;
 
       await storageClient.storage.from('form-documents').uploadBinary(
         path,

@@ -25,7 +25,7 @@ class CandidateRepository {
 
   bool get isReady => CRMConfig.crmEnabled && _supabase.isInitialized;
 
-  SupabaseClient get _client => _supabase.privilegedClient;
+  SupabaseClient get _client => _supabase.client;
 
   // ── Finance data cache (1hr TTL) ──────────────────────────────
   // Avoids re-firing 11 RPCs every time the Money tab is opened.
@@ -45,7 +45,12 @@ class CandidateRepository {
     _financeCache[mecId] = _CachedFinance(summary: summary, fetchedAt: DateTime.now());
   }
 
-  void clearFinanceCache() => _financeCache.clear();
+  /// Static cache-clear for use from UserSessionProvider.clearSession().
+  /// Prevents cross-user leakage of finance data when one user logs out
+  /// and another logs in (Wave 2 audit §A.5 / §B.3).
+  static void clearFinanceCache() {
+    _financeCache.clear();
+  }
 
   // ─── Fetch all candidates (with optional filters) ──────────────
 

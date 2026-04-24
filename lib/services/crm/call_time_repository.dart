@@ -10,8 +10,7 @@ class CallTimeRepository {
 
   bool get isReady => CRMConfig.crmEnabled && _supabase.isInitialized;
 
-  SupabaseClient get _client =>
-      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+  SupabaseClient get _client => _supabase.client;
 
   /// Fetch all call time lists with summary counts
   Future<List<CallTimeList>> fetchLists({String? status}) async {

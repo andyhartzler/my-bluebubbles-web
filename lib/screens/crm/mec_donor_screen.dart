@@ -63,7 +63,7 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
       return;
     }
     try {
-      final resp = await _supabase.privilegedClient.rpc(
+      final resp = await _supabase.client.rpc(
         'get_donor_profile_by_natural_key',
         params: {
           'p_first_name': widget.firstName,

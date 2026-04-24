@@ -13,8 +13,7 @@ class MecRepository {
 
   bool get isReady => CRMConfig.crmEnabled && _supabase.isInitialized;
 
-  SupabaseClient get _readClient =>
-      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+  SupabaseClient get _readClient => _supabase.client;
 
   // ---------------------------------------------------------------------------
   // searchDonors (RPC — aggregated donor search)

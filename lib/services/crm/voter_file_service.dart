@@ -27,7 +27,7 @@ class VoterFileService {
     if (!supabase.isInitialized) return null;
 
     try {
-      final response = await supabase.privilegedClient
+      final response = await supabase.client
           .from('mo_voter_file')
           .select(_columns)
           .eq('voter_id', voterId)

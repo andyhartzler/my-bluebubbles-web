@@ -18,8 +18,7 @@ class CommitteeRepository {
 
   bool get isReady => _supabase.isInitialized;
 
-  SupabaseClient get _readClient =>
-      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+  SupabaseClient get _readClient => _supabase.client;
 
   /// Get all members belonging to a committee
   Future<List<Member>> getMembersForCommittee(String committeeName, {int? limit}) async {
@@ -67,7 +66,7 @@ class CommitteeRepository {
     if (!isReady) return false;
 
     try {
-      final writeClient = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final writeClient = _supabase.client;
 
       // First get the current committee list for this member
       final memberData = await _readClient
@@ -110,7 +109,7 @@ class CommitteeRepository {
     if (!isReady) return false;
 
     try {
-      final writeClient = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final writeClient = _supabase.client;
 
       // First get the current committee list for this member
       final memberData = await _readClient
@@ -1293,7 +1292,7 @@ class CommitteeRepository {
     if (!isReady) return false;
 
     try {
-      final writeClient = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final writeClient = _supabase.client;
 
       // First find the committee by name
       final existing = await _readClient
@@ -1387,7 +1386,7 @@ class CommitteeRepository {
     if (!isReady) return false;
 
     try {
-      final writeClient = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final writeClient = _supabase.client;
 
       // First find the committee by name
       final existing = await _readClient
@@ -1442,7 +1441,7 @@ class CommitteeRepository {
     if (!isReady) return false;
 
     try {
-      final writeClient = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final writeClient = _supabase.client;
 
       final existing = await _readClient
           .from('committees')
@@ -1472,7 +1471,7 @@ class CommitteeRepository {
     if (!isReady) return false;
 
     try {
-      final writeClient = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final writeClient = _supabase.client;
 
       final existing = await _readClient
           .from('committees')

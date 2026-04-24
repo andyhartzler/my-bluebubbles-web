@@ -210,7 +210,7 @@ class GlobalSearchService {
     if (!isReady) return const [];
 
     try {
-      final client = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final client = _supabase.client;
       var query = client.from('members').select();
       query = query.or(buildIlikeOrClauses(
         const ['name', 'email', 'phone', 'phone_e164', 'county', 'chapter_name'],
@@ -233,7 +233,7 @@ class GlobalSearchService {
     if (!isReady) return const [];
 
     try {
-      final client = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final client = _supabase.client;
       var query = client.from('meetings').select('*');
       query = query.or(buildIlikeOrClauses(
         const [
@@ -263,7 +263,7 @@ class GlobalSearchService {
     if (!isReady) return const [];
 
     try {
-      final client = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final client = _supabase.client;
       var query = client.from('meeting_transcripts').select('*');
       query = query.or(buildIlikeOrClauses(
         const ['title', 'summary', 'meeting_title'],

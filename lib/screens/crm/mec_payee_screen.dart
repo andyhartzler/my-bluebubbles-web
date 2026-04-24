@@ -62,7 +62,7 @@ class _MECPayeeScreenState extends State<MECPayeeScreen> {
       return;
     }
     try {
-      final resp = await _supabase.privilegedClient.rpc(
+      final resp = await _supabase.client.rpc(
         'get_payee_profile_by_natural_key',
         params: {
           'p_first_name': widget.firstName,

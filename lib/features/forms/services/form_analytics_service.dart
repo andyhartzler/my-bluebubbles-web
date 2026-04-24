@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../services/crm/supabase_service.dart';
 
 /// Event types for form analytics
 /// These correspond to the form lifecycle stages
@@ -33,13 +32,9 @@ class FormEventTypes {
 /// Service for tracking form analytics and interactions
 class FormAnalyticsService {
   final _supabase = Supabase.instance.client;
-  final _crmService = CRMSupabaseService();
 
-  /// Get privileged client for bypassing RLS when reading submissions
-  SupabaseClient get _readClient =>
-      _crmService.isInitialized && _crmService.hasServiceRole
-      ? _crmService.privilegedClient
-      : _supabase;
+  /// Client for reading submissions (RLS enforced via user JWT on anon client)
+  SupabaseClient get _readClient => _supabase;
 
   /// Track when a form is viewed
   /// Returns a session token for tracking before subscriber is created

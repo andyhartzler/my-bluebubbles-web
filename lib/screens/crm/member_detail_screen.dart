@@ -758,7 +758,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
       // Load job applications
       try {
-        final jobsResponse = await _supabaseService.privilegedClient
+        final jobsResponse = await _supabaseService.client
             .from('job_applications')
             .select('*')
             .eq('member_id', _member.id)

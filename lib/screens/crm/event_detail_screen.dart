@@ -23,6 +23,7 @@ import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/phone_normalizer.dart';
 import 'package:bluebubbles/screens/crm/qr_scanner_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/widgets/event_map_widget.dart';
 import 'package:bluebubbles/models/crm/survey_model.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
@@ -441,7 +442,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> with TickerProvid
       maxAttendees: int.tryParse(_maxAttendeesController.text),
       checkinEnabled: _checkinEnabled,
       status: _status,
-      createdBy: _currentEvent.createdBy ?? widget.initialEvent.createdBy,
+      createdBy: _currentEvent.createdBy ?? widget.initialEvent.createdBy ?? Supabase.instance.client.auth.currentUser?.id,
       createdAt: _currentEvent.createdAt ?? widget.initialEvent.createdAt,
       updatedAt: DateTime.now(),
       socialShareImage: _currentEvent.socialShareImage,

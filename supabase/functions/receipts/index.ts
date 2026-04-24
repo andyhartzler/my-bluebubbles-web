@@ -15,6 +15,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const AI_ENDPOINT = "https://ai.hartzler.app/v1";
 const AI_API_KEY = Deno.env.get("AI_API_KEY") ?? "";
@@ -26,6 +27,74 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "https://moyd.app",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// ── Auth helper: validate user JWT + require executive_committee membership ──
+// Receipts touches finance data (bank_transactions, Gmail tokens, storage bucket
+// writes) — service-role DB ops stay, but every call now requires a real exec
+// user JWT. Access-audit Wave 2 patch, 2026-04-24.
+async function requireStaffUser(req: Request): Promise<
+  | { userId: string; email: string | null }
+  | { error: Response }
+> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const jwt = authHeader.replace(/^Bearer /i, "").trim();
+  if (!jwt) {
+    return {
+      error: new Response(
+        JSON.stringify({ error: "Missing Authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      ),
+    };
+  }
+  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+  });
+  const { data: userData, error: authErr } = await userClient.auth.getUser(jwt);
+  if (authErr || !userData?.user) {
+    return {
+      error: new Response(
+        JSON.stringify({ error: "Invalid or expired JWT" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      ),
+    };
+  }
+  const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data: memberRow } = await adminClient
+    .from("members")
+    .select("executive_committee, email")
+    .eq("id", userData.user.id)
+    .maybeSingle();
+  if (!memberRow?.executive_committee) {
+    return {
+      error: new Response(
+        JSON.stringify({ error: "Forbidden — executive_committee required" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      ),
+    };
+  }
+  return { userId: userData.user.id, email: memberRow.email ?? userData.user.email ?? null };
+}
+
+async function auditLogAction(params: {
+  actor_id: string | null;
+  event: string;
+  details?: Record<string, unknown>;
+}) {
+  try {
+    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    await adminClient.from("audit_log").insert({
+      action: "EDGE_FN",
+      actor_id: params.actor_id,
+      actor_role: params.actor_id ? "authenticated" : "service_role",
+      schema_name: "public",
+      table_name: "edge_fn:receipts",
+      row_id: null,
+      context: { event: params.event, details: params.details ?? {} },
+    });
+  } catch (e) {
+    console.error("[receipts] audit_log insert failed:", e);
+  }
+}
 
 // ── AI Receipt Analysis ──
 
@@ -144,8 +213,18 @@ serve(async (req) => {
   }
 
   try {
+    const gate = await requireStaffUser(req);
+    if ("error" in gate) return gate.error;
+    const actorId = gate.userId;
+
     const { action, ...params } = await req.json();
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    auditLogAction({
+      actor_id: actorId,
+      event: `receipts:${action ?? "unknown"}`,
+      details: action === "update" ? { receipt_id: params.id } : undefined,
+    });
 
     switch (action) {
       // ── Process a single receipt from email data ──

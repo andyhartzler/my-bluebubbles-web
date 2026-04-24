@@ -3,7 +3,9 @@ import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import 'package:bluebubbles/providers/user_session_provider.dart';
 import 'package:bluebubbles/models/crm/subscriber.dart';
 import 'package:bluebubbles/models/crm/email_campaign.dart';
 import 'package:bluebubbles/services/crm/subscriber_repository.dart';
@@ -62,7 +64,11 @@ class _SubscribersScreenState extends State<SubscribersScreen> {
   static const _pageSize = 30;
 
   bool get _crmReady => _supabaseService.isInitialized;
-  bool get _canManage => _supabaseService.hasServiceRole;
+  // Manage affordance — gated by executive-committee membership.
+  // Server-side RLS still enforces write access regardless of this flag.
+  // Uses context.watch so the affordance refreshes immediately on session
+  // changes (logout, role update) instead of going stale until next rebuild.
+  bool get _canManage => context.watch<UserSessionProvider>().isExecutive;
 
   @override
   void initState() {

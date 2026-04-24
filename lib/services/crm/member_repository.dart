@@ -59,10 +59,9 @@ class MemberRepository {
     'intro_sent_at',
   ];
 
-  SupabaseClient get _readClient =>
-      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+  SupabaseClient get _readClient => _supabase.client;
 
-  SupabaseClient get _writeClient => _supabase.privilegedClient;
+  SupabaseClient get _writeClient => _supabase.client;
 
 
   /// Get all members (with optional filters)

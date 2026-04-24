@@ -48,6 +48,15 @@ class CRMMessageService {
     _surveyResponseController.close();
   }
 
+  /// Clear per-session automation/guard caches. Invoked from
+  /// UserSessionProvider.clearSession() to prevent STOP/START dedup state
+  /// from leaking across user sessions (Wave 2 audit §A.5 / §B.3).
+  static void clearAutomationCache() {
+    instance._automationGuardCache.clear();
+    instance._serviceCache.clear();
+    // Clear any other per-session caches if present.
+  }
+
   // Rate limiting
   static const int messagesPerMinute = CRMConfig.messagesPerMinute;
   static const Duration delayBetweenMessages = CRMConfig.messageDelay;

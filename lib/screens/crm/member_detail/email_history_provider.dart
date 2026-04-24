@@ -794,15 +794,10 @@ class EmailHistoryProvider extends ChangeNotifier {
   _SupabaseClients? _resolveSupabaseClients() {
     supabase.SupabaseClient? database;
     try {
-      database = _supabaseService.privilegedClient;
+      database = _supabaseService.client;
     } catch (error, stack) {
       Logger.warn('Supabase client unavailable for email history: $error', trace: stack);
-      try {
-        database = _supabaseService.client;
-      } catch (clientError, clientStack) {
-        Logger.warn('Fallback Supabase client unavailable: $clientError', trace: clientStack);
-        database = null;
-      }
+      database = null;
     }
 
     if (database == null) {
@@ -1991,7 +1986,7 @@ class EmailHistoryProvider extends ChangeNotifier {
 
     supabase.SupabaseClient client;
     try {
-      client = _supabaseService.privilegedClient;
+      client = _supabaseService.client;
     } catch (error, stack) {
       Logger.warn('Supabase client unavailable for email thread: $error', trace: stack);
       throw StateError('Supabase client is not available.');

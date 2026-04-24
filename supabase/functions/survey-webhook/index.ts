@@ -232,6 +232,17 @@ async function sendBBMessage(phone: string, message: string, service: string = "
 }
 
 // ── Main handler ────────────────────────────────────────────────────────────
+//
+// PUBLIC WEBHOOK ENDPOINT. This fn is invoked by BlueBubbles (SMS/iMessage
+// reply ingest). There is no user session — no Supabase auth token is sent
+// with the webhook callback. This path MUST NOT require a user JWT.
+//
+// Auth model (Wave 2 access-audit 2026-04-24): optional shared-secret header
+// via SURVEY_WEBHOOK_SECRET env var. If the secret is configured we require
+// the `x-webhook-secret` header to match; if unset we accept anonymously to
+// keep compatibility with existing BlueBubbles deployments. Every reply is
+// audit-logged with actor_role='service_role' so the Activity dashboard can
+// show SMS-reply ingestion activity.
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -239,6 +250,18 @@ serve(async (req) => {
   }
 
   try {
+    // Optional shared-secret verification (keeps backward compat if unset).
+    const webhookSecret = Deno.env.get("SURVEY_WEBHOOK_SECRET") ?? "";
+    if (webhookSecret) {
+      const provided = req.headers.get("x-webhook-secret") ?? "";
+      if (provided !== webhookSecret) {
+        return new Response(JSON.stringify({ error: "Invalid webhook secret" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const payload = await req.json();
 
     const data = payload.data ?? payload;
@@ -387,6 +410,22 @@ serve(async (req) => {
       raw_response: messageText,
       parsed_response: parsed,
     });
+
+    // Audit log (non-blocking) — public webhook, actor is the system.
+    supabase.from("audit_log").insert({
+      action: "EDGE_FN",
+      actor_id: null,
+      actor_role: "service_role",
+      schema_name: "public",
+      table_name: "edge_fn:survey-webhook",
+      row_id: session.id,
+      context: {
+        event: "survey-webhook",
+        session_id: session.id,
+        question_id: currentQ.id,
+        service: incomingService,
+      },
+    }).then(() => {}).catch((e: unknown) => console.error("[survey-webhook] audit_log insert failed:", e));
 
     // Advance to next question
     await advanceToNextQuestion(supabase, session, currentQ, phone, incomingService);

@@ -44,8 +44,7 @@ class CalendarService {
 
   bool get isReady => _supabase.isInitialized;
 
-  SupabaseClient get _client =>
-      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+  SupabaseClient get _client => _supabase.client;
 
   /// Creates a new calendar event, optionally syncing to Google Calendar
   Future<CalendarEvent> createEvent({

@@ -43,6 +43,8 @@ import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart'
 import 'package:bluebubbles/screens/crm/surveys_screen.dart';
 import 'package:bluebubbles/screens/crm/candidates_page.dart';
 import 'package:bluebubbles/screens/crm/finances_page.dart';
+import 'package:bluebubbles/screens/crm/superadmin/activity_screen.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:collection/collection.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:provider/provider.dart';
@@ -669,6 +671,7 @@ enum _HomeSection {
   surveys,
   candidates,
   finances,
+  activity, // superadmin-only: Activity dashboard
 }
 
 class _HomeState extends OptimizedState<Home>
@@ -1033,6 +1036,17 @@ class _HomeState extends OptimizedState<Home>
                       const SurveysScreen(key: PageStorageKey('surveys-view')),
                       const CandidatesPage(key: PageStorageKey('candidates-view')),
                       const FinancesPage(key: PageStorageKey('finances-view')),
+                      // Superadmin Activity dashboard — wrapped in a Builder so
+                      // the realtime subscriptions only start when the section
+                      // is active (IndexedStack still keeps all children in
+                      // the tree, but the Builder defers child construction).
+                      Builder(
+                        key: const PageStorageKey('activity-view'),
+                        builder: (context) =>
+                            _currentSection == _HomeSection.activity
+                                ? const ActivityScreen()
+                                : const SizedBox.shrink(),
+                      ),
                     ],
                   ),
                 ),
@@ -1047,6 +1061,7 @@ class _HomeState extends OptimizedState<Home>
   Widget _buildTopBar(BuildContext context, bool crmReady) {
     final theme = Theme.of(context);
     final bool isMobileWidth = MediaQuery.of(context).size.width < 600;
+    final session = context.watch<UserSessionProvider>();
 
     if (isMobileWidth) {
       return _buildMobileTopBar(context, theme, crmReady);
@@ -1320,6 +1335,15 @@ class _HomeState extends OptimizedState<Home>
               Icons.chat_bubble_outline,
               hideIcon: hideIcons,
             ),
+            if (session.isSuperadmin)
+              _buildNavButton(
+                context,
+                _HomeSection.activity,
+                'Activity',
+                Icons.history,
+                enabled: crmReady,
+                hideIcon: hideIcons,
+              ),
           ];
 
           // Always use Row layout - logo left (fixed), nav middle (scrollable), search/settings right (fixed)
@@ -1345,6 +1369,13 @@ class _HomeState extends OptimizedState<Home>
                 ),
               ),
               const SizedBox(width: 8),
+              // Current-user badge (desktop)
+              _CurrentUserBadge(
+                session: session,
+                onOpenProfile: () => _openSelfProfile(context, session),
+                onSignOut: () => _handleSignOut(context, session),
+              ),
+              const SizedBox(width: 4),
               // Search and Settings - always visible on right
               searchButton,
               settingsButton,
@@ -1360,6 +1391,7 @@ class _HomeState extends OptimizedState<Home>
     ThemeData theme,
     bool crmReady,
   ) {
+    final session = context.watch<UserSessionProvider>();
     return Material(
       elevation: 4,
       color: theme.colorScheme.surface,
@@ -1409,6 +1441,13 @@ class _HomeState extends OptimizedState<Home>
                           ? () => _openGlobalSearch(context)
                           : null,
                     ),
+                  ),
+                  const SizedBox(width: 4),
+                  _CurrentUserBadge(
+                    session: session,
+                    compact: true,
+                    onOpenProfile: () => _openSelfProfile(context, session),
+                    onSignOut: () => _handleSignOut(context, session),
                   ),
                 ],
               ),
@@ -1671,6 +1710,19 @@ class _HomeState extends OptimizedState<Home>
                     label: 'Conversations',
                     onActivate: () => _setSection(_HomeSection.conversations),
                   ),
+                  if (parentContext
+                      .read<UserSessionProvider>()
+                      .isSuperadmin)
+                    buildItem(
+                      order: 16.5,
+                      icon: Icons.history,
+                      label: 'Activity',
+                      enabled: crmReady,
+                      subtitle: disabledMessage,
+                      onActivate: crmReady
+                          ? () => _setSection(_HomeSection.activity)
+                          : null,
+                    ),
                   const Divider(),
                   buildItem(
                     order: 17,
@@ -1849,6 +1901,34 @@ class _HomeState extends OptimizedState<Home>
         builder: (_) => const GlobalCrmSearchDialog(),
       ),
     );
+  }
+
+  void _openSelfProfile(BuildContext context, UserSessionProvider session) {
+    final member = session.currentMember;
+    if (member == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No profile loaded for this session.')),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MemberDetailScreen(member: member),
+      ),
+    );
+  }
+
+  Future<void> _handleSignOut(
+    BuildContext context,
+    UserSessionProvider session,
+  ) async {
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (_) {
+      // Even if network sign-out fails, clear the local session so the UI
+      // drops back to the auth gate.
+    }
+    session.clearSession();
   }
 }
 
@@ -2280,6 +2360,143 @@ Future<void> setSystemTrayContextMenu({bool windowHidden = false}) async {
           MenuItem(label: 'Close App', key: 'close_app'),
         ],
       ),
+    );
+  }
+}
+
+/// Top-bar badge showing who's currently signed in.
+///
+/// Desktop: pill with initials avatar + display name (and a shield icon when
+/// the session is superadmin), opens a popup menu on click.
+/// Mobile (compact): just the initials avatar circle, popup on tap.
+///
+/// Popup offers "My Profile" (opens the member-detail screen for the current
+/// session's member) and "Sign Out".
+class _CurrentUserBadge extends StatelessWidget {
+  const _CurrentUserBadge({
+    required this.session,
+    required this.onOpenProfile,
+    required this.onSignOut,
+    this.compact = false,
+  });
+
+  final UserSessionProvider session;
+  final VoidCallback onOpenProfile;
+  final VoidCallback onSignOut;
+  final bool compact;
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
+    return (parts.first.characters.first + parts.last.characters.first)
+        .toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final name = session.displayName;
+    final isSuper = session.isSuperadmin;
+
+    final avatar = CircleAvatar(
+      radius: compact ? 14 : 13,
+      backgroundColor: theme.colorScheme.primary,
+      foregroundColor: theme.colorScheme.onPrimary,
+      child: Text(
+        _initials(name),
+        style: TextStyle(
+          fontSize: compact ? 11 : 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+
+    return PopupMenuButton<String>(
+      tooltip: 'Signed in as $name',
+      offset: const Offset(0, 44),
+      onSelected: (value) {
+        switch (value) {
+          case 'profile':
+            onOpenProfile();
+            break;
+          case 'signout':
+            onSignOut();
+            break;
+        }
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem<String>(
+          value: 'profile',
+          child: ListTile(
+            leading: const Icon(Icons.person_outline),
+            title: const Text('My Profile'),
+            subtitle: Text(name),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'signout',
+          child: ListTile(
+            leading: Icon(Icons.logout),
+            title: Text('Sign Out'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      ],
+      child: compact
+          ? Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  avatar,
+                  if (isSuper)
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Icon(
+                        Icons.shield,
+                        size: 12,
+                        color: theme.colorScheme.tertiary,
+                      ),
+                    ),
+                ],
+              ),
+            )
+          : Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceVariant.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  avatar,
+                  const SizedBox(width: 8),
+                  Text(
+                    name,
+                    style: theme.textTheme.bodyMedium,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (isSuper) ...[
+                    const SizedBox(width: 4),
+                    Tooltip(
+                      message: 'Superadmin',
+                      child: Icon(
+                        Icons.shield,
+                        size: 14,
+                        color: theme.colorScheme.tertiary,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down, size: 18),
+                ],
+              ),
+            ),
     );
   }
 }

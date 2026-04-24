@@ -40,8 +40,7 @@ class WalletNotificationService {
 
   bool get isReady => _supabase.isInitialized;
 
-  SupabaseClient get _client =>
-      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+  SupabaseClient get _client => _supabase.client;
 
   /// Load the latest wallet pass holders with optional search / inclusion
   /// filters. Results are limited to prevent runaway memory usage on web.

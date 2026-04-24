@@ -4,9 +4,6 @@ const String _supabaseUrlDefine = String.fromEnvironment('SUPABASE_URL');
 const String _supabaseUrlNextDefine = String.fromEnvironment('NEXT_PUBLIC_SUPABASE_URL');
 const String _supabaseAnonKeyDefine = String.fromEnvironment('SUPABASE_ANON_KEY');
 const String _supabaseAnonKeyNextDefine = String.fromEnvironment('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-const String _supabaseServiceRoleDefine = String.fromEnvironment('SUPABASE_SERVICE_ROLE_KEY');
-const String _supabaseServiceRoleNextDefine =
-    String.fromEnvironment('NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY');
 const String _crmOrgMailboxesDefine = String.fromEnvironment('CRM_ORG_MAILBOXES');
 const String _crmOrgMailboxesAltDefine =
     String.fromEnvironment('CRM_ORGANIZATION_MAILBOXES');
@@ -46,17 +43,6 @@ class CRMConfig {
     return _readEnv([
       'SUPABASE_ANON_KEY',
       'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    ]);
-  }
-
-  /// Optional service role key used only for privileged server tasks.
-  /// This should never be exposed in a public build.
-  static String get supabaseServiceRoleKey {
-    if (_supabaseServiceRoleDefine.isNotEmpty) return _supabaseServiceRoleDefine;
-    if (_supabaseServiceRoleNextDefine.isNotEmpty) return _supabaseServiceRoleNextDefine;
-    return _readEnv([
-      'SUPABASE_SERVICE_ROLE_KEY',
-      'NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY',
     ]);
   }
 

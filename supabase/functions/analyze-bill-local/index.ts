@@ -6,6 +6,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const AI_ENDPOINT = "https://ai.hartzler.app/v1/chat/completions";
 const AI_API_KEY = Deno.env.get("AI_API_KEY") ?? "";
@@ -15,6 +16,37 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Wave 2 access-audit 2026-04-24: gate on authenticated user (any member).
+// Bill analysis is expensive (AI calls) but reads-only on the bills table.
+async function requireAuthenticatedUser(req: Request): Promise<
+  | { userId: string }
+  | { error: Response }
+> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const jwt = authHeader.replace(/^Bearer /i, "").trim();
+  if (!jwt) {
+    return {
+      error: new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }),
+    };
+  }
+  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+  });
+  const { data: userData, error: authErr } = await userClient.auth.getUser(jwt);
+  if (authErr || !userData?.user) {
+    return {
+      error: new Response(JSON.stringify({ error: "Invalid or expired JWT" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }),
+    };
+  }
+  return { userId: userData.user.id };
+}
 
 const ANALYSIS_SYSTEM_PROMPT = `You are a legislative analyst for Missouri Young Democrats (MOYD), a progressive Democratic youth organization focused on empowering young Missourians (ages 14-36) in politics.
 
@@ -112,11 +144,31 @@ serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  const gate = await requireAuthenticatedUser(req);
+  if ("error" in gate) return gate.error;
+  const actorId = gate.userId;
+
   try {
     const body = await req.json();
     const { billId, batchSize, processQueue } = body;
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Audit log (non-blocking)
+    supabase.from("audit_log").insert({
+      action: "EDGE_FN",
+      actor_id: actorId,
+      actor_role: "authenticated",
+      schema_name: "public",
+      table_name: "edge_fn:analyze-bill-local",
+      row_id: billId ?? null,
+      context: {
+        event: "analyze-bill-local",
+        bill_id: billId ?? null,
+        batch_size: batchSize ?? null,
+        process_queue: !!processQueue,
+      },
+    }).then(() => {}).catch((e: unknown) => console.error("[analyze-bill-local] audit_log insert failed:", e));
 
     // Mode 1: Process a single bill by ID
     if (billId) {

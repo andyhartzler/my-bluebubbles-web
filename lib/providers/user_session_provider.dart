@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/services/crm/candidate_repository.dart';
+import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
 /// Information about a committee the user belongs to, fetched from RPC
@@ -66,6 +68,8 @@ class UserSessionProvider extends ChangeNotifier {
   bool _isLoading = true;
   String? _error;
   bool _isInitialized = false;
+  String? _authUserId;
+  bool _isSuperadmin = false;
 
   // Getters for user state
   Member? get currentMember => _currentMember;
@@ -73,6 +77,17 @@ class UserSessionProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isInitialized => _isInitialized;
+
+  /// The Supabase auth user id (`auth.users.id`) for the current session,
+  /// distinct from the `members.id` primary key. Populated after
+  /// `loadUserSession()` resolves the member record.
+  String? get authUserId => _authUserId;
+
+  /// Whether the current user is a superadmin (per the
+  /// `current_user_is_superadmin()` RPC). Superadmins bypass member/committee
+  /// gates and can access break-glass tooling. Defaults to false while the
+  /// Phase 0 migration creating the RPC rolls out.
+  bool get isSuperadmin => _isSuperadmin;
 
   /// Whether the current user is an executive committee member
   /// Executives have full access to the CRM dashboard
@@ -160,7 +175,29 @@ class UserSessionProvider extends ChangeNotifier {
         _currentMember = Member.fromJson(memberResponse);
       }
 
-      debugPrint('Member loaded: ${_currentMember?.name}, executiveCommittee: ${_currentMember?.executiveCommittee}, isExecutive: $isExecutive');
+      // Capture the auth user id — distinct from members.id — so callers can
+      // reference `auth.users.id` (for audit writes, RLS checks that compare
+      // to auth.uid(), etc.) without another round-trip to Supabase.
+      _authUserId = Supabase.instance.client.auth.currentUser?.id;
+
+      // Resolve superadmin status via the security-definer RPC. Wrapped in
+      // try/catch so the app tolerates the pre-migration state during the
+      // Phase 0 rollout (plan §3) — if the RPC doesn't exist yet we simply
+      // fall back to the default of `_isSuperadmin = false`. The RPC is a
+      // scalar `boolean` under the hood, but supabase-dart's rpc() returns
+      // `dynamic` so we defensively handle bool/Map/List shapes.
+      try {
+        // ignore: avoid_dynamic_calls
+        final dynamic superadminResponse =
+            await Supabase.instance.client.rpc('current_user_is_superadmin');
+        _isSuperadmin = _coerceSuperadminResult(superadminResponse);
+      } catch (e) {
+        debugPrint('UserSessionProvider: current_user_is_superadmin RPC failed '
+            '(defaulting to false — migration may not be applied yet): $e');
+        _isSuperadmin = false;
+      }
+
+      debugPrint('Member loaded: ${_currentMember?.name}, executiveCommittee: ${_currentMember?.executiveCommittee}, isExecutive: $isExecutive, isSuperadmin: $_isSuperadmin');
 
       // If not executive, fetch their valid committees via RPC
       if (!isExecutive) {
@@ -271,7 +308,33 @@ class UserSessionProvider extends ChangeNotifier {
     return committee.tools;
   }
 
+  /// Coerce the `current_user_is_superadmin()` RPC payload into a bool.
+  /// Supabase's Dart client can return the scalar directly, a single-key map
+  /// (e.g. `{'current_user_is_superadmin': true}`), or a one-row list
+  /// containing such a map — so we accept all three shapes defensively.
+  bool _coerceSuperadminResult(dynamic response) {
+    if (response is bool) return response;
+    if (response is Map) {
+      final value = response['current_user_is_superadmin'];
+      if (value is bool) return value;
+      if (response.values.isNotEmpty) {
+        final first = response.values.first;
+        if (first is bool) return first;
+      }
+      return false;
+    }
+    if (response is List && response.isNotEmpty) {
+      return _coerceSuperadminResult(response.first);
+    }
+    return false;
+  }
+
   /// Clear the session (for logout)
+  ///
+  /// Also flushes per-session static caches in repositories/services so that
+  /// one user's data can never leak into a subsequent login on the same
+  /// process (Wave 2 audit §A.5 / §B.3). Does NOT sign out of Supabase —
+  /// that is the caller's responsibility (existing behavior preserved).
   void clearSession() {
     debugPrint('UserSessionProvider.clearSession called - clearing all session data');
     _currentMember = null;
@@ -279,6 +342,21 @@ class UserSessionProvider extends ChangeNotifier {
     _isLoading = false;
     _error = null;
     _isInitialized = false;
+    _authUserId = null;
+    _isSuperadmin = false;
+
+    // Flush cross-user static caches.
+    try {
+      CandidateRepository.clearFinanceCache();
+    } catch (e) {
+      debugPrint('UserSessionProvider.clearSession: CandidateRepository.clearFinanceCache failed: $e');
+    }
+    try {
+      CRMMessageService.clearAutomationCache();
+    } catch (e) {
+      debugPrint('UserSessionProvider.clearSession: CRMMessageService.clearAutomationCache failed: $e');
+    }
+
     notifyListeners();
   }
 

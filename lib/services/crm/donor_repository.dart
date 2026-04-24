@@ -14,10 +14,9 @@ class DonorRepository {
 
   bool get isReady => CRMConfig.crmEnabled && _supabase.isInitialized;
 
-  SupabaseClient get _readClient =>
-      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+  SupabaseClient get _readClient => _supabase.client;
 
-  SupabaseClient get _writeClient => _supabase.privilegedClient;
+  SupabaseClient get _writeClient => _supabase.client;
 
   Future<List<Donation>> fetchRecentDonations({int limit = 50}) async {
     if (!isReady) return [];

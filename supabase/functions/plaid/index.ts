@@ -18,6 +18,7 @@ const PLAID_BASE_URL =
     : "https://sandbox.plaid.com";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY =
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
@@ -26,6 +27,77 @@ const corsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+// ── Auth helper: validate user JWT + require executive_committee membership ──
+// This fn handles high-stakes finance paths (Plaid tokens, MEC reports) so we
+// keep a service-role DB client for writes but gate every call on a real
+// authenticated user who is an exec. Access-audit Wave 2 patch, 2026-04-24.
+async function requireStaffUser(req: Request): Promise<
+  | { user: { id: string; email?: string | null }; email: string | null }
+  | { error: Response }
+> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const jwt = authHeader.replace(/^Bearer /i, "").trim();
+  if (!jwt) {
+    return {
+      error: new Response(
+        JSON.stringify({ error: "Missing Authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      ),
+    };
+  }
+  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+  });
+  const { data: userData, error: authErr } = await userClient.auth.getUser(jwt);
+  if (authErr || !userData?.user) {
+    return {
+      error: new Response(
+        JSON.stringify({ error: "Invalid or expired JWT" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      ),
+    };
+  }
+  const user = userData.user;
+  // Staff gate: executive_committee=true on the matching members row
+  const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data: memberRow } = await adminClient
+    .from("members")
+    .select("executive_committee, email")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!memberRow?.executive_committee) {
+    return {
+      error: new Response(
+        JSON.stringify({ error: "Forbidden — executive_committee required" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      ),
+    };
+  }
+  return { user: { id: user.id, email: user.email }, email: memberRow.email ?? user.email ?? null };
+}
+
+async function auditLogAction(params: {
+  action: string;
+  actor_id: string | null;
+  event: string;
+  details?: Record<string, unknown>;
+}) {
+  try {
+    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    await adminClient.from("audit_log").insert({
+      action: "EDGE_FN",
+      actor_id: params.actor_id,
+      actor_role: params.actor_id ? "authenticated" : "service_role",
+      schema_name: "public",
+      table_name: `edge_fn:plaid`,
+      row_id: null,
+      context: { event: params.event, details: params.details ?? {} },
+    });
+  } catch (e) {
+    console.error("[plaid] audit_log insert failed:", e);
+  }
+}
 
 async function plaidRequest(endpoint: string, body: Record<string, unknown>) {
   const resp = await fetch(`${PLAID_BASE_URL}${endpoint}`, {
@@ -50,8 +122,21 @@ serve(async (req) => {
   }
 
   try {
+    // Staff-gated: caller must hold a valid user JWT + executive_committee=true.
+    const gate = await requireStaffUser(req);
+    if ("error" in gate) return gate.error;
+    const actorId = gate.user.id;
+
     const { action, ...params } = await req.json();
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Fire-and-forget audit log for this action
+    auditLogAction({
+      action: "EDGE_FN",
+      actor_id: actorId,
+      event: `plaid:${action ?? "unknown"}`,
+      details: action === "generate_mec_report" ? { quarter: params.quarter } : undefined,
+    });
 
     switch (action) {
       // ── Create Link Token (for Plaid Link UI) ──
@@ -412,7 +497,7 @@ serve(async (req) => {
             cd1a_csv_url: cd1aUrl,
             cd3b_csv_url: cd3bUrl,
             generated_at: new Date().toISOString(),
-            generated_by: "edge-function",
+            generated_by: actorId,
             updated_at: new Date().toISOString(),
           },
           { onConflict: "quarter" }

@@ -12,14 +12,14 @@ class DashboardMetricsService {
   /// Falls back to Supabase.instance.client if CRMSupabaseService isn't initialized
   /// but the global Supabase instance is available.
   SupabaseClient? get _client {
-    // Prefer privileged client if CRM service is fully initialized with service role
-    if (_crmService.isInitialized && _crmService.hasServiceRole) {
-      return _crmService.privilegedClient;
+    // Prefer the CRM service client when initialized
+    if (_crmService.isInitialized) {
+      return _crmService.client;
     }
 
     // Fallback: try to use Supabase.instance.client directly
     // This works if Supabase.initialize() was called, even if CRMSupabaseService
-    // had initialization issues (e.g., service role setup failed)
+    // had initialization issues
     try {
       final client = Supabase.instance.client;
       // If we can access the client without throwing, it's initialized
@@ -37,7 +37,6 @@ class DashboardMetricsService {
     if (client == null) {
       debugPrint('[DashboardMetricsService] fetchMetrics: client is null');
       debugPrint('[DashboardMetricsService] CRMSupabaseService.isInitialized: ${_crmService.isInitialized}');
-      debugPrint('[DashboardMetricsService] CRMSupabaseService.hasServiceRole: ${_crmService.hasServiceRole}');
       debugPrint('[DashboardMetricsService] Neither CRM service nor Supabase.instance is available');
       return null;
     }

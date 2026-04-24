@@ -4,17 +4,12 @@ import '../models/voting_form.dart';
 import '../models/vote_analytics.dart';
 import 'form_confirmation_service.dart';
 import 'form_analytics_service.dart';
-import '../../../services/crm/supabase_service.dart';
 
 class VotesService {
   final _supabase = Supabase.instance.client;
-  final _crmService = CRMSupabaseService();
 
-  /// Get privileged client for bypassing RLS when reading votes
-  SupabaseClient get _readClient =>
-      _crmService.isInitialized && _crmService.hasServiceRole
-      ? _crmService.privilegedClient
-      : _supabase;
+  /// Client for reading votes (RLS enforced via user JWT on anon client)
+  SupabaseClient get _readClient => _supabase;
 
   // Voting forms are stored in form_schemas with form_type='vote'
   Stream<List<VotingForm>> watchVotes(

@@ -47,7 +47,7 @@ class MeetingRepository {
     if (!_isReady) return [];
 
     try {
-      final client = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final client = _supabase.client;
 
       final response = await client
           .from('meeting_attendance')
@@ -72,8 +72,7 @@ class MeetingRepository {
     if (!_isReady) return [];
 
     try {
-      final SupabaseClient client =
-          _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final SupabaseClient client = _supabase.client;
 
       var query = client.from('meetings').select('*');
 
@@ -254,7 +253,7 @@ class MeetingRepository {
     if (!_isReady) return [];
 
     try {
-      final client = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final client = _supabase.client;
 
       final response = await client
           .from('meeting_attendance')
@@ -292,7 +291,7 @@ class MeetingRepository {
     final payload = Map<String, dynamic>.from(updates);
 
     try {
-      final response = await _supabase.privilegedClient
+      final response = await _supabase.client
           .from('meetings')
           .update(payload)
           .eq('id', meetingId)
@@ -323,7 +322,7 @@ class MeetingRepository {
     final targetTable = _resolveAttendanceTable(payload);
 
     try {
-      final response = await _supabase.privilegedClient
+      final response = await _supabase.client
           .from(targetTable)
           .update(payload)
           .eq('id', attendanceId)
@@ -392,7 +391,7 @@ class MeetingRepository {
     }
 
     try {
-      final response = await _supabase.privilegedClient
+      final response = await _supabase.client
           .from('meeting_attendance')
           .upsert(payload, onConflict: 'meeting_id,member_id')
           .select(
@@ -417,7 +416,7 @@ class MeetingRepository {
     if (!_isReady) return;
 
     try {
-      await _supabase.privilegedClient
+      await _supabase.client
           .from('meeting_attendance')
           .delete()
           .eq('id', attendanceId);
@@ -432,7 +431,7 @@ class MeetingRepository {
     if (!_isReady) return null;
 
     try {
-      final response = await _supabase.privilegedClient
+      final response = await _supabase.client
           .from('meetings')
           .update({'committee': committee})
           .eq('id', meetingId)
@@ -453,7 +452,7 @@ class MeetingRepository {
     if (!_isReady) return [];
 
     try {
-      final client = _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+      final client = _supabase.client;
       final response = await client
           .from('non_member_attendees')
           .select('*, meeting:meetings(id, meeting_title, meeting_date, duration_minutes, recording_url, recording_embed_url, recording_thumbnail_url)')
@@ -478,7 +477,7 @@ class MeetingRepository {
     final payload = Map<String, dynamic>.from(updates);
 
     try {
-      final response = await _supabase.privilegedClient
+      final response = await _supabase.client
           .from('non_member_attendees')
           .update(payload)
           .eq('id', attendeeId)
@@ -501,7 +500,7 @@ class MeetingRepository {
     if (!_isReady) return;
 
     try {
-      await _supabase.privilegedClient
+      await _supabase.client
           .from('non_member_attendees')
           .delete()
           .eq('id', attendeeId);
@@ -520,7 +519,7 @@ class MeetingRepository {
     if (!_isReady) return null;
 
     try {
-      final client = _supabase.privilegedClient;
+      final client = _supabase.client;
       final attendeeResponse = await client
           .from('non_member_attendees')
           .select()

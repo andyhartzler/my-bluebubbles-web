@@ -1,24 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/form_template_db.dart';
-import '../../../services/crm/supabase_service.dart';
 
 /// Service for managing form templates in the database
 class FormTemplatesService {
   final _supabase = Supabase.instance.client;
-  final _crmService = CRMSupabaseService();
 
-  /// Get privileged client for write operations
-  SupabaseClient get _writeClient =>
-      _crmService.isInitialized && _crmService.hasServiceRole
-          ? _crmService.privilegedClient
-          : _supabase;
+  /// Client for write operations (RLS enforced via user JWT on anon client)
+  SupabaseClient get _writeClient => _supabase;
 
-  /// Get privileged client for read operations
-  SupabaseClient get _readClient =>
-      _crmService.isInitialized && _crmService.hasServiceRole
-          ? _crmService.privilegedClient
-          : _supabase;
+  /// Client for read operations (RLS enforced via user JWT on anon client)
+  SupabaseClient get _readClient => _supabase;
 
   /// Watch all templates (real-time stream) with fallback to one-time fetch on error
   Stream<List<FormTemplateDb>> watchTemplates({String? category}) async* {

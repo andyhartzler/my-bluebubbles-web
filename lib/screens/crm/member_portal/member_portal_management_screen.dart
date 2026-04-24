@@ -22,6 +22,7 @@ import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/member_portal_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/utils/markdown_quill_loader.dart';
 import 'package:bluebubbles/utils/quill_html_converter.dart';
 import 'package:mime_type/mime_type.dart';
@@ -1647,7 +1648,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                     children: [
                       TextButton(
                         onPressed: () async {
-                          await _repository.approveSubmittedEvent(submissionId: submission.id);
+                          await _repository.approveSubmittedEvent(
+                            submissionId: submission.id,
+                            adminId: Supabase.instance.client.auth.currentUser?.id,
+                          );
                           await _reloadEvents();
                         },
                         child: const Text('Approve'),
@@ -1657,6 +1661,7 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                           await _repository.rejectSubmittedEvent(
                             submissionId: submission.id,
                             reason: 'Not a fit for portal',
+                            adminId: Supabase.instance.client.auth.currentUser?.id,
                           );
                           await _reloadEvents();
                         },
@@ -2444,14 +2449,21 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
                 children: [
                   TextButton(
                     onPressed: () async {
-                      await _repository.approveProfileChange(change.id);
+                      await _repository.approveProfileChange(
+                        change.id,
+                        adminId: Supabase.instance.client.auth.currentUser?.id,
+                      );
                       await _reloadProfileChanges();
                     },
                     child: const Text('Approve'),
                   ),
                   TextButton(
                     onPressed: () async {
-                      await _repository.rejectProfileChange(change.id, reason: 'Rejected by admin');
+                      await _repository.rejectProfileChange(
+                        change.id,
+                        reason: 'Rejected by admin',
+                        adminId: Supabase.instance.client.auth.currentUser?.id,
+                      );
                       await _reloadProfileChanges();
                     },
                     child: const Text('Reject'),

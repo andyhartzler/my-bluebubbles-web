@@ -42,10 +42,9 @@ class QuickLinksRepository {
   @protected
   bool get isReady => _isReadyOverride ?? _supabase.isInitialized;
 
-  SupabaseClient get _readClient => _readOverride ??
-      (_supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client);
+  SupabaseClient get _readClient => _readOverride ?? _supabase.client;
 
-  SupabaseClient get _writeClient => _writeOverride ?? _supabase.privilegedClient;
+  SupabaseClient get _writeClient => _writeOverride ?? _supabase.client;
 
   @visibleForTesting
   void debugOverrideClients({

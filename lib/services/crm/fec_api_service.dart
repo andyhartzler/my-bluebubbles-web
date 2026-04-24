@@ -278,48 +278,16 @@ class FecApiService {
 
   // ─── Supabase cache helpers ───────────────────────────────────
 
+  // TODO: fec_finance_cache table doesn't exist in prod — audit 2026-04-24
+  // Cache read returns null (table 404s gracefully). Cache write removed during
+  // Wave 2 service-role cleanup — no caching until the table is provisioned
+  // and RLS is configured.
   Future<CandidateFinance?> _getCachedFinance(String fecId) async {
-    if (!_supabase.isInitialized) return null;
-
-    try {
-      final response = await _supabase.privilegedClient
-          .from('fec_finance_cache')
-          .select()
-          .eq('fec_id', fecId)
-          .gte('cached_at',
-              DateTime.now().subtract(const Duration(hours: 24)).toIso8601String())
-          .maybeSingle();
-
-      if (response == null) return null;
-      return CandidateFinance.fromJson(response);
-    } catch (e) {
-      // Table might not exist yet, that's fine
-      return null;
-    }
+    return null;
   }
 
   Future<void> _cacheFinance(CandidateFinance finance) async {
-    if (!_supabase.isInitialized) return;
-
-    try {
-      await _supabase.privilegedClient
-          .from('fec_finance_cache')
-          .upsert({
-        'fec_id': finance.fecId,
-        'candidate_id': finance.candidateId,
-        'total_raised': finance.totalRaised,
-        'total_spent': finance.totalSpent,
-        'cash_on_hand': finance.cashOnHand,
-        'total_debt': finance.totalDebt,
-        'contributor_count': finance.contributorCount,
-        'individual_contributions': finance.individualContributions,
-        'pac_contributions': finance.pacContributions,
-        'last_updated': finance.lastUpdated,
-        'cached_at': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      debugPrint('⚠️ Failed to cache FEC finance: $e');
-    }
+    // no-op: fec_finance_cache table doesn't exist in prod (2026-04-24).
   }
 
   // ─── Clear cache ──────────────────────────────────────────────

@@ -9,8 +9,7 @@ class EmailTemplateRepository {
 
   bool get _isReady => _supabase.isInitialized;
 
-  SupabaseClient get _readClient =>
-      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+  SupabaseClient get _readClient => _supabase.client;
 
   Future<List<EmailTemplate>> getActiveTemplates({String? audience}) async {
     if (!_isReady) {

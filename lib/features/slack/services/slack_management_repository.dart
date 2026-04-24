@@ -19,11 +19,9 @@ class SlackManagementRepository {
 
   bool get isReady => _supabase.isInitialized;
 
-  SupabaseClient get _readClient =>
-      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+  SupabaseClient get _readClient => _supabase.client;
 
-  SupabaseClient get _writeClient =>
-      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+  SupabaseClient get _writeClient => _supabase.client;
 
   /// Supabase storage URL for cached avatar images
   static const _supabaseAvatarStorageUrl =

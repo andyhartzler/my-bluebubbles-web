@@ -177,7 +177,7 @@ class _FinancesPageState extends State<FinancesPage>
 
   Future<void> _loadConnections() async {
     try {
-      final resp = await _supabase.privilegedClient
+      final resp = await _supabase.client
           .from('plaid_connections')
           .select()
           .eq('status', 'active');
@@ -192,7 +192,7 @@ class _FinancesPageState extends State<FinancesPage>
 
   Future<void> _loadTransactions() async {
     try {
-      final resp = await _supabase.privilegedClient
+      final resp = await _supabase.client
           .from('bank_transactions')
           .select()
           .order('date', ascending: false)
@@ -208,7 +208,7 @@ class _FinancesPageState extends State<FinancesPage>
 
   Future<void> _loadReports() async {
     try {
-      final resp = await _supabase.privilegedClient
+      final resp = await _supabase.client
           .from('mec_reports')
           .select()
           .order('period_start', ascending: false)
@@ -224,7 +224,7 @@ class _FinancesPageState extends State<FinancesPage>
 
   Future<void> _loadDonations() async {
     try {
-      final resp = await _supabase.privilegedClient
+      final resp = await _supabase.client
           .from('donations')
           .select('amount, donation_date, donor_id, payment_method, status')
           .eq('status', 'completed')
@@ -241,7 +241,7 @@ class _FinancesPageState extends State<FinancesPage>
 
   Future<void> _loadDonors() async {
     try {
-      final resp = await _supabase.privilegedClient
+      final resp = await _supabase.client
           .from('donors')
           .select('id, name, email, total_donated')
           .order('total_donated', ascending: false)
@@ -254,7 +254,7 @@ class _FinancesPageState extends State<FinancesPage>
 
   Future<void> _loadReceipts() async {
     try {
-      final resp = await _supabase.privilegedClient
+      final resp = await _supabase.client
           .from('receipts')
           .select()
           .order('email_date', ascending: false)
@@ -270,7 +270,7 @@ class _FinancesPageState extends State<FinancesPage>
 
   Future<void> _loadPastFilings() async {
     try {
-      final resp = await _supabase.privilegedClient
+      final resp = await _supabase.client
           .from('mec_historical_filings')
           .select()
           .eq('committee_mec_id', _moydMecId)
@@ -363,7 +363,7 @@ class _FinancesPageState extends State<FinancesPage>
     if (!mounted) return;
     setState(() => _syncing = true);
     try {
-      await _supabase.privilegedClient.functions
+      await _supabase.client.functions
           .invoke('plaid', body: {'action': 'sync_transactions'});
       await _loadTransactions();
       await _loadConnections();
@@ -389,7 +389,7 @@ class _FinancesPageState extends State<FinancesPage>
     if (!mounted) return;
     setState(() => _generating = true);
     try {
-      final resp = await _supabase.privilegedClient.functions.invoke('plaid',
+      final resp = await _supabase.client.functions.invoke('plaid',
           body: {'action': 'generate_mec_report', 'quarter': _selectedQuarter});
       await _loadReports();
       if (mounted) {
@@ -419,7 +419,7 @@ class _FinancesPageState extends State<FinancesPage>
       }
 
       // 1. Get a link_token from the Edge Function
-      final resp = await _supabase.privilegedClient.functions.invoke('plaid',
+      final resp = await _supabase.client.functions.invoke('plaid',
           body: {
             'action': 'create_link_token',
             'redirect_uri': 'https://moyd.app/plaid/callback',
@@ -485,7 +485,7 @@ class _FinancesPageState extends State<FinancesPage>
 
     try {
       // Exchange the public_token for a permanent access_token via Edge Function
-      await _supabase.privilegedClient.functions.invoke('plaid', body: {
+      await _supabase.client.functions.invoke('plaid', body: {
         'action': 'exchange_token',
         'public_token': publicToken,
         'institution_id': institutionId,
@@ -528,7 +528,7 @@ class _FinancesPageState extends State<FinancesPage>
     if (id == null) return;
     setState(() => _togglingInclusion = true);
     try {
-      await _supabase.privilegedClient
+      await _supabase.client
           .from('bank_transactions')
           .update({'mec_included': value})
           .eq('id', id);
@@ -549,7 +549,7 @@ class _FinancesPageState extends State<FinancesPage>
     if (id == null) return;
     setState(() => _updatingMecPurpose = true);
     try {
-      await _supabase.privilegedClient
+      await _supabase.client
           .from('bank_transactions')
           .update({'mec_purpose': purpose})
           .eq('id', id);
@@ -572,7 +572,7 @@ class _FinancesPageState extends State<FinancesPage>
     final newStatus = current == 'filed' ? 'ready' : 'filed';
     setState(() => _togglingReportFiled = true);
     try {
-      await _supabase.privilegedClient
+      await _supabase.client
           .from('mec_reports')
           .update({'status': newStatus})
           .eq('id', id);
@@ -2809,7 +2809,7 @@ class _FinancesPageState extends State<FinancesPage>
           if (_savingMerchantStatus) return;
           setState(() => _savingMerchantStatus = true);
           try {
-            await _supabase.privilegedClient
+            await _supabase.client
                 .from('receipts')
                 .update({'match_status': status, 'updated_at': DateTime.now().toIso8601String()})
                 .eq('id', receiptId);
@@ -2828,7 +2828,7 @@ class _FinancesPageState extends State<FinancesPage>
 
   Future<void> _deleteReceipt(String receiptId) async {
     try {
-      await _supabase.privilegedClient.functions
+      await _supabase.client.functions
           .invoke('receipts', body: {'action': 'delete', 'receipt_id': receiptId});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -3000,7 +3000,7 @@ class _FinancesPageState extends State<FinancesPage>
     if (id == null) return;
     setState(() => _updatingReceiptStatus = true);
     try {
-      await _supabase.privilegedClient
+      await _supabase.client
           .from('receipts')
           .update({'match_status': status, 'updated_at': DateTime.now().toIso8601String()})
           .eq('id', id);
@@ -3082,7 +3082,7 @@ class _FinancesPageState extends State<FinancesPage>
     setState(() => _matchingReceipt = true);
     Navigator.pop(dialogCtx);
     try {
-      await _supabase.privilegedClient
+      await _supabase.client
           .from('receipts')
           .update({
             'transaction_id': txnId,
@@ -3334,7 +3334,7 @@ class _FinancesPageState extends State<FinancesPage>
                 if (storagePath != null)
                   _downloadChip(
                       'Archived PDF',
-                      _supabase.privilegedClient.storage
+                      _supabase.client.storage
                           .from('mec-filings')
                           .getPublicUrl(storagePath),
                       BrandColors.momentumBlue),

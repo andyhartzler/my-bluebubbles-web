@@ -42,8 +42,7 @@ class RecipientSelectorWidget extends StatefulWidget {
 class _RecipientSelectorWidgetState extends State<RecipientSelectorWidget> {
   final CRMSupabaseService _supabase = CRMSupabaseService();
 
-  SupabaseClient get _client =>
-      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+  SupabaseClient get _client => _supabase.client;
 
   // ── Mode ──────────────────────────────────────────────────────────────
   RecipientMode _mode = RecipientMode.individual;

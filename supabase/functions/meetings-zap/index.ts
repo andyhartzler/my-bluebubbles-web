@@ -1085,11 +1085,34 @@ async function findMemberWithFallback(supabaseClient, zoomName, zoomEmail) {
   return null;
 }
 // ==================== MAIN HANDLER ====================
+// Wave 2 access-audit 2026-04-24:
+// This function is a Zoom webhook ingest — invoked server-to-server by Zoom
+// after each meeting ends with the transcript + participant payload. It is
+// NOT invoked from the Dart CRM (Dart uses zoom-create-meeting, zoom-update-
+// meeting, zoom-delete-meeting, send-meeting-invites instead — audited
+// separately). Since no user JWT exists in the webhook path, we gate on an
+// optional shared secret via ZOOM_WEBHOOK_SECRET + the existing Zoom
+// verification token header `x-zoom-request-token`. Audit-log each meeting
+// upsert with actor_role='service_role'.
 serve(async (req)=>{
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: corsHeaders
     });
+  }
+  // Webhook-secret verification (optional — fails open if env unset to
+  // preserve current behavior until Andrew configures it).
+  const webhookSecret = Deno.env.get('ZOOM_WEBHOOK_SECRET') ?? '';
+  if (webhookSecret) {
+    const zoomToken = req.headers.get('x-zoom-request-token') ?? req.headers.get('authorization') ?? '';
+    if (!zoomToken.includes(webhookSecret)) {
+      return new Response(JSON.stringify({
+        error: 'Invalid or missing Zoom webhook secret'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
   }
   let payload = null;
   try {
@@ -1218,6 +1241,23 @@ serve(async (req)=>{
       processing_status: 'completed'
     }).eq('id', meeting.id);
     console.log(`Attendance processed: ${successfulMatches} matched, ${nonMemberCount} non-members`);
+    // Audit log (non-blocking) — Zoom webhook ingest, no user actor.
+    supabaseClient.from('audit_log').insert({
+      action: 'EDGE_FN',
+      actor_id: null,
+      actor_role: 'service_role',
+      schema_name: 'public',
+      table_name: 'edge_fn:meetings-zap',
+      row_id: meeting.id,
+      context: {
+        event: 'meetings-zap:zoom-webhook',
+        zoom_meeting_id: payload.meeting_id,
+        topic: payload.meeting_topic,
+        host_member_id: meetingHostMemberId,
+        attendance_matched: successfulMatches,
+        non_members: nonMemberCount
+      }
+    }).then(() => {}).catch((e) => console.error('[meetings-zap] audit_log insert failed:', e));
     return new Response(JSON.stringify({
       success: true,
       meeting_id: meeting.id,

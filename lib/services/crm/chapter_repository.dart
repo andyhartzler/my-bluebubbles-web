@@ -17,10 +17,9 @@ class ChapterRepository {
 
   bool get _isReady => _supabase.isInitialized;
 
-  SupabaseClient get _readClient =>
-      _supabase.hasServiceRole ? _supabase.privilegedClient : _supabase.client;
+  SupabaseClient get _readClient => _supabase.client;
 
-  SupabaseClient get _writeClient => _supabase.privilegedClient;
+  SupabaseClient get _writeClient => _supabase.client;
 
   Future<List<Chapter>> getAllChapters({String? chapterType}) async {
     if (!_isReady) return [];

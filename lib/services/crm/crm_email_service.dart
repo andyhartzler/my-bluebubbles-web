@@ -176,7 +176,7 @@ class CRMEmailService {
 
     FunctionResponse response;
     try {
-      response = await supabaseService.privilegedClient.functions.invoke(
+      response = await supabaseService.client.functions.invoke(
         'send-email',
         body: payload,
       );
@@ -297,7 +297,7 @@ class CRMEmailService {
 
     FunctionResponse response;
     try {
-      response = await supabaseService.privilegedClient.functions.invoke(
+      response = await supabaseService.client.functions.invoke(
         'send-email-reply',
         body: payload,
       );
@@ -475,7 +475,7 @@ class CRMEmailService {
 
     try {
       // Query members table for committee membership
-      final response = await supabaseService.privilegedClient
+      final response = await supabaseService.client
           .from('members')
           .select()
           .overlaps('committees', filter.committees!);

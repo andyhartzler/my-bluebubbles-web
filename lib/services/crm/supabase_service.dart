@@ -11,7 +11,6 @@ class CRMSupabaseService {
   CRMSupabaseService._internal();
 
   SupabaseClient? _client;
-  SupabaseClient? _serviceClient;
   bool _initialized = false;
 
   /// Initialize Supabase connection.
@@ -46,20 +45,6 @@ class CRMSupabaseService {
       _client = Supabase.instance.client;
       debugPrint('[CRMSupabaseService] Client created successfully');
 
-      final serviceRoleKey = CRMConfig.supabaseServiceRoleKey;
-      if (serviceRoleKey.isNotEmpty) {
-        try {
-          _serviceClient = SupabaseClient(
-            url,
-            serviceRoleKey,
-          );
-          debugPrint('✅ CRM Supabase service role client configured');
-        } catch (e) {
-          debugPrint('⚠️ Failed to create service role client: $e');
-        }
-      } else {
-        debugPrint('[CRMSupabaseService] No service role key provided, using anon client only');
-      }
       _initialized = true;
       debugPrint('✅ CRM Supabase initialized successfully');
     } catch (e, stack) {
@@ -79,16 +64,17 @@ class CRMSupabaseService {
 
   bool get isInitialized => _initialized;
 
-  bool get hasServiceRole => _serviceClient != null;
+  @Deprecated('Service role key no longer ships in the client. hasServiceRole always returns false; migrate call sites to RPC-backed privilege checks.')
+  bool get hasServiceRole => false;
 
-  SupabaseClient get privilegedClient => _serviceClient ?? client;
+  @Deprecated('Use `client`. privilegedClient is now an alias; will be removed once all call sites are migrated.')
+  SupabaseClient get privilegedClient => client;
 
   @visibleForTesting
   void debugSetInitialized(bool value) {
     _initialized = value;
     if (!value) {
       _client = null;
-      _serviceClient = null;
     }
   }
 }

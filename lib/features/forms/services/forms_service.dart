@@ -3,17 +3,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/form_schema.dart';
 import '../models/form_submission.dart';
 import 'form_confirmation_service.dart';
-import '../../../services/crm/supabase_service.dart';
 
 class FormsService {
   final _supabase = Supabase.instance.client;
-  final _crmService = CRMSupabaseService();
 
-  /// Get privileged client for bypassing RLS when reading submissions
-  SupabaseClient get _readClient =>
-      _crmService.isInitialized && _crmService.hasServiceRole
-          ? _crmService.privilegedClient
-          : _supabase;
+  /// Client for reading submissions (RLS enforced via user JWT on anon client)
+  SupabaseClient get _readClient => _supabase;
 
   /// Watch forms with realtime updates, with fallback to one-time fetch on error
   Stream<List<FormSchema>> watchForms(String typeFilter) async* {
@@ -323,7 +318,7 @@ class FormsService {
           .order('created_at', ascending: false);
 
       final data = response as List;
-      debugPrint('FormsService.getSubmissions: Found ${data.length} submissions for form $formId (using ${_crmService.hasServiceRole ? "service role" : "anon"} client)');
+      debugPrint('FormsService.getSubmissions: Found ${data.length} submissions for form $formId');
 
       return data.map((json) {
         try {

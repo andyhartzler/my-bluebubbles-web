@@ -39,7 +39,7 @@ class _MECCommitteeScreenState extends State<MECCommitteeScreen> {
       return;
     }
     try {
-      final resp = await _supabase.privilegedClient.rpc(
+      final resp = await _supabase.client.rpc(
         'get_committee_full_profile',
         params: {'p_mec_id': widget.mecId},
       );

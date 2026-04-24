@@ -47,7 +47,7 @@ class _NewsArticleDetailScreenState extends State<NewsArticleDetailScreen> {
       return;
     }
     try {
-      final resp = await _supabase.privilegedClient
+      final resp = await _supabase.client
           .from('candidate_news')
           .select()
           .eq('id', widget.newsId)
