@@ -67,6 +67,11 @@ class _AssignmentCreateDialogState extends State<AssignmentCreateDialog> {
   }
 
   Future<void> _loadStaffCandidates() async {
+    // Edit mode hides the dropdown — no need to load the staff list.
+    if (widget.existing != null) {
+      setState(() => _searching = false);
+      return;
+    }
     setState(() => _searching = true);
     try {
       final result = await _memberRepo.getAllMembers(fetchAll: true);
@@ -84,14 +89,17 @@ class _AssignmentCreateDialogState extends State<AssignmentCreateDialog> {
   }
 
   Future<void> _save() async {
-    final assignee = _selectedAssignee;
-    if (assignee == null) {
-      setState(() => _error = 'Pick an assignee');
-      return;
-    }
+    final isEdit = widget.existing != null;
     final title = _title.text.trim();
     if (title.isEmpty) {
       setState(() => _error = 'Title is required');
+      return;
+    }
+    // Edit mode keeps the existing assignee — re-assignment is not
+    // supported in v1 (the dropdown is hidden in edit mode). Create
+    // mode requires a selection from the dropdown.
+    if (!isEdit && _selectedAssignee == null) {
+      setState(() => _error = 'Pick an assignee');
       return;
     }
     setState(() {
@@ -99,18 +107,8 @@ class _AssignmentCreateDialogState extends State<AssignmentCreateDialog> {
       _error = null;
     });
 
-    // Resolve the assignee's auth user id by querying members.user_id
-    final assigneeAuthId = await _resolveAuthUserId(assignee);
-    if (assigneeAuthId == null) {
-      setState(() {
-        _saving = false;
-        _error = 'Selected member does not have a linked auth account yet';
-      });
-      return;
-    }
-
     Assignment? result;
-    if (widget.existing != null) {
+    if (isEdit) {
       final updated = widget.existing!.copyWith(
         title: title,
         note: _note.text.trim().isEmpty ? null : _note.text.trim(),
@@ -127,6 +125,15 @@ class _AssignmentCreateDialogState extends State<AssignmentCreateDialog> {
       }
       result = updated;
     } else {
+      // Resolve the assignee's auth user id by querying members.user_id
+      final assigneeAuthId = await _resolveAuthUserId(_selectedAssignee!);
+      if (assigneeAuthId == null) {
+        setState(() {
+          _saving = false;
+          _error = 'Selected member does not have a linked auth account yet';
+        });
+        return;
+      }
       result = await _service.create(
         assignedTo: assigneeAuthId,
         assignedBy: widget.currentAuthUserId,

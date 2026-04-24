@@ -90,7 +90,9 @@ class _AddPageDialogState extends State<AddPageDialog> {
               subtitle: const Text('Copy the global Dashboard'),
               value: 'universal',
               groupValue: _seed,
-              onChanged: (v) => setState(() => _seed = v ?? 'universal'),
+              onChanged: (v) {
+                if (v != null) setState(() => _seed = v);
+              },
             ),
             RadioListTile<String>(
               dense: true,
@@ -98,7 +100,9 @@ class _AddPageDialogState extends State<AddPageDialog> {
               subtitle: const Text('Empty grid'),
               value: 'blank',
               groupValue: _seed,
-              onChanged: (v) => setState(() => _seed = v ?? 'universal'),
+              onChanged: (v) {
+                if (v != null) setState(() => _seed = v);
+              },
             ),
             if (widget.existingPages.isNotEmpty)
               RadioListTile<String>(
@@ -106,7 +110,9 @@ class _AddPageDialogState extends State<AddPageDialog> {
                 title: const Text('Duplicate existing page'),
                 value: 'page',
                 groupValue: _seed,
-                onChanged: (v) => setState(() => _seed = v ?? 'universal'),
+                onChanged: (v) {
+                  if (v != null) setState(() => _seed = v);
+                },
               ),
             if (_seed == 'page' && widget.existingPages.isNotEmpty)
               Padding(

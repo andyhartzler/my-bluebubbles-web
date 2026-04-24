@@ -31,14 +31,24 @@ class _DashboardShellScreenState extends State<DashboardShellScreen>
   bool _loading = true;
   TabController? _tabs;
   int _selectedIndex = 0;
+  String? _loadedForAuthId;
+  bool _addingPage = false;
 
   @override
   bool get wantKeepAlive => true;
 
   @override
-  void initState() {
-    super.initState();
-    _load();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // IndexedStack mounts every section eagerly, so the auth id may be
+    // null on the first frame and only resolve once UserSessionProvider
+    // finishes loading. Triggering load from didChangeDependencies lets
+    // us pick up the auth id whenever the provider notifies a change.
+    final authId = context.read<UserSessionProvider>().authUserId;
+    if (authId != null && _loadedForAuthId != authId) {
+      _loadedForAuthId = authId;
+      _load(authId);
+    }
   }
 
   @override
@@ -47,17 +57,7 @@ class _DashboardShellScreenState extends State<DashboardShellScreen>
     super.dispose();
   }
 
-  Future<void> _load() async {
-    final session = context.read<UserSessionProvider>();
-    final authId = session.authUserId;
-    if (authId == null) {
-      setState(() {
-        _loading = false;
-        _pages = const [];
-      });
-      _rebuildTabs();
-      return;
-    }
+  Future<void> _load(String authId) async {
     setState(() => _loading = true);
     final pages = await _service.fetchPagesForUser(authId);
     if (!mounted) return;
@@ -94,23 +94,29 @@ class _DashboardShellScreenState extends State<DashboardShellScreen>
   }
 
   Future<void> _addPage() async {
-    final session = context.read<UserSessionProvider>();
-    final authId = session.authUserId;
-    if (authId == null) return;
-    final created = await showDialog<DashboardPage?>(
-      context: context,
-      builder: (_) => AddPageDialog(
-        userId: authId,
-        createdBy: authId,
-        existingPages: _pages,
-      ),
-    );
-    if (created == null) return;
-    setState(() {
-      _pages = [..._pages, created];
-      _selectedIndex = _pages.length; // jump to new page (universal=0, pages start at 1)
-    });
-    _rebuildTabs();
+    if (_addingPage) return;
+    _addingPage = true;
+    try {
+      final session = context.read<UserSessionProvider>();
+      final authId = session.authUserId;
+      if (authId == null) return;
+      final created = await showDialog<DashboardPage?>(
+        context: context,
+        builder: (_) => AddPageDialog(
+          userId: authId,
+          createdBy: authId,
+          existingPages: _pages,
+        ),
+      );
+      if (created == null) return;
+      setState(() {
+        _pages = [..._pages, created];
+        _selectedIndex = _pages.length; // jump to new page (universal=0, pages start at 1)
+      });
+      _rebuildTabs();
+    } finally {
+      _addingPage = false;
+    }
   }
 
   Future<void> _renamePage(DashboardPage page) async {

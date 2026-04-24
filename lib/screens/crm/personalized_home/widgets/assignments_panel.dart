@@ -40,7 +40,8 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
   List<Assignment> _toMe = [];
   List<Assignment> _byMe = [];
   List<AutoInferredAssignment> _auto = [];
-  bool _loadingExplicit = true;
+  bool _loadingToMe = true;
+  bool _loadingByMe = true;
   bool _loadingAuto = true;
 
   @override
@@ -62,28 +63,37 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
   Future<void> _initSubscribe() async {
     final stream = _service.watchAssignedToMe(widget.authUserId);
     if (stream == null) {
-      // Fallback to one-shot fetch
+      // Fallback to one-shot fetch (Supabase not initialized for streams)
       final list = await _service.fetchAssignedToMe(widget.authUserId);
       if (mounted) {
         setState(() {
           _toMe = list;
-          _loadingExplicit = false;
+          _loadingToMe = false;
         });
       }
       return;
     }
-    _toMeSub = stream.listen((list) {
-      if (!mounted) return;
-      setState(() {
-        _toMe = list;
-        _loadingExplicit = false;
-      });
-    });
+    _toMeSub = stream.listen(
+      (list) {
+        if (!mounted) return;
+        setState(() {
+          _toMe = list;
+          _loadingToMe = false;
+        });
+      },
+      onError: (_) {
+        if (mounted) setState(() => _loadingToMe = false);
+      },
+    );
   }
 
   Future<void> _loadOutgoing() async {
     final list = await _service.fetchAssignedByMe(widget.authUserId);
-    if (mounted) setState(() => _byMe = list);
+    if (!mounted) return;
+    setState(() {
+      _byMe = list;
+      _loadingByMe = false;
+    });
   }
 
   Future<void> _loadAuto() async {
@@ -183,8 +193,8 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
               child: TabBarView(
                 controller: _tabs,
                 children: [
-                  _explicitList(_toMe, _loadingExplicit, allowEdit: false),
-                  _explicitList(_byMe, _loadingExplicit, allowEdit: true),
+                  _explicitList(_toMe, _loadingToMe, allowEdit: false),
+                  _explicitList(_byMe, _loadingByMe, allowEdit: true),
                   _autoList(_auto, _loadingAuto),
                 ],
               ),

@@ -114,7 +114,10 @@ class HomeMeetingHistoryService {
   }
 
   /// Flattens `[{meeting_id: ..., joinKey: {...}}, ...]` into
-  /// `[{...}, ...]` (the inner join records).
+  /// `[{...}, ...]` (the inner join records). Handles both shapes
+  /// PostgREST may return for the embedded resource — a single map
+  /// (one-to-one) or a single-element list (the supabase-dart client
+  /// occasionally surfaces nested resources as lists).
   List<Map<String, dynamic>> _flattenJoined(dynamic rows,
       {required String joinKey}) {
     if (rows is! List) return const [];
@@ -123,6 +126,8 @@ class HomeMeetingHistoryService {
       final inner = r[joinKey];
       if (inner is Map) {
         out.add(Map<String, dynamic>.from(inner));
+      } else if (inner is List && inner.isNotEmpty && inner.first is Map) {
+        out.add(Map<String, dynamic>.from(inner.first as Map));
       }
     }
     return out;
