@@ -84,6 +84,10 @@ class Member {
   // truth over the member's self-reported values.
   final String? moVoterFileId;
 
+  // User-uploaded avatar (members.avatar_url, added in 20260424_04 migration).
+  // Takes precedence over auto-fetched profilePhotos when present.
+  final String? avatarUrl;
+
   Member({
     required this.id,
     this.createdAt,
@@ -156,6 +160,7 @@ class Member {
     List<MemberProfilePhoto> profilePhotos = const [],
     MemberInternalInfo internalInfo = MemberInternalInfo.empty,
     this.moVoterFileId,
+    this.avatarUrl,
   }) : profilePhotos = List<MemberProfilePhoto>.unmodifiable(profilePhotos),
        internalInfo = internalInfo;
 
@@ -460,6 +465,7 @@ class Member {
       profilePhotos: MemberProfilePhoto.parseList(json['profile_pictures']),
       internalInfo: MemberInternalInfo.fromJson(json['internal_member_info']),
       moVoterFileId: _normalizeText(json['mo_voter_file_id']),
+      avatarUrl: _normalizeText(json['avatar_url']),
     );
   }
 
@@ -537,6 +543,7 @@ class Member {
       'profile_pictures': profilePhotos.map((photo) => photo.toJson()).toList(),
       'internal_member_info': internalInfo.toJson(),
       'mo_voter_file_id': moVoterFileId,
+      'avatar_url': avatarUrl,
     };
   }
 
@@ -577,6 +584,17 @@ class Member {
     final primary = profilePhotos.firstWhereOrNull((photo) => photo.isPrimary) ??
         profilePhotos.firstOrNull;
     return primary?.publicUrl;
+  }
+
+  /// Effective avatar URL — prefers the user-uploaded `avatarUrl`, falls
+  /// back to the auto-fetched `primaryProfilePhotoUrl`. Used by the
+  /// personalized home profile header and any future avatar surface.
+  String? get effectiveAvatarUrl {
+    final uploaded = avatarUrl;
+    if (uploaded != null && uploaded.isNotEmpty) {
+      return uploaded;
+    }
+    return primaryProfilePhotoUrl;
   }
 
   /// Preferred school/education label prioritizing dedicated columns.
@@ -655,6 +673,7 @@ class Member {
     List<MemberProfilePhoto>? profilePhotos,
     MemberInternalInfo? internalInfo,
     String? moVoterFileId,
+    String? avatarUrl,
   }) {
     return Member(
       id: id ?? this.id,
@@ -728,6 +747,7 @@ class Member {
       profilePhotos: profilePhotos ?? this.profilePhotos,
       internalInfo: internalInfo ?? this.internalInfo,
       moVoterFileId: moVoterFileId ?? this.moVoterFileId,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
     );
   }
 
