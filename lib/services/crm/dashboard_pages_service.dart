@@ -100,7 +100,7 @@ class DashboardPagesService {
           .order('position', ascending: false)
           .limit(1);
       int nextPos = 0;
-      if (existing is List && existing.isNotEmpty) {
+      if (existing.isNotEmpty) {
         final p = (existing.first as Map)['position'];
         nextPos = (p is int ? p : int.tryParse(p?.toString() ?? '0') ?? 0) + 1;
       }
@@ -128,7 +128,7 @@ class DashboardPagesService {
           })
           .select()
           .single();
-      return DashboardPage.fromJson(inserted as Map<String, dynamic>);
+      return DashboardPage.fromJson(Map<String, dynamic>.from(inserted));
     } catch (e) {
       debugPrint('[DashboardPagesService] createPage: $e');
       return null;

@@ -104,7 +104,7 @@ class AssignmentsService {
           })
           .select()
           .single();
-      return Assignment.fromJson(inserted as Map<String, dynamic>);
+      return Assignment.fromJson(Map<String, dynamic>.from(inserted));
     } catch (e) {
       debugPrint('[AssignmentsService] create: $e');
       return null;

@@ -36,7 +36,7 @@ class UserHomePreferencesService {
           .eq('user_id', userId)
           .maybeSingle();
       if (row == null) return UserHomePreferences.defaultsFor(userId);
-      return UserHomePreferences.fromJson(row as Map<String, dynamic>);
+      return UserHomePreferences.fromJson(Map<String, dynamic>.from(row));
     } catch (e) {
       debugPrint('[UserHomePreferencesService] fetchOrDefault: $e');
       return UserHomePreferences.defaultsFor(userId);
