@@ -17,12 +17,14 @@ import 'package:jmap_dart_client/jmap/core/session/session.dart';
 import 'package:jmap_dart_client/jmap/core/state.dart';
 import 'package:jmap_dart_client/jmap/core/user_name.dart';
 
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/data/datasource/contact_datasource.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/data/datasource/email_datasource.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/data/datasource/mailbox_datasource.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/data/datasource/identity_data_source.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/data/datasource/vacation_data_source.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/server_settings/data/datasource/server_settings_data_source.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread/data/datasource/thread_datasource.dart';
+import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_contact_datasource.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_email_datasource.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_identity_datasource.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_mailbox_datasource.dart';
@@ -80,5 +82,8 @@ void registerEdgeFnDataSources() {
       EdgeFnServerSettingsDataSource(),
       permanent: true,
     );
+  }
+  if (!Get.isRegistered<ContactDataSource>()) {
+    Get.put<ContactDataSource>(EdgeFnContactDataSource(), permanent: true);
   }
 }

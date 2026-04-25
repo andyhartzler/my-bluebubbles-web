@@ -15,12 +15,25 @@ class ContactAutoCompleteBindings extends BaseBindings {
 
   @override
   void bindingsDataSource() {
-    Get.put<ContactDataSource>(Get.find<ContactDataSourceImpl>());
+    // MOYD CRM patch — registerEdgeFnDataSources() already put a permanent
+    // ContactDataSource (EdgeFnContactDataSource) at MailScreen mount.
+    // Skip overwriting it so the autocomplete on dashboard search /
+    // forward-recipient hits the CRM members directory like the composer
+    // does. If the global registration is missing for some reason, fall
+    // back to tmail's tagged impl rather than crash.
+    if (!Get.isRegistered<ContactDataSource>()) {
+      Get.put<ContactDataSource>(Get.find<ContactDataSourceImpl>());
+    }
   }
 
   @override
   void bindingsDataSourceImpl() {
-    Get.put(ContactDataSourceImpl(Get.find<CacheExceptionThrower>()));
+    // Still construct the impl-keyed binding so the legacy fallback path
+    // above (and any tmail code path that does Get.find<ContactDataSourceImpl>)
+    // still resolves. The impl is harmless when unused.
+    if (!Get.isRegistered<ContactDataSourceImpl>()) {
+      Get.put(ContactDataSourceImpl(Get.find<CacheExceptionThrower>()));
+    }
   }
 
   @override

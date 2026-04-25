@@ -160,8 +160,16 @@ class ComposerBindings extends BaseBindings {
       () => Get.find<ComposerDataSourceImpl>(tag: composerId),
       tag: composerId,
     );
+    // MOYD CRM patch — forward the per-composer ContactDataSource to the
+    // untagged EdgeFnContactDataSource registered globally by
+    // registerEdgeFnDataSources(). The original line was:
+    //   () => Get.find<ContactDataSourceImpl>(tag: composerId)
+    // — which calls device contacts (stubbed on web) or JMAP
+    // users.contacts.search (no JMAP backend). Forwarding here gives
+    // the To/Cc/Bcc autocomplete real CRM members instead of an empty
+    // list. Same pattern as commit d0dab6169 (IdentityDataSource).
     Get.lazyPut<ContactDataSource>(
-      () => Get.find<ContactDataSourceImpl>(tag: composerId),
+      () => Get.find<ContactDataSource>(),
       tag: composerId,
     );
     Get.lazyPut<MailboxDataSource>(

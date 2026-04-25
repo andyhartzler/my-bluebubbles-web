@@ -537,6 +537,34 @@ class MailApiClient {
     return (deleted: deleted, skipped: skipped, errors: errors);
   }
 
+  /// Searches the MOYD CRM members directory for autocomplete suggestions.
+  /// Backs `EdgeFnContactDataSource.getContactSuggestions()` — the composer
+  /// types into a To/Cc/Bcc field and we substring-match against
+  /// `members.name` / `members.email` server-side via the `mail-contact-search`
+  /// edge fn.
+  ///
+  /// Returns up to `limit` rows (capped at 25 server-side). Empty queries
+  /// short-circuit to an empty list — no point round-tripping for nothing.
+  Future<List<({String id, String name, String email, String? phone})>>
+      searchContacts({required String q, int limit = 10}) async {
+    if (q.trim().isEmpty) return const [];
+    final resp = await _supabase.client.functions.invoke(
+      'mail-contact-search',
+      body: {'q': q, 'limit': limit},
+    );
+    final data = (resp.data as Map?)?.cast<String, dynamic>() ?? const {};
+    final list = (data['contacts'] as List?) ?? const [];
+    return list.map((c) {
+      final m = Map<String, dynamic>.from(c as Map);
+      return (
+        id: m['id'] as String,
+        name: (m['name'] as String?) ?? '',
+        email: m['email'] as String,
+        phone: m['phone'] as String?,
+      );
+    }).toList();
+  }
+
   /// Returns true iff the current user has an active mail alias provisioned.
   /// Used to gate the Mail nav tab — non-execs without an alias should not
   /// see the tab (avoids a confusing 403 on first open).
