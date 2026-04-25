@@ -2,7 +2,7 @@
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/app_toast.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_date_range_picker/material_date_range_picker_dialog.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/flutter_date_range_picker.dart';
 import 'package:get/get.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/route_navigation.dart';

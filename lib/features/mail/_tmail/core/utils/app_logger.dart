@@ -1,6 +1,6 @@
 import 'package:bluebubbles/features/mail/_tmail/core/utils/build_utils.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/platform_info.dart';
-import 'package:bluebubbles/features/mail/_tmail/core/utils/sentry/sentry_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/sentry_flutter.dart';
 import 'package:universal_html/html.dart' as html;
 
 /// ANSI escape colors (Web only)

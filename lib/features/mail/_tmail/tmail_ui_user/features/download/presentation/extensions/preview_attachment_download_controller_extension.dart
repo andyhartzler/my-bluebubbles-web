@@ -46,12 +46,12 @@ import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localization
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/app_routes.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/route_navigation.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/route_utils.dart';
-import 'package:twake_previewer_flutter/core/constants/supported_charset.dart';
-import 'package:twake_previewer_flutter/core/previewer_options/options/previewer_state.dart';
-import 'package:twake_previewer_flutter/core/previewer_options/options/top_bar_options.dart';
-import 'package:twake_previewer_flutter/core/previewer_options/previewer_options.dart';
-import 'package:twake_previewer_flutter/twake_image_previewer/twake_image_previewer.dart';
-import 'package:twake_previewer_flutter/twake_plain_text_previewer/twake_plain_text_previewer.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
 
 typedef OnPreviewOrDownloadAttachmentAction = void Function(
   Attachment attachment,

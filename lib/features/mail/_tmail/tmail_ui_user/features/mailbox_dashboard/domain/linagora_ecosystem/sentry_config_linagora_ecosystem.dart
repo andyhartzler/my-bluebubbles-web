@@ -1,5 +1,5 @@
 import 'package:bluebubbles/features/mail/_tmail/core/utils/application_manager.dart';
-import 'package:bluebubbles/features/mail/_tmail/core/utils/sentry/sentry_config.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/sentry_flutter.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/domain/linagora_ecosystem/empty_linagora_ecosystem.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/domain/linagora_ecosystem/linagora_ecosystem_properties.dart';

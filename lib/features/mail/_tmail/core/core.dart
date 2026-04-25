@@ -62,9 +62,10 @@ export 'utils/preview_eml_file_utils.dart';
 export 'utils/logger/log_tracking.dart';
 export 'utils/html/html_utils.dart';
 export 'utils/web_link_generator.dart';
-export 'utils/sentry/sentry_manager.dart';
+// sentry/ stripped — re-export the SentryManager + SentryConfig shims from _stubs
+export 'package:bluebubbles/features/mail/_tmail/_stubs/sentry_flutter.dart' show SentryManager, SentryConfig;
 export 'utils/config/env_loader.dart';
-export 'utils/sentry/sentry_dio_helper.dart';
+// sentry_dio_helper.dart stripped — extension lives in _stubs/sentry_flutter.dart
 export 'utils/widget_utils.dart';
 
 // Views

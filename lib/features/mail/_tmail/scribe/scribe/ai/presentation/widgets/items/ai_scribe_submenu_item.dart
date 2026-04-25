@@ -35,7 +35,7 @@ class AiScribeSubmenuItem extends StatelessWidget {
                     height: 20,
                     fit: BoxFit.fill,
                     colorFilter:
-                        AppColor.gray424244.withOpacity(0.72).asFilter(),
+                        AppColor.gray424244.withValues(alpha: 0.72).asFilter(),
                   ),
                 ),
               Flexible(

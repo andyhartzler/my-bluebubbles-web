@@ -1,7 +1,7 @@
 
 import 'dart:convert';
 
-import 'package:bluebubbles/features/mail/_tmail/core/utils/sentry/sentry_config.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/sentry_flutter.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jmap_dart_client/jmap/account_id.dart';
 import 'package:bluebubbles/features/mail/_tmail/model/extensions/account_id_extensions.dart';

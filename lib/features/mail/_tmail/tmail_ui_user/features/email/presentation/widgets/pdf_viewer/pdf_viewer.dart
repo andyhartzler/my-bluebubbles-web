@@ -18,11 +18,11 @@ import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/download
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/download/domain/usecase/download_attachment_for_web_interactor.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/route_navigation.dart';
-import 'package:twake_previewer_flutter/core/previewer_options/options/loading_options.dart';
-import 'package:twake_previewer_flutter/core/previewer_options/options/previewer_state.dart';
-import 'package:twake_previewer_flutter/core/previewer_options/options/top_bar_options.dart';
-import 'package:twake_previewer_flutter/core/previewer_options/previewer_options.dart';
-import 'package:twake_previewer_flutter/twake_pdf_previewer/twake_pdf_previewer.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
 
 typedef DownloadPDFFileAction = Function(Uint8List bytes, String fileName);
 typedef PrintPDFFileAction = Function(Uint8List bytes, String fileName);

@@ -12,10 +12,10 @@ abstract final class AIScribeColors {
   // Icons
   static const Color scribeIcon = AppColor.primaryMain;
   static const Color aiAssistantIcon = AppColor.primaryMain;
-  static final Color secondaryIcon = AppColor.gray424244.withOpacity(0.72);
+  static final Color secondaryIcon = AppColor.gray424244.withValues(alpha: 0.72);
 
   // Overlays
-  static final Color dialogBarrier = Colors.black.withOpacity(0.12);
+  static final Color dialogBarrier = Colors.black.withValues(alpha: 0.12);
 
   // Gradients
   static const LinearGradient barGradient = LinearGradient(
@@ -33,12 +33,12 @@ abstract final class AIScribeColors {
 abstract final class AIScribeShadows {
   static final List<BoxShadow> sparkleIcon = [
     BoxShadow(
-      color: AppColor.gray424244.withOpacity(0.08),
+      color: AppColor.gray424244.withValues(alpha: 0.08),
       blurRadius: 3,
       offset: const Offset(0, 1.5),
     ),
     BoxShadow(
-      color: Colors.black.withOpacity(0.06),
+      color: Colors.black.withValues(alpha: 0.06),
       blurRadius: 12,
       offset: const Offset(0, 3),
     ),
@@ -46,11 +46,11 @@ abstract final class AIScribeShadows {
 
   static final List<BoxShadow> modal = [
     BoxShadow(
-      color: AppColor.gray424244.withOpacity(0.12),
+      color: AppColor.gray424244.withValues(alpha: 0.12),
       spreadRadius: 0.5,
     ),
     BoxShadow(
-      color: AppColor.gray424244.withOpacity(0.11),
+      color: AppColor.gray424244.withValues(alpha: 0.11),
       spreadRadius: 2,
       blurRadius: 26,
       offset: const Offset(0, 6),
@@ -59,13 +59,13 @@ abstract final class AIScribeShadows {
 
   static final List<BoxShadow> contentCard = [
     BoxShadow(
-      color: Colors.black.withOpacity(0.1),
+      color: Colors.black.withValues(alpha: 0.1),
       spreadRadius: 0,
       blurRadius: 3,
       offset: const Offset(0, 1),
     ),
     BoxShadow(
-      color: Colors.black.withOpacity(0.1),
+      color: Colors.black.withValues(alpha: 0.1),
       spreadRadius: 0,
       blurRadius: 2,
       offset: const Offset(0, 2),
@@ -78,7 +78,7 @@ abstract final class AIScribeTextStyles {
     fontSize: 14,
     height: 21.01 / 14,
     letterSpacing: -0.15,
-    color: AppColor.gray424244.withOpacity(0.9),
+    color: AppColor.gray424244.withValues(alpha: 0.9),
   );
 
   static final TextStyle searchBarHint =
@@ -86,14 +86,14 @@ abstract final class AIScribeTextStyles {
     fontSize: 14,
     height: 22 / 14,
     letterSpacing: 0.4,
-    color: AppColor.gray9B9B9B.withOpacity(0.85),
+    color: AppColor.gray9B9B9B.withValues(alpha: 0.85),
   );
 
   static final TextStyle searchBar = ThemeUtils.textStyleInter400.copyWith(
     fontSize: 14,
     height: 24 / 14,
     letterSpacing: 0.4,
-    color: Colors.black.withOpacity(0.85),
+    color: Colors.black.withValues(alpha: 0.85),
   );
 
   static final TextStyle suggestionTitle =
@@ -101,7 +101,7 @@ abstract final class AIScribeTextStyles {
     fontSize: 14,
     height: 22 / 14,
     letterSpacing: 0.4,
-    color: AppColor.black1A1A1A.withOpacity(0.85),
+    color: AppColor.black1A1A1A.withValues(alpha: 0.85),
   );
 
   static final TextStyle suggestionLoading =
@@ -109,7 +109,7 @@ abstract final class AIScribeTextStyles {
     fontSize: 14,
     height: 22 / 14,
     letterSpacing: 0.4,
-    color: AppColor.black1A1A1A.withOpacity(0.85),
+    color: AppColor.black1A1A1A.withValues(alpha: 0.85),
   );
 
   static final TextStyle suggestionContent =
@@ -117,7 +117,7 @@ abstract final class AIScribeTextStyles {
     fontSize: 14,
     height: 22 / 14,
     letterSpacing: 0.4,
-    color: Colors.black.withOpacity(0.85),
+    color: Colors.black.withValues(alpha: 0.85),
   );
 
   static final TextStyle contentCard = suggestionContent;

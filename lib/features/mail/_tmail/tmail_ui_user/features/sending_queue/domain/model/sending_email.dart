@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:bluebubbles/features/mail/_tmail/core/domain/extensions/datetime_extension.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/platform_info.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_date_range_picker/flutter_date_range_picker.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/flutter_date_range_picker.dart';
 import 'package:jmap_dart_client/http/converter/email_id_nullable_converter.dart';
 import 'package:jmap_dart_client/http/converter/identities/identity_id_nullable_converter.dart';
 import 'package:jmap_dart_client/http/converter/mailbox_id_nullable_converter.dart';

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/build_utils.dart';
-import 'package:super_dns_client/super_dns_client.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/super_dns_client.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/data/network/dns_lookup/dns_lookup_priority.dart';
 
 /// Handles DNS SRV lookups for JMAP service discovery.

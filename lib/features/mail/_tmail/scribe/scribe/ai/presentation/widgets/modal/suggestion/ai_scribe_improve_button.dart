@@ -30,7 +30,7 @@ class _AiScribeImproveButtonState extends State<AiScribeImproveButton> {
       text: ScribeLocalizations.of(context).improve,
       padding: AIScribeSizes.improveButtonPadding,
       borderRadius: AIScribeSizes.improveButtonBorderRadius,
-      backgroundColor: AppColor.colorBackgroundTagFilter.withOpacity(0.08),
+      backgroundColor: AppColor.colorBackgroundTagFilter.withValues(alpha: 0.08),
       icon: widget.imagePaths.icChevronDown,
       iconColor: AppColor.colorTextButtonHeaderThread,
       iconAlignment: TextDirection.rtl,

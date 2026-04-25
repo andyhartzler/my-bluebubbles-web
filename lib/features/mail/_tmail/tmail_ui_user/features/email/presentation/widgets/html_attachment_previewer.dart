@@ -11,10 +11,10 @@ import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/iso
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/presentation/widgets/pdf_viewer/top_bar_attachment_viewer.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/route_navigation.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/utils/app_utils.dart';
-import 'package:twake_previewer_flutter/core/previewer_options/options/previewer_state.dart';
-import 'package:twake_previewer_flutter/core/previewer_options/previewer_options.dart';
-import 'package:twake_previewer_flutter/twake_html_previewer/options/html_view_options.dart';
-import 'package:twake_previewer_flutter/twake_html_previewer/twake_html_previewer.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/twake_previewer_flutter.dart';
 
 class HtmlAttachmentPreviewer extends StatefulWidget {
   const HtmlAttachmentPreviewer({
