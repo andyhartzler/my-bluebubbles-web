@@ -351,6 +351,130 @@ class MailApiClient {
     return fallback;
   }
 
+  /// Fires an unsubscribe via the mail-unsubscribe edge fn. The edge fn
+  /// verifies the caller's alias against the message's Delivered-To/To/Cc/Bcc
+  /// headers (so an exec can't unsubscribe from another exec's lists), parses
+  /// `List-Unsubscribe` + `List-Unsubscribe-Post`, and chooses one of three
+  /// methods: `one-click-post` (RFC 8058), `http-get` (RFC 2369 https
+  /// fallback), or `mailto` (RFC 2369 mailto fallback — sent via Gmail API
+  /// from the caller's alias).
+  ///
+  /// Throws on any failure (no header, network error, 4xx/5xx from the
+  /// sender's unsubscribe endpoint, etc.) — caller's UI should surface the
+  /// message.
+  Future<({String method, String url})> unsubscribe({
+    required String messageId,
+  }) async {
+    final resp = await _supabase.client.functions.invoke(
+      'mail-unsubscribe',
+      body: {'messageId': messageId},
+    );
+    final data = (resp.data as Map?)?.cast<String, dynamic>() ?? {};
+    if (data['ok'] != true) {
+      throw Exception('Unsubscribe failed: ${data['error'] ?? 'unknown'}');
+    }
+    return (
+      method: data['method'] as String,
+      url: data['url'] as String,
+    );
+  }
+
+  /// Fetches the raw RFC 822 bytes of a message via the mail-eml-get edge fn.
+  ///
+  /// We bypass `functions.invoke` for the same reason as [getAttachment]: the
+  /// Supabase Dart client utf8-decodes any non-`application/octet-stream`
+  /// response into a String, which mangles the binary EML stream. We go direct
+  /// with `package:http`, reusing the auth + apikey headers Supabase has
+  /// already populated on its FunctionsClient.
+  ///
+  /// Returns the raw bytes, the message Subject (URL-decoded from the
+  /// `X-Subject` response header so the caller doesn't have to re-parse the
+  /// envelope), and a sanitized `<subject>.eml` filename ready for download.
+  Future<({Uint8List bytes, String subject, String filename})> getMessageRaw({
+    required String messageId,
+  }) async {
+    final functions = _supabase.client.functions;
+    final url = Uri.parse(
+      '${CRMConfig.supabaseUrl}/functions/v1/mail-eml-get',
+    );
+    final headers = <String, String>{
+      ...functions.headers,
+      'Content-Type': 'application/json',
+    };
+    final resp = await http.post(
+      url,
+      headers: headers,
+      body: jsonEncode({'messageId': messageId}),
+    );
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(
+        'mail-eml-get failed: ${resp.statusCode} ${resp.body}',
+      );
+    }
+    final encodedSubject = resp.headers['x-subject'] ?? '';
+    String subject;
+    try {
+      subject = Uri.decodeComponent(encodedSubject);
+    } catch (_) {
+      subject = encodedSubject;
+    }
+    final filename = _parseDispositionFilename(
+      resp.headers['content-disposition'],
+      fallback: 'message-${messageId.substring(0, messageId.length.clamp(0, 8))}.eml',
+    );
+    return (bytes: resp.bodyBytes, subject: subject, filename: filename);
+  }
+
+  /// Calls the mail-mutation edge fn to add/remove Gmail labels on a list of
+  /// message IDs. The edge fn does per-message alias verification: any IDs
+  /// the caller doesn't own land in `skipped`. Per-message Gmail-API failures
+  /// land in `errors`. `mutated` contains IDs whose modify call returned 2xx.
+  Future<({List<String> mutated, List<String> skipped, Map<String, String> errors})>
+      modifyMessages({
+    required List<String> messageIds,
+    List<String>? addLabelIds,
+    List<String>? removeLabelIds,
+  }) async {
+    if (messageIds.isEmpty) {
+      return (
+        mutated: const <String>[],
+        skipped: const <String>[],
+        errors: const <String, String>{},
+      );
+    }
+    final hasAdd = addLabelIds != null && addLabelIds.isNotEmpty;
+    final hasRemove = removeLabelIds != null && removeLabelIds.isNotEmpty;
+    if (!hasAdd && !hasRemove) {
+      // Nothing to do — short-circuit to avoid a 400 from the edge fn.
+      return (
+        mutated: List<String>.from(messageIds),
+        skipped: const <String>[],
+        errors: const <String, String>{},
+      );
+    }
+    final resp = await _supabase.client.functions.invoke(
+      'mail-mutation',
+      body: {
+        'messageIds': messageIds,
+        if (hasAdd) 'addLabelIds': addLabelIds,
+        if (hasRemove) 'removeLabelIds': removeLabelIds,
+      },
+    );
+    final data = (resp.data as Map?)?.cast<String, dynamic>() ?? const {};
+    final mutated = ((data['mutated'] as List?) ?? const [])
+        .whereType<String>()
+        .toList();
+    final skipped = ((data['skipped'] as List?) ?? const [])
+        .whereType<String>()
+        .toList();
+    final rawErrors = (data['errors'] as Map?) ?? const {};
+    final errors = <String, String>{};
+    rawErrors.forEach((k, v) {
+      if (k is String && v != null) errors[k] = v.toString();
+    });
+    return (mutated: mutated, skipped: skipped, errors: errors);
+  }
+
   /// Returns true iff the current user has an active mail alias provisioned.
   /// Used to gate the Mail nav tab — non-execs without an alias should not
   /// see the tab (avoids a confusing 403 on first open).

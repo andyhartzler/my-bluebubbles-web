@@ -10,8 +10,11 @@
 // methods (storeEmail, getStoredEmail, etc.) which are no-ops.
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http_parser/http_parser.dart';
 import 'package:universal_html/html.dart' as html;
 import 'package:jmap_dart_client/jmap/account_id.dart';
@@ -458,9 +461,11 @@ class EdgeFnEmailDataSource extends EmailDataSource {
   @override
   Future<void> unsubscribeMail(
       Session session, AccountId accountId, EmailId emailId) async {
-    // Gmail doesn't expose List-Unsubscribe headers via our edge fns yet; the
-    // caller treats success as "unsubscribe sent" — quietly no-op until a
-    // mail-unsubscribe edge function ships.
+    // Routes through mail-unsubscribe (RFC 8058 one-click + RFC 2369
+    // fallbacks). The edge fn verifies caller's alias matches the message
+    // before doing anything. Throws on failure so tmail's downstream
+    // controller surfaces the error to the user.
+    await _api.unsubscribe(messageId: emailId.id.value);
   }
 
   @override
@@ -500,12 +505,26 @@ class EdgeFnEmailDataSource extends EmailDataSource {
   @override
   Future<String> generatePreviewEmailEMLContent(
       PreviewEmailEMLRequest previewEmailEMLRequest) async {
-    // EML preview = render an .eml attachment inline. Currently no edge fn
-    // for fetching raw RFC 822; throw with a clear marker so the UI can
-    // surface "Preview not supported on this account" rather than crash.
-    throw UnsupportedError(
-      'EML preview not supported — Gmail backend would need a mail-eml-get '
-      'edge function returning the raw RFC 822. Phase 4 follow-up.',
+    // EML preview = render an .eml attachment inline. The PreviewEmailEMLRequest
+    // carries an already-parsed Email; its `id` is the Gmail messageId we
+    // stamped in JmapEmailBuilder. Fetch the raw RFC 822 via mail-eml-get,
+    // wrap it in a styled HTML <pre> block (the previewer iframe uses
+    // contentHtml/srcdoc — a blob: URL alone wouldn't render). On web we
+    // ALSO mint an object URL so the caller can offer a "Save as .eml"
+    // anchor; the URL is exposed via a comment marker the consumer can
+    // pull out if needed.
+    final messageId = previewEmailEMLRequest.email.id?.id.value;
+    if (messageId == null || messageId.isEmpty) {
+      throw StateError(
+        'EdgeFnEmailDataSource.generatePreviewEmailEMLContent: '
+        'PreviewEmailEMLRequest.email.id is null — cannot route to mail-eml-get.',
+      );
+    }
+    final result = await _api.getMessageRaw(messageId: messageId);
+    return _buildEmlHtmlDocument(
+      title: previewEmailEMLRequest.title,
+      filename: result.filename,
+      bytes: result.bytes,
     );
   }
 
@@ -553,11 +572,98 @@ class EdgeFnEmailDataSource extends EmailDataSource {
   @override
   Future<String> generateEntireMessageAsDocument(
       ViewEntireMessageRequest entireMessageRequest) async {
-    throw UnsupportedError(
-      'generateEntireMessageAsDocument not implemented — would require '
-      'a mail-eml-get edge function returning the raw RFC 822.',
+    // "View original" / "Save as .eml" — fetch the raw RFC 822 for the
+    // currently-open message and render it inside an HTML <pre> block.
+    // The previewer iframe consumes the return value as srcdoc/contentHtml,
+    // so a bare blob: URL string would just render as visible text — the
+    // HTML-wrapped raw EML is what actually displays.
+    final messageId = entireMessageRequest.presentationEmail.id?.id.value;
+    if (messageId == null || messageId.isEmpty) {
+      throw StateError(
+        'EdgeFnEmailDataSource.generateEntireMessageAsDocument: '
+        'ViewEntireMessageRequest.presentationEmail.id is null — cannot '
+        'route to mail-eml-get.',
+      );
+    }
+    final result = await _api.getMessageRaw(messageId: messageId);
+    return _buildEmlHtmlDocument(
+      title: entireMessageRequest.presentationEmail.subject ?? result.filename,
+      filename: result.filename,
+      bytes: result.bytes,
     );
   }
+
+  /// Wraps the raw RFC 822 bytes in an HTML document that renders the EML
+  /// content as monospaced preformatted text inside the previewer iframe.
+  ///
+  /// On web, we also create a `blob:` object URL so the consumer (or a future
+  /// "Save as .eml" affordance) can hand the URL to an `<a download>` anchor
+  /// or `window.open()`. The URL is included in the HTML as a hidden
+  /// download link so the user can grab the original .eml from the preview.
+  ///
+  /// Web-quirk note: object URLs created via `Url.createObjectUrlFromBlob`
+  /// are scoped to the document that minted them and will leak until the
+  /// page unloads (we deliberately skip `revokeObjectUrl` so the link in
+  /// the rendered HTML stays clickable for the lifetime of the previewer).
+  String _buildEmlHtmlDocument({
+    required String title,
+    required String filename,
+    required Uint8List bytes,
+  }) {
+    final escapedTitle = _htmlEscape(title);
+    final escapedFilename = _htmlEscape(filename);
+
+    String? downloadUrl;
+    if (kIsWeb) {
+      final blob = html.Blob(<Object>[bytes], 'message/rfc822');
+      downloadUrl = html.Url.createObjectUrlFromBlob(blob);
+    }
+
+    final emlText = _decodeEmlForDisplay(bytes);
+    final escapedEml = _htmlEscape(emlText);
+
+    final downloadLink = downloadUrl != null
+        ? '<p style="margin:0 0 12px 0;"><a href="$downloadUrl" '
+            'download="$escapedFilename" '
+            'style="color:#0b6cff;text-decoration:underline;">'
+            'Download original ($escapedFilename)</a></p>'
+        : '';
+
+    return '<!doctype html>'
+        '<html><head><meta charset="utf-8"><title>$escapedTitle</title>'
+        '<style>'
+        'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;'
+        'margin:16px;color:#1f2937;}'
+        'pre{background:#f6f8fa;border:1px solid #d0d7de;border-radius:6px;'
+        'padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;'
+        'font-size:12px;white-space:pre-wrap;word-break:break-word;overflow-x:auto;}'
+        '</style></head>'
+        '<body>'
+        '<h2 style="margin:0 0 8px 0;font-size:16px;">$escapedTitle</h2>'
+        '$downloadLink'
+        '<pre>$escapedEml</pre>'
+        '</body></html>';
+  }
+
+  /// Decodes the raw EML bytes for display. RFC 822 headers are ASCII-only
+  /// but the body may be 8-bit; we try utf-8 first (handles MIME-decoded
+  /// content) and fall back to latin-1 (lossless byte-to-char) so we never
+  /// lose bytes when rendering. Either way it's just for display — the raw
+  /// bytes are also exposed verbatim via the blob URL.
+  String _decodeEmlForDisplay(Uint8List bytes) {
+    try {
+      return utf8.decode(bytes, allowMalformed: true);
+    } catch (_) {
+      return latin1.decode(bytes, allowInvalid: true);
+    }
+  }
+
+  String _htmlEscape(String s) => s
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
 
   @override
   Future<void> addLabelToEmail(
