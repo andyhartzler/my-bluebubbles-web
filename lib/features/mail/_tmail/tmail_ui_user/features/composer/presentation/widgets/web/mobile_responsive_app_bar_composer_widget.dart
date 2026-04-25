@@ -4,7 +4,7 @@ import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/button/
 import 'package:bluebubbles/features/mail/_tmail/core/utils/platform_info.dart';
 import 'package:custom_pop_up_menu/custom_pop_up_menu.dart';
 import 'package:flutter/material.dart';
-import 'package:scribe/scribe/ai/presentation/widgets/button/ai_assistant_button.dart';
+import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/presentation/widgets/button/ai_assistant_button.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/model/ui_keys.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/widget/highlight_svg_icon_on_hover.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/widget/popup_item_widget.dart';

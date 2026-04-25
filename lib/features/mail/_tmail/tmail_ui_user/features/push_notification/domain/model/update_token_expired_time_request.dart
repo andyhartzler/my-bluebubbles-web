@@ -1,7 +1,7 @@
 
 import 'package:equatable/equatable.dart';
-import 'package:fcm/model/firebase_registration_expired_time.dart';
-import 'package:fcm/model/firebase_registration_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/firebase_registration_expired_time.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/firebase_registration_id.dart';
 
 class UpdateTokenExpiredTimeRequest with EquatableMixin {
 

@@ -4,7 +4,7 @@ import 'package:bluebubbles/features/mail/_tmail/core/utils/platform_info.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/string_convert.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:scribe/scribe.dart';
+import 'package:bluebubbles/features/mail/_tmail/scribe/scribe.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/composer_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/mixin/text_selection_mixin.dart';
 

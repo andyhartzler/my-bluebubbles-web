@@ -5,7 +5,7 @@ import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/theme_u
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/button/tmail_button_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:rule_filter/rule_filter/tmail_rule.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/tmail_rule.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/presentation/extensions/tmail_rule_extension.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
 

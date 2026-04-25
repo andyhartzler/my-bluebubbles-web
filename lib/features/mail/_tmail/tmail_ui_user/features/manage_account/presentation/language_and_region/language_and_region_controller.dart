@@ -2,7 +2,7 @@ import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success
 import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:server_settings/server_settings/capability_server_settings.dart';
+import 'package:bluebubbles/features/mail/_tmail/server_settings/server_settings/capability_server_settings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/base_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/home/domain/extensions/session_extensions.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/state/save_language_state.dart';

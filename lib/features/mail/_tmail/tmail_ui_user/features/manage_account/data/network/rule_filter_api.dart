@@ -4,11 +4,11 @@ import 'package:jmap_dart_client/http/http_client.dart';
 import 'package:jmap_dart_client/jmap/account_id.dart';
 import 'package:jmap_dart_client/jmap/core/id.dart';
 import 'package:jmap_dart_client/jmap/jmap_request.dart';
-import 'package:rule_filter/rule_filter/get/get_rule_filter_method.dart';
-import 'package:rule_filter/rule_filter/get/get_rule_filter_response.dart';
-import 'package:rule_filter/rule_filter/rule_filter_id.dart';
-import 'package:rule_filter/rule_filter/set/set_rule_filter_method.dart';
-import 'package:rule_filter/rule_filter/tmail_rule.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/get/get_rule_filter_method.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/get/get_rule_filter_response.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/rule_filter_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/set/set_rule_filter_method.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/tmail_rule.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/data/extensions/list_tmail_rule_extensions.dart';
 
 class RuleFilterAPI {

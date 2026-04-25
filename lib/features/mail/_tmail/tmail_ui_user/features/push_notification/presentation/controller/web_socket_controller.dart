@@ -8,7 +8,7 @@ import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success
 import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/platform_info.dart';
 import 'package:debounce_throttle/debounce_throttle.dart';
-import 'package:fcm/model/type_name.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/type_name.dart';
 import 'package:flutter/material.dart';
 import 'package:jmap_dart_client/jmap/account_id.dart';
 import 'package:jmap_dart_client/jmap/core/session/session.dart';

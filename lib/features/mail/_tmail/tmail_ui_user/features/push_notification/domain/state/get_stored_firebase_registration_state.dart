@@ -1,7 +1,7 @@
 
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
-import 'package:fcm/model/firebase_registration.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/firebase_registration.dart';
 
 class GetStoredFirebaseRegistrationLoading extends LoadingState {}
 

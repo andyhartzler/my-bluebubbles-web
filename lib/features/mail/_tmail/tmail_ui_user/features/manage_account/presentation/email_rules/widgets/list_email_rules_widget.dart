@@ -1,8 +1,8 @@
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/responsive_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:rule_filter/rule_filter/rule_id.dart';
-import 'package:rule_filter/rule_filter/tmail_rule.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/rule_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/tmail_rule.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/presentation/email_rules/widgets/email_rule_item_widget.dart';
 
 class ListEmailRulesWidget extends StatelessWidget {

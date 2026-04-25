@@ -1,9 +1,9 @@
-import 'package:fcm/converter/device_client_id_nullable_converter.dart';
-import 'package:fcm/converter/fcm_token_nullable_converter.dart';
-import 'package:fcm/converter/firebase_registration_id_nullable_converter.dart';
-import 'package:fcm/converter/type_name_converter.dart';
-import 'package:fcm/model/firebase_registration.dart';
-import 'package:fcm/model/firebase_registration_expired_time.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/converter/device_client_id_nullable_converter.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/converter/fcm_token_nullable_converter.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/converter/firebase_registration_id_nullable_converter.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/converter/type_name_converter.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/firebase_registration.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/firebase_registration_expired_time.dart';
 import 'package:jmap_dart_client/jmap/core/utc_date.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/push_notification/data/model/firebase_registration_cache.dart';
 

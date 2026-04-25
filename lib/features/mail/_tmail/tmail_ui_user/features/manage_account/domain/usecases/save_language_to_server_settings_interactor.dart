@@ -5,7 +5,7 @@ import 'package:dartz/dartz.dart';
 import 'package:flutter/widgets.dart';
 import 'package:jmap_dart_client/jmap/account_id.dart';
 import 'package:jmap_dart_client/jmap/core/session/session.dart';
-import 'package:server_settings/server_settings/tmail_server_settings.dart';
+import 'package:bluebubbles/features/mail/_tmail/server_settings/server_settings/tmail_server_settings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/state/save_language_to_server_settings_state.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/server_settings/domain/repository/server_settings_repository.dart';
 

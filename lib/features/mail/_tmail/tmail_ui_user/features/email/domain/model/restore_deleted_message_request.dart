@@ -1,4 +1,4 @@
-import 'package:email_recovery/email_recovery/email_recovery_action.dart';
+import 'package:bluebubbles/features/mail/_tmail/email_recovery/email_recovery/email_recovery_action.dart';
 import 'package:equatable/equatable.dart';
 import 'package:jmap_dart_client/jmap/core/id.dart';
 

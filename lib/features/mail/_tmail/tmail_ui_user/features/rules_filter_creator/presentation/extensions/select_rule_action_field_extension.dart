@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:rule_filter/rule_filter/rule_condition.dart';
-import 'package:rule_filter/rule_filter/rule_condition_group.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/rule_condition.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/rule_condition_group.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/rules_filter_creator/presentation/model/context_menu/context_item_condition_combiner_action.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/rules_filter_creator/presentation/model/context_menu/context_item_rule_condition_comparator_action.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/rules_filter_creator/presentation/model/context_menu/context_item_rule_condition_field_action.dart';

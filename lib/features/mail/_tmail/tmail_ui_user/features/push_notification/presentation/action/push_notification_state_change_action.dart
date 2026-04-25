@@ -1,5 +1,5 @@
 
-import 'package:fcm/model/type_name.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/type_name.dart';
 import 'package:jmap_dart_client/jmap/account_id.dart';
 import 'package:jmap_dart_client/jmap/core/session/session.dart';
 import 'package:jmap_dart_client/jmap/core/user_name.dart';

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:scribe/scribe/ai/presentation/widgets/overlay/ai_selection_overlay.dart';
+import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/presentation/widgets/overlay/ai_selection_overlay.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/composer_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/extensions/ai_scribe/handle_ai_scribe_in_composer_extension.dart';
 

@@ -1,7 +1,7 @@
 
-import 'package:rule_filter/rule_filter/rule_condition.dart' as rule_condition;
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/rule_condition.dart' as rule_condition;
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
-import 'package:rule_filter/rule_filter/rule_condition_group.dart' as rule_combiner;
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/rule_condition_group.dart' as rule_combiner;
 
 extension RuleConditionFieldExtension on rule_condition.Field {
 

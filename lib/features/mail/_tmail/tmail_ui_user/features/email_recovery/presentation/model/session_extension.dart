@@ -1,6 +1,6 @@
 
 import 'package:duration/duration.dart';
-import 'package:email_recovery/email_recovery/capability_deleted_messages_vault.dart';
+import 'package:bluebubbles/features/mail/_tmail/email_recovery/email_recovery/capability_deleted_messages_vault.dart';
 import 'package:jmap_dart_client/jmap/core/session/session.dart';
 import 'package:bluebubbles/features/mail/_tmail/model/extensions/session_extension.dart';
 

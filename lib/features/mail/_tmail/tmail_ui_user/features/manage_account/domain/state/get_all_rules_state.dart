@@ -1,6 +1,6 @@
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
-import 'package:rule_filter/rule_filter/tmail_rule.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/tmail_rule.dart';
 
 class GettingAllRules extends LoadingState {}
 

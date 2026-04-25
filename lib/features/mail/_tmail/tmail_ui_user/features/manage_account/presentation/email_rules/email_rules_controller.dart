@@ -6,7 +6,7 @@ import 'package:dartz/dartz.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jmap_dart_client/jmap/account_id.dart';
-import 'package:rule_filter/rule_filter/tmail_rule.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/tmail_rule.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/base_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/mixin/message_dialog_action_manager.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/model/create_new_email_rule_filter_request.dart';

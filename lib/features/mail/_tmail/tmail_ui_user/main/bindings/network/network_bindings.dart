@@ -8,7 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:get/get.dart';
 import 'package:jmap_dart_client/http/http_client.dart';
-import 'package:scribe/scribe/ai/data/service/prompt_service.dart';
+import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/data/service/prompt_service.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/contact/data/network/contact_api.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/data/network/email_api.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/data/network/mdn_api.dart';

@@ -2,7 +2,7 @@ import 'package:bluebubbles/features/mail/_tmail/core/core.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:rule_filter/rule_filter/tmail_rule.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/tmail_rule.dart';
 
 class EmailRuleBottomSheetActionTileBuilder
     extends CupertinoActionSheetActionBuilder<TMailRule> {

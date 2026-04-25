@@ -13,7 +13,7 @@ import 'package:jmap_dart_client/jmap/core/capability/websocket_capability.dart'
 import 'package:bluebubbles/features/mail/_tmail/labels/model/labels_capability.dart';
 import 'package:bluebubbles/features/mail/_tmail/model/saas/saas_account_capability.dart';
 import 'package:bluebubbles/features/mail/_tmail/model/support/contact_support_capability.dart';
-import 'package:scribe/scribe/ai/presentation/model/ai_capability.dart';
+import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/presentation/model/ai_capability.dart';
 
 class CapabilityPropertiesConverter {
 

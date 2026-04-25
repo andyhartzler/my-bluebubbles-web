@@ -1,5 +1,5 @@
 import 'package:bluebubbles/features/mail/_tmail/core/core.dart';
-import 'package:cozy/cozy_config_manager/cozy_config_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/cozy/cozy_config_manager/cozy_config_manager.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_portal/flutter_portal.dart';

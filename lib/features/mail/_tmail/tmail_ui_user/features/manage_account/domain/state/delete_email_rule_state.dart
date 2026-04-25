@@ -1,5 +1,5 @@
 import 'package:bluebubbles/features/mail/_tmail/core/core.dart';
-import 'package:rule_filter/rule_filter/tmail_rule.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/tmail_rule.dart';
 
 class DeleteEmailRuleSuccess extends UIState {
   final List<TMailRule>? rules;

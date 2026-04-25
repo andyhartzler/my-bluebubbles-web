@@ -1,6 +1,6 @@
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/capitalize_extension.dart';
 import 'package:flutter/material.dart';
-import 'package:rule_filter/rule_filter/rule_condition_group.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/rule_condition_group.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/presentation/extensions/tmail_rule_extension.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/rules_filter_creator/presentation/extensions/list_rule_filter_action_argument_extension.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/rules_filter_creator/presentation/extensions/rule_condition_extensions.dart';

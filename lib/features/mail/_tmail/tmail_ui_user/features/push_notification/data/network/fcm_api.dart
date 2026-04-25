@@ -1,12 +1,12 @@
 
-import 'package:fcm/converter/firebase_registration_expired_time_nullable_converter.dart';
-import 'package:fcm/method/set/firebase_registration_set_method.dart';
-import 'package:fcm/method/set/firebase_registration_set_response.dart';
-import 'package:fcm/method/get/firebase_registration_get_method.dart';
-import 'package:fcm/method/get/firebase_registration_get_response.dart';
-import 'package:fcm/model/device_client_id.dart';
-import 'package:fcm/model/firebase_registration.dart';
-import 'package:fcm/model/firebase_registration_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/converter/firebase_registration_expired_time_nullable_converter.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/method/set/firebase_registration_set_method.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/method/set/firebase_registration_set_response.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/method/get/firebase_registration_get_method.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/method/get/firebase_registration_get_response.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/device_client_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/firebase_registration.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/firebase_registration_id.dart';
 import 'package:jmap_dart_client/http/http_client.dart';
 import 'package:jmap_dart_client/jmap/core/patch_object.dart';
 import 'package:jmap_dart_client/jmap/jmap_request.dart';

@@ -1,4 +1,4 @@
-import 'package:scribe/scribe/ai/presentation/utils/ai_scribe_constants.dart';
+import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/presentation/utils/ai_scribe_constants.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/mailbox_dashboard_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/error/capability_validator.dart';
 

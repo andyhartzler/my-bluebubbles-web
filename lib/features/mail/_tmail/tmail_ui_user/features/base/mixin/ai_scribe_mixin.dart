@@ -1,8 +1,8 @@
 import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
 import 'package:jmap_dart_client/jmap/account_id.dart';
 import 'package:jmap_dart_client/jmap/core/session/session.dart';
-import 'package:scribe/scribe.dart';
-import 'package:scribe/scribe/ai/presentation/bindings/ai_scribe_bindings.dart';
+import 'package:bluebubbles/features/mail/_tmail/scribe/scribe.dart';
+import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/presentation/bindings/ai_scribe_bindings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/home/domain/extensions/session_extensions.dart';
 
 mixin AiScribeMixin {

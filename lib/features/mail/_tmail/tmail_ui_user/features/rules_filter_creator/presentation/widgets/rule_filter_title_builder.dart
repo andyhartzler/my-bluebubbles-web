@@ -2,7 +2,7 @@ import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/co
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/theme_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:rule_filter/rule_filter/rule_condition_group.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/rule_condition_group.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/widget/drop_down_button_widget.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/rules_filter_creator/presentation/widgets/rule_filter_button_field.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';

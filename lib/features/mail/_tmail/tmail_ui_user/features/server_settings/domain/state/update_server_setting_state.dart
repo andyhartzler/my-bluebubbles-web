@@ -1,6 +1,6 @@
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
-import 'package:server_settings/server_settings/tmail_server_settings.dart';
+import 'package:bluebubbles/features/mail/_tmail/server_settings/server_settings/tmail_server_settings.dart';
 
 class UpdatingServerSetting extends LoadingState {}
 

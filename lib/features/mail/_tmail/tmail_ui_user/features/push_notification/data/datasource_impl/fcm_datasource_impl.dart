@@ -1,7 +1,7 @@
-import 'package:fcm/model/device_client_id.dart';
-import 'package:fcm/model/firebase_registration.dart';
-import 'package:fcm/model/firebase_registration_id.dart';
-import 'package:fcm/model/type_name.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/device_client_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/firebase_registration.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/firebase_registration_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/type_name.dart';
 import 'package:jmap_dart_client/jmap/account_id.dart';
 import 'package:jmap_dart_client/jmap/core/state.dart' as jmap;
 import 'package:jmap_dart_client/jmap/core/user_name.dart';

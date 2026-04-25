@@ -1,7 +1,7 @@
 
 import 'package:jmap_dart_client/jmap/core/id.dart';
-import 'package:rule_filter/rule_filter/rule_id.dart';
-import 'package:rule_filter/rule_filter/tmail_rule.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/rule_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/tmail_rule.dart';
 
 extension ListTMailRuleExtensions on List<TMailRule> {
 

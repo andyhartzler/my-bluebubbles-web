@@ -1,7 +1,7 @@
 
 import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
 import 'package:equatable/equatable.dart';
-import 'package:rule_filter/rule_filter/tmail_rule.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/tmail_rule.dart';
 
 class EditEmailRuleFilterRequest with EquatableMixin {
 

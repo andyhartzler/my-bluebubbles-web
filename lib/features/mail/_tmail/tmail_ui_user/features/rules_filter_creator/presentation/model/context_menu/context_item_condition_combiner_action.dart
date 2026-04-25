@@ -1,5 +1,5 @@
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
-import 'package:rule_filter/rule_filter/rule_condition_group.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/rule_condition_group.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/widget/context_menu/context_menu_item_action.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/rules_filter_creator/presentation/extensions/rule_condition_extensions.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';

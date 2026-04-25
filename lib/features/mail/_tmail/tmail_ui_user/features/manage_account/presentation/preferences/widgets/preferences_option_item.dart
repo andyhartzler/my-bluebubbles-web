@@ -2,7 +2,7 @@ import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/co
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/theme_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:server_settings/server_settings/tmail_server_settings.dart';
+import 'package:bluebubbles/features/mail/_tmail/server_settings/server_settings/tmail_server_settings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/widget/default_switch_icon_widget.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/model/preferences/preferences_setting.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/presentation/model/preferences_option_type.dart';

@@ -4,8 +4,8 @@ import 'package:bluebubbles/features/mail/_tmail/core/data/model/source_type/dat
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/html_transformer/transform_configuration.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
 import 'package:dio/dio.dart';
-import 'package:email_recovery/email_recovery/email_recovery_action.dart';
-import 'package:email_recovery/email_recovery/email_recovery_action_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/email_recovery/email_recovery/email_recovery_action.dart';
+import 'package:bluebubbles/features/mail/_tmail/email_recovery/email_recovery/email_recovery_action_id.dart';
 import 'package:jmap_dart_client/jmap/account_id.dart';
 import 'package:jmap_dart_client/jmap/core/error/set_error.dart';
 import 'package:jmap_dart_client/jmap/core/id.dart';

@@ -1,7 +1,7 @@
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
 import 'package:dartz/dartz.dart';
-import 'package:fcm/model/firebase_registration.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/firebase_registration.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/push_notification/domain/repository/fcm_repository.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/push_notification/domain/state/store_firebase_registration_state.dart';
 

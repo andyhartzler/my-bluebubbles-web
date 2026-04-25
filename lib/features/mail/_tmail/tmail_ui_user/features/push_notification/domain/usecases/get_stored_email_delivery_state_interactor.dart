@@ -1,7 +1,7 @@
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
 import 'package:dartz/dartz.dart';
-import 'package:fcm/model/type_name.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/type_name.dart';
 import 'package:jmap_dart_client/jmap/account_id.dart';
 import 'package:jmap_dart_client/jmap/core/user_name.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/push_notification/domain/repository/fcm_repository.dart';

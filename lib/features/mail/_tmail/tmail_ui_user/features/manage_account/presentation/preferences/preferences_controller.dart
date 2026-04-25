@@ -3,7 +3,7 @@ import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success
 import 'package:dartz/dartz.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:server_settings/server_settings/tmail_server_settings.dart';
+import 'package:bluebubbles/features/mail/_tmail/server_settings/server_settings/tmail_server_settings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/base_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/home/data/exceptions/session_exceptions.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/model/loader_status.dart';

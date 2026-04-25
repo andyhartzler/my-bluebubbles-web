@@ -1,7 +1,7 @@
 
 import 'package:bluebubbles/features/mail/_tmail/model/email/email_action_type.dart';
 import 'package:bluebubbles/features/mail/_tmail/model/extensions/email_extension.dart';
-import 'package:server_settings/server_settings/tmail_server_settings_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/server_settings/server_settings/tmail_server_settings_extension.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/composer_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/presentation/model/composer_arguments.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/extensions/handle_preferences_setting_extension.dart';

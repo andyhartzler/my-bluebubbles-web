@@ -1,7 +1,7 @@
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/keyboard_utils.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/platform_info.dart';
-import 'package:email_recovery/email_recovery/email_recovery_action.dart';
+import 'package:bluebubbles/features/mail/_tmail/email_recovery/email_recovery/email_recovery_action.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:jmap_dart_client/jmap/account_id.dart';

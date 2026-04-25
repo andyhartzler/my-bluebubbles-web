@@ -1,4 +1,4 @@
-import 'package:fcm/model/type_name.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/type_name.dart';
 
 class WebSocketPushEnableRequest {
   static const String type = 'WebSocketPushEnable';

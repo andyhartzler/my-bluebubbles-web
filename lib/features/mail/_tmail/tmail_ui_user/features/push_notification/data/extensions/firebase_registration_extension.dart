@@ -1,4 +1,4 @@
-import 'package:fcm/model/firebase_registration.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/firebase_registration.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/push_notification/data/model/firebase_registration_cache.dart';
 
 extension FirebaseRegistrationExtension on FirebaseRegistration {

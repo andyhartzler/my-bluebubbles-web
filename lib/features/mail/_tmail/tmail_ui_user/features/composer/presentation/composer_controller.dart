@@ -27,7 +27,7 @@ import 'package:bluebubbles/features/mail/_tmail/model/model.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:rich_text_composer/rich_text_composer.dart';
-import 'package:scribe/scribe.dart';
+import 'package:bluebubbles/features/mail/_tmail/scribe/scribe.dart';
 import 'package:super_tag_editor/tag_editor.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/base_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/before_reconnect_handler.dart';

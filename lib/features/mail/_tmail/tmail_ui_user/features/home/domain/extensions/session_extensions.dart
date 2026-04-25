@@ -17,9 +17,9 @@ import 'package:bluebubbles/features/mail/_tmail/labels/utils/labels_constants.d
 import 'package:bluebubbles/features/mail/_tmail/model/download_all/download_all_capability.dart';
 import 'package:bluebubbles/features/mail/_tmail/model/mailbox/mailbox_constants.dart';
 import 'package:bluebubbles/features/mail/_tmail/model/model.dart';
-import 'package:scribe/scribe/ai/presentation/model/ai_capability.dart';
-import 'package:scribe/scribe/ai/presentation/utils/ai_scribe_constants.dart';
-import 'package:server_settings/server_settings/capability_server_settings.dart';
+import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/presentation/model/ai_capability.dart';
+import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/presentation/utils/ai_scribe_constants.dart';
+import 'package:bluebubbles/features/mail/_tmail/server_settings/server_settings/capability_server_settings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/home/data/model/session_hive_obj.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/home/domain/converter/session_account_converter.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/home/domain/converter/session_capabilities_converter.dart';

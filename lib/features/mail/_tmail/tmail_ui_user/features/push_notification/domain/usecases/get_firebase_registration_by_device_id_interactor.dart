@@ -2,8 +2,8 @@
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
 import 'package:dartz/dartz.dart';
-import 'package:fcm/model/device_client_id.dart';
-import 'package:fcm/model/fcm_token.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/device_client_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/fcm_token.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/push_notification/domain/repository/fcm_repository.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/push_notification/domain/state/get_firebase_registration_by_device_id_state.dart';
 

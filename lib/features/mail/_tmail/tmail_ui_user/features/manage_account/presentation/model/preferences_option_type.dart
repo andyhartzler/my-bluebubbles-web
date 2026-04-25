@@ -1,6 +1,6 @@
 
-import 'package:server_settings/server_settings/tmail_server_settings.dart';
-import 'package:server_settings/server_settings/tmail_server_settings_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/server_settings/server_settings/tmail_server_settings.dart';
+import 'package:bluebubbles/features/mail/_tmail/server_settings/server_settings/tmail_server_settings_extension.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/model/preferences/preferences_setting.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
 

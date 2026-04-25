@@ -1,7 +1,7 @@
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/color_extension.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/responsive_utils.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/responsive/responsive_widget.dart';
-import 'package:cozy/cozy_config_manager/cozy_config_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/cozy/cozy_config_manager/cozy_config_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_portal/flutter_portal.dart';
 import 'package:get/get.dart';

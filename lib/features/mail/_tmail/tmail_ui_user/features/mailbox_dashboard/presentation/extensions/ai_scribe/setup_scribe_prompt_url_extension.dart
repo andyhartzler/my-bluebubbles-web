@@ -1,6 +1,6 @@
 import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/platform_info.dart';
-import 'package:scribe/scribe/ai/data/service/prompt_service.dart';
+import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/data/service/prompt_service.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/domain/linagora_ecosystem/linagora_ecosystem.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/domain/state/get_linagora_ecosystem_state.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/domain/usecases/get_linagora_system_interactor.dart';

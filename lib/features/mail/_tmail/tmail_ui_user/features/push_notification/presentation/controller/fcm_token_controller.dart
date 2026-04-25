@@ -3,10 +3,10 @@ import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/build_utils.dart';
-import 'package:fcm/model/device_client_id.dart';
-import 'package:fcm/model/fcm_token.dart';
-import 'package:fcm/model/firebase_registration.dart';
-import 'package:fcm/model/firebase_registration_expired_time.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/device_client_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/fcm_token.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/firebase_registration.dart';
+import 'package:bluebubbles/features/mail/_tmail/fcm/model/firebase_registration_expired_time.dart';
 import 'package:jmap_dart_client/jmap/core/id.dart';
 import 'package:jmap_dart_client/jmap/core/utc_date.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/push_notification/domain/model/register_new_token_request.dart';

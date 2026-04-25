@@ -5,7 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/deep_links/deep_links_manager.dart';
-import 'package:scribe/scribe/ai/localizations/scribe_localizations.dart';
+import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/localizations/scribe_localizations.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations_delegate.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/localization_service.dart';

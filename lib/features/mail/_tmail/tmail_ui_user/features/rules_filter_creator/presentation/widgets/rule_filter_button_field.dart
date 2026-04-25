@@ -5,8 +5,8 @@ import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/theme_u
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:bluebubbles/features/mail/_tmail/model/model.dart';
-import 'package:rule_filter/rule_filter/rule_condition.dart' as rule_condition;
-import 'package:rule_filter/rule_filter/rule_condition_group.dart';
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/rule_condition.dart' as rule_condition;
+import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/rule_condition_group.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/presentation/extensions/presentation_mailbox_extension.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/rules_filter_creator/presentation/extensions/rule_condition_extensions.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/rules_filter_creator/presentation/model/email_rule_filter_action.dart';

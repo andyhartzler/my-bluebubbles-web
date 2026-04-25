@@ -1,6 +1,6 @@
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
-import 'package:email_recovery/email_recovery/email_recovery_action.dart';
+import 'package:bluebubbles/features/mail/_tmail/email_recovery/email_recovery/email_recovery_action.dart';
 
 class RestoreDeletedMessageLoading extends LoadingState {}
 
