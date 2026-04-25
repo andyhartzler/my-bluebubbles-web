@@ -37,6 +37,8 @@ import 'package:bluebubbles/screens/crm/subscribers_screen.dart';
 import 'package:bluebubbles/screens/crm/wallet_notification_composer.dart';
 import 'package:bluebubbles/features/committees/screens/committees_dashboard_screen.dart';
 import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
+import 'package:bluebubbles/screens/crm/personalized_home/personalized_home_screen.dart';
+import 'package:bluebubbles/screens/crm/dashboard_shell/dashboard_shell_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/mautic_embed_screen.dart';
 import 'package:bluebubbles/features/forms/screens/forms_main_screen.dart';
 import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
@@ -654,6 +656,7 @@ class Home extends StatefulWidget {
 }
 
 enum _HomeSection {
+  home, // NEW: Personalized landing screen (default for execs)
   dashboard,
   members,
   donors,
@@ -678,7 +681,7 @@ class _HomeState extends OptimizedState<Home>
     with WidgetsBindingObserver, TrayListener {
   bool serverCompatible = true;
   bool fullyLoaded = false;
-  _HomeSection _currentSection = _HomeSection.dashboard;
+  _HomeSection _currentSection = _HomeSection.home;
   final PageStorageBucket _bucket = PageStorageBucket();
 
   @override
@@ -986,7 +989,10 @@ class _HomeState extends OptimizedState<Home>
                   child: IndexedStack(
                     index: _currentSection.index,
                     children: [
-                      const DashboardScreen(
+                      const PersonalizedHomeScreen(
+                        key: PageStorageKey('home-view'),
+                      ),
+                      const DashboardShellScreen(
                         key: PageStorageKey('dashboard-view'),
                       ),
                       const MembersListScreen(
@@ -1224,6 +1230,13 @@ class _HomeState extends OptimizedState<Home>
 
           // Navigation buttons that scroll
           final navChildren = [
+            _buildNavButton(
+              context,
+              _HomeSection.home,
+              'Home',
+              Icons.home_outlined,
+              hideIcon: hideIcons,
+            ),
             _buildNavButton(
               context,
               _HomeSection.dashboard,
@@ -1540,6 +1553,12 @@ class _HomeState extends OptimizedState<Home>
                 children: [
                   buildItem(
                     order: 0,
+                    icon: Icons.home_outlined,
+                    label: 'Home',
+                    onActivate: () => _setSection(_HomeSection.home),
+                  ),
+                  buildItem(
+                    order: 0.5,
                     icon: Icons.dashboard_outlined,
                     label: 'Dashboard',
                     onActivate: () => _setSection(_HomeSection.dashboard),
@@ -1771,7 +1790,7 @@ class _HomeState extends OptimizedState<Home>
 
     return InkWell(
       borderRadius: BorderRadius.circular(18),
-      onTap: () => _setSection(_HomeSection.dashboard),
+      onTap: () => _setSection(_HomeSection.home),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,

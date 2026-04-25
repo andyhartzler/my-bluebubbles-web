@@ -8,6 +8,7 @@ import 'package:bluebubbles/providers/user_session_provider.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
 import 'activity_screen.dart';
+import 'superadmin_user_pages_screen.dart';
 import 'widgets/invite_executive_dialog.dart';
 
 /// Superadmin-only screen that lists every `members` row with
@@ -179,6 +180,22 @@ class _ExecutivesScreenState extends State<ExecutivesScreen> {
     );
   }
 
+  void _managePagesFor(Map<String, dynamic> member) {
+    // members.id == auth.users.id (verified in 2026-04-24 audit). Pass it
+    // straight through as the targetAuthUserId.
+    final memberId = member['id']?.toString();
+    if (memberId == null || memberId.isEmpty) return;
+    final name = (member['name'] as String?) ?? 'Unknown user';
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SuperadminUserPagesScreen(
+          targetAuthUserId: memberId,
+          targetDisplayName: name,
+        ),
+      ),
+    );
+  }
+
   String _formatLastSeen(String? iso) {
     if (iso == null || iso.isEmpty) return 'Never';
     final dt = DateTime.tryParse(iso)?.toLocal();
@@ -261,6 +278,7 @@ class _ExecutivesScreenState extends State<ExecutivesScreen> {
               const SizedBox(height: 12),
               if (wide)
                 _ExecTable(
+                  onManagePages: _managePagesFor,
                   execs: _execs,
                   revokingIds: _revokingIds,
                   onRevoke: _revoke,
@@ -269,6 +287,7 @@ class _ExecutivesScreenState extends State<ExecutivesScreen> {
                 )
               else
                 ..._execs.map((m) => _ExecCard(
+                      onManagePages: () => _managePagesFor(m),
                       exec: m,
                       revoking:
                           _revokingIds.contains(m['id']?.toString() ?? ''),
@@ -347,6 +366,7 @@ class _ExecTable extends StatelessWidget {
     required this.revokingIds,
     required this.onRevoke,
     required this.onViewActivity,
+    required this.onManagePages,
     required this.formatLastSeen,
   });
 
@@ -354,6 +374,7 @@ class _ExecTable extends StatelessWidget {
   final Set<String> revokingIds;
   final void Function(Map<String, dynamic>) onRevoke;
   final void Function(Map<String, dynamic>) onViewActivity;
+  final void Function(Map<String, dynamic>) onManagePages;
   final String Function(String?) formatLastSeen;
 
   @override
@@ -391,6 +412,11 @@ class _ExecTable extends StatelessWidget {
                     tooltip: 'View activity',
                     onPressed: revoking ? null : () => onViewActivity(exec),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.dashboard_customize, size: 18),
+                    tooltip: 'Manage dashboard pages',
+                    onPressed: revoking ? null : () => onManagePages(exec),
+                  ),
                   if (revoking)
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 8),
@@ -423,6 +449,7 @@ class _ExecCard extends StatelessWidget {
     required this.revoking,
     required this.onRevoke,
     required this.onViewActivity,
+    required this.onManagePages,
     required this.formatLastSeen,
   });
 
@@ -430,6 +457,7 @@ class _ExecCard extends StatelessWidget {
   final bool revoking;
   final VoidCallback onRevoke;
   final VoidCallback onViewActivity;
+  final VoidCallback onManagePages;
   final String Function(String?) formatLastSeen;
 
   @override
@@ -483,6 +511,7 @@ class _ExecCard extends StatelessWidget {
                     icon: const Icon(Icons.more_vert),
                     onSelected: (v) {
                       if (v == 'activity') onViewActivity();
+                      if (v == 'pages') onManagePages();
                       if (v == 'revoke') onRevoke();
                     },
                     itemBuilder: (_) => [
@@ -493,6 +522,16 @@ class _ExecCard extends StatelessWidget {
                             Icon(Icons.history, size: 16),
                             SizedBox(width: 8),
                             Text('View activity'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'pages',
+                        child: Row(
+                          children: [
+                            Icon(Icons.dashboard_customize, size: 16),
+                            SizedBox(width: 8),
+                            Text('Manage dashboard pages'),
                           ],
                         ),
                       ),
