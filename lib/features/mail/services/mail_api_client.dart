@@ -1,0 +1,78 @@
+import 'package:bluebubbles/features/mail/models/mail_message.dart';
+import 'package:bluebubbles/services/crm/supabase_service.dart';
+
+class MailListPage {
+  final List<MailMessage> messages;
+  final String? nextPageToken;
+  const MailListPage({required this.messages, this.nextPageToken});
+}
+
+class MailApiClient {
+  MailApiClient({CRMSupabaseService? supabase})
+    : _supabase = supabase ?? CRMSupabaseService();
+
+  final CRMSupabaseService _supabase;
+
+  Future<MailListPage> listInbox({
+    int maxResults = 25,
+    String? pageToken,
+    String? q,
+  }) async {
+    final resp = await _supabase.client.functions.invoke(
+      'mail-list',
+      body: {
+        'maxResults': maxResults,
+        if (pageToken != null) 'pageToken': pageToken,
+        if (q != null && q.isNotEmpty) 'q': q,
+      },
+    );
+    final data = (resp.data as Map?)?.cast<String, dynamic>() ?? {};
+    final messages = ((data['messages'] as List?) ?? const [])
+        .map((m) => MailMessage.fromJson(Map<String, dynamic>.from(m as Map)))
+        .toList();
+    return MailListPage(
+      messages: messages,
+      nextPageToken: data['nextPageToken'] as String?,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getThread(String threadId) async {
+    final resp = await _supabase.client.functions.invoke(
+      'mail-thread-get',
+      body: {'threadId': threadId},
+    );
+    final data = (resp.data as Map?)?.cast<String, dynamic>() ?? {};
+    return ((data['messages'] as List?) ?? const [])
+        .map((m) => Map<String, dynamic>.from(m as Map))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> getMessage(String messageId) async {
+    final resp = await _supabase.client.functions.invoke(
+      'mail-message-get',
+      body: {'messageId': messageId},
+    );
+    return Map<String, dynamic>.from(resp.data as Map);
+  }
+
+  /// Returns true iff the current user has an active mail alias provisioned.
+  /// Used to gate the Mail nav tab — non-execs without an alias should not
+  /// see the tab (avoids a confusing 403 on first open).
+  Future<bool> hasActiveAlias() async {
+    if (!_supabase.isInitialized) return false;
+    final userId = _supabase.client.auth.currentUser?.id;
+    if (userId == null) return false;
+    try {
+      final row = await _supabase.client
+          .from('mail_aliases')
+          .select('alias_email, revoked_at, gmail_send_as_verified')
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (row == null) return false;
+      return row['revoked_at'] == null &&
+          row['gmail_send_as_verified'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+}

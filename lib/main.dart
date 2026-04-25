@@ -42,6 +42,8 @@ import 'package:bluebubbles/screens/crm/dashboard_shell/dashboard_shell_screen.d
 import 'package:bluebubbles/features/campaigns/screens/mautic_embed_screen.dart';
 import 'package:bluebubbles/features/forms/screens/forms_main_screen.dart';
 import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
+import 'package:bluebubbles/features/mail/screens/mail_screen.dart';
+import 'package:bluebubbles/features/mail/services/mail_api_client.dart';
 import 'package:bluebubbles/screens/crm/surveys_screen.dart';
 import 'package:bluebubbles/screens/crm/candidates_page.dart';
 import 'package:bluebubbles/screens/crm/finances_page.dart';
@@ -668,6 +670,7 @@ enum _HomeSection {
   memberPortal,
   walletNotifications,
   slackManagement,
+  mail, // per-exec Gmail mail client (gated by mail_aliases row)
   campaigns,
   forms,
   conversations,
@@ -681,8 +684,20 @@ class _HomeState extends OptimizedState<Home>
     with WidgetsBindingObserver, TrayListener {
   bool serverCompatible = true;
   bool fullyLoaded = false;
+  bool _mailEnabled = false; // gated by a provisioned mail_aliases row
   _HomeSection _currentSection = _HomeSection.home;
   final PageStorageBucket _bucket = PageStorageBucket();
+
+  Future<void> _checkMailAlias() async {
+    try {
+      final has = await MailApiClient().hasActiveAlias();
+      if (!mounted) return;
+      if (has != _mailEnabled) setState(() => _mailEnabled = has);
+    } catch (_) {
+      // Silent — non-execs/unauthenticated users get no Mail nav, which
+      // is the correct fallback.
+    }
+  }
 
   @override
   void initState() {
@@ -690,6 +705,8 @@ class _HomeState extends OptimizedState<Home>
 
     // Bind the lifecycle events
     WidgetsBinding.instance.addObserver(this);
+
+    _checkMailAlias();
 
     /* ----- APP REFRESH LISTENER INITIALIZATION ----- */
     eventDispatcher.stream.listen((event) {
@@ -1030,6 +1047,9 @@ class _HomeState extends OptimizedState<Home>
                         key: PageStorageKey('slack-management-view'),
                         embed: true,
                       ),
+                      const MailScreen(
+                        key: PageStorageKey('mail-view'),
+                      ),
                       const MauticEmbedScreen(
                         key: PageStorageKey('campaigns-view'),
                       ),
@@ -1341,6 +1361,14 @@ class _HomeState extends OptimizedState<Home>
               enabled: crmReady,
               hideIcon: hideIcons,
             ),
+            if (_mailEnabled)
+              _buildNavButton(
+                context,
+                _HomeSection.mail,
+                'Mail',
+                Icons.mail_outline,
+                hideIcon: hideIcons,
+              ),
             _buildNavButton(
               context,
               _HomeSection.conversations,
@@ -1723,6 +1751,13 @@ class _HomeState extends OptimizedState<Home>
                         ? () => _setSection(_HomeSection.candidates)
                         : null,
                   ),
+                  if (_mailEnabled)
+                    buildItem(
+                      order: 12,
+                      icon: Icons.mail_outline,
+                      label: 'Mail',
+                      onActivate: () => _setSection(_HomeSection.mail),
+                    ),
                   buildItem(
                     order: 16,
                     icon: Icons.chat_bubble_outline,
