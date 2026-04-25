@@ -376,6 +376,12 @@ dev_dependencies:
   mocktail: ^1.0.3
   freezed: ^2.5.4
   json_serializable: ^6.7.1
+  # tmail fork — needed for hive_ce TypeAdapter generation
+  hive_ce_generator: ^1.6.0
+  # tmail fork — intl_generator pulled, but conflicts with bluebubbles'
+  # analyzer ^6.5.0 (intl_generator pins ^5.1.0). Drop dev-time codegen
+  # for tmail's i18n; the generated messages_all.dart files would have
+  # to be hand-rolled or i18n disabled. Acceptable for Phase 1.
 
 flutter_icons:
   android: true
