@@ -55,6 +55,49 @@ class MailApiClient {
     return Map<String, dynamic>.from(resp.data as Map);
   }
 
+  /// Sends a message via the mail-send edge function. From: header is
+  /// pinned server-side to caller's alias (the resolveCaller layer
+  /// ignores any client-supplied From). Returns the new gmailMessageId
+  /// + threadId.
+  Future<({String gmailMessageId, String threadId, String rfc822MessageId})>
+      sendMessage({
+    required List<String> to,
+    List<String>? cc,
+    List<String>? bcc,
+    required String subject,
+    String? bodyText,
+    String? bodyHtml,
+    String? threadId,
+    String? inReplyTo,
+    List<String>? references,
+    String? relatedEntityType,
+    String? relatedEntityId,
+  }) async {
+    final resp = await _supabase.client.functions.invoke(
+      'mail-send',
+      body: {
+        'to': to,
+        if (cc != null && cc.isNotEmpty) 'cc': cc,
+        if (bcc != null && bcc.isNotEmpty) 'bcc': bcc,
+        'subject': subject,
+        if (bodyText != null && bodyText.isNotEmpty) 'bodyText': bodyText,
+        if (bodyHtml != null && bodyHtml.isNotEmpty) 'bodyHtml': bodyHtml,
+        if (threadId != null) 'threadId': threadId,
+        if (inReplyTo != null) 'inReplyTo': inReplyTo,
+        if (references != null && references.isNotEmpty)
+          'references': references,
+        if (relatedEntityType != null) 'relatedEntityType': relatedEntityType,
+        if (relatedEntityId != null) 'relatedEntityId': relatedEntityId,
+      },
+    );
+    final data = Map<String, dynamic>.from(resp.data as Map);
+    return (
+      gmailMessageId: data['gmailMessageId'] as String,
+      threadId: data['threadId'] as String,
+      rfc822MessageId: data['rfc822MessageId'] as String,
+    );
+  }
+
   /// Returns true iff the current user has an active mail alias provisioned.
   /// Used to gate the Mail nav tab — non-execs without an alias should not
   /// see the tab (avoids a confusing 403 on first open).
