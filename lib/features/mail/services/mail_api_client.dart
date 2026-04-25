@@ -42,6 +42,33 @@ class MailApiClient {
     );
   }
 
+  /// Searches the inbox via the `mail-search` edge function. The query string
+  /// is passed through unchanged; the edge function clamps results to the
+  /// caller's alias-scoped Gmail mailbox server-side. Same response shape as
+  /// `mail-list` so we can reuse [MailListPage].
+  Future<MailListPage> searchInbox({
+    required String q,
+    int maxResults = 25,
+    String? pageToken,
+  }) async {
+    final resp = await _supabase.client.functions.invoke(
+      'mail-search',
+      body: {
+        'q': q,
+        'maxResults': maxResults,
+        if (pageToken != null) 'pageToken': pageToken,
+      },
+    );
+    final data = (resp.data as Map?)?.cast<String, dynamic>() ?? {};
+    final messages = ((data['messages'] as List?) ?? const [])
+        .map((m) => MailMessage.fromJson(Map<String, dynamic>.from(m as Map)))
+        .toList();
+    return MailListPage(
+      messages: messages,
+      nextPageToken: data['nextPageToken'] as String?,
+    );
+  }
+
   Future<List<Map<String, dynamic>>> getThread(String threadId) async {
     final resp = await _supabase.client.functions.invoke(
       'mail-thread-get',
@@ -101,6 +128,136 @@ class MailApiClient {
       gmailMessageId: data['gmailMessageId'] as String,
       threadId: data['threadId'] as String,
       rfc822MessageId: data['rfc822MessageId'] as String,
+    );
+  }
+
+  /// Creates a Gmail draft via the mail-draft-create edge function. From: header
+  /// is pinned server-side to caller's alias (the resolveCaller layer ignores
+  /// any client-supplied From). Returns the draftId + the draft's underlying
+  /// gmailMessageId / threadId / rfc822MessageId.
+  Future<({String draftId, String gmailMessageId, String threadId, String rfc822MessageId})>
+      createDraft({
+    required List<String> to,
+    List<String>? cc,
+    List<String>? bcc,
+    required String subject,
+    String? bodyText,
+    String? bodyHtml,
+    String? threadId,
+    String? inReplyTo,
+    List<String>? references,
+    String? relatedEntityType,
+    String? relatedEntityId,
+  }) async {
+    final resp = await _supabase.client.functions.invoke(
+      'mail-draft-create',
+      body: {
+        'to': to,
+        if (cc != null && cc.isNotEmpty) 'cc': cc,
+        if (bcc != null && bcc.isNotEmpty) 'bcc': bcc,
+        'subject': subject,
+        if (bodyText != null && bodyText.isNotEmpty) 'bodyText': bodyText,
+        if (bodyHtml != null && bodyHtml.isNotEmpty) 'bodyHtml': bodyHtml,
+        if (threadId != null) 'threadId': threadId,
+        if (inReplyTo != null) 'inReplyTo': inReplyTo,
+        if (references != null && references.isNotEmpty)
+          'references': references,
+        if (relatedEntityType != null) 'relatedEntityType': relatedEntityType,
+        if (relatedEntityId != null) 'relatedEntityId': relatedEntityId,
+      },
+    );
+    final data = Map<String, dynamic>.from(resp.data as Map);
+    return (
+      draftId: data['draftId'] as String,
+      gmailMessageId: (data['gmailMessageId'] ?? '') as String,
+      threadId: (data['threadId'] ?? '') as String,
+      rfc822MessageId: (data['rfc822MessageId'] ?? '') as String,
+    );
+  }
+
+  /// Lists drafts owned by the caller's alias via the mail-draft-list edge fn.
+  /// Each draft entry exposes the same shape mail-draft-list returns:
+  /// `{id, message: {id, threadId, from, to, cc, subject, snippet, ...}}`.
+  Future<({List<Map<String, dynamic>> drafts, String? nextPageToken})>
+      listDrafts({
+    int? maxResults,
+    String? pageToken,
+  }) async {
+    final resp = await _supabase.client.functions.invoke(
+      'mail-draft-list',
+      body: {
+        if (maxResults != null) 'maxResults': maxResults,
+        if (pageToken != null) 'pageToken': pageToken,
+      },
+    );
+    final data = (resp.data as Map?)?.cast<String, dynamic>() ?? {};
+    final drafts = ((data['drafts'] as List?) ?? const [])
+        .whereType<Object>()
+        .map((d) => Map<String, dynamic>.from(d as Map))
+        .toList();
+    return (
+      drafts: drafts,
+      nextPageToken: data['nextPageToken'] as String?,
+    );
+  }
+
+  /// Updates an existing Gmail draft via the mail-draft-update edge fn. The
+  /// edge fn verifies caller owns the draft (From: header == caller's alias)
+  /// before rewriting it. Returns the (possibly-changed) draftId / message
+  /// metadata after the update.
+  Future<({String draftId, String gmailMessageId, String threadId})>
+      updateDraft({
+    required String draftId,
+    required List<String> to,
+    List<String>? cc,
+    List<String>? bcc,
+    required String subject,
+    String? bodyText,
+    String? bodyHtml,
+    String? threadId,
+    String? inReplyTo,
+    List<String>? references,
+  }) async {
+    final resp = await _supabase.client.functions.invoke(
+      'mail-draft-update',
+      body: {
+        'draftId': draftId,
+        'to': to,
+        if (cc != null && cc.isNotEmpty) 'cc': cc,
+        if (bcc != null && bcc.isNotEmpty) 'bcc': bcc,
+        'subject': subject,
+        if (bodyText != null && bodyText.isNotEmpty) 'bodyText': bodyText,
+        if (bodyHtml != null && bodyHtml.isNotEmpty) 'bodyHtml': bodyHtml,
+        if (threadId != null) 'threadId': threadId,
+        if (inReplyTo != null) 'inReplyTo': inReplyTo,
+        if (references != null && references.isNotEmpty)
+          'references': references,
+      },
+    );
+    final data = Map<String, dynamic>.from(resp.data as Map);
+    return (
+      draftId: (data['draftId'] ?? draftId) as String,
+      gmailMessageId: (data['gmailMessageId'] ?? '') as String,
+      threadId: (data['threadId'] ?? '') as String,
+    );
+  }
+
+  /// Sends an existing Gmail draft via the mail-draft-send edge fn. The edge
+  /// fn verifies caller ownership before sending. Returns the SENT message's
+  /// gmailMessageId / threadId / rfc822MessageId for cache + audit reconciliation.
+  Future<({String gmailMessageId, String threadId, String rfc822MessageId})>
+      sendDraft({
+    required String draftId,
+  }) async {
+    final resp = await _supabase.client.functions.invoke(
+      'mail-draft-send',
+      body: {'draftId': draftId},
+    );
+    final data = Map<String, dynamic>.from(resp.data as Map);
+    return (
+      gmailMessageId: (data['gmailMessageId'] ?? '') as String,
+      threadId: (data['threadId'] ?? '') as String,
+      rfc822MessageId: (data['rfc822MessageId'] ?? '') as String,
     );
   }
 

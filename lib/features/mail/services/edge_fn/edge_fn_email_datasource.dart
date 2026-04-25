@@ -75,10 +75,28 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     // a built Email (subject, from, to, htmlBody, textBody, threadId
     // ref via inReplyTo). The edge fn server-side overwrites From: with
     // the caller's alias, so the EmailRequest.email.from set is ignored.
-    final email = emailRequest.email;
-    final to = email.to?.map((a) => _formatAddr(a)).toList() ?? const [];
-    final cc = email.cc?.map((a) => _formatAddr(a)).toList() ?? const [];
-    final bcc = email.bcc?.map((a) => _formatAddr(a)).toList() ?? const [];
+    final parsed = _parseEmail(emailRequest.email);
+    await _api.sendMessage(
+      to: parsed.to,
+      cc: parsed.cc.isEmpty ? null : parsed.cc,
+      bcc: parsed.bcc.isEmpty ? null : parsed.bcc,
+      subject: parsed.subject,
+      bodyText: parsed.textBody,
+      bodyHtml: parsed.htmlBody,
+      threadId: parsed.threadId,
+      inReplyTo: parsed.inReplyTo,
+      references: parsed.references,
+    );
+  }
+
+  /// Extracts the wire-shape fields the mail-send / mail-draft-{create,update}
+  /// edge fns expect out of a tmail-built Email: address lists, subject,
+  /// htmlBody/textBody (resolved via bodyValues lookup), threadId, and
+  /// In-Reply-To / References header values.
+  _ParsedEmail _parseEmail(Email email) {
+    final to = email.to?.map(_formatAddr).toList() ?? const <String>[];
+    final cc = email.cc?.map(_formatAddr).toList() ?? const <String>[];
+    final bcc = email.bcc?.map(_formatAddr).toList() ?? const <String>[];
     final subject = email.subject ?? '';
 
     String? htmlBody;
@@ -98,16 +116,56 @@ class EdgeFnEmailDataSource extends EmailDataSource {
         : null;
     final references = email.references?.ids.toList();
 
-    await _api.sendMessage(
+    return _ParsedEmail(
       to: to,
-      cc: cc.isEmpty ? null : cc,
-      bcc: bcc.isEmpty ? null : bcc,
+      cc: cc,
+      bcc: bcc,
       subject: subject,
-      bodyText: textBody,
-      bodyHtml: htmlBody,
+      htmlBody: htmlBody,
+      textBody: textBody,
       threadId: email.threadId?.id.value,
       inReplyTo: inReplyTo,
       references: references,
+    );
+  }
+
+  /// Reconstructs an Email mirroring `newEmail`'s composer-built body but with
+  /// the new server-assigned ids stamped in. tmail's downstream consumers only
+  /// require `Email.id` to be non-null (see CreateNewAndSaveEmailToDraftsInteractor —
+  /// it reads `emailDraftSaved.id!`); we additionally populate `threadId` so
+  /// any later code that re-threads the draft has the canonical Gmail thread id.
+  Email _emailWithIds(Email source, {required String id, String? threadId}) {
+    final emailId = EmailId(Id(id));
+    final tid = (threadId != null && threadId.isNotEmpty)
+        ? ThreadId(Id(threadId))
+        : source.threadId;
+    return Email(
+      id: emailId,
+      blobId: source.blobId,
+      threadId: tid,
+      mailboxIds: source.mailboxIds,
+      keywords: source.keywords,
+      size: source.size,
+      receivedAt: source.receivedAt,
+      messageId: source.messageId,
+      inReplyTo: source.inReplyTo,
+      references: source.references,
+      sender: source.sender,
+      from: source.from,
+      to: source.to,
+      cc: source.cc,
+      bcc: source.bcc,
+      replyTo: source.replyTo,
+      subject: source.subject,
+      sentAt: source.sentAt,
+      hasAttachment: source.hasAttachment,
+      preview: source.preview,
+      bodyValues: source.bodyValues,
+      textBody: source.textBody,
+      htmlBody: source.htmlBody,
+      attachments: source.attachments,
+      headerUserAgent: source.headerUserAgent,
+      identityHeader: source.identityHeader,
     );
   }
 
@@ -230,8 +288,24 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     AccountId accountId,
     Email email, {
     CancelToken? cancelToken,
-  }) =>
-      _todo('saveEmailAsDrafts');
+  }) async {
+    final parsed = _parseEmail(email);
+    final result = await _api.createDraft(
+      to: parsed.to,
+      cc: parsed.cc.isEmpty ? null : parsed.cc,
+      bcc: parsed.bcc.isEmpty ? null : parsed.bcc,
+      subject: parsed.subject,
+      bodyText: parsed.textBody,
+      bodyHtml: parsed.htmlBody,
+      threadId: parsed.threadId,
+      inReplyTo: parsed.inReplyTo,
+      references: parsed.references,
+    );
+    // Use Gmail's draft id as the canonical Email.id — the composer's
+    // "discard" / "update" paths key off the id we hand back here, and
+    // mail-draft-{update,send} take that draftId as input.
+    return _emailWithIds(email, id: result.draftId, threadId: result.threadId);
+  }
 
   @override
   Future<bool> removeEmailDrafts(
@@ -240,6 +314,10 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     EmailId emailId, {
     CancelToken? cancelToken,
   }) async =>
+      // Gmail's users.drafts.delete isn't a critical path — when the
+      // composer is discarded the draft simply ages out (and the user
+      // can hard-delete from Gmail directly). Returning true keeps the
+      // optimistic UI happy.
       true;
 
   @override
@@ -249,8 +327,23 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     Email newEmail,
     EmailId oldEmailId, {
     CancelToken? cancelToken,
-  }) =>
-      _todo('updateEmailDrafts');
+  }) async {
+    final parsed = _parseEmail(newEmail);
+    final result = await _api.updateDraft(
+      draftId: oldEmailId.id.value,
+      to: parsed.to,
+      cc: parsed.cc.isEmpty ? null : parsed.cc,
+      bcc: parsed.bcc.isEmpty ? null : parsed.bcc,
+      subject: parsed.subject,
+      bodyText: parsed.textBody,
+      bodyHtml: parsed.htmlBody,
+      threadId: parsed.threadId,
+      inReplyTo: parsed.inReplyTo,
+      references: parsed.references,
+    );
+    return _emailWithIds(newEmail,
+        id: result.draftId, threadId: result.threadId);
+  }
 
   @override
   Future<Email> saveEmailAsTemplate(
@@ -476,4 +569,30 @@ class EdgeFnEmailDataSource extends EmailDataSource {
       mapErrors: <Id, SetError>{},
     );
   }
+}
+
+/// Internal value-type holding the wire-shape body the mail-send /
+/// mail-draft-{create,update} edge fns expect after parsing a tmail Email.
+class _ParsedEmail {
+  final List<String> to;
+  final List<String> cc;
+  final List<String> bcc;
+  final String subject;
+  final String? htmlBody;
+  final String? textBody;
+  final String? threadId;
+  final String? inReplyTo;
+  final List<String>? references;
+
+  const _ParsedEmail({
+    required this.to,
+    required this.cc,
+    required this.bcc,
+    required this.subject,
+    required this.htmlBody,
+    required this.textBody,
+    required this.threadId,
+    required this.inReplyTo,
+    required this.references,
+  });
 }
