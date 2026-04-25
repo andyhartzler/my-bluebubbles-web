@@ -1,5 +1,5 @@
 
-import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/color_extension.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/responsive_utils.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/theme_utils.dart';
@@ -36,10 +36,16 @@ class ComposeButtonWidget extends StatelessWidget {
         borderRadius: 10,
         iconSize: 24,
         height: 44,
-        iconColor: Colors.white,
+        // White-on-gold fails 4.5:1; use navy for both icon and label so
+        // the compose button stays readable against sunriseGold.
+        iconColor: BrandColors.unityBlue,
         padding: const EdgeInsetsDirectional.symmetric(horizontal: 12),
-        backgroundColor: AppColor.blue700,
-        textStyle: ThemeUtils.textStyleBodyBody2(color: Colors.white),
+        // MOYD brand: compose is the primary call-to-action on the
+        // mailbox -- map to sunriseGold so it pops against the navy nav
+        // chrome instead of reading as a second "blue button" next to the
+        // (also-navy) selected mailbox highlight. Was AppColor.blue700.
+        backgroundColor: BrandColors.sunriseGold,
+        textStyle: ThemeUtils.textStyleBodyBody2(color: BrandColors.unityBlue),
         onTapActionCallback: onTapAction,
       ),
     );

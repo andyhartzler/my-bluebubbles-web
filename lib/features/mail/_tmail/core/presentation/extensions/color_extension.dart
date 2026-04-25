@@ -1,7 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+
+// ============================================================================
+// MOYD BRAND OVERRIDE (audit 2026-04-25)
+// ----------------------------------------------------------------------------
+// tmail's MailboxDashBoardView is mounted under a Theme override at
+// MailScreen scope (`lib/features/mail/screens/mail_screen.dart`) that maps
+// `colorScheme.primary` -> BrandColors.unityBlue. That override only catches
+// widgets reading from `Theme.of(context)`. Many tmail widgets reference
+// `AppColor.<name>` constants directly (~250 call sites across the
+// dashboard / mailbox / thread / thread_detail / email / composer / base /
+// search feature dirs), bypassing the override entirely.
+//
+// Rather than touching ~250 call sites (and reintroducing drift on every
+// fork-resync), we surgically remap the *brand-bearing* constants here at
+// their declaration site. This keeps every read-path correct without
+// stripping any widget that relies on the constant.
+//
+// Mapping rule of thumb:
+//   - "primary blue" (#007AFF / #0A84FF / #3840F7 / #182952) -> unityBlue
+//   - "secondary / link blue" (#208BFF / #297EF2 / etc.)     -> momentumBlue
+//   - "accent purple" used decoratively                      -> sunriseGold
+//   - "decorative warm/red" (avatar, AI tag) used as chrome  -> unityBlue
+//   - Semantic state colors (red errors, orange warnings,
+//     green success, calendar update/maybe banners)          -> LEFT ALONE
+//   - Pale tint colors (DFEEFF, EBF4FF, E3F1FF) used as
+//     selected-row highlight                                 -> LEFT ALONE
+//     (they read fine against navy/gold and replacing them
+//      with unityBlue would hide the highlight)
+// ============================================================================
 
 extension AppColor on Color {
-  static const primaryColor = Color(0xFF007AFF);
+  // Primary brand blue. Was Color(0xFF007AFF) (Linagora iOS-blue).
+  // Remapped to MOYD navy. Cascades to text-buttons, focused borders,
+  // dialog action buttons, expand-mailbox arrow, send-button, and 60+
+  // other call sites that use `AppColor.primaryColor` directly.
+  static const primaryColor = BrandColors.unityBlue;
   static const primaryDarkColor = Color(0xFF1C1C1C);
   static const primaryLightColor = Color(0xFFFFFFFF);
   static const primarySelectedColor = Color(0xFFDFEEFF);
@@ -10,49 +44,71 @@ extension AppColor on Color {
   static const textFieldLabelColor = Color(0xFF7E869B);
   static const textFieldHintColor = Color(0xFF757575);
   static const textFieldBorderColor = Color(0xfff2f3f5);
-  static const textFieldFocusedBorderColor = Color(0xFF007AFF);
+  // Was Color(0xFF007AFF). Focused text-field underline -> navy.
+  static const textFieldFocusedBorderColor = BrandColors.unityBlue;
   static const loginTextFieldBorderColor = Color(0xFFF2F3F5);
   static const textFieldErrorBorderColor = Color(0xffE64646);
   static const loginTextFieldErrorBorder = Color(0xffE64646);
-  static const loginTextFieldFocusedBorder = Color(0xFF007AFF);
+  // Was Color(0xFF007AFF). Login form focus ring -> navy.
+  static const loginTextFieldFocusedBorder = BrandColors.unityBlue;
   static const loginTextFieldHintColor = Color(0xff818C99);
   static const loginTextFieldBackgroundColor = Color(0xFFF2F3F5);
-  static const appColor = Color(0xFF3840F7);
-  static const nameUserColor = Color(0xFF182952);
+  // Was Color(0xFF3840F7) (Linagora indigo). Generic "app" accent -> navy.
+  static const appColor = BrandColors.unityBlue;
+  // Was Color(0xFF182952) (Linagora deep navy). Display-name color -> navy.
+  static const nameUserColor = BrandColors.unityBlue;
   static const userInformationBackgroundColor = Color(0xFFF5F5F7);
   static const searchBorderColor = Color(0xFFEAEAEA);
   static const searchHintTextColor = Color(0xFF7E869B);
-  static const mailboxSelectedBackgroundColor = Color(0xFFE6E5FF);
+  // Was Color(0xFFE6E5FF) (very pale Linagora indigo tint). Selected
+  // mailbox background -> faint navy tint that reads on light surfaces.
+  static const mailboxSelectedBackgroundColor = Color(0xFFE0E6F0);
   static const mailboxBackgroundColor = Color(0xFFFFFFFF);
-  static const mailboxSelectedTextColor = Color(0xFF3840F7);
-  static const mailboxTextColor = Color(0xFF182952);
-  static const emailMailboxContainColor = Color(0xFF162546);
-  static const mailboxSelectedTextNumberColor = Color(0xFF182952);
-  static const mailboxSelectedIconColor = Color(0xFF3840F7);
+  // Was Color(0xFF3840F7). Selected mailbox label color -> navy.
+  static const mailboxSelectedTextColor = BrandColors.unityBlue;
+  // Was Color(0xFF182952). Default mailbox label color -> navy.
+  static const mailboxTextColor = BrandColors.unityBlue;
+  // Was Color(0xFF162546). Container chrome -> navy.
+  static const emailMailboxContainColor = BrandColors.unityBlue;
+  // Was Color(0xFF182952). Selected mailbox unread-count -> navy.
+  static const mailboxSelectedTextNumberColor = BrandColors.unityBlue;
+  // Was Color(0xFF3840F7). Selected mailbox icon -> navy.
+  static const mailboxSelectedIconColor = BrandColors.unityBlue;
   static const mailboxIconColor = Color(0xFF7E869B);
   static const storageBackgroundColor = Color(0xFFF5F5F7);
   static const storageTitleColor = Color(0xFF7E869B);
-  static const storageMaxSizeColor = Color(0xFF101D43);
-  static const storageUseSizeColor = Color(0xFF2D0CFF);
+  // Was Color(0xFF101D43). Storage max-size label -> navy.
+  static const storageMaxSizeColor = BrandColors.unityBlue;
+  // Was Color(0xFF2D0CFF) (deep Linagora violet). Used in storage progress
+  // bar fill -> navy so the progress bar reads as a brand element.
+  static const storageUseSizeColor = BrandColors.unityBlue;
   static const myFolderTitleColor = Color(0xFF7E869B);
-  static const titleAppBarMailboxListMail = Color(0xFF182952);
-  static const counterMailboxColor = Color(0xFF3840F7);
+  // Was Color(0xFF182952). App bar title color -> navy.
+  static const titleAppBarMailboxListMail = BrandColors.unityBlue;
+  // Was Color(0xFF3840F7). Mailbox unread counter -> navy.
+  static const counterMailboxColor = BrandColors.unityBlue;
   static const backgroundCounterMailboxColor = Color(0xFFE3E1FD);
   static const backgroundCounterMailboxSelectedColor = Color(0x17313131);
   static const bgMailboxListMail = Color(0xFFFBFBFF);
   static const bgMessenger = Color(0xFFF2F2F5);
-  static const textButtonColor = Color(0xFF182952);
+  // Was Color(0xFF182952). Default text-button color -> navy.
+  static const textButtonColor = BrandColors.unityBlue;
   static const attachmentFileBorderColor = Color(0x1F000000);
   static const attachmentFileNameColor = Color(0xFF000000);
   static const attachmentFileSizeColor = Color(0xFF818C99);
   static const avatarColor = Color(0xFFF8F8F8);
-  static const avatarTextColor = Color(0xFF3840F7);
-  static const sentTimeTextColorUnRead = Color(0xFF182952);
-  static const subjectEmailTextColorUnRead = Color(0xFF3840F7);
+  // Was Color(0xFF3840F7). Avatar initials color -> navy.
+  static const avatarTextColor = BrandColors.unityBlue;
+  // Was Color(0xFF182952). Unread sent-time -> navy bold text.
+  static const sentTimeTextColorUnRead = BrandColors.unityBlue;
+  // Was Color(0xFF3840F7). Unread subject text (load-bearing -- the bold
+  // navy/indigo of unread rows in the inbox list) -> navy.
+  static const subjectEmailTextColorUnRead = BrandColors.unityBlue;
   static const dividerColor = Color(0xFFEAEAEA);
   static const bgComposer = Color(0xFFFBFBFF);
   static const emailAddressChipColor = Color(0x0D001C3D);
-  static const enableSendEmailButtonColor = Color(0xFF007AFF);
+  // Was Color(0xFF007AFF). Send-email button enabled state -> navy.
+  static const enableSendEmailButtonColor = BrandColors.unityBlue;
   static const disableSendEmailButtonColor = Color(0xFFA9B4C2);
   static const borderLeftEmailContentColor = Color(0xFFEFEFEF);
   static const toastWarningBackgroundColor = Color(0xFFFFC107);
@@ -64,17 +120,21 @@ extension AppColor on Color {
   static const bgStatusResultSearch = Color(0xFFF5F5F7);
   static const colorNameEmail = Color(0xFF000000);
   static const colorContentEmail = Color(0xFF6D7885);
-  static const colorTextButton = Color(0xFF007AFF);
+  // Was Color(0xFF007AFF). Generic text-button color (action bar, dialogs,
+  // 12 call sites) -> navy.
+  static const colorTextButton = BrandColors.unityBlue;
   static const colorHintSearchBar = Color(0xFF818C99);
   static const colorBgSearchBar = Color(0x99EBEDF0);
   static const colorBgIdentityButton = Color(0x00EBEDF0);
   static const colorShadowBgContentEmail = Color(0x14000000);
   static const colorDividerMailbox = Color(0x1F000000);
   static const colorCollapseMailbox = Color(0xFFB8C1CC);
-  static const colorExpandMailbox = Color(0xFF007AFF);
+  // Was Color(0xFF007AFF). Expanded-mailbox arrow -> navy.
+  static const colorExpandMailbox = BrandColors.unityBlue;
   static const colorBgMailbox = Color(0xFFF7F7F7);
   static const colorFilterMessageDisabled = Color(0xFF99A2AD);
-  static const colorFilterMessageEnabled = Color(0xFF007AFF);
+  // Was Color(0xFF007AFF). Active filter pill text -> navy.
+  static const colorFilterMessageEnabled = BrandColors.unityBlue;
   static const colorDefaultCupertinoActionSheet = Color(0x66000000);
   static const colorDisableMailboxCreateButton = Color(0x2E3C3C43);
   static const colorInputBorderErrorVerifyName = Color(0xFFE64646);
@@ -84,7 +144,8 @@ extension AppColor on Color {
   static const colorHintInputCreateMailbox = Color(0xFFA9B4C2);
   static const colorMessageConfirmDialog = Color(0xFF6D7885);
   static const colorActionDeleteConfirmDialog = Color(0xFFE64646);
-  static const colorActionCancelDialog = Color(0xFF007AFF);
+  // Was Color(0xFF007AFF). Dialog "cancel"/affirm action color -> navy.
+  static const colorActionCancelDialog = BrandColors.unityBlue;
   static const colorMessageDialog = Color(0xFF222222);
   static const colorConfirmActionDialog = Color(0xFFF2F2F2);
   static const colorEmailAddress = Color(0xFF333333);
@@ -105,7 +166,12 @@ extension AppColor on Color {
   static const colorBorderBodyThread = Color(0x5CB8C1CC);
   static const colorBgDesktop = Color(0xFFF3F6F9);
   static const colorItemEmailSelectedDesktop = Color(0xFFDFEEFF);
-  static const colorAvatar = Color(0xFFDE5E5E);
+  // Was Color(0xFFDE5E5E) (Linagora coral red). Default avatar background
+  // when no per-recipient color is computed -> navy. The avatarTextColor is
+  // also remapped to navy above; the runtime decorates avatars with white
+  // text on this background. Leaving it as red bled "Linagora red" through
+  // every email row that didn't have a custom palette entry.
+  static const colorAvatar = BrandColors.unityBlue;
   static const colorFocusButton = Color(0x14818C99);
   static const colorBorderEmailAddressInvalid = Color(0xFFFF3347);
   static const colorBorderIdentityInfo = Color(0xFFE7E8EC);
@@ -113,7 +179,10 @@ extension AppColor on Color {
   static const colorLoading = Color(0x2999A2AD);
   static const colorBgMenuItemDropDownSelected = Color(0x80DEE2E7);
   static const colorButtonCancelDialog = Color(0x0D000000);
-  static const colorShadowComposerButton = Color(0x99007AFF);
+  // Was Color(0x99007AFF) (semi-transparent Linagora blue glow under
+  // composer's send button). 0x99 alpha (60%) on unityBlue (0x273351) ->
+  // 0x99273351 to keep the glow but dressed in MOIBlue navy.
+  static const colorShadowComposerButton = Color(0x99273351);
   static const colorBackgroundTagFilter = Color(0xFF6D7885);
   static const colorDefaultRichTextButton = Color(0xFF99A2AD);
   static const colorStyleBlockQuote = Color(0xFFEEEEEE);
@@ -169,7 +238,10 @@ extension AppColor on Color {
   static const colorCalendarEventUnread = Color(0xFF1C1B1F);
   static const colorMaybeEventActionText = Color(0xFFFFC107);
   static const colorMaybeEventActionBanner = Color(0xFFFFF5C2);
-  static const colorInvitedEventActionText = Color(0xFF007AFF);
+  // Was Color(0xFF007AFF). Calendar "invited" action text -> navy.
+  // (Calendar updated/maybe/canceled action text + banners deliberately
+  //  left as semantic green/orange/red below.)
+  static const colorInvitedEventActionText = BrandColors.unityBlue;
   static const colorInvitedEventActionBanner = Color(0xFFEBF4FF);
   static const colorUpdatedEventActionText = Color(0xFF4BB34B);
   static const colorUpdatedEventActionBanner = Color(0xFFECF8E5);
@@ -228,12 +300,16 @@ extension AppColor on Color {
   static const steelGrayA540 = Color(0xFF55687D);
   static const steelGray200 = Color(0xFFAEB7C2);
   static const steelGray80 = Color(0xFFE7E8EC);
-  static const blue700 = Color(0xFF208BFF);
+  // Was Color(0xFF208BFF). Used for action-pill text + secondary buttons
+  // ("blue700"). Map to MOYD's accent momentumBlue so non-primary affordances
+  // (links, info pills) read as the lighter brand blue rather than iOS blue.
+  static const blue700 = BrandColors.momentumBlue;
   static const steelGray400 = Color(0xFF818C99);
   static const steelGray600 = Color(0xFF4E5966);
   static const blue100 = Color(0xFFDFEEFF);
   static const blue400 = Color(0xFF80BDFF);
-  static const blue900 = Color(0xFF0F76E7);
+  // Was Color(0xFF0F76E7). Hover/pressed link blue -> momentumBlue.
+  static const blue900 = BrandColors.momentumBlue;
   static const m3Tertiary = Color(0xFF8C9CAF);
   static const m3Tertiary60 = Color(0xFFD8E1EB);
   static const m3Tertiary70 = Color(0xFFE5ECF3);
@@ -241,18 +317,26 @@ extension AppColor on Color {
   static const m3Neutral70 = Color(0xFFAEAAAE);
   static const m3Neutral90 = Color(0xFFE6E1E5);
   static const m3Neutral40 = Color(0xFF605D62);
-  static const m3SysLightSecondaryBlue = Color(0xFF5C9CE6);
-  static const m3SysLight = Color(0xFF0157AD);
+  // Was Color(0xFF5C9CE6). M3 secondary blue -> momentumBlue.
+  static const m3SysLightSecondaryBlue = BrandColors.momentumBlue;
+  // Was Color(0xFF0157AD). M3 primary surface blue -> navy.
+  static const m3SysLight = BrandColors.unityBlue;
   static const m3SysOutline = Color(0xFFAEAEC0);
   static const grayBackgroundColor = Color(0xFFF3F6F9);
   static const m3SurfaceBackground = Color(0xFF1C1B1F);
   static const warningColor = Color(0xFFFFC107);
-  static const primaryMain = Color(0xFF0A84FF);
+  // Was Color(0xFF0A84FF). Generic "primary main" used as foreground for
+  // action affordances + selected highlights (18 call sites) -> navy.
+  static const primaryMain = BrandColors.unityBlue;
   static const m3LayerDarkOutline = Color(0xFF938F99);
   static const blackAlpha40 = Color.fromRGBO(0, 0, 0, 0.4);
   static const blackAlpha20 = Color.fromRGBO(0, 0, 0, 0.2);
   static const textPrimary = Color(0xFF424244);
-  static const iconFolder = Color(0xFF297EF2);
+  // Was Color(0xFF297EF2). Generic folder/label icon tint -> momentumBlue.
+  // (User-specific role icons -- inbox/drafts/sent/trash -- use SVG asset
+  //  paths with their own internal colors, not this constant, so they are
+  //  NOT affected by this remap.)
+  static const iconFolder = BrandColors.momentumBlue;
   static const folderDivider = Color(0xFFE4E8EC);
   static const gray424244 = Color(0xFF424244);
   static const gray777778 = Color(0xFF777778);
@@ -271,14 +355,17 @@ extension AppColor on Color {
   static const profileMenuDivider = Color(0xFF1D192B);
   static const popupMenuItemHovered = Color(0xFFF8F8F8);
   static const secondaryContrastText = Color(0xFFFFFFFF);
-  static const primaryLinShare = Color(0xFF007AFF);
+  // Was Color(0xFF007AFF). LinShare attachment integration accent -> navy.
+  static const primaryLinShare = BrandColors.unityBlue;
   static const lightGrayEAEDF2 = Color(0xFFEAEDF2);
   static const lightIconTertiary = Color(0xFFB8C1CC);
   static const gray6D7885 = Color(0xFF6D7885);
-  static const m3Primary = Color(0xFF0A84FF);
+  // Was Color(0xFF0A84FF). M3 primary -> navy.
+  static const m3Primary = BrandColors.unityBlue;
   static const m3Primary95 = Color(0xFFE3F1FF);
   static const gray49454F = Color(0xFF49454F);
-  static const blue00B7FF = Color(0xFF00B7FF);
+  // Was Color(0xFF00B7FF) (Linagora cyan-blue). -> momentumBlue.
+  static const blue00B7FF = BrandColors.momentumBlue;
   static const blueD2E9FF = Color(0xFFD2E9FF);
   static const grayCDCDCD = Color(0xFFCDCDCD);
   static const lightGrayF9FAFB = Color(0xFFF9FAFB);
@@ -291,8 +378,12 @@ extension AppColor on Color {
   static const lightBlueBFDBFE = Color(0xFFBFDBFE);
   static const lightGrayF6FAFF = Color(0xFFF6FAFF);
   static const lightGrayF7F6F9 = Color(0xFFF7F6F9);
-  static const blue25AEFE = Color(0xFF25AEFE);
-  static const aiActionTag = Color(0xFF7E57E3);
+  // Was Color(0xFF25AEFE). Cyan accent -> momentumBlue.
+  static const blue25AEFE = BrandColors.momentumBlue;
+  // Was Color(0xFF7E57E3) (Linagora purple). AI/Scribe tag is decorative,
+  // not semantic -> remap to sunriseGold so the AI affordance reads as the
+  // MOYD accent instead of off-brand purple.
+  static const aiActionTag = BrandColors.sunriseGold;
 
   static const mapGradientColor = [
     [Color(0xFF21D4FD), Color(0xFFB721FF)],
