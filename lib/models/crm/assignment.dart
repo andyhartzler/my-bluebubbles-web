@@ -132,6 +132,8 @@ class AutoInferredAssignment {
   final String? subtitle;
   final String entityUrl;    // in-app deep link
   final DateTime? at;        // when the underlying row was last updated
+  final String? memberName;       // optional — name of the related member (e.g. profile-change subject)
+  final String? memberAvatarUrl;  // optional — avatar URL for the related member
 
   const AutoInferredAssignment({
     required this.key,
@@ -140,5 +142,7 @@ class AutoInferredAssignment {
     this.subtitle,
     required this.entityUrl,
     this.at,
+    this.memberName,
+    this.memberAvatarUrl,
   });
 }

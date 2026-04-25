@@ -7,6 +7,7 @@ import 'package:bluebubbles/services/crm/assignments_service.dart';
 import 'package:bluebubbles/services/crm/auto_inferred_assignments_service.dart';
 
 import 'assignment_create_dialog.dart';
+import 'branded_panel.dart';
 
 /// Two-tab panel showing assignments to the user (incoming) and from the
 /// user (outgoing). Includes a third virtual tab for auto-inferred items.
@@ -147,60 +148,31 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Icon(Icons.task_alt),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Assignments',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const Spacer(),
-                FilledButton.tonalIcon(
-                  onPressed: _create,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('New'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            TabBar(
-              controller: _tabs,
-              isScrollable: true,
-              tabs: [
-                Tab(text: 'To me (${_toMe.length})'),
-                Tab(text: 'By me (${_byMe.length})'),
-                Tab(text: 'Auto (${_auto.length})'),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 320,
-              child: TabBarView(
-                controller: _tabs,
-                children: [
-                  _explicitList(_toMe, _loadingToMe, allowEdit: false),
-                  _explicitList(_byMe, _loadingByMe, allowEdit: true),
-                  _autoList(_auto, _loadingAuto),
-                ],
-              ),
-            ),
-          ],
-        ),
+    return BrandedPanel(
+      title: 'Assignments',
+      icon: Icons.task_alt,
+      headerAction: BrandedHeaderPillButton(
+        onPressed: _create,
+        icon: Icons.add,
+        label: 'New',
+      ),
+      tabBar: BrandedHeaderTabBar(
+        controller: _tabs,
+        onTap: (i) => _tabs.animateTo(i),
+        tabs: [
+          Tab(text: 'To me (${_toMe.length})'),
+          Tab(text: 'By me (${_byMe.length})'),
+          Tab(text: 'Auto (${_auto.length})'),
+        ],
+      ),
+      bodyHeight: 320,
+      body: TabBarView(
+        controller: _tabs,
+        children: [
+          _explicitList(_toMe, _loadingToMe, allowEdit: false),
+          _explicitList(_byMe, _loadingByMe, allowEdit: true),
+          _autoList(_auto, _loadingAuto),
+        ],
       ),
     );
   }
@@ -270,7 +242,7 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
       itemBuilder: (context, i) {
         final a = items[i];
         return ListTile(
-          leading: Icon(_iconForSource(a.source), size: 20),
+          leading: _autoLeading(a),
           title: Text(a.title),
           subtitle: a.subtitle != null
               ? Text(a.subtitle!, maxLines: 2, overflow: TextOverflow.ellipsis)
@@ -286,6 +258,28 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
         );
       },
     );
+  }
+
+  Widget _autoLeading(AutoInferredAssignment a) {
+    if (a.memberAvatarUrl != null && a.memberAvatarUrl!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 18,
+        backgroundImage: NetworkImage(a.memberAvatarUrl!),
+        onBackgroundImageError: (_, __) {},
+        backgroundColor: Colors.grey.shade300,
+      );
+    }
+    if (a.memberName != null && a.memberName!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 18,
+        backgroundColor: Colors.blueGrey.shade100,
+        child: Text(
+          a.memberName!.trim().substring(0, 1).toUpperCase(),
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+      );
+    }
+    return Icon(_iconForSource(a.source), size: 20);
   }
 
   Widget _priorityChip(String p) {

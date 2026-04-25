@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/user_home_preferences.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
 import 'package:bluebubbles/services/crm/user_home_preferences_service.dart';
@@ -13,8 +14,10 @@ import 'widgets/optional_tiles_section.dart';
 import 'widgets/profile_header.dart';
 
 /// The default landing screen for executive members after sign-in.
-/// Composes profile header, assignments, meeting history, and (in v2)
-/// an optional drag-drop metric-tiles area.
+/// Composes a branded gradient profile banner, assignments, meeting
+/// history, and an optional drag-add metric-tiles area. Mirrors the
+/// visual language of [SlackManagementScreen] — navy → momentum-blue
+/// gradient header, branded background, sunrise-gold accents.
 class PersonalizedHomeScreen extends StatefulWidget {
   const PersonalizedHomeScreen({super.key});
 
@@ -73,7 +76,6 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
       builder: (_) => AvatarUploadDialog(authUserId: authId),
     );
     if (url != null && session.currentMember != null) {
-      // Pull a fresh member record so the header re-renders with the new url.
       session.refreshMember(session.currentMember!.copyWith(avatarUrl: url));
     }
   }
@@ -86,8 +88,15 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
     final authId = session.authUserId;
 
     if (_loading || member == null || authId == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        body: BrandedBackground(
+          child: const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation(BrandColors.unityBlue),
+            ),
+          ),
+        ),
       );
     }
 
@@ -95,61 +104,90 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 12 : 24,
-            vertical: 16,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (prefs.showProfileHeader) ...[
-                ProfileHeader(
-                  member: member,
-                  session: session,
-                  onEditAvatar: _editAvatar,
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (prefs.showAssignments) ...[
-                AssignmentsPanel(
-                  authUserId: authId,
-                  memberId: member.id,
-                  isStaff: session.isExecutive || session.isCommitteeMember,
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (prefs.showMeetingHistory) ...[
-                MeetingHistoryPanel(
-                  authUserId: authId,
-                  memberId: member.id,
-                ),
-                const SizedBox(height: 16),
-              ],
-              if (prefs.showOptionalTiles) ...[
-                OptionalTilesSection(
-                  prefs: prefs,
-                  onPrefsChanged: (updated) {
-                    if (mounted) setState(() => _prefs = updated);
-                  },
-                ),
-                const SizedBox(height: 16),
-              ],
-              Center(
-                child: TextButton.icon(
-                  onPressed: _customize,
-                  icon: const Icon(Icons.tune),
-                  label: const Text('Customize home'),
+      backgroundColor: Colors.transparent,
+      body: BrandedBackground(
+        child: Column(
+          children: [
+            if (prefs.showProfileHeader)
+              ProfileHeader(
+                member: member,
+                session: session,
+                onEditAvatar: _editAvatar,
+                onCustomize: _customize,
+              )
+            else
+              SafeArea(
+                bottom: false,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: BrandColors.tileGradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Home',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _customize,
+                        tooltip: 'Customize home',
+                        icon: const Icon(Icons.tune, color: Colors.white),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-            ],
-          ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 12 : 24,
+                  vertical: 16,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (prefs.showAssignments) ...[
+                      AssignmentsPanel(
+                        authUserId: authId,
+                        memberId: member.id,
+                        isStaff: session.isExecutive || session.isCommitteeMember,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    if (prefs.showMeetingHistory) ...[
+                      MeetingHistoryPanel(
+                        authUserId: authId,
+                        memberId: member.id,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    if (prefs.showOptionalTiles) ...[
+                      OptionalTilesSection(
+                        prefs: prefs,
+                        onPrefsChanged: (updated) {
+                          if (mounted) setState(() => _prefs = updated);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
-

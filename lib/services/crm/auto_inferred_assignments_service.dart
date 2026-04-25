@@ -81,18 +81,43 @@ class AutoInferredAssignmentsService {
       await safe(() async {
         final rows = await client
             .from('member_profile_changes')
-            .select('id, member_id, created_at, status')
+            .select(
+                'id, member_id, created_at, status, members:member_id(id, name, avatar_url, profile_pictures)')
             .eq('status', 'pending')
             .order('created_at', ascending: false)
             .limit(20);
         for (final r in (rows as List).whereType<Map>()) {
+          final memberJoin = r['members'];
+          Map<String, dynamic>? mem;
+          if (memberJoin is Map) {
+            mem = Map<String, dynamic>.from(memberJoin);
+          } else if (memberJoin is List && memberJoin.isNotEmpty && memberJoin.first is Map) {
+            mem = Map<String, dynamic>.from(memberJoin.first as Map);
+          }
+          final name = (mem?['name'] as String?)?.trim();
+          final avatar = (mem?['avatar_url'] as String?)?.trim();
+          // Fall back to profile_pictures jsonb (instagram > twitter) when avatar_url isn't set.
+          String? fallbackAvatar = avatar;
+          if ((fallbackAvatar == null || fallbackAvatar.isEmpty) && mem?['profile_pictures'] is Map) {
+            final pics = mem!['profile_pictures'] as Map;
+            final ig = pics['instagram'];
+            final tw = pics['twitter'];
+            if (ig is String && ig.isNotEmpty) {
+              fallbackAvatar = ig;
+            } else if (tw is String && tw.isNotEmpty) {
+              fallbackAvatar = tw;
+            }
+          }
+          final memberId = r['member_id']?.toString() ?? '';
           results.add(AutoInferredAssignment(
             key: 'profile_change:${r['id']}',
             source: 'profile_change',
             title: 'Profile change pending review',
-            subtitle: 'Member ${r['member_id']}',
-            entityUrl: '/members/${r['member_id']}?changes=pending',
+            subtitle: (name != null && name.isNotEmpty) ? name : 'Member $memberId',
+            entityUrl: '/members/$memberId?changes=pending',
             at: DateTime.tryParse(r['created_at']?.toString() ?? ''),
+            memberName: (name != null && name.isNotEmpty) ? name : null,
+            memberAvatarUrl: (fallbackAvatar != null && fallbackAvatar.isNotEmpty) ? fallbackAvatar : null,
           ));
         }
       });

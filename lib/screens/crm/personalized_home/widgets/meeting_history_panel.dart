@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 import 'package:bluebubbles/services/crm/home_meeting_history_service.dart';
+
+import 'branded_panel.dart';
 
 /// Three-section meeting widget on the Personalized Home Screen:
 /// upcoming (invited), recent (attended), and hosted.
@@ -59,62 +63,67 @@ class _MeetingHistoryPanelState extends State<MeetingHistoryPanel>
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Icon(Icons.calendar_today),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Meetings',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: _load,
-                  tooltip: 'Refresh',
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            TabBar(
-              controller: _tabs,
-              isScrollable: true,
-              tabs: [
-                Tab(text: 'Upcoming (${_upcoming.length})'),
-                Tab(text: 'Recent (${_attended.length})'),
-                Tab(text: 'Hosted (${_hosted.length})'),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 240,
-              child: TabBarView(
-                controller: _tabs,
-                children: [
-                  _list(_upcoming, _loading, isUpcoming: true),
-                  _list(_attended, _loading, isUpcoming: false),
-                  _list(_hosted, _loading, isUpcoming: false),
-                ],
-              ),
-            ),
-          ],
-        ),
+    return BrandedPanel(
+      title: 'Meetings',
+      icon: Icons.calendar_today,
+      headerAction: IconButton(
+        onPressed: _load,
+        tooltip: 'Refresh',
+        icon: const Icon(Icons.refresh, color: Colors.white),
+      ),
+      tabBar: BrandedHeaderTabBar(
+        controller: _tabs,
+        onTap: (i) => _tabs.animateTo(i),
+        tabs: [
+          Tab(text: 'Upcoming (${_upcoming.length})'),
+          Tab(text: 'Recent (${_attended.length})'),
+          Tab(text: 'Hosted (${_hosted.length})'),
+        ],
+      ),
+      bodyHeight: 280,
+      body: TabBarView(
+        controller: _tabs,
+        children: [
+          _list(_upcoming, _loading, isUpcoming: true),
+          _list(_attended, _loading, isUpcoming: false),
+          _list(_hosted, _loading, isUpcoming: false),
+        ],
       ),
     );
+  }
+
+  /// Format a meeting's date+time for display, always in America/Chicago
+  /// (Central Time, with DST handled — labels as CST or CDT depending on
+  /// the date). Inputs may be a full ISO timestamp on `date`, or a
+  /// date-only string with a separate `start_time` HH:MM[:SS].
+  static String _formatMeetingTime(String? date, String? start) {
+    if (date == null || date.isEmpty) return '';
+    final chicago = tz.getLocation('America/Chicago');
+    DateTime? parsed;
+
+    // Try the full ISO timestamp form first (e.g. "2025-10-31T00:30:00+00:00").
+    if (date.contains('T') || date.contains(' ')) {
+      parsed = DateTime.tryParse(date);
+    } else if (start != null && start.isNotEmpty) {
+      // Combine date + start_time. Treat as UTC if no tz info present
+      // (matches what Supabase returns for `time without time zone`
+      // columns paired with `date`).
+      final combined = '${date}T$start${start.contains('+') || start.contains('Z') ? '' : 'Z'}';
+      parsed = DateTime.tryParse(combined);
+    } else {
+      // Date-only — show the date in Chicago timezone with no time.
+      final dateOnly = DateTime.tryParse(date);
+      if (dateOnly == null) return date;
+      final chiDate = tz.TZDateTime.from(dateOnly.toUtc(), chicago);
+      return DateFormat('EEE MMM d').format(chiDate);
+    }
+
+    if (parsed == null) return date;
+    final chi = tz.TZDateTime.from(parsed, chicago);
+    final dayLabel = DateFormat('EEE MMM d').format(chi);
+    final timeLabel = DateFormat('h:mm a').format(chi);
+    final tzAbbrev = chi.timeZoneName; // "CST" or "CDT"
+    return '$dayLabel · $timeLabel $tzAbbrev';
   }
 
   Widget _list(List<Map<String, dynamic>> items, bool loading, {required bool isUpcoming}) {
@@ -135,9 +144,11 @@ class _MeetingHistoryPanelState extends State<MeetingHistoryPanel>
       itemBuilder: (context, i) {
         final m = items[i];
         final title = (m['meeting_title'] as String?) ?? 'Meeting';
-        final date = m['meeting_date']?.toString() ?? '';
-        final start = m['start_time']?.toString();
         final committee = m['committee']?.toString() ?? m['committee_id']?.toString();
+        final timeLabel = _formatMeetingTime(
+          m['meeting_date']?.toString(),
+          m['start_time']?.toString(),
+        );
         return ListTile(
           dense: true,
           leading: Icon(
@@ -147,8 +158,7 @@ class _MeetingHistoryPanelState extends State<MeetingHistoryPanel>
           title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
           subtitle: Text(
             [
-              if (date.isNotEmpty) date,
-              if (start != null && start.isNotEmpty) start,
+              if (timeLabel.isNotEmpty) timeLabel,
               if (committee != null && committee.isNotEmpty) committee,
             ].join(' · '),
             maxLines: 1,

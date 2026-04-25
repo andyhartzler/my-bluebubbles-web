@@ -8,6 +8,7 @@ import 'package:bluebubbles/services/crm/dashboard_metrics_service.dart';
 import 'package:bluebubbles/services/crm/user_home_preferences_service.dart';
 
 import 'add_tile_dialog.dart';
+import 'branded_panel.dart';
 
 /// Drag-add area on the Personalized Home Screen where the user pins
 /// dashboard metric tiles. Tiles render via `DashboardWidgetRenderer`
@@ -102,53 +103,50 @@ class _OptionalTilesSectionState extends State<OptionalTilesSection> {
     final layout = _activeLayout;
     final widgets = layout.widgets;
 
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.dashboard_customize,
-                    color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text('Metric tiles', style: theme.textTheme.titleSmall),
-                const Spacer(),
-                if (_saving)
-                  const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                if (widgets.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: () => setState(() => _editing = !_editing),
-                    icon: Icon(_editing ? Icons.done : Icons.edit_outlined),
-                    label: Text(_editing ? 'Done' : 'Edit'),
-                  ),
-                FilledButton.tonalIcon(
-                  onPressed: _addTile,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add tile'),
+    return BrandedPanel(
+      title: 'Metric tiles',
+      icon: Icons.dashboard_customize,
+      headerAction: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_saving)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(Colors.white),
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 12),
-            if (_loadingMetrics)
-              const Padding(
+          if (widgets.isNotEmpty)
+            IconButton(
+              onPressed: () => setState(() => _editing = !_editing),
+              tooltip: _editing ? 'Done editing' : 'Edit tiles',
+              icon: Icon(
+                _editing ? Icons.done : Icons.edit_outlined,
+                color: Colors.white,
+              ),
+            ),
+          BrandedHeaderPillButton(
+            onPressed: _addTile,
+            icon: Icons.add,
+            label: 'Add tile',
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: _loadingMetrics
+            ? const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(child: CircularProgressIndicator()),
               )
-            else if (widgets.isEmpty)
-              _buildEmptyState(theme)
-            else
-              _buildTileGrid(widgets),
-          ],
-        ),
+            : widgets.isEmpty
+                ? _buildEmptyState(theme)
+                : _buildTileGrid(widgets),
       ),
     );
   }
