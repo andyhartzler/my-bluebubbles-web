@@ -21,10 +21,12 @@ import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/da
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/data/datasource/mailbox_datasource.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/data/datasource/identity_data_source.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/data/datasource/vacation_data_source.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/server_settings/data/datasource/server_settings_data_source.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread/data/datasource/thread_datasource.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_email_datasource.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_identity_datasource.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_mailbox_datasource.dart';
+import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_server_settings_datasource.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_thread_datasource.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_vacation_datasource.dart';
 
@@ -72,5 +74,11 @@ void registerEdgeFnDataSources() {
   }
   if (!Get.isRegistered<VacationDataSource>()) {
     Get.put<VacationDataSource>(EdgeFnVacationDataSource(), permanent: true);
+  }
+  if (!Get.isRegistered<ServerSettingsDataSource>()) {
+    Get.put<ServerSettingsDataSource>(
+      EdgeFnServerSettingsDataSource(),
+      permanent: true,
+    );
   }
 }
