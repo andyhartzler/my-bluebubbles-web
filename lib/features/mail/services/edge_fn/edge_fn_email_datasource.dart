@@ -12,6 +12,8 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
+import 'package:universal_html/html.dart' as html;
 import 'package:jmap_dart_client/jmap/account_id.dart';
 import 'package:jmap_dart_client/jmap/core/error/set_error.dart';
 import 'package:jmap_dart_client/jmap/core/id.dart';
@@ -168,8 +170,39 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     String baseDownloadUrl,
     AccountRequest accountRequest,
     CancelToken cancelToken,
-  ) =>
-      _todo('exportAttachment');
+  ) async {
+    // Our edge function takes (messageId, attachmentId) but tmail's JMAP
+    // Attachment only carries a single blobId. Convention: when populating
+    // Attachment from Gmail, blobId = "<messageId>:<gmailAttachmentId>".
+    // Gmail attachment ids are base64url (alphabet -_ only, no colons), so
+    // splitting on the first ':' is unambiguous.
+    final blob = attachment.blobId?.value ?? '';
+    final colonIdx = blob.indexOf(':');
+    if (colonIdx <= 0 || colonIdx == blob.length - 1) {
+      throw ArgumentError(
+        'EdgeFnEmailDataSource.exportAttachment: blobId "$blob" is not in '
+        '"<messageId>:<attachmentId>" form — cannot route to mail-attachment-get',
+      );
+    }
+    final messageId = blob.substring(0, colonIdx);
+    final attachmentId = blob.substring(colonIdx + 1);
+
+    final result = await _api.getAttachment(
+      messageId: messageId,
+      attachmentId: attachmentId,
+    );
+
+    // Mirror tmail's JMAP behavior on web: stuff bytes into a Blob,
+    // produce an object URL, return that URL as the "filePath" so the
+    // success-action handler has something it can hand to the browser
+    // (anchor.href or window.open). DownloadController is platform-blind
+    // here — it just opens whatever filePath we hand back.
+    final mediaType = MediaType.parse(result.mimeType);
+    final webBlob = html.Blob(<Object>[result.bytes], result.mimeType);
+    final objectUrl = html.Url.createObjectUrlFromBlob(webBlob);
+
+    return DownloadedResponse(objectUrl, mediaType: mediaType);
+  }
 
   @override
   Future<({List<EmailId> emailIdsSuccess, Map<Id, SetError> mapErrors})>

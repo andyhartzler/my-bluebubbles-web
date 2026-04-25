@@ -1,3 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:http/http.dart' as http;
+
+import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/features/mail/models/mail_message.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
@@ -96,6 +102,96 @@ class MailApiClient {
       threadId: data['threadId'] as String,
       rfc822MessageId: data['rfc822MessageId'] as String,
     );
+  }
+
+  /// Fetches a single attachment's bytes via the mail-attachment-get edge fn.
+  ///
+  /// We bypass `functions.invoke` here because the Supabase Dart client only
+  /// returns raw bytes when the response Content-Type is exactly
+  /// `application/octet-stream` — anything else (image/png, application/pdf,
+  /// etc.) gets utf8-decoded into a String, which mangles binary payloads.
+  /// The edge function returns the attachment's *real* mimeType, so we go
+  /// direct with `package:http`, reusing the auth + apikey headers Supabase
+  /// has already populated on its FunctionsClient.
+  ///
+  /// Filename is decoded from the Content-Disposition header (RFC 5987
+  /// `filename*=UTF-8''…` takes precedence over the plain `filename="..."`
+  /// for non-ASCII names).
+  Future<({Uint8List bytes, String mimeType, String filename})> getAttachment({
+    required String messageId,
+    required String attachmentId,
+  }) async {
+    final functions = _supabase.client.functions;
+    final url = Uri.parse(
+      '${CRMConfig.supabaseUrl}/functions/v1/mail-attachment-get',
+    );
+    final headers = <String, String>{
+      ...functions.headers,
+      'Content-Type': 'application/json',
+    };
+    final resp = await http.post(
+      url,
+      headers: headers,
+      body: jsonEncode({
+        'messageId': messageId,
+        'attachmentId': attachmentId,
+      }),
+    );
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(
+        'mail-attachment-get failed: ${resp.statusCode} ${resp.body}',
+      );
+    }
+    final mimeType = (resp.headers['content-type'] ?? 'application/octet-stream')
+        .split(';')
+        .first
+        .trim();
+    final filename = _parseDispositionFilename(
+      resp.headers['content-disposition'],
+      fallback: 'attachment-${attachmentId.substring(0, attachmentId.length.clamp(0, 8))}',
+    );
+    return (bytes: resp.bodyBytes, mimeType: mimeType, filename: filename);
+  }
+
+  /// Parses a Content-Disposition header into a filename string. Prefers the
+  /// RFC 5987 extended `filename*=UTF-8''…` parameter (which is percent-encoded
+  /// UTF-8 and supports non-ASCII), falling back to the unquoted `filename=…`
+  /// parameter. Strips surrounding quotes and unescapes backslash-escaped
+  /// quotes inside the quoted form.
+  static String _parseDispositionFilename(
+    String? header, {
+    required String fallback,
+  }) {
+    if (header == null || header.isEmpty) return fallback;
+    // RFC 5987: filename*=charset'lang'percent-encoded-value
+    final extMatch = RegExp(
+      r"filename\*\s*=\s*([^']*)'[^']*'([^;]+)",
+      caseSensitive: false,
+    ).firstMatch(header);
+    if (extMatch != null) {
+      final charset = (extMatch.group(1) ?? 'utf-8').toLowerCase();
+      final raw = extMatch.group(2)!.trim();
+      try {
+        if (charset == 'utf-8' || charset == 'utf8') {
+          return Uri.decodeComponent(raw);
+        }
+        return Uri.decodeComponent(raw);
+      } catch (_) {
+        // fall through to plain filename
+      }
+    }
+    final plainMatch = RegExp(
+      r'filename\s*=\s*("((?:\\.|[^"\\])*)"|([^;]+))',
+      caseSensitive: false,
+    ).firstMatch(header);
+    if (plainMatch != null) {
+      final quoted = plainMatch.group(2);
+      final bare = plainMatch.group(3);
+      final value = (quoted ?? bare ?? '').trim();
+      // Unescape backslash-escaped chars inside the quoted form.
+      return value.replaceAll(RegExp(r'\\(.)'), r'$1');
+    }
+    return fallback;
   }
 
   /// Returns true iff the current user has an active mail alias provisioned.
