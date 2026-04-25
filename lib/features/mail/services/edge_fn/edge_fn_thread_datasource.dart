@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:dartz/dartz.dart' as dartz;
 import 'package:jmap_dart_client/jmap/account_id.dart';
 import 'package:jmap_dart_client/jmap/core/filter/filter.dart';
+import 'package:jmap_dart_client/jmap/core/filter/filter_operator.dart';
 import 'package:jmap_dart_client/jmap/core/properties/properties.dart';
 import 'package:jmap_dart_client/jmap/core/session/session.dart';
 import 'package:jmap_dart_client/jmap/core/sort/comparator.dart';
@@ -16,6 +17,7 @@ import 'package:jmap_dart_client/jmap/core/state.dart';
 import 'package:jmap_dart_client/jmap/core/unsigned_int.dart';
 import 'package:jmap_dart_client/jmap/core/user_name.dart';
 import 'package:jmap_dart_client/jmap/mail/email/email.dart';
+import 'package:jmap_dart_client/jmap/mail/email/email_filter_condition.dart';
 import 'package:jmap_dart_client/jmap/mail/mailbox/mailbox.dart';
 
 import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
@@ -67,7 +69,7 @@ class EdgeFnThreadDataSource extends ThreadDataSource {
     bool? collapseThreads,
     Properties? properties,
   }) async {
-    final q = _filterToQuery(filter);
+    final q = _filterToQuery(filter).trim();
     if (q.isEmpty) {
       return SearchEmailsResponse(
         emailList: const [],
@@ -85,18 +87,97 @@ class EdgeFnThreadDataSource extends ThreadDataSource {
     );
   }
 
-  /// Extract a Gmail-search-syntax query string from a JMAP Filter. Tmail's
-  /// search controller wraps the user-typed text in a `FilterCondition`
-  /// (sometimes nested inside `FilterOperator` AND/OR trees). Our edge fn
-  /// already alias-clamps + sanitizes, so we just need a flat string to
-  /// hand off. The cheap-but-correct path: stringify the filter.
+  /// Converts a tmail JMAP [Filter] tree into a Gmail-style search query
+  /// string for the `mail-search` edge function. Tmail's search controller
+  /// builds either a single [EmailFilterCondition] or a [LogicFilterOperator]
+  /// (AND/OR/NOT) wrapping nested conditions — see
+  /// `search_email_filter.dart#mappingToEmailFilterCondition`. We walk the
+  /// tree, emit Gmail operators (from:, to:, cc:, bcc:, subject:, has:, is:),
+  /// and concatenate. The plain `text` and `body` fields fall through as
+  /// bare tokens so Gmail's full-text matcher handles them.
   String _filterToQuery(Filter? filter) {
     if (filter == null) return '';
-    final s = filter.toString();
-    // Filter.toString() typically wraps the body of interest. Strip the
-    // class-name prefix Dart's default toString adds. If the user typed
-    // `from:foo` etc., the edge fn's sanitizer will strip dangerous ops.
-    return s;
+    if (filter is EmailFilterCondition) {
+      return _conditionToTokens(filter).join(' ');
+    }
+    if (filter is FilterOperator) {
+      return _operatorToQuery(filter);
+    }
+    return '';
+  }
+
+  String _operatorToQuery(FilterOperator op) {
+    final parts = op.conditions
+        .map((c) {
+          if (c is EmailFilterCondition) {
+            return _conditionToTokens(c).join(' ').trim();
+          }
+          if (c is FilterOperator) {
+            return _operatorToQuery(c);
+          }
+          return '';
+        })
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '';
+    switch (op.operator) {
+      case Operator.AND:
+        return parts.length == 1 ? parts.first : parts.join(' ');
+      case Operator.OR:
+        return parts.length == 1
+            ? parts.first
+            : '(${parts.join(' OR ')})';
+      case Operator.NOT:
+        return parts.map((p) => '-($p)').join(' ');
+    }
+  }
+
+  /// Maps each populated field on an [EmailFilterCondition] to a Gmail
+  /// search operator. Fields tmail uses but Gmail can't express (mailbox
+  /// IDs, JMAP keyword IDs other than $seen, before/after as UTC objects)
+  /// are dropped — the alias-clamp on the server already constrains the
+  /// mailbox, and unread/has-attachment are the keyword cases that matter
+  /// in practice.
+  List<String> _conditionToTokens(EmailFilterCondition c) {
+    final tokens = <String>[];
+    final text = c.text?.trim();
+    if (text != null && text.isNotEmpty) tokens.add(text);
+    final body = c.body?.trim();
+    if (body != null && body.isNotEmpty) tokens.add(body);
+    final subject = c.subject?.trim();
+    if (subject != null && subject.isNotEmpty) {
+      tokens.add('subject:${_quoteIfNeeded(subject)}');
+    }
+    final from = c.from?.trim();
+    if (from != null && from.isNotEmpty) {
+      tokens.add('from:${_quoteIfNeeded(from)}');
+    }
+    final to = c.to?.trim();
+    if (to != null && to.isNotEmpty) {
+      tokens.add('to:${_quoteIfNeeded(to)}');
+    }
+    final cc = c.cc?.trim();
+    if (cc != null && cc.isNotEmpty) {
+      tokens.add('cc:${_quoteIfNeeded(cc)}');
+    }
+    final bcc = c.bcc?.trim();
+    if (bcc != null && bcc.isNotEmpty) {
+      tokens.add('bcc:${_quoteIfNeeded(bcc)}');
+    }
+    if (c.hasAttachment == true) tokens.add('has:attachment');
+    // tmail encodes "unread" via notKeyword: $seen — translate to is:unread.
+    if (c.notKeyword == r'$seen') tokens.add('is:unread');
+    if (c.hasKeyword == r'$flagged') tokens.add('is:starred');
+    return tokens;
+  }
+
+  String _quoteIfNeeded(String value) {
+    if (value.contains(' ') || value.contains(':')) {
+      // Escape any embedded quotes, then wrap.
+      final escaped = value.replaceAll('"', r'\"');
+      return '"$escaped"';
+    }
+    return value;
   }
 
   @override
