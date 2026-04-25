@@ -14,7 +14,6 @@ import 'package:jmap_dart_client/jmap/quotas/quota.dart';
 import 'package:bluebubbles/features/mail/_tmail/model/model.dart';
 import 'package:bluebubbles/features/mail/_tmail/rule_filter/rule_filter/capability_rule_filter.dart';
 import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/presentation/utils/ai_scribe_constants.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bluebubbles/features/mail/_tmail/server_settings/server_settings/capability_server_settings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/action/ui_action.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/mixin/ai_scribe_mixin.dart';

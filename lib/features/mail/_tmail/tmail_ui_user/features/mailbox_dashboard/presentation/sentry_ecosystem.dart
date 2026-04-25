@@ -3,7 +3,6 @@ import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/platform_info.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/sentry/sentry_config.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/sentry/sentry_manager.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/caching/extensions/sentry_cache_extensions.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/caching/manager/sentry_configuration_cache_manager.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/domain/linagora_ecosystem/sentry_config_linagora_ecosystem.dart';

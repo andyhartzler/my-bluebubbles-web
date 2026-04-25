@@ -30,7 +30,6 @@ import 'package:bluebubbles/features/mail/_tmail/labels/model/label.dart';
 import 'package:bluebubbles/features/mail/_tmail/model/model.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:rxdart/transformers.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:bluebubbles/features/mail/_tmail/server_settings/server_settings/tmail_server_settings_extension.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/action/ui_action.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/base_controller.dart';
