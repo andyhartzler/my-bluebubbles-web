@@ -6,6 +6,42 @@
 
 **Architecture:** Flutter never holds the Google service-account key. All Gmail API traffic goes through Supabase Edge Functions that authenticate via the existing `moyd-ai-agent@backend-everything.iam.gserviceaccount.com` (DWD impersonating `crm@`), inject `q=deliveredto:<caller-alias>` server-side, and post-filter responses by `Delivered-To` header before returning to the client. Send path overwrites `From:` header from `auth.uid()`'s alias — clients cannot send as someone else. One `users.watch` on `crm@` covers all aliases via Pub/Sub fan-out in our reactor. Andrew, Dustin, and Landon already have their own Workspace seats — they're excluded from the shared-mailbox flow.
 
+## Status — 2026-04-25 (live)
+
+**Phase 1 + 2 + 3 edge layer = SHIPPED to `master` and live on moyd.app:**
+- Schema migration applied: `mail_aliases`, `mail_messages_cache`, `mail_send_log`, `mail_pubsub_state` (4 tables, RLS, audit triggers, `current_user_alias()` SECURITY DEFINER scalar). `mail_threads_cache` deferred to Phase 2 per H1.
+- 9 edge functions deployed to `faajpcarasilbfndzkmd`: `_shared/{google-auth,alias-resolver,email-utils,oidc-verify}`, `mail-list`, `mail-thread-get`, `mail-message-get`, `mail-send`, `mail-watch-renew`, `mail-pubsub-receiver`, `provision-mail-alias`. All reviewer C1–C5 / H1/H3/H5/H6 / M1/M2/M5/M6 / L6 fixes baked in.
+- Pub/Sub: topic `gmail-crm` + push-subscription `gmail-crm-sub` ACTIVE; `gmail-api-push@system.gserviceaccount.com` granted `roles/pubsub.publisher` (after Andrew set the project-level `iam.allowedPolicyMemberDomains` override). Daily pg_cron renew (`mail-watch-renew-daily` jobid 86 at 09:15 UTC) registered. `users.watch` seeded historyId=1399.
+- 15 execs provisioned (`firstname@moyoungdemocrats.org` for everyone except Andrew/Dustin/Landon who have their own seats): austin, chelsea, chloe, claudia, elena, elmedin, gannon, gavin, heather, james, katlin, lucas, lucy, rogelio, ryan. Workspace user-aliases on `crm@`, Gmail send-as auto-verified, `mail_aliases` rows keyed on each exec's `auth.uid()`.
+- Andrew's `andrew.crm@` test-alias (the carveout the plan originally proposed in Task 0.4) was reverted — Andrew clarified he doesn't want one, only the 15 non-self-serving execs do.
+
+**Flutter inbox UI on `master`:** fresh widgets (BrandedBackground/BrandedActivityFeedItem-style) gating on `mail_aliases.user_id = auth.uid()`. Working for the 15 execs. Andrew rejected this UI direction on the same day — wants the literal tmail-flutter source fork instead, no shortcuts. Fresh widgets stay live until the fork ships.
+
+**Fork in progress on branch `feat/mail-tmail-fork` (NOT yet on master):**
+
+`feat/mail-tmail-fork` checkpoint commits (most recent first):
+- `e90fd7376` — strip sentry/, patch sanitize_html API
+- `7cfb32b44` — Flutter 3.27+ Color API patches (.withValues → .withOpacity, etc.)
+- `629754398` — 8 misc deps added (sanitize_html, lottie, html_unescape, etc.)
+- `6457d1c42` — pubspec merge resolves (95 deps changed)
+- `76a8e4240` — re-sed all _tmail imports, strip tmail-app runners
+- `3f594c8b0` — bulk-fork remaining tmail packages (fcm, scribe, cozy, email_recovery, server_settings, rule_filter)
+- `85bbe81e1` — initial bulk-fork checkpoint (core, model, labels, contact, forward, lib → `lib/features/mail/_tmail/`; assets → `assets/tmail/`)
+
+Compile errors: **796 → 426** in the fork. Pubspec resolves cleanly. Path-stub overrides keep our existing native-platform stubs winning over tmail's real dep requirements (photo_manager, permission_handler, fast_contacts, flutter_local_notifications). 4 tmail deps **dropped as non-Phase-1**: super_dns_client (Dart 3.7+ requirement, autoconfig — we don't need), flutter_date_range_picker (Dart 3.7+, advanced search filter), twake_previewer_flutter (Dart 3.7+, file preview), sentry_flutter / sentry_dio (telemetry).
+
+**Step-by-step status of the fork (steps numbered to match feature-dev tasks 16-19):**
+- ✅ **step 1** (commits 85bbe81e1, 3f594c8b0, 76a8e4240): bulk-copy tmail source into `lib/features/mail/_tmail/` preserving directory structure; rewrite all `package:core/`, `package:model/`, `package:labels/`, `package:contact/`, `package:forward/`, `package:tmail_ui_user/`, `package:fcm/`, `package:scribe/`, `package:cozy/`, `package:email_recovery/`, `package:server_settings/`, `package:rule_filter/` imports to point inside our package tree. 2,514 .dart files. Strip top-level `tmail_ui_user/main/runner/` + `main.dart`.
+- 🟡 **step 3 in progress** (commits 6457d1c42, 629754398, 7cfb32b44, e90fd7376): pubspec merge + Flutter 3.24 compatibility patches. Errors halved. Remaining ~426 errors split between (a) ~92 missing `_$XxxFromJson` / `_$XxxToJson` json_serializable `.g.dart` files (need `dart run build_runner build` pass after the rest of imports stabilize), (b) ~280 chained errors from sentry/twake_previewer/manage_account call sites that step 5 will strip, (c) misc API drifts.
+- ⏳ **step 5** (next): strip non-Phase-1 tmail features. Delete `lib/features/mail/_tmail/tmail_ui_user/features/{manage_account,login,starting_page,push_notification,scribe,server_settings,rule_filter,forward,email_recovery,logout,offline_mode}/` plus `lib/features/mail/_tmail/{cozy,scribe,email_recovery,server_settings,rule_filter,forward,fcm}/` package roots if no longer referenced. Drop tmail's GetX bootstrap bindings that boot OAuth login. Should drop error count to under ~150.
+- ⏳ **step 4**: bridge tmail's JMAP client → our edge functions. Replace tmail's `EmailRepository` (JMAP HTTP `Email/get`, `Email/query`, `Email/set`) with adapters that hit `mail-list`, `mail-thread-get`, `mail-message-get`, `mail-send`. Authentication shim: tmail's OIDC login → Supabase auth (alias resolved server-side via existing `_shared/alias-resolver.ts`).
+- ⏳ **step 6**: mount tmail's mailbox/thread/email/composer view tree inside our `MailScreen` route. Apply `BrandColors` over `LinagoraColors`/`AppColor` via theme injection.
+- ⏳ **step 2** (build_runner): defer until step 4/5 unblock the import graph. `dart run build_runner build` against the post-strip codebase generates the json_serializable / hive_ce / freezed `.g.dart` files in one pass.
+
+**Live deploy:** unaffected by the fork. Phase 1 inbox is working for the 15 execs right now. The fork lands on master (replacing the fresh inbox UI) only when steps 4-6 complete and the branch is PR-merged.
+
+---
+
 ## Plan v2.1 — Review fixes applied 2026-04-25
 
 After the initial draft was reviewed by the `code-reviewer` agent, the following fixes are baked into Phase 0/1 below. Each is referenced by the reviewer's tag (C# = critical, H# = high, M# = medium, L# = low).
