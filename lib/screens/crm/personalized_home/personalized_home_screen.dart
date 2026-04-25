@@ -9,6 +9,7 @@ import 'widgets/assignments_panel.dart';
 import 'widgets/avatar_upload_dialog.dart';
 import 'widgets/home_customize_dialog.dart';
 import 'widgets/meeting_history_panel.dart';
+import 'widgets/optional_tiles_section.dart';
 import 'widgets/profile_header.dart';
 
 /// The default landing screen for executive members after sign-in.
@@ -128,7 +129,12 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
                 const SizedBox(height: 16),
               ],
               if (prefs.showOptionalTiles) ...[
-                _OptionalTilesPlaceholder(),
+                OptionalTilesSection(
+                  prefs: prefs,
+                  onPrefsChanged: (updated) {
+                    if (mounted) setState(() => _prefs = updated);
+                  },
+                ),
                 const SizedBox(height: 16),
               ],
               Center(
@@ -147,39 +153,3 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
   }
 }
 
-/// v1 placeholder for the drag-drop metric tiles area. The real tile
-/// renderer lands in v2 once the multi-page Dashboard's edit mode is
-/// extracted. For now we surface a CTA pointing at the Dashboard tab.
-class _OptionalTilesPlaceholder extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(Icons.dashboard_customize,
-                color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Metric tiles',
-                      style: Theme.of(context).textTheme.titleSmall),
-                  Text(
-                    'Drop dashboard metrics directly on your home screen — coming soon. Until then, build a personal Dashboard page from the Dashboard tab.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
