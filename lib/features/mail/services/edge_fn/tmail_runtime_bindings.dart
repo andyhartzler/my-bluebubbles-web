@@ -19,8 +19,10 @@ import 'package:jmap_dart_client/jmap/core/user_name.dart';
 
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/data/datasource/email_datasource.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/data/datasource/mailbox_datasource.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/data/datasource/identity_data_source.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread/data/datasource/thread_datasource.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_email_datasource.dart';
+import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_identity_datasource.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_mailbox_datasource.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_thread_datasource.dart';
 
@@ -62,5 +64,8 @@ void registerEdgeFnDataSources() {
   }
   if (!Get.isRegistered<MailboxDataSource>()) {
     Get.put<MailboxDataSource>(EdgeFnMailboxDataSource(), permanent: true);
+  }
+  if (!Get.isRegistered<IdentityDataSource>()) {
+    Get.put<IdentityDataSource>(EdgeFnIdentityDataSource(), permanent: true);
   }
 }
