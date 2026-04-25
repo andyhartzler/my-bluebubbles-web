@@ -567,18 +567,29 @@ class EdgeFnEmailDataSource extends EmailDataSource {
   @override
   Future<void> markAsAnswered(
       Session session, AccountId accountId, List<EmailId> emailIds) async {
-    // Gmail has no first-class "answered" label — its UI renders a "Replied"
-    // badge from thread state automatically once a reply is sent. We treat
-    // this as a no-op (success): the next sync will pick up the real
-    // reply badge once the outbound message lands. Calling modify with no
-    // labels would 400, so we skip the network round-trip entirely.
+    // Gmail has no built-in "answered" label, but we seed a user-defined
+    // "Answered" label via tool/create_label_seed.js (hidden from sidebar,
+    // visible on messages). The label IDs are exposed by the mail-labels-get
+    // edge fn so the dart side never hard-codes Label_<n> values.
+    if (emailIds.isEmpty) return;
+    final labels = await _api.getLabelIds();
+    await _api.modifyMessages(
+      messageIds: emailIds.map((e) => e.id.value).toList(),
+      addLabelIds: [labels.answered],
+    );
   }
 
   @override
   Future<void> markAsForwarded(
       Session session, AccountId accountId, List<EmailId> emailIds) async {
-    // Same rationale as markAsAnswered: Gmail tracks "Forwarded" via thread
-    // state, not a per-message label. No-op, success.
+    // Same plumbing as markAsAnswered, against the user-defined "Forwarded"
+    // label. tmail's UI fires this from the composer's forward path.
+    if (emailIds.isEmpty) return;
+    final labels = await _api.getLabelIds();
+    await _api.modifyMessages(
+      messageIds: emailIds.map((e) => e.id.value).toList(),
+      addLabelIds: [labels.forwarded],
+    );
   }
 
   @override

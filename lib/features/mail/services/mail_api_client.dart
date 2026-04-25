@@ -19,6 +19,27 @@ class MailApiClient {
 
   final CRMSupabaseService _supabase;
 
+  /// Cached user-defined Gmail label IDs (Answered + Forwarded). Looked up
+  /// once via `mail-labels-get` and reused for the rest of the session — the
+  /// IDs are stable per Gmail account, so there's no benefit to re-fetching.
+  ({String answered, String forwarded})? _cachedLabels;
+
+  /// Returns the (answered, forwarded) Gmail label IDs for the caller's
+  /// alias-scoped mailbox. The IDs are seeded one-shot via
+  /// `tool/create_label_seed.js` and exposed by the `mail-labels-get` edge
+  /// fn from Supabase secrets. First call hits the network, subsequent
+  /// calls are served from the in-memory cache.
+  Future<({String answered, String forwarded})> getLabelIds() async {
+    if (_cachedLabels != null) return _cachedLabels!;
+    final resp = await _supabase.client.functions.invoke('mail-labels-get');
+    final data = (resp.data as Map?)?.cast<String, dynamic>() ?? {};
+    _cachedLabels = (
+      answered: data['answeredLabelId'] as String,
+      forwarded: data['forwardedLabelId'] as String,
+    );
+    return _cachedLabels!;
+  }
+
   Future<MailListPage> listInbox({
     int maxResults = 25,
     String? pageToken,
