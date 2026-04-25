@@ -1365,7 +1365,7 @@ class _HomeState extends OptimizedState<Home>
               _buildNavButton(
                 context,
                 _HomeSection.mail,
-                'Mail',
+                'Email',
                 Icons.mail_outline,
                 hideIcon: hideIcons,
               ),
@@ -1755,7 +1755,7 @@ class _HomeState extends OptimizedState<Home>
                     buildItem(
                       order: 12,
                       icon: Icons.mail_outline,
-                      label: 'Mail',
+                      label: 'Email',
                       onActivate: () => _setSection(_HomeSection.mail),
                     ),
                   buildItem(

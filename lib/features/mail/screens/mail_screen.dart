@@ -1,110 +1,167 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
-import 'package:bluebubbles/features/mail/providers/mail_inbox_provider.dart';
-import 'package:bluebubbles/features/mail/screens/mail_inbox_view.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/mailbox_dashboard_view.dart';
+import 'package:bluebubbles/features/mail/services/edge_fn/dashboard_controller_fixups.dart';
+import 'package:bluebubbles/features/mail/services/edge_fn/mail_screen_tmail_bindings.dart';
 
-/// Root mail screen — wraps the inbox in a brand-themed scaffold so it
-/// shares the rest of the CRM's navy/gradient look. Phase 1 has only
-/// the inbox; Phase 2 will add the composer screen here.
-class MailScreen extends StatelessWidget {
+/// Root mail screen. Mounts tmail-flutter's `MailboxDashBoardView` —
+/// tmail's literal forked widget tree — wrapped in a Theme override that
+/// recolors LinagoraColors to MOYD's BrandColors.
+///
+/// Boot sequence on first mount:
+///   1. `MailScreenTmailBindings.initialize()` registers our EdgeFn data
+///      sources first (permanent), then walks tmail's CoreBindings,
+///      LocalBindings, NetworkBindings, CredentialBindings, SessionBindings,
+///      NetWorkConnectionBindings, MailboxDashBoardBindings.
+///   2. `registerDashboardControllerFixups()` validates the 7 controllers
+///      MailboxDashBoardController depends on are registered (fast-fails
+///      with a descriptive StateError otherwise).
+///   3. `MailboxDashBoardView()` constructor runs — it's a `GetWidget`
+///      that resolves its `controller` via `Get.find` from the registry
+///      we just primed.
+///
+/// Theme override: tmail uses `LinagoraColors`/`AppColor` constants
+/// throughout. We wrap in a `Theme` that maps the most-load-bearing
+/// surfaces (primary, secondary, surface, scaffold background, app bar)
+/// to BrandColors so the navy + sunrise-gold accent pulls through.
+class MailScreen extends StatefulWidget {
   const MailScreen({super.key});
 
   @override
+  State<MailScreen> createState() => _MailScreenState();
+}
+
+class _MailScreenState extends State<MailScreen> {
+  Future<void>? _bootFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _bootFuture = _boot();
+  }
+
+  Future<void> _boot() async {
+    await MailScreenTmailBindings.initialize();
+    registerDashboardControllerFixups();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => MailInboxProvider()..refresh(),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: BrandedBackground(
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: const [
-                  _MailHeader(),
-                  SizedBox(height: 12),
-                  Expanded(child: MailInboxView()),
-                ],
+    return Theme(
+      data: _moydTmailTheme(context),
+      child: FutureBuilder<void>(
+        future: _bootFuture,
+        builder: (context, snap) {
+          if (snap.connectionState != ConnectionState.done) {
+            return Scaffold(
+              backgroundColor: Colors.transparent,
+              body: BrandedBackground(
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation(Colors.white),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ),
+            );
+          }
+          if (snap.hasError) {
+            return Scaffold(
+              backgroundColor: Colors.transparent,
+              body: BrandedBackground(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: Colors.white,
+                          size: 48,
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Failed to boot mail',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SelectableText(
+                          snap.error.toString(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+          return MailboxDashBoardView();
+        },
       ),
     );
   }
 }
 
-class _MailHeader extends StatelessWidget {
-  const _MailHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          gradient: BrandColors.getTileGradient(),
-          boxShadow: [
-            BoxShadow(
-              color: BrandColors.unityBlue.withOpacity(0.32),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.mail_outline, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Mail',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            _RefreshButton(),
-          ],
-        ),
+/// Theme override applied at the MailScreen scope. Pulls MOYD's BrandColors
+/// (unityBlue + sunriseGold + momentumBlue) into the Material color slots
+/// tmail's widgets read.
+ThemeData _moydTmailTheme(BuildContext context) {
+  final base = Theme.of(context);
+  return base.copyWith(
+    colorScheme: base.colorScheme.copyWith(
+      primary: BrandColors.unityBlue,
+      onPrimary: Colors.white,
+      secondary: BrandColors.sunriseGold,
+      onSecondary: BrandColors.unityBlue,
+      surface: Colors.white,
+      onSurface: const Color(0xFF1A1F36),
+      surfaceTint: BrandColors.momentumBlue,
+    ),
+    scaffoldBackgroundColor: Colors.white,
+    appBarTheme: AppBarTheme(
+      backgroundColor: BrandColors.unityBlue,
+      foregroundColor: Colors.white,
+      iconTheme: const IconThemeData(color: Colors.white),
+      titleTextStyle: const TextStyle(
+        color: Colors.white,
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
       ),
-    );
-  }
-}
-
-class _RefreshButton extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<MailInboxProvider>(
-      builder: (_, inbox, __) => IconButton(
-        tooltip: 'Refresh inbox',
-        onPressed: inbox.loading ? null : inbox.refresh,
-        icon: inbox.loading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(Colors.white),
-                ),
-              )
-            : const Icon(Icons.refresh, color: Colors.white),
+    ),
+    iconTheme: const IconThemeData(color: BrandColors.unityBlue),
+    primaryIconTheme: const IconThemeData(color: Colors.white),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: BrandColors.sunriseGold,
+      foregroundColor: BrandColors.unityBlue,
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: BrandColors.unityBlue,
+        foregroundColor: Colors.white,
       ),
-    );
-  }
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: BrandColors.unityBlue,
+      ),
+    ),
+    listTileTheme: const ListTileThemeData(
+      iconColor: BrandColors.unityBlue,
+      textColor: Color(0xFF1A1F36),
+    ),
+    progressIndicatorTheme: const ProgressIndicatorThemeData(
+      color: BrandColors.momentumBlue,
+    ),
+    dividerColor: const Color(0xFFE5E7EB),
+  );
 }
