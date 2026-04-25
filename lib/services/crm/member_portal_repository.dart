@@ -502,13 +502,27 @@ class MemberPortalRepository {
   Future<void> approveProfileChange(String changeId, {String? adminId}) async {
     if (!_isReady) return;
 
+    // The RPC `apply_approved_profile_change` only fires when the row is
+    // already `status = 'approved' AND applied_at IS NULL`. Earlier code
+    // called the RPC FIRST while status was still 'pending' (RPC no-op'd),
+    // and never flipped status to 'approved' — so approval was a silent
+    // no-op in prod. Fix: flip status (+ reviewed_by + reviewed_at) FIRST,
+    // then invoke the RPC, which now finds the row and applies the diff
+    // to the `members` row.
     try {
-      await _writeClient.rpc('apply_approved_profile_change', params: {'p_change_id': changeId});
-
       await _writeClient
           .from('member_profile_changes')
-          .update({'reviewed_by': adminId})
+          .update({
+            'status': 'approved',
+            'reviewed_by': adminId,
+            'reviewed_at': DateTime.now().toIso8601String(),
+          })
           .eq('id', changeId);
+
+      await _writeClient.rpc(
+        'apply_approved_profile_change',
+        params: {'p_change_id': changeId},
+      );
     } catch (e) {
       debugPrint('❌ Failed to approve profile change: $e');
       rethrow;

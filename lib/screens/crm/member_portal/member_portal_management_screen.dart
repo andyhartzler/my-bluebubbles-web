@@ -28,7 +28,14 @@ import 'package:bluebubbles/utils/quill_html_converter.dart';
 import 'package:mime_type/mime_type.dart';
 
 class MemberPortalManagementScreen extends StatefulWidget {
-  const MemberPortalManagementScreen({super.key});
+  /// Initial tab to focus on mount. Order: 0 Overview · 1 Meetings ·
+  /// 2 Submitted Events · 3 Resources · 4 Profile Changes · 5 Field Visibility.
+  final int initialTabIndex;
+
+  const MemberPortalManagementScreen({
+    super.key,
+    this.initialTabIndex = 0,
+  });
 
   @override
   State<MemberPortalManagementScreen> createState() => _MemberPortalManagementScreenState();
@@ -41,7 +48,11 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   static const _unityBlue = Color(0xFF273351);
   static const _momentumBlue = Color(0xFF32A6DE);
 
-  late final TabController _tabController = TabController(length: 6, vsync: this);
+  late final TabController _tabController = TabController(
+    length: 6,
+    vsync: this,
+    initialIndex: widget.initialTabIndex.clamp(0, 5),
+  );
   final MemberPortalRepository _repository = MemberPortalRepository();
   final MeetingRepository _meetingRepository = MeetingRepository();
   final MemberRepository _memberRepository = MemberRepository();

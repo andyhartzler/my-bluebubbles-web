@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/features/committees/legislation_tracker/screens/bill_detail_screen.dart';
-import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/forms/screens/jobs/job_detail_screen.dart';
 import 'package:bluebubbles/models/crm/assignment.dart';
 import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/event_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/member_portal/member_portal_management_screen.dart';
 import 'package:bluebubbles/services/crm/assignments_service.dart';
 import 'package:bluebubbles/services/crm/auto_inferred_assignments_service.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
@@ -19,12 +19,15 @@ import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'assignment_create_dialog.dart';
 import 'branded_panel.dart';
 
-/// Two-tab panel showing assignments to the user (incoming) and from the
-/// user (outgoing). Includes a third virtual tab for auto-inferred items.
+/// Panel that surfaces both explicit assignments (rows in
+/// `public.assignments`) and auto-inferred items (pending profile
+/// changes, candidate ownership, mentioned bill notes, pending events
+/// or jobs) in a single unified, category-tabbed list.
 ///
-/// Realtime updates: subscribes to the realtime stream of `assignments`
-/// rows where `assigned_to = me` so newly-created items appear without
-/// a manual refresh.
+/// Tabs are dynamic: `All` is always present (and default); each entity
+/// kind only shows up as a tab if at least one item lands in that
+/// category. Tap on any item navigates to the right detail screen
+/// (or the member-portal pending-changes tab for profile-change items).
 class AssignmentsPanel extends StatefulWidget {
   final String authUserId;
   final String memberId;
@@ -42,10 +45,9 @@ class AssignmentsPanel extends StatefulWidget {
 }
 
 class _AssignmentsPanelState extends State<AssignmentsPanel>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _service = AssignmentsService();
   final _autoService = AutoInferredAssignmentsService();
-  late final TabController _tabs;
 
   StreamSubscription<List<Assignment>>? _toMeSub;
   List<Assignment> _toMe = [];
@@ -55,33 +57,35 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
   bool _loadingByMe = true;
   bool _loadingAuto = true;
 
+  TabController? _tabs;
+  List<_HomeCategory> _activeCategories = const [_HomeCategory.all];
+
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
     _initSubscribe();
     _loadOutgoing();
     _loadAuto();
+    _rebuildTabs();
   }
 
   @override
   void dispose() {
     _toMeSub?.cancel();
-    _tabs.dispose();
+    _tabs?.dispose();
     super.dispose();
   }
 
   Future<void> _initSubscribe() async {
     final stream = _service.watchAssignedToMe(widget.authUserId);
     if (stream == null) {
-      // Fallback to one-shot fetch (Supabase not initialized for streams)
       final list = await _service.fetchAssignedToMe(widget.authUserId);
-      if (mounted) {
-        setState(() {
-          _toMe = list;
-          _loadingToMe = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _toMe = list;
+        _loadingToMe = false;
+      });
+      _rebuildTabs();
       return;
     }
     _toMeSub = stream.listen(
@@ -91,6 +95,7 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
           _toMe = list;
           _loadingToMe = false;
         });
+        _rebuildTabs();
       },
       onError: (_) {
         if (mounted) setState(() => _loadingToMe = false);
@@ -105,6 +110,7 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
       _byMe = list;
       _loadingByMe = false;
     });
+    _rebuildTabs();
   }
 
   Future<void> _loadAuto() async {
@@ -114,12 +120,66 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
       memberId: widget.memberId,
       isStaff: widget.isStaff,
     );
-    if (mounted) {
-      setState(() {
-        _auto = list;
-        _loadingAuto = false;
-      });
+    if (!mounted) return;
+    setState(() {
+      _auto = list;
+      _loadingAuto = false;
+    });
+    _rebuildTabs();
+  }
+
+  /// Build the unified list of categorized items from the explicit +
+  /// auto sources. Each item carries the category and the action.
+  List<_Item> _buildItems() {
+    final out = <_Item>[];
+    for (final a in _auto) {
+      out.add(_Item.fromAuto(a, this));
     }
+    // Use a set on Assignment.id to avoid duplicates if a single row
+    // appears in both _toMe and _byMe streams (assigner-of-self case).
+    final seen = <String>{};
+    for (final a in [..._toMe, ..._byMe]) {
+      if (!seen.add(a.id)) continue;
+      out.add(_Item.fromExplicit(a, this));
+    }
+    out.sort((a, b) {
+      final ta = a.at ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final tb = b.at ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return tb.compareTo(ta);
+    });
+    return out;
+  }
+
+  void _rebuildTabs() {
+    final items = _buildItems();
+    final present = <_HomeCategory>{_HomeCategory.all};
+    for (final i in items) {
+      if (i.category != _HomeCategory.other) present.add(i.category);
+    }
+    // Fixed display order: All first, then the entity kinds.
+    const order = [
+      _HomeCategory.all,
+      _HomeCategory.profileChanges,
+      _HomeCategory.candidates,
+      _HomeCategory.bills,
+      _HomeCategory.events,
+      _HomeCategory.jobs,
+      _HomeCategory.tasks,
+      _HomeCategory.other,
+    ];
+    final next = order.where(present.contains).toList();
+    if (_listEq(next, _activeCategories) && _tabs != null) return;
+    _activeCategories = next;
+    _tabs?.dispose();
+    _tabs = TabController(length: next.length, vsync: this);
+  }
+
+  bool _listEq<T>(List<T> a, List<T> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   Future<void> _create() async {
@@ -127,9 +187,7 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
       context: context,
       builder: (_) => AssignmentCreateDialog(currentAuthUserId: widget.authUserId),
     );
-    if (created != null) {
-      _loadOutgoing();
-    }
+    if (created != null) _loadOutgoing();
   }
 
   Future<void> _edit(Assignment a) async {
@@ -140,9 +198,7 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
         existing: a,
       ),
     );
-    if (updated != null) {
-      _loadOutgoing();
-    }
+    if (updated != null) _loadOutgoing();
   }
 
   Future<void> _toggleDone(Assignment a) async {
@@ -154,33 +210,39 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
     });
   }
 
-  /// Navigate to the entity an auto-inferred item points at, by pushing
-  /// the existing native detail screen. Falls back to opening the
-  /// member-edit dialog or surfacing a snackbar if a fetch fails.
   Future<void> _openAuto(AutoInferredAssignment a) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    // Profile-change items go to the member-portal pending-changes tab,
+    // NOT the member detail screen — that's where Andrew can actually
+    // approve/reject the change.
+    if (a.source == 'profile_change') {
+      navigator.push(MaterialPageRoute(
+        builder: (_) => const MemberPortalManagementScreen(initialTabIndex: 4),
+      ));
+      return;
+    }
     final kind = a.entityKind;
     final id = a.entityId;
     if (kind == null || id == null || id.isEmpty) {
-      _snackbarFallback(a.entityUrl);
+      messenger.showSnackBar(SnackBar(content: Text('Link: ${a.entityUrl}')));
       return;
     }
     await _navigateToEntity(kind: kind, id: id, committeeId: a.committeeId);
   }
 
-  /// Navigate from an explicit assignment to its linked entity, if any.
-  /// If the assignment has no `entityType/entityId`, opens the edit
-  /// dialog (when the user is the assigner) instead.
   Future<void> _openExplicit(Assignment a, {required bool allowEdit}) async {
     final kind = a.entityType;
     final id = a.entityId;
-    if (kind != null && id != null && id.isNotEmpty &&
-        const {'candidate','member','event','job','bill'}.contains(kind)) {
+    if (kind != null &&
+        id != null &&
+        id.isNotEmpty &&
+        const {'candidate', 'member', 'event', 'job', 'bill'}.contains(kind)) {
       await _navigateToEntity(kind: kind, id: id);
       return;
     }
-    if (allowEdit) {
-      await _edit(a);
-    }
+    if (allowEdit) await _edit(a);
   }
 
   Future<void> _navigateToEntity({
@@ -199,11 +261,8 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
             messenger.showSnackBar(const SnackBar(content: Text('Candidate not found')));
             return;
           }
-          navigator.push(MaterialPageRoute(
-            builder: (_) => CandidateDetailScreen(candidate: c),
-          ));
+          navigator.push(MaterialPageRoute(builder: (_) => CandidateDetailScreen(candidate: c)));
           return;
-
         case 'member':
           final m = await MemberRepository().getMemberById(id);
           if (!mounted) return;
@@ -211,11 +270,8 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
             messenger.showSnackBar(const SnackBar(content: Text('Member not found')));
             return;
           }
-          navigator.push(MaterialPageRoute(
-            builder: (_) => MemberDetailScreen(member: m),
-          ));
+          navigator.push(MaterialPageRoute(builder: (_) => MemberDetailScreen(member: m)));
           return;
-
         case 'event':
           final client = CRMSupabaseService().client;
           final row = await client.from('events').select().eq('id', id).maybeSingle();
@@ -225,17 +281,11 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
             return;
           }
           final ev = Event.fromJson(Map<String, dynamic>.from(row));
-          navigator.push(MaterialPageRoute(
-            builder: (_) => EventDetailScreen(initialEvent: ev),
-          ));
+          navigator.push(MaterialPageRoute(builder: (_) => EventDetailScreen(initialEvent: ev)));
           return;
-
         case 'job':
-          navigator.push(MaterialPageRoute(
-            builder: (_) => JobDetailScreen(jobId: id),
-          ));
+          navigator.push(MaterialPageRoute(builder: (_) => JobDetailScreen(jobId: id)));
           return;
-
         case 'bill':
           if (committeeId == null || committeeId.isEmpty) {
             messenger.showSnackBar(const SnackBar(
@@ -244,13 +294,9 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
             return;
           }
           navigator.push(MaterialPageRoute(
-            builder: (_) => BillDetailScreen(
-              billId: id,
-              committeeId: committeeId,
-            ),
+            builder: (_) => BillDetailScreen(billId: id, committeeId: committeeId),
           ));
           return;
-
         default:
           messenger.showSnackBar(SnackBar(content: Text('Cannot open: $kind')));
       }
@@ -260,14 +306,12 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
     }
   }
 
-  void _snackbarFallback(String url) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Link: $url')),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final tabs = _tabs;
+    final items = _buildItems();
+    final loading = _loadingToMe || _loadingByMe || _loadingAuto;
+
     return BrandedPanel(
       title: 'Assignments',
       icon: Icons.task_alt,
@@ -276,115 +320,189 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
         icon: Icons.add,
         label: 'New',
       ),
-      tabBar: BrandedHeaderTabBar(
-        controller: _tabs,
-        onTap: (i) => _tabs.animateTo(i),
-        tabs: [
-          Tab(text: 'To me (${_toMe.length})'),
-          Tab(text: 'By me (${_byMe.length})'),
-          Tab(text: 'Auto (${_auto.length})'),
-        ],
-      ),
-      bodyHeight: 320,
-      body: TabBarView(
-        controller: _tabs,
-        children: [
-          _explicitList(_toMe, _loadingToMe, allowEdit: false),
-          _explicitList(_byMe, _loadingByMe, allowEdit: true),
-          _autoList(_auto, _loadingAuto),
-        ],
-      ),
-    );
-  }
-
-  Widget _explicitList(List<Assignment> items, bool loading, {required bool allowEdit}) {
-    if (loading && items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (items.isEmpty) {
-      return const Center(
-        child: Text('Nothing here yet', style: TextStyle(color: Color(0xFF6B7280))),
-      );
-    }
-    return ListView.separated(
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, i) {
-        final a = items[i];
-        return ListTile(
-          onTap: () => _openExplicit(a, allowEdit: allowEdit),
-          leading: Checkbox(
-            value: a.isDone,
-            onChanged: (_) => _toggleDone(a),
-          ),
-          title: Text(
-            a.title,
-            style: TextStyle(
-              decoration: a.isDone ? TextDecoration.lineThrough : null,
+      tabBar: tabs == null
+          ? null
+          : BrandedHeaderTabBar(
+              controller: tabs,
+              onTap: (i) => tabs.animateTo(i),
+              tabs: _activeCategories
+                  .map((c) => Tab(text: '${c.label} (${_countFor(c, items)})'))
+                  .toList(),
             ),
-          ),
-          subtitle: a.note != null && a.note!.isNotEmpty
-              ? Text(a.note!, maxLines: 2, overflow: TextOverflow.ellipsis)
-              : (a.dueDate != null
-                  ? Text('Due ${a.dueDate!.toIso8601String().split('T').first}')
-                  : null),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (a.priority != null) _priorityChip(a.priority!),
-              if (allowEdit)
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 18),
-                  onPressed: () => _edit(a),
-                  tooltip: 'Edit',
-                ),
-            ],
-          ),
-        );
-      },
+      bodyHeight: 320,
+      body: tabs == null
+          ? const SizedBox.shrink()
+          : TabBarView(
+              controller: tabs,
+              children: _activeCategories
+                  .map((c) => _list(_filter(c, items), loading))
+                  .toList(),
+            ),
     );
   }
 
-  Widget _autoList(List<AutoInferredAssignment> items, bool loading) {
+  int _countFor(_HomeCategory c, List<_Item> items) =>
+      c == _HomeCategory.all ? items.length : items.where((i) => i.category == c).length;
+
+  List<_Item> _filter(_HomeCategory c, List<_Item> items) =>
+      c == _HomeCategory.all ? items : items.where((i) => i.category == c).toList();
+
+  Widget _list(List<_Item> items, bool loading) {
     if (loading && items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator(color: Colors.white));
     }
     if (items.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
-          'No auto-detected items',
-          style: TextStyle(color: Color(0xFF6B7280)),
+          'Nothing here',
+          style: TextStyle(color: Colors.white.withOpacity(0.65)),
         ),
       );
     }
     return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: items.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, i) {
-        final a = items[i];
-        return ListTile(
-          leading: _autoLeading(a),
-          title: Text(a.title),
-          subtitle: a.subtitle != null
-              ? Text(a.subtitle!, maxLines: 2, overflow: TextOverflow.ellipsis)
-              : null,
-          trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-          onTap: () => _openAuto(a),
-        );
-      },
+      separatorBuilder: (_, __) =>
+          Divider(height: 1, color: Colors.white.withOpacity(0.10)),
+      itemBuilder: (_, i) => items[i].buildTile(context),
+    );
+  }
+}
+
+/// Display category for the unified item list.
+enum _HomeCategory {
+  all,
+  profileChanges,
+  candidates,
+  bills,
+  events,
+  jobs,
+  tasks, // explicit "free-form" assignments with no entityType
+  other;
+
+  String get label {
+    switch (this) {
+      case _HomeCategory.all:
+        return 'All';
+      case _HomeCategory.profileChanges:
+        return 'Profile changes';
+      case _HomeCategory.candidates:
+        return 'Candidates';
+      case _HomeCategory.bills:
+        return 'Bills';
+      case _HomeCategory.events:
+        return 'Events';
+      case _HomeCategory.jobs:
+        return 'Jobs';
+      case _HomeCategory.tasks:
+        return 'Tasks';
+      case _HomeCategory.other:
+        return 'Other';
+    }
+  }
+}
+
+class _Item {
+  final String id;
+  final _HomeCategory category;
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final String? memberName;
+  final String? memberAvatarUrl;
+  final DateTime? at;
+  final VoidCallback onTap;
+  final bool? isDone;
+  final VoidCallback? onToggleDone;
+  final VoidCallback? onEdit;
+  final String? priority;
+
+  _Item({
+    required this.id,
+    required this.category,
+    required this.title,
+    this.subtitle,
+    required this.icon,
+    this.memberName,
+    this.memberAvatarUrl,
+    this.at,
+    required this.onTap,
+    this.isDone,
+    this.onToggleDone,
+    this.onEdit,
+    this.priority,
+  });
+
+  factory _Item.fromAuto(AutoInferredAssignment a, _AssignmentsPanelState state) {
+    return _Item(
+      id: 'auto:${a.key}',
+      category: _categoryForSource(a.source),
+      title: a.title,
+      subtitle: a.subtitle,
+      icon: _iconForSource(a.source),
+      memberName: a.memberName,
+      memberAvatarUrl: a.memberAvatarUrl,
+      at: a.at,
+      onTap: () => state._openAuto(a),
     );
   }
 
-  /// Always render initials (or a source icon) as the `child:` of the
-  /// CircleAvatar, then lay the network image over it via `foregroundImage`.
-  /// On a 404/CORS/empty-URL failure the foreground falls away and the
-  /// child stays visible — so Andrew sees "AH" / "SJ" / icon, never an
-  /// empty grey circle.
-  Widget _autoLeading(AutoInferredAssignment a) {
-    final hasName = a.memberName != null && a.memberName!.trim().isNotEmpty;
-    final initials = hasName ? _initialsOf(a.memberName!) : null;
+  factory _Item.fromExplicit(Assignment a, _AssignmentsPanelState state) {
+    final allowEdit = a.assignedBy == state.widget.authUserId;
+    final note = a.note;
+    final due = a.dueDate;
+    final subtitle = (note != null && note.isNotEmpty)
+        ? note
+        : (due != null ? 'Due ${due.toIso8601String().split('T').first}' : null);
+    return _Item(
+      id: 'explicit:${a.id}',
+      category: _categoryForExplicit(a),
+      title: a.title,
+      subtitle: subtitle,
+      icon: _iconForExplicit(a.entityType),
+      at: a.updatedAt,
+      onTap: () => state._openExplicit(a, allowEdit: allowEdit),
+      isDone: a.isDone,
+      onToggleDone: () => state._toggleDone(a),
+      onEdit: allowEdit ? () => state._edit(a) : null,
+      priority: a.priority,
+    );
+  }
 
-    final fallbackChild = initials != null
+  Widget buildTile(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      leading: _buildLeading(),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          decoration: (isDone == true) ? TextDecoration.lineThrough : null,
+        ),
+      ),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white.withOpacity(0.78)),
+            ),
+      trailing: _buildTrailing(),
+    );
+  }
+
+  Widget _buildLeading() {
+    if (onToggleDone != null) {
+      return Checkbox(
+        value: isDone ?? false,
+        onChanged: (_) => onToggleDone!(),
+      );
+    }
+    final hasName = memberName != null && memberName!.trim().isNotEmpty;
+    final initials = hasName ? _initialsOf(memberName!) : null;
+    final fallback = initials != null
         ? Text(
             initials,
             style: const TextStyle(
@@ -393,41 +511,46 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
               fontSize: 13,
             ),
           )
-        : Icon(_iconForSource(a.source), color: Colors.white, size: 18);
-
-    final hasUrl = a.memberAvatarUrl != null && a.memberAvatarUrl!.isNotEmpty;
-
+        : Icon(icon, color: Colors.white, size: 18);
+    final hasUrl = memberAvatarUrl != null && memberAvatarUrl!.isNotEmpty;
     return CircleAvatar(
       radius: 18,
-      backgroundColor: BrandColors.unityBlue,
-      foregroundImage: hasUrl ? NetworkImage(a.memberAvatarUrl!) : null,
+      backgroundColor: Colors.white.withOpacity(0.12),
+      foregroundImage: hasUrl ? NetworkImage(memberAvatarUrl!) : null,
       onForegroundImageError: hasUrl ? (_, __) {} : null,
-      child: fallbackChild,
+      child: fallback,
     );
   }
 
-  static String _initialsOf(String name) {
-    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
-    return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
+  Widget? _buildTrailing() {
+    final actions = <Widget>[];
+    if (priority != null) actions.add(_priorityChip(priority!));
+    if (onEdit != null) {
+      actions.add(IconButton(
+        icon: Icon(Icons.edit, size: 18, color: Colors.white.withOpacity(0.85)),
+        onPressed: onEdit,
+        tooltip: 'Edit',
+      ));
+    }
+    actions.add(Icon(
+      Icons.arrow_forward_ios,
+      size: 14,
+      color: Colors.white.withOpacity(0.6),
+    ));
+    return Row(mainAxisSize: MainAxisSize.min, children: actions);
   }
 
-  Widget _priorityChip(String p) {
+  static Widget _priorityChip(String p) {
     Color bg;
-    Color fg;
     switch (p) {
       case 'high':
-        bg = const Color(0xFFFEE2E2); // red-100
-        fg = const Color(0xFF991B1B); // red-800
+        bg = const Color(0xFFEF4444);
         break;
       case 'medium':
-        bg = const Color(0xFFFFEDD5); // orange-100
-        fg = const Color(0xFF9A3412); // orange-800
+        bg = const Color(0xFFF59E0B);
         break;
       default:
-        bg = const Color(0xFFF1F5F9); // slate-100
-        fg = const Color(0xFF334155); // slate-700
+        bg = Colors.white.withOpacity(0.20);
     }
     return Container(
       margin: const EdgeInsets.only(right: 4),
@@ -438,12 +561,58 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
       ),
       child: Text(
         p,
-        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w600),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
 
-  IconData _iconForSource(String source) {
+  static String _initialsOf(String name) {
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
+    return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
+  }
+
+  static _HomeCategory _categoryForSource(String source) {
+    switch (source) {
+      case 'profile_change':
+        return _HomeCategory.profileChanges;
+      case 'candidate':
+        return _HomeCategory.candidates;
+      case 'bill_mention':
+        return _HomeCategory.bills;
+      case 'event_pending':
+        return _HomeCategory.events;
+      case 'job_pending':
+        return _HomeCategory.jobs;
+      default:
+        return _HomeCategory.other;
+    }
+  }
+
+  static _HomeCategory _categoryForExplicit(Assignment a) {
+    switch (a.entityType) {
+      case 'candidate':
+        return _HomeCategory.candidates;
+      case 'member':
+        return _HomeCategory.profileChanges;
+      case 'bill':
+        return _HomeCategory.bills;
+      case 'event':
+        return _HomeCategory.events;
+      case 'job':
+        return _HomeCategory.jobs;
+      default:
+        return _HomeCategory.tasks;
+    }
+  }
+
+  static IconData _iconForSource(String source) {
     switch (source) {
       case 'candidate':
         return Icons.how_to_vote;
@@ -459,4 +628,22 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
         return Icons.notifications;
     }
   }
+
+  static IconData _iconForExplicit(String? entityType) {
+    switch (entityType) {
+      case 'candidate':
+        return Icons.how_to_vote;
+      case 'member':
+        return Icons.person;
+      case 'bill':
+        return Icons.gavel;
+      case 'event':
+        return Icons.event;
+      case 'job':
+        return Icons.work_outline;
+      default:
+        return Icons.task_alt;
+    }
+  }
 }
+

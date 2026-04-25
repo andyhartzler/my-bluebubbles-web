@@ -2,22 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/member_calendar_widget.dart';
 import 'package:bluebubbles/models/crm/user_home_preferences.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
 import 'package:bluebubbles/services/crm/user_home_preferences_service.dart';
 
+import 'widgets/activity_panel.dart';
 import 'widgets/assignments_panel.dart';
 import 'widgets/avatar_upload_dialog.dart';
+import 'widgets/branded_panel.dart';
 import 'widgets/home_customize_dialog.dart';
-import 'widgets/meeting_history_panel.dart';
-import 'widgets/optional_tiles_section.dart';
 import 'widgets/profile_header.dart';
 
 /// The default landing screen for executive members after sign-in.
-/// Composes a branded gradient profile banner, assignments, meeting
-/// history, and an optional drag-add metric-tiles area. Mirrors the
-/// visual language of [SlackManagementScreen] — navy → momentum-blue
-/// gradient header, branded background, sunrise-gold accents.
+/// Composes a branded gradient profile banner, an Assignments panel
+/// (category-tabbed), an Activity panel (Meetings + Events), and the
+/// org-wide Calendar shared with the Committees first page. All
+/// surfaces use the navy → momentum-blue brand language with white
+/// text and sunrise-gold accents.
 class PersonalizedHomeScreen extends StatefulWidget {
   const PersonalizedHomeScreen({super.key});
 
@@ -159,8 +161,8 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Wide desktop: Assignments + Meetings sit side-by-side
-                    // in a 50/50 row above the full-width tiles area.
+                    // Wide desktop: Assignments + Activity sit side-by-side
+                    // in a 50/50 row above the full-width Calendar.
                     if (prefs.showAssignments &&
                         prefs.showMeetingHistory &&
                         isWide) ...[
@@ -178,7 +180,7 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
                             ),
                             const SizedBox(width: 16),
                             Expanded(
-                              child: MeetingHistoryPanel(
+                              child: ActivityPanel(
                                 authUserId: authId,
                                 memberId: member.id,
                               ),
@@ -198,22 +200,25 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
                         const SizedBox(height: 16),
                       ],
                       if (prefs.showMeetingHistory) ...[
-                        MeetingHistoryPanel(
+                        ActivityPanel(
                           authUserId: authId,
                           memberId: member.id,
                         ),
                         const SizedBox(height: 16),
                       ],
                     ],
-                    if (prefs.showOptionalTiles) ...[
-                      OptionalTilesSection(
-                        prefs: prefs,
-                        onPrefsChanged: (updated) {
-                          if (mounted) setState(() => _prefs = updated);
-                        },
+                    // Calendar — shared with the Committees first page,
+                    // wrapped in a BrandedPanel so it matches the rest
+                    // of the home surface visually.
+                    BrandedPanel(
+                      title: 'Calendar',
+                      icon: Icons.calendar_month,
+                      body: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: MemberCalendarWidget(),
                       ),
-                      const SizedBox(height: 16),
-                    ],
+                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),

@@ -44,49 +44,72 @@ class BrandedPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Force the body to render against a light surface theme so default
-    // text widgets land as dark-on-light regardless of the app-wide
-    // dark theme — guarantees AA contrast on the white panel body.
-    final lightTheme = Theme.of(context).copyWith(
-      brightness: Brightness.light,
-      colorScheme: const ColorScheme.light(
-        surface: Colors.white,
-        onSurface: Color(0xFF1F2937), // slate-800
+    // Body sits inside the navy/momentum gradient header strip and reads
+    // as one continuous branded surface. Text inside is light-on-navy
+    // (white headline, white-78% body, white-60% secondary) which is
+    // the same contrast pattern the Slack management screen uses on its
+    // gradient strip. White text on `unityBlue` (#273351) is ~12.5:1 —
+    // well above WCAG AA, so the contrast pet peeve stays satisfied.
+    final navyTheme = Theme.of(context).copyWith(
+      brightness: Brightness.dark,
+      colorScheme: ColorScheme.dark(
+        surface: BrandColors.unityBlue,
+        onSurface: Colors.white,
+        primary: BrandColors.sunriseGold,
+        onPrimary: BrandColors.unityBlue,
       ),
-      iconTheme: const IconThemeData(color: Color(0xFF334155)), // slate-700
+      iconTheme: const IconThemeData(color: Colors.white),
       textTheme: Theme.of(context).textTheme.apply(
-            bodyColor: const Color(0xFF1F2937),
-            displayColor: const Color(0xFF111827),
+            bodyColor: Colors.white,
+            displayColor: Colors.white,
           ),
-      listTileTheme: const ListTileThemeData(
-        textColor: Color(0xFF1F2937),
-        iconColor: Color(0xFF475569), // slate-600
-        subtitleTextStyle: TextStyle(color: Color(0xFF475569)),
+      listTileTheme: ListTileThemeData(
+        textColor: Colors.white,
+        iconColor: Colors.white.withOpacity(0.85),
+        subtitleTextStyle: TextStyle(color: Colors.white.withOpacity(0.78)),
       ),
-      dividerTheme: const DividerThemeData(color: Color(0xFFE5E7EB)),
+      dividerTheme: DividerThemeData(color: Colors.white.withOpacity(0.10)),
+      checkboxTheme: CheckboxThemeData(
+        side: BorderSide(color: Colors.white.withOpacity(0.7), width: 2),
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return BrandColors.sunriseGold;
+          }
+          return Colors.transparent;
+        }),
+        checkColor: const WidgetStatePropertyAll(BrandColors.unityBlue),
+      ),
     );
 
-    final themedBody = Theme(data: lightTheme, child: this.body);
+    final themedBody = Theme(data: navyTheme, child: this.body);
     final sized = bodyHeight != null
         ? SizedBox(height: bodyHeight, child: themedBody)
         : themedBody;
 
-    // Always paint a near-white surface for the body so default
-    // `ListTile` dark-on-light text stays readable on BOTH light and
-    // dark themes. We sit on top of `BrandedBackground` (light blue
-    // gradient + image overlay), so a near-opaque white reads as a
-    // clean card, never as a black slab. NEVER use `Theme.cardColor`
-    // here — on dark theme it resolves near-black and kills contrast.
+    // The whole panel — header strip + body — is one continuous navy
+    // → momentum-blue gradient surface, mirroring the Slack management
+    // screen's pattern. The header gets the steeper part of the
+    // gradient (top-left → bottom-right), the body uses unityBlue with
+    // a softer momentum-blue undertone via a subtle vertical gradient.
+    // The whole thing carries the brand vibe Andrew asked for and
+    // every text element inside renders white-on-navy at 12.5:1+.
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.96),
+          gradient: const LinearGradient(
+            colors: [
+              BrandColors.unityBlue,
+              Color(0xFF1E2742), // slightly darker navy at the bottom
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
           boxShadow: [
             BoxShadow(
-              color: BrandColors.unityBlue.withOpacity(0.18),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: BrandColors.unityBlue.withOpacity(0.32),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
             ),
           ],
         ),

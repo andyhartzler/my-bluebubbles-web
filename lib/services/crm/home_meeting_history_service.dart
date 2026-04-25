@@ -73,6 +73,79 @@ class HomeMeetingHistoryService {
     }
   }
 
+  /// Past meetings the member EITHER attended OR hosted, merged and
+  /// deduped by meeting id. Sorted newest first. Used by the home
+  /// "Activity" panel — Andrew's requested merge of attended + hosted.
+  Future<List<Map<String, dynamic>>> fetchAttendedOrHosted(
+    String memberId, {
+    int limit = 20,
+  }) async {
+    final attended = await fetchPastAttended(memberId, limit: limit);
+    final client = _client;
+    if (client == null) return attended;
+    List<Map<String, dynamic>> hosted = const [];
+    try {
+      final rows = await client
+          .from('meetings')
+          .select('id, meeting_title, meeting_date, committee')
+          .eq('meeting_host', memberId)
+          .order('meeting_date', ascending: false)
+          .limit(limit);
+      hosted = (rows as List)
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList();
+    } catch (e) {
+      debugPrint('[HomeMeetingHistoryService] fetchAttendedOrHosted hosted: $e');
+    }
+    final byId = <String, Map<String, dynamic>>{};
+    for (final m in [...attended, ...hosted]) {
+      final id = m['id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      byId.putIfAbsent(id, () => m);
+    }
+    final merged = byId.values.toList();
+    merged.sort((a, b) {
+      final da = DateTime.tryParse(a['meeting_date']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final db = DateTime.tryParse(b['meeting_date']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      return db.compareTo(da);
+    });
+    if (merged.length > limit) return merged.sublist(0, limit);
+    return merged;
+  }
+
+  /// Events the member attended (via `event_attendees` joined to
+  /// `events`). Sorted newest first.
+  Future<List<Map<String, dynamic>>> fetchAttendedEvents(
+    String memberId, {
+    int limit = 20,
+  }) async {
+    final client = _client;
+    if (client == null) return const [];
+    try {
+      final rows = await client
+          .from('event_attendees')
+          .select('event_id, events:event_id(id, name, event_date, location, address)')
+          .eq('member_id', memberId)
+          .limit(limit * 2);
+      final events = _flattenJoined(rows, joinKey: 'events');
+      events.sort((a, b) {
+        final da = DateTime.tryParse(a['event_date']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final db = DateTime.tryParse(b['event_date']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return db.compareTo(da);
+      });
+      if (events.length > limit) return events.sublist(0, limit);
+      return events;
+    } catch (e) {
+      debugPrint('[HomeMeetingHistoryService] fetchAttendedEvents: $e');
+      return const [];
+    }
+  }
+
   /// Meetings the member hosts: past hosted + upcoming created.
   /// authUserId is required for the upcoming half because
   /// scheduled_meetings.created_by references auth.users.id.
