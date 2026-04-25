@@ -360,23 +360,51 @@ class _ExecutivesScreenState extends State<ExecutivesScreen> {
 
     try {
       final client = CRMSupabaseService().client;
-      // No revoke-mail-alias edge fn yet — direct UPDATE under the
-      // superadmin RLS path (ma_self / ma_service_role policies allow it).
-      await client
-          .from('mail_aliases')
-          .update({'revoked_at': DateTime.now().toUtc().toIso8601String()})
-          .eq('user_id', memberId);
+      // The revoke-mail-alias edge fn deletes the Workspace user-alias and
+      // Gmail send-as on crm@ in addition to setting mail_aliases.revoked_at,
+      // so the alias slot is freed and the send-as disappears from crm@'s
+      // Send-as list.
+      final res = await client.functions.invoke(
+        'revoke-mail-alias',
+        body: {'userId': memberId},
+      );
 
+      final data = res.data;
+      if (data is Map && data['ok'] == true) {
+        final revokedEmail =
+            (data['revoked'] as String?) ?? aliasEmail;
+        if (!mounted) return;
+        setState(() {
+          _aliasesByUserId.remove(memberId);
+          _mailBusyIds.remove(memberId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(revokedEmail.isEmpty
+                ? 'Mail access revoked for $fullName'
+                : 'Mail access revoked: $revokedEmail'),
+          ),
+        );
+      } else {
+        final err = (data is Map ? data['error']?.toString() : null) ??
+            'unknown error';
+        if (!mounted) return;
+        setState(() => _mailBusyIds.remove(memberId));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: BrandColors.error,
+            content: Text('Revoke failed: $err'),
+          ),
+        );
+      }
+    } on FunctionException catch (e) {
       if (!mounted) return;
-      setState(() {
-        _aliasesByUserId.remove(memberId);
-        _mailBusyIds.remove(memberId);
-      });
+      setState(() => _mailBusyIds.remove(memberId));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(aliasEmail.isEmpty
-              ? 'Mail access revoked for $fullName'
-              : 'Mail access revoked: $aliasEmail'),
+          backgroundColor: BrandColors.error,
+          content: Text(
+              'Revoke failed: ${e.details ?? e.reasonPhrase ?? "unknown error"}'),
         ),
       );
     } catch (e) {
