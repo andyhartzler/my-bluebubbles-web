@@ -361,6 +361,9 @@ dependency_overrides:
   json_annotation: ^4.9.0  # bluebubbles version, supersedes tmail's 4.8.0
   dio: ^5.4.2+1  # jmap_dart_client wants 5.2.0; pin to ours (forwards-compat)
   build_runner: ^2.4.12  # jmap_dart_client pins 2.4.10; ours newer
+  # printing 5.13.2 (bluebubbles) breaks on package:web 1.1.1's Window API.
+  # Pin to 1.0.0 which matches what master built clean against.
+  web: 1.0.0
 
 dev_dependencies:
   build_runner: ^2.4.12
