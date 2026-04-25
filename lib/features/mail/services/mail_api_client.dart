@@ -475,6 +475,47 @@ class MailApiClient {
     return (mutated: mutated, skipped: skipped, errors: errors);
   }
 
+  /// Permanently deletes the given Gmail messages via mail-permanent-delete.
+  ///
+  /// Two-layer safety on the server:
+  ///   1. Per-message alias trust verification (silent skip on mismatch).
+  ///   2. Refuses to delete messages currently labeled INBOX (caller must
+  ///      trash-then-delete to confirm intent — mirrors tmail's UI flow).
+  ///
+  /// Returns:
+  ///   deleted  — IDs whose users.messages.delete returned 2xx
+  ///   skipped  — IDs the caller doesn't own (alias mismatch). NO error
+  ///              surfaced for these — same pattern as `modifyMessages`.
+  ///   errors   — per-id failure reasons. Includes `not_in_trash` (safety
+  ///              gate fired) and `delete_failed_<status>` (Gmail rejected).
+  Future<({List<String> deleted, List<String> skipped, Map<String, String> errors})>
+      permanentlyDeleteMessages({required List<String> messageIds}) async {
+    if (messageIds.isEmpty) {
+      return (
+        deleted: const <String>[],
+        skipped: const <String>[],
+        errors: const <String, String>{},
+      );
+    }
+    final resp = await _supabase.client.functions.invoke(
+      'mail-permanent-delete',
+      body: {'messageIds': messageIds},
+    );
+    final data = (resp.data as Map?)?.cast<String, dynamic>() ?? const {};
+    final deleted = ((data['deleted'] as List?) ?? const [])
+        .whereType<String>()
+        .toList();
+    final skipped = ((data['skipped'] as List?) ?? const [])
+        .whereType<String>()
+        .toList();
+    final rawErrors = (data['errors'] as Map?) ?? const {};
+    final errors = <String, String>{};
+    rawErrors.forEach((k, v) {
+      if (k is String && v != null) errors[k] = v.toString();
+    });
+    return (deleted: deleted, skipped: skipped, errors: errors);
+  }
+
   /// Returns true iff the current user has an active mail alias provisioned.
   /// Used to gate the Mail nav tab — non-execs without an alias should not
   /// see the tab (avoids a confusing 403 on first open).

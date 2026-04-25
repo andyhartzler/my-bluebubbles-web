@@ -410,16 +410,50 @@ class EdgeFnEmailDataSource extends EmailDataSource {
   Future<({List<EmailId> emailIdsSuccess, Map<Id, SetError> mapErrors})>
       deleteMultipleEmailsPermanently(Session session, AccountId accountId,
           List<EmailId> emailIds) async {
-    // Phase 1: permanent-delete is intentionally a no-op success. Gmail's
-    // users.messages.delete is destructive and bypasses the 30-day Trash
-    // recovery window — we route deletes through the move-to-Trash path
-    // instead (handled via moveToMailbox -> 'trash'). Returning success
-    // keeps the optimistic UI consistent; the user can still hard-delete
-    // from gmail.com if they really need to.
-    return (
-      emailIdsSuccess: emailIds,
-      mapErrors: const <Id, SetError>{},
-    );
+    // Routes through mail-permanent-delete which calls users.messages.delete
+    // after two-layer verification: alias trust + "must be in TRASH/SPAM"
+    // safety gate. Caller's UI flow is trash-then-empty, mirroring tmail.
+    if (emailIds.isEmpty) {
+      return (
+        emailIdsSuccess: const <EmailId>[],
+        mapErrors: const <Id, SetError>{},
+      );
+    }
+    final ids = emailIds.map((e) => e.id.value).toList();
+    final result = await _api.permanentlyDeleteMessages(messageIds: ids);
+
+    final deletedSet = result.deleted.toSet();
+    final emailIdsSuccess = emailIds
+        .where((e) => deletedSet.contains(e.id.value))
+        .toList(growable: false);
+
+    final mapErrors = <Id, SetError>{};
+    // Skipped IDs without an explicit error are alias-mismatch (silent skip
+    // on the server). Surface as `forbidden` so tmail's downstream UI shows
+    // a sensible reason rather than an unattributed "failed".
+    final errorIds = result.errors.keys.toSet();
+    for (final skipped in result.skipped) {
+      if (errorIds.contains(skipped)) continue;
+      mapErrors[Id(skipped)] = SetError(
+        SetError.forbidden,
+        description: 'caller alias does not match this message',
+      );
+    }
+    result.errors.forEach((id, msg) {
+      // `not_in_trash` is the safety-gate hit — distinguish it so the UI can
+      // route the user to "move to Trash first" instead of looking like a
+      // backend bug. All other failures funnel through serverFail.
+      if (msg == 'not_in_trash') {
+        mapErrors[Id(id)] = SetError(
+          SetError.invalidArguments,
+          description:
+              'message must be in Trash or Spam before permanent deletion',
+        );
+      } else {
+        mapErrors[Id(id)] = SetError(SetError.serverFail, description: msg);
+      }
+    });
+    return (emailIdsSuccess: emailIdsSuccess, mapErrors: mapErrors);
   }
 
   @override
@@ -429,10 +463,16 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     EmailId emailId, {
     CancelToken? cancelToken,
   }) async {
-    // Phase 1: see deleteMultipleEmailsPermanently. Routes destructive
-    // deletes through the move-to-Trash path; report success so the UI
-    // doesn't roll back the (already-correct) optimistic remove.
-    return true;
+    // Single-message convenience wrapper around mail-permanent-delete.
+    // Returns true iff the message was actually hard-deleted server-side
+    // (i.e., passed both the alias trust check AND the "in TRASH/SPAM"
+    // safety gate). Returns false otherwise so the caller can roll back
+    // the optimistic UI removal — losing a message silently would be worse
+    // than a brief flicker back into the list.
+    final result = await _api.permanentlyDeleteMessages(
+      messageIds: [emailId.id.value],
+    );
+    return result.deleted.contains(emailId.id.value);
   }
 
   @override
