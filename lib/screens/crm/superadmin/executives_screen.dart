@@ -28,6 +28,8 @@ class _ExecutivesScreenState extends State<ExecutivesScreen> {
   static const _pageTitle = 'Executive Committee';
 
   List<Map<String, dynamic>> _execs = [];
+  // user_id -> mail_aliases row (active rows only — revoked_at IS NULL).
+  Map<String, Map<String, dynamic>> _aliasesByUserId = {};
   bool _loading = true;
   String? _errorMessage;
 
@@ -35,6 +37,8 @@ class _ExecutivesScreenState extends State<ExecutivesScreen> {
   // we can show a spinner on just the affected row rather than disabling the
   // whole page.
   final Set<String> _revokingIds = <String>{};
+  // Member ids currently provisioning / revoking a mail alias.
+  final Set<String> _mailBusyIds = <String>{};
 
   @override
   void initState() {
@@ -72,9 +76,32 @@ class _ExecutivesScreenState extends State<ExecutivesScreen> {
           .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
           .toList();
 
+      // Pull active mail_aliases in parallel. RLS lets superadmins read every
+      // row; revoked rows are filtered client-side so we still see history if
+      // we ever surface it.
+      Map<String, Map<String, dynamic>> aliasMap = {};
+      try {
+        final aliasResp = await client
+            .from('mail_aliases')
+            .select('user_id, alias_email, display_name, revoked_at, created_at')
+            .filter('revoked_at', 'is', null);
+        for (final row in (aliasResp as List)) {
+          final m = Map<String, dynamic>.from(row as Map);
+          final uid = m['user_id']?.toString();
+          if (uid != null && uid.isNotEmpty) {
+            aliasMap[uid] = m;
+          }
+        }
+      } catch (_) {
+        // Soft-fail: if mail_aliases isn't readable for any reason, the
+        // screen still renders without the Mail column.
+        aliasMap = {};
+      }
+
       if (!mounted) return;
       setState(() {
         _execs = list;
+        _aliasesByUserId = aliasMap;
         _loading = false;
       });
     } catch (e) {
@@ -93,6 +120,274 @@ class _ExecutivesScreenState extends State<ExecutivesScreen> {
     );
     if (result == true) {
       await _load();
+    }
+  }
+
+  // Mirrors slug() in supabase/functions/provision-mail-alias/index.ts:
+  // NFD-normalize, drop combining marks, lowercase, keep [a-z0-9._-].
+  static String _aliasSlug(String name) {
+    // NFD normalization isn't directly exposed in pure Dart; emulate by
+    // stripping the common Latin diacritics. The edge fn does a true NFD
+    // pass — for the names in our exec roster (ASCII + occasional accent)
+    // this transliteration map covers every observed case. If a name uses
+    // characters outside this set, the result will be empty and the UI
+    // surfaces the "cannot derive ASCII alias" error.
+    const diacritics = {
+      'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'å': 'a',
+      'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
+      'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i',
+      'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o',
+      'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u',
+      'ñ': 'n', 'ç': 'c', 'ý': 'y', 'ÿ': 'y',
+      'À': 'a', 'Á': 'a', 'Â': 'a', 'Ã': 'a', 'Ä': 'a', 'Å': 'a',
+      'È': 'e', 'É': 'e', 'Ê': 'e', 'Ë': 'e',
+      'Ì': 'i', 'Í': 'i', 'Î': 'i', 'Ï': 'i',
+      'Ò': 'o', 'Ó': 'o', 'Ô': 'o', 'Õ': 'o', 'Ö': 'o',
+      'Ù': 'u', 'Ú': 'u', 'Û': 'u', 'Ü': 'u',
+      'Ñ': 'n', 'Ç': 'c', 'Ý': 'y',
+    };
+    final buf = StringBuffer();
+    for (final ch in name.split('')) {
+      buf.write(diacritics[ch] ?? ch);
+    }
+    return buf
+        .toString()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9._-]'), '')
+        .trim();
+  }
+
+  String _firstNameOf(Map<String, dynamic> member) {
+    final full = (member['name'] as String?) ?? '';
+    final trimmed = full.trim();
+    if (trimmed.isEmpty) return '';
+    final firstToken = trimmed.split(RegExp(r'\s+')).first;
+    return firstToken;
+  }
+
+  Future<void> _enableMail(Map<String, dynamic> member) async {
+    final memberId = member['id']?.toString();
+    if (memberId == null || memberId.isEmpty) return;
+
+    final fullName = (member['name'] as String?) ?? '(unknown)';
+    final firstName = _firstNameOf(member);
+    final localPart = _aliasSlug(firstName);
+
+    if (firstName.isEmpty || localPart.isEmpty) {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          title: const Text('Cannot derive alias'),
+          content: Text(
+            'Cannot derive an ASCII alias from "$fullName". Edit the member '
+            "name to add an English version, then try again.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final proposed = '$localPart@moyoungdemocrats.org';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Provision mail alias?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Provision a mail alias for $fullName? They will get the '
+              'following address on the shared crm@ Workspace seat:',
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: BrandColors.unityBlue.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: BrandColors.unityBlue.withOpacity(0.25),
+                ),
+              ),
+              child: SelectableText(
+                proposed,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w600,
+                  color: BrandColors.unityBlue,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Workspace alias propagation can take 30-90 seconds; the '
+              'edge function retries automatically.',
+              style: TextStyle(fontSize: 12, color: Colors.black54),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style:
+                FilledButton.styleFrom(backgroundColor: BrandColors.unityBlue),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Provision'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    setState(() => _mailBusyIds.add(memberId));
+
+    try {
+      final client = CRMSupabaseService().client;
+      final res = await client.functions.invoke(
+        'provision-mail-alias',
+        body: {
+          'userId': memberId,
+          'firstName': firstName,
+          'displayName': fullName,
+        },
+      );
+
+      final data = res.data;
+      if (data is Map && data['ok'] == true) {
+        final aliasRow = (data['alias'] is Map)
+            ? Map<String, dynamic>.from(data['alias'] as Map)
+            : <String, dynamic>{
+                'user_id': memberId,
+                'alias_email': proposed,
+                'display_name': fullName,
+              };
+        final aliasEmail =
+            (aliasRow['alias_email'] as String?) ?? proposed;
+        if (!mounted) return;
+        setState(() {
+          _aliasesByUserId[memberId] = aliasRow;
+          _mailBusyIds.remove(memberId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: BrandColors.success,
+            content: Text('✓ $aliasEmail provisioned'),
+          ),
+        );
+      } else {
+        final err = (data is Map ? data['error']?.toString() : null) ??
+            'unknown error';
+        if (!mounted) return;
+        setState(() => _mailBusyIds.remove(memberId));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: BrandColors.error,
+            content: Text('Provision failed: $err'),
+          ),
+        );
+      }
+    } on FunctionException catch (e) {
+      if (!mounted) return;
+      setState(() => _mailBusyIds.remove(memberId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: BrandColors.error,
+          content: Text(
+              'Provision failed: ${e.details ?? e.reasonPhrase ?? "unknown error"}'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _mailBusyIds.remove(memberId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: BrandColors.error,
+          content: Text('Provision failed: $e'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _revokeMail(Map<String, dynamic> member) async {
+    final memberId = member['id']?.toString();
+    if (memberId == null || memberId.isEmpty) return;
+
+    final fullName = (member['name'] as String?) ?? '(unknown)';
+    final aliasRow = _aliasesByUserId[memberId];
+    final aliasEmail = (aliasRow?['alias_email'] as String?) ?? '';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Revoke mail access?'),
+        content: Text(
+          'This will remove $fullName\'s access to $aliasEmail. They will '
+          'no longer be able to send or receive mail through the CRM. '
+          'Confirm?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: BrandColors.error),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Revoke'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    setState(() => _mailBusyIds.add(memberId));
+
+    try {
+      final client = CRMSupabaseService().client;
+      // No revoke-mail-alias edge fn yet — direct UPDATE under the
+      // superadmin RLS path (ma_self / ma_service_role policies allow it).
+      await client
+          .from('mail_aliases')
+          .update({'revoked_at': DateTime.now().toUtc().toIso8601String()})
+          .eq('user_id', memberId);
+
+      if (!mounted) return;
+      setState(() {
+        _aliasesByUserId.remove(memberId);
+        _mailBusyIds.remove(memberId);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(aliasEmail.isEmpty
+              ? 'Mail access revoked for $fullName'
+              : 'Mail access revoked: $aliasEmail'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _mailBusyIds.remove(memberId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: BrandColors.error,
+          content: Text('Revoke failed: $e'),
+        ),
+      );
     }
   }
 
@@ -280,21 +575,31 @@ class _ExecutivesScreenState extends State<ExecutivesScreen> {
                 _ExecTable(
                   onManagePages: _managePagesFor,
                   execs: _execs,
+                  aliasesByUserId: _aliasesByUserId,
                   revokingIds: _revokingIds,
+                  mailBusyIds: _mailBusyIds,
                   onRevoke: _revoke,
                   onViewActivity: _viewActivityFor,
+                  onEnableMail: _enableMail,
+                  onRevokeMail: _revokeMail,
                   formatLastSeen: _formatLastSeen,
                 )
               else
-                ..._execs.map((m) => _ExecCard(
-                      onManagePages: () => _managePagesFor(m),
-                      exec: m,
-                      revoking:
-                          _revokingIds.contains(m['id']?.toString() ?? ''),
-                      onRevoke: () => _revoke(m),
-                      onViewActivity: () => _viewActivityFor(m),
-                      formatLastSeen: _formatLastSeen,
-                    )),
+                ..._execs.map((m) {
+                  final id = m['id']?.toString() ?? '';
+                  return _ExecCard(
+                    onManagePages: () => _managePagesFor(m),
+                    exec: m,
+                    aliasRow: _aliasesByUserId[id],
+                    revoking: _revokingIds.contains(id),
+                    mailBusy: _mailBusyIds.contains(id),
+                    onRevoke: () => _revoke(m),
+                    onViewActivity: () => _viewActivityFor(m),
+                    onEnableMail: () => _enableMail(m),
+                    onRevokeMail: () => _revokeMail(m),
+                    formatLastSeen: _formatLastSeen,
+                  );
+                }),
             ],
           );
         },
@@ -363,82 +668,171 @@ class _HeaderBanner extends StatelessWidget {
 class _ExecTable extends StatelessWidget {
   const _ExecTable({
     required this.execs,
+    required this.aliasesByUserId,
     required this.revokingIds,
+    required this.mailBusyIds,
     required this.onRevoke,
     required this.onViewActivity,
     required this.onManagePages,
+    required this.onEnableMail,
+    required this.onRevokeMail,
     required this.formatLastSeen,
   });
 
   final List<Map<String, dynamic>> execs;
+  final Map<String, Map<String, dynamic>> aliasesByUserId;
   final Set<String> revokingIds;
+  final Set<String> mailBusyIds;
   final void Function(Map<String, dynamic>) onRevoke;
   final void Function(Map<String, dynamic>) onViewActivity;
   final void Function(Map<String, dynamic>) onManagePages;
+  final void Function(Map<String, dynamic>) onEnableMail;
+  final void Function(Map<String, dynamic>) onRevokeMail;
   final String Function(String?) formatLastSeen;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       elevation: 1,
-      child: DataTable(
-        headingRowColor: WidgetStatePropertyAll(Colors.grey.shade100),
-        columns: const [
-          DataColumn(label: Text('Name')),
-          DataColumn(label: Text('Email')),
-          DataColumn(label: Text('Title')),
-          DataColumn(label: Text('Role')),
-          DataColumn(label: Text('Last sign-in')),
-          DataColumn(label: Text('Actions')),
-        ],
-        rows: execs.map((exec) {
-          final id = exec['id']?.toString() ?? '';
-          final revoking = revokingIds.contains(id);
-          return DataRow(
-            cells: [
-              DataCell(Text(
-                (exec['name'] as String?) ?? '(unnamed)',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              )),
-              DataCell(Text((exec['email'] as String?) ?? '')),
-              DataCell(Text((exec['executive_title'] as String?) ?? '—')),
-              DataCell(Text((exec['executive_role'] as String?) ?? '—')),
-              DataCell(Text(formatLastSeen(exec['last_sign_in_at'] as String?))),
-              DataCell(Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.history, size: 18),
-                    tooltip: 'View activity',
-                    onPressed: revoking ? null : () => onViewActivity(exec),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.dashboard_customize, size: 18),
-                    tooltip: 'Manage dashboard pages',
-                    onPressed: revoking ? null : () => onManagePages(exec),
-                  ),
-                  if (revoking)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  else
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: WidgetStatePropertyAll(Colors.grey.shade100),
+          columns: const [
+            DataColumn(label: Text('Name')),
+            DataColumn(label: Text('Email')),
+            DataColumn(label: Text('Title')),
+            DataColumn(label: Text('Role')),
+            DataColumn(label: Text('Last sign-in')),
+            DataColumn(label: Text('Mail alias')),
+            DataColumn(label: Text('Actions')),
+          ],
+          rows: execs.map((exec) {
+            final id = exec['id']?.toString() ?? '';
+            final revoking = revokingIds.contains(id);
+            final mailBusy = mailBusyIds.contains(id);
+            final aliasRow = aliasesByUserId[id];
+            return DataRow(
+              cells: [
+                DataCell(Text(
+                  (exec['name'] as String?) ?? '(unnamed)',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                )),
+                DataCell(Text((exec['email'] as String?) ?? '')),
+                DataCell(Text((exec['executive_title'] as String?) ?? '—')),
+                DataCell(Text((exec['executive_role'] as String?) ?? '—')),
+                DataCell(Text(
+                    formatLastSeen(exec['last_sign_in_at'] as String?))),
+                DataCell(_MailAliasCell(
+                  aliasRow: aliasRow,
+                  busy: mailBusy,
+                  onEnable: () => onEnableMail(exec),
+                  onRevoke: () => onRevokeMail(exec),
+                )),
+                DataCell(Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     IconButton(
-                      icon: Icon(Icons.block,
-                          size: 18, color: BrandColors.error),
-                      tooltip: 'Revoke access',
-                      onPressed: () => onRevoke(exec),
+                      icon: const Icon(Icons.history, size: 18),
+                      tooltip: 'View activity',
+                      onPressed: revoking ? null : () => onViewActivity(exec),
                     ),
-                ],
-              )),
-            ],
-          );
-        }).toList(),
+                    IconButton(
+                      icon: const Icon(Icons.dashboard_customize, size: 18),
+                      tooltip: 'Manage dashboard pages',
+                      onPressed: revoking ? null : () => onManagePages(exec),
+                    ),
+                    if (revoking)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    else
+                      IconButton(
+                        icon: Icon(Icons.block,
+                            size: 18, color: BrandColors.error),
+                        tooltip: 'Revoke access',
+                        onPressed: () => onRevoke(exec),
+                      ),
+                  ],
+                )),
+              ],
+            );
+          }).toList(),
+        ),
       ),
+    );
+  }
+}
+
+/// Renders the per-row mail status: either an "Enable Mail" outlined button
+/// or the existing alias with a small Revoke trailing action.
+class _MailAliasCell extends StatelessWidget {
+  const _MailAliasCell({
+    required this.aliasRow,
+    required this.busy,
+    required this.onEnable,
+    required this.onRevoke,
+  });
+
+  final Map<String, dynamic>? aliasRow;
+  final bool busy;
+  final VoidCallback onEnable;
+  final VoidCallback onRevoke;
+
+  @override
+  Widget build(BuildContext context) {
+    if (busy) {
+      return const SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    if (aliasRow == null) {
+      return OutlinedButton.icon(
+        icon: const Icon(Icons.mail_outline, size: 16),
+        label: const Text('Enable Mail'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: BrandColors.unityBlue,
+          side: BorderSide(color: BrandColors.unityBlue.withOpacity(0.5)),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        ),
+        onPressed: onEnable,
+      );
+    }
+    final aliasEmail = (aliasRow!['alias_email'] as String?) ?? '';
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.check_circle, size: 16, color: BrandColors.success),
+        const SizedBox(width: 6),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 220),
+          child: Text(
+            aliasEmail,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        IconButton(
+          icon: Icon(Icons.delete_outline,
+              size: 16, color: BrandColors.error),
+          tooltip: 'Revoke mail',
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+          onPressed: onRevoke,
+        ),
+      ],
     );
   }
 }
@@ -446,18 +840,26 @@ class _ExecTable extends StatelessWidget {
 class _ExecCard extends StatelessWidget {
   const _ExecCard({
     required this.exec,
+    required this.aliasRow,
     required this.revoking,
+    required this.mailBusy,
     required this.onRevoke,
     required this.onViewActivity,
     required this.onManagePages,
+    required this.onEnableMail,
+    required this.onRevokeMail,
     required this.formatLastSeen,
   });
 
   final Map<String, dynamic> exec;
+  final Map<String, dynamic>? aliasRow;
   final bool revoking;
+  final bool mailBusy;
   final VoidCallback onRevoke;
   final VoidCallback onViewActivity;
   final VoidCallback onManagePages;
+  final VoidCallback onEnableMail;
+  final VoidCallback onRevokeMail;
   final String Function(String?) formatLastSeen;
 
   @override
@@ -560,6 +962,16 @@ class _ExecCard extends StatelessWidget {
                 if (role.isNotEmpty) _chip(Icons.shield_outlined, role),
                 _chip(Icons.access_time, 'Last sign-in: $lastSeen'),
               ],
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _MailAliasCell(
+                aliasRow: aliasRow,
+                busy: mailBusy,
+                onEnable: onEnableMail,
+                onRevoke: onRevokeMail,
+              ),
             ),
           ],
         ),
