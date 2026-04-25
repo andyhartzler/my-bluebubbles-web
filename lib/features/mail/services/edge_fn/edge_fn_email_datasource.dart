@@ -303,38 +303,59 @@ class EdgeFnEmailDataSource extends EmailDataSource {
 
   @override
   Future<DetailedEmail> getStoredOpenedEmail(
-          Session session, AccountId accountId, EmailId emailId) =>
-      _todo('getStoredOpenedEmail');
+      Session session, AccountId accountId, EmailId emailId) async {
+    // Caller (EmailController.getEmailContent) catches NotFoundEmailException
+    // and falls through to fetching the email via the network slot. Throwing
+    // a sentinel error rather than UnimplementedError keeps that retry path
+    // intact instead of crashing the controller.
+    throw StateError(
+      'EdgeFnEmailDataSource.getStoredOpenedEmail: no offline cache; '
+      'caller should fall back to getEmailContent (network slot).',
+    );
+  }
 
   @override
   Future<DetailedEmail> getStoredNewEmail(
-          Session session, AccountId accountId, EmailId emailId) =>
-      _todo('getStoredNewEmail');
+      Session session, AccountId accountId, EmailId emailId) async {
+    throw StateError(
+      'EdgeFnEmailDataSource.getStoredNewEmail: no offline cache; '
+      'caller should fall back to getEmailContent (network slot).',
+    );
+  }
 
   @override
   Future<SendingEmail> storeSendingEmail(
-          AccountId accountId, UserName userName, SendingEmail sendingEmail) =>
-      _todo('storeSendingEmail');
+          AccountId accountId, UserName userName, SendingEmail sendingEmail) async =>
+      sendingEmail;
 
   @override
   Future<SendingEmail> updateSendingEmail(
-          AccountId accountId, UserName userName, SendingEmail newSendingEmail) =>
-      _todo('updateSendingEmail');
+          AccountId accountId, UserName userName, SendingEmail newSendingEmail) async =>
+      newSendingEmail;
 
   @override
   Future<List<SendingEmail>> updateMultipleSendingEmail(AccountId accountId,
-          UserName userName, List<SendingEmail> newSendingEmails) =>
-      _todo('updateMultipleSendingEmail');
+          UserName userName, List<SendingEmail> newSendingEmails) async =>
+      newSendingEmails;
 
   @override
   Future<SendingEmail> getStoredSendingEmail(
-          AccountId accountId, UserName userName, String sendingId) =>
-      _todo('getStoredSendingEmail');
+      AccountId accountId, UserName userName, String sendingId) async {
+    // No persistent sending-queue store. Caller treats throw as "missing"
+    // and reconciles by re-listing via getAllSendingEmails (which is []).
+    throw StateError(
+      'EdgeFnEmailDataSource.getStoredSendingEmail: no persistent sending '
+      'queue cache for sendingId=$sendingId.',
+    );
+  }
 
   @override
   Future<void> unsubscribeMail(
-          Session session, AccountId accountId, EmailId emailId) =>
-      _todo('unsubscribeMail');
+      Session session, AccountId accountId, EmailId emailId) async {
+    // Gmail doesn't expose List-Unsubscribe headers via our edge fns yet; the
+    // caller treats success as "unsubscribe sent" — quietly no-op until a
+    // mail-unsubscribe edge function ships.
+  }
 
   @override
   Future<EmailRecoveryAction> restoreDeletedMessage(
