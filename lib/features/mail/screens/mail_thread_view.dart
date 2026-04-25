@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/html_viewer/html_content_viewer_on_web_widget.dart';
 import 'package:bluebubbles/features/mail/providers/mail_thread_provider.dart';
+import 'package:bluebubbles/features/mail/services/tmail_bridge.dart';
 
 class MailThreadView extends StatelessWidget {
   const MailThreadView({
@@ -131,21 +133,34 @@ class _ThreadBody extends StatelessWidget {
   }
 }
 
-class _MessageBubble extends StatelessWidget {
+class _MessageBubble extends StatefulWidget {
   const _MessageBubble({required this.message});
   final Map<String, dynamic> message;
 
   @override
+  State<_MessageBubble> createState() => _MessageBubbleState();
+}
+
+class _MessageBubbleState extends State<_MessageBubble> {
+  @override
+  void initState() {
+    super.initState();
+    ensureTmailGetXBindings();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final headers = _headerMap(message);
+    final headers = _headerMap(widget.message);
     final from = headers['from'] ?? '';
     final to = headers['to'] ?? '';
     final dateStr = headers['date'] ?? '';
-    final body = _extractPlainBody(message);
+    final htmlBody = _extractHtmlBody(widget.message);
+    final plainBody = _extractPlainBody(widget.message);
+    final width = MediaQuery.of(context).size.width;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
+        color: Colors.white.withOpacity(0.97),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -155,17 +170,30 @@ class _MessageBubble extends StatelessWidget {
           if (to.isNotEmpty) _Row(label: 'To', value: to),
           if (dateStr.isNotEmpty) _Row(label: 'Date', value: dateStr),
           const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(8),
+          if (htmlBody.isNotEmpty)
+            // tmail's HtmlContentViewerOnWeb renders email HTML inside a
+            // sandboxed iframe with mailto/link interception. Used in
+            // place of a SelectableText fallback when the message
+            // contains a text/html body part.
+            HtmlContentViewerOnWeb(
+              contentHtml: htmlBody,
+              widthContent: width - 80,
+              autoAdjustHeight: true,
+              keepAlive: true,
+              useDefaultFontStyle: true,
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: SelectableText(
+                plainBody.isEmpty ? '(no body)' : plainBody,
+                style: const TextStyle(color: Colors.black87, fontSize: 13),
+              ),
             ),
-            child: SelectableText(
-              body.isEmpty ? '(no body)' : body,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-            ),
-          ),
         ],
       ),
     );
@@ -178,6 +206,8 @@ class _Row extends StatelessWidget {
   final String value;
   @override
   Widget build(BuildContext context) {
+    // Bubble switched to white surface to match tmail's HtmlContentViewerOnWeb
+    // which renders inside a white iframe — keep header rows readable.
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Row(
@@ -187,8 +217,8 @@ class _Row extends StatelessWidget {
             width: 50,
             child: Text(
               label,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+              style: const TextStyle(
+                color: Colors.black54,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -198,7 +228,7 @@ class _Row extends StatelessWidget {
             child: Text(
               value,
               style: const TextStyle(
-                color: Colors.white,
+                color: Colors.black87,
                 fontSize: 12,
               ),
             ),
@@ -278,10 +308,19 @@ Map<String, String> _headerMap(Map<String, dynamic> message) {
   return out;
 }
 
+/// Returns the raw HTML body of the message, if any. Used by the
+/// HtmlContentViewerOnWeb renderer.
+String _extractHtmlBody(Map<String, dynamic> message) {
+  final payload = message['payload'];
+  if (payload is! Map) return '';
+  final html = _findPart(payload, 'text/html');
+  if (html != null) return _decode(html);
+  return '';
+}
+
 /// Walks the Gmail payload tree and returns the first plain-text body
 /// found. Falls back to a stripped HTML body if no text/plain part is
-/// present. Phase 1 keeps it simple — Phase 2/3 can swap to
-/// MimeMessageViewer for full HTML rendering.
+/// present.
 String _extractPlainBody(Map<String, dynamic> message) {
   final payload = message['payload'];
   if (payload is! Map) return '';
