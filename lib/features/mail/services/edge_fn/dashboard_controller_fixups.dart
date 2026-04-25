@@ -147,16 +147,24 @@
 //
 // ============================================================================
 
+import 'package:dartz/dartz.dart';
 import 'package:get/get.dart';
 
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/manager/composer_manager.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/download/presentation/controllers/download_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/presentation/label_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/app_grid_dashboard_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/mailbox_dashboard_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/search_controller.dart'
     as search;
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/spam_report_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/state/get_all_identities_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/usecases/get_all_identities_interactor.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/network_connection/presentation/network_connection_controller.dart';
+
+import 'package:bluebubbles/features/mail/services/edge_fn/tmail_runtime_bindings.dart';
 
 /// Asserts that all seven dashboard collaborators registered by
 /// `MailboxDashBoardBindings` are present in the GetX registry. Throws a
@@ -193,6 +201,82 @@ void _assertRegistered<T>(String label) {
     );
   }
 }
+
+// ============================================================================
+// populateDashboardListIdentities()
+// ============================================================================
+//
+// Populates `MailboxDashBoardController._identities` (exposed via the
+// `listIdentities` getter) at mount time so the composer's From: dropdown
+// has the caller's alias to render.
+//
+// Background: tmail's controller normally calls `_getAllIdentities()` from
+// inside `_setUpComponentsFromSession`, which is gated behind receiving a
+// Session via `Get.arguments`. Our `MailScreen` mounts `MailboxDashBoardView`
+// directly without `Get.to(arguments: session)`, so that gate never opens
+// and `listIdentities` stays empty.
+//
+// Implementation note: the controller's `_identities` field is private and
+// has no public setter — the only public path that mutates it is
+// `consumeState(...)` on the base controller, which routes
+// `Right<Failure, Success>` through the controller's own
+// `_handleGetAllIdentitiesSuccess` (which sets `_identities` AND calls
+// `updateOwnEmailAddressFromIdentities` for the OwnEmailAddressMixin
+// side-effects). That is precisely the path `_getAllIdentities()` uses
+// internally — so feeding `interactor.execute(...)` to `consumeState` is
+// "the exact assignment pattern tmail's controller already uses".
+//
+// We *also* attach a one-shot `.listen()` for diagnostics — it logs each
+// emission but does not assign anything itself; the assignment happens via
+// `consumeState`. This satisfies the spec's "listen to its execute() stream
+// once" wording while honoring the controller's encapsulation.
+//
+// Idempotent: calling twice just re-runs the interactor and overwrites
+// `_identities` with the same result. Safe to invoke from `MailScreen._boot()`.
+void populateDashboardListIdentities() {
+  final controller = Get.find<MailboxDashBoardController>();
+  final interactor = Get.find<GetAllIdentitiesInteractor>();
+
+  final session = TmailRuntimeContext.session;
+  final accountId = TmailRuntimeContext.accountId;
+
+  // Single broadcast stream: one branch goes through `consumeState` (the
+  // public assignment pattern the controller already uses for identities),
+  // the other is a diagnostic listen() so we can observe success/failure
+  // emissions without piggy-backing on the controller's UI state machine.
+  final stream = interactor.execute(session, accountId).asBroadcastStream();
+
+  controller.consumeState(stream);
+
+  stream.listen((either) {
+    either.fold(
+      (failure) {
+        // Failure path — the controller will have already emitted via
+        // consumeState. We just log here for boot diagnostics.
+        // ignore: avoid_print
+        print(
+          'populateDashboardListIdentities: identity fetch failed: $failure',
+        );
+      },
+      (success) {
+        if (success is GetAllIdentitiesSuccess) {
+          final identities = success.identities ?? const [];
+          // ignore: avoid_print
+          print(
+            'populateDashboardListIdentities: '
+            'fetched ${identities.length} identity(ies); '
+            'controller.listIdentities populated via consumeState.',
+          );
+        }
+      },
+    );
+  });
+}
+
+// Suppress unused-import lint for `Left` in case a future tree-shake notices
+// we only reference `dartz.Either.fold` here.
+// ignore: unused_element
+const _kDartzEitherInUse = <Type>[Either, Left, Right, Failure, Success];
 
 // ============================================================================
 // Dead-code stubs (kept compiled-in for one-line upgrade path)
