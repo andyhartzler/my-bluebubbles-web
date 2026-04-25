@@ -168,3 +168,137 @@ All 16 `Get.find` calls in the constructor + parent `ReloadableController` resol
 ### Future hardening
 
 If we mount the dashboard for real (i.e. `Session` passed via `Get.arguments`), `_setUpComponentsFromSession` will trigger `_getAllIdentities()` → `_getAllIdentitiesInteractor.execute(session, accountId)` which dispatches to `IdentityDataSource` (a separate datasource we have NOT implemented). Track as a separate edge-fn data source (`EdgeFnIdentityDataSource`) or stub the interactor at the bindings level.
+
+---
+
+# ComposerController boot path trace
+
+Traced against `lib/features/mail/_tmail/tmail_ui_user/features/composer/presentation/composer_controller.dart` (2389 lines) and `composer_bindings.dart` (406 lines) at HEAD.
+
+The composer is reached on web by `MailboxDashBoardController.openComposer()` → `_openComposerOnWeb()` → `composerManager.addComposer(args)`. `ComposerManager.addComposer` (composer_manager.dart:23) generates a `composerId` from `DateTime.now().millisecondsSinceEpoch.toString()`, runs `ComposerBindings(composerId, composerArguments).dependencies()` (which is the full BaseBindings chain — DataSourceImpl, DataSource, RepositoryImpl, Repository, Interactor, Controller — all `lazyPut` with `tag: composerId`), then inserts a `ComposerView` keyed by that `composerId` into `composers` `RxMap`. The ComposerView's `controller` getter (composer_view_web.dart:53) lazy-resolves the controller via `Get.find<ComposerController>(tag: composerId)` on first build, which triggers the GetX lazy chain and runs the controller constructor → `onInit` → `onReady`.
+
+**Important**: every Get.find inside ComposerBindings/ComposerController is **tagged with `composerId`**. That means the composer's repos and data sources are NEW instances distinct from the dashboard's untagged ones. The EdgeFn data sources we registered in `tmail_runtime_bindings.dart:registerEdgeFnDataSources()` are registered without a tag — they back the dashboard, but the composer's tagged `IdentityDataSource` lazyPut creates a separate slot pointed at the JMAP `IdentityDataSourceImpl` (which is what `IdentityInteractorsBindings.bindingsDataSource` registers). See section 3 below.
+
+---
+
+## 0. Constructor field initializers (synchronous Get.find at controller-construction)
+
+When `Get.find<ComposerController>(tag: composerId)` is first called from `ComposerView`, GetX runs the lazy factory in `ComposerBindings.bindingsController()`. That factory:
+
+1. Resolves the 14 positional + 2 named dependencies from the tagged registry (all `lazyPut` registered in `bindingsInteractor` / `bindingsRepository` / `bindingsController` of the same `ComposerBindings`). Each lazyPut transitively triggers `Get.find<...>()` for the upstream graph (RemoteExceptionThrower, EmailAPI, MailboxAPI, FileUploader, Uuid, HtmlAnalyzer, etc.). All upstream finds resolve to instances registered by `MailScreenTmailBindings.initialize()` — verified clean.
+
+2. Calls `ComposerController(...)` with the 14+2 constructor args.
+
+The controller body's field initializers (composer_controller.dart:140-142) run during construction, before `onInit`:
+
+| # | Line | `Get.find<X>()` (untagged) | Registered by |
+|---|------|---------------------------|---------------|
+| 1 | 140 | `MailboxDashBoardController` | `MailboxDashBoardBindings.bindingsController()` ✅ |
+| 2 | 141 | `NetworkConnectionController` | `NetWorkConnectionBindings` ✅ |
+| 3 | 142 | `BeforeReconnectManager` | `CoreBindings` ✅ |
+
+Plus the `BaseController` superclass field initializers — same set as the dashboard trace (CachingManager, AuthorizationInterceptors x2, DynamicUrlInterceptors, DeleteCredentialInteractor, LogoutOidcInteractor, DeleteAuthorityOidcInteractor, AppToast, ImagePaths, ResponsiveUtils, Uuid, ToastManager, TwakeAppManager, LanguageCacheManager, MailNotificationManager). All are registered by `CoreBindings` / `LocalBindings` / `NetworkBindings` / `CredentialBindings`.
+
+**No interactor.execute() runs in the constructor body.** All finds resolve cleanly.
+
+The 16 args injected into ComposerController via the lazyPut factory are themselves resolved with `tag: composerId` and back the per-composer interactor chain. Their construction does NOT execute any data source method.
+
+---
+
+## 1. onInit() execution order
+
+Source lines 295-311. Web is the only target.
+
+1. (line 296) `super.onInit()` — `BaseController.onInit()` is empty.
+2. (line 298) `responsiveContainerKey = GlobalKey()` — pure Flutter.
+3. (line 299) `richTextWebController = getBinding<RichTextWebController>(tag: composerId)` — registered by `ComposerBindings.bindingsController()` ✅.
+4. (line 300) `restoreEmailInlineImagesInteractor = getBinding<RestoreEmailInlineImagesInteractor>(tag: composerId)` — registered by `ComposerBindings.bindingsInteractor()` ✅.
+5. (line 301) `menuMoreOptionController = CustomPopupMenuController()` — pure widget util.
+6. (line 305) `createFocusNodeInput()` — instantiates FocusNodes, no data source.
+7. (line 306) `scrollControllerEmailAddress.addListener(...)` — pure listener registration.
+8. (line 307) `_listenStreamEvent()` — wires `uploadInlineImageWorker = ever(uploadController.uploadInlineViewState, ...)` (composer_controller.dart:441-449). Worker only; no execute.
+9. (line 308) `_beforeReconnectManager.addListener(onBeforeReconnect)` — listener registration only.
+10. (line 309) `_injectBinding()` (composer_controller.dart:631-636) — calls `injectAutoCompleteBindings(session, accountId)` (BaseController:326). Wrapped in try/catch. Internally: `ContactAutoCompleteBindings().dependencies()` registers `ContactDataSourceImpl` / `ContactRepositoryImpl` / `GetDeviceContactSuggestionsInteractor` (all `Get.put` with no tag). No execute. Then `requireCapability(...)` — with our synthetic `Session` having an empty capabilities map, this throws `NotSupportFeatureException`, the catch swallows it, and `TMailAutoCompleteBindings().dependencies()` is skipped. ⚠️ Safe by design (try/catch).
+11. (line 310) `onKeyboardShortcutInit()` (handle_keyboard_shortcut_actions_extension.dart:19) — assigns `keyboardShortcutFocusNode = FocusNode()`. Pure Flutter.
+
+**onInit() interactor.execute() count: 0. No EdgeFn data source method invoked.**
+
+---
+
+## 2. onReady() execution order
+
+Source lines 314-323.
+
+1. (line 316) `_triggerBrowserEventListener()` (composer_controller.dart:452-489) — registers 5 `html.window.on*` listeners (DragEnter, DragOver, DragLeave, Drop, Blur). Pure browser event registration.
+2. (line 318) `setupComposer()` — see section 2a below. **THIS is where the only execute fires.**
+3. `super.onReady()` — `BaseController.onReady()` registers two more `html.window.on*` listeners (BeforeUnload, Unload). Browser event registration only.
+
+### 2a. `setupComposer()` (composer_controller.dart:638-672)
+
+For the standard "compose" button click → `composerArguments.value.emailActionType == EmailActionType.compose` (default action type when `controller.openComposer(ComposerArguments())` is called from `mailbox_dashboard_view_web.dart:127`):
+
+1. `setupEmailSubject(arguments)` — Rxn assignment, no execute.
+2. `setupEmailRecipients(arguments)` — list copies, no execute.
+3. `setupEmailImportantFlag(arguments)` — Rx assignment, no execute.
+4. `setupEmailAttachments(arguments)` — invokes `uploadController.initializeUploadAttachments(...)` only if attachments are present (compose=empty), no execute.
+5. `setupEmailOtherComponents(arguments)` (setup_email_other_components_extension.dart:8) — for `.compose` falls into `default:` branch → just sets `minInputLengthAutocomplete`. No execute.
+6. `setupEmailRequestReadReceiptFlag(arguments)` (setup_email_request_read_receipt_flag_extension.dart:12) — for `.compose` action type, falls into the `else if (currentEmailActionType != editDraft && != editAsNewEmail)` branch. Guarded by `mailboxDashBoardController.isServerSettingsCapabilitySupported`, which (manage_account_dashboard_controller.dart:338) checks `capabilityServerSettings.isSupported(session, accountId)`. **Our synthetic Session has an empty capabilities map → returns false → `getServerSetting()` skipped.** ⚠️ No-op by environment.
+7. `setupEmailTemplateId(arguments)` — assigns `currentTemplateEmailId`. No execute.
+8. `await setupListIdentities(arguments)` (setup_list_identities_extension.dart:10) — **fires the only execute at composer boot:**
+   - Reads `arguments.identities` (set via `MailboxDashBoardController.openComposer` → `arguments.withIdentity(identities: List.from(listIdentities), ...)`).
+   - In our environment the dashboard's `_getAllIdentities()` is only called from `_setUpComponentsFromSession` which fires when a `Session` is passed via `Get.arguments`. `MailScreen` does NOT pass a Session → dashboard's `_identities` stays null → `dashboard.listIdentities` returns `[]` → `arguments.identities` is empty.
+   - With empty identities, falls into `getAllIdentitiesAsSynchronize()` (line 19) which calls `getAllIdentitiesInteractor.execute(session, accountId).last`.
+   - The `GetAllIdentitiesInteractor` is registered with `tag: composerId` and depends on `IdentityRepository(tag)` → `IdentityDataSource(tag)`. **`IdentityInteractorsBindings.bindingsDataSource()` (identity_interactors_bindings.dart:38-47) registers a tagged `IdentityDataSource` slot pointing at `IdentityDataSourceImpl` (the JMAP impl) — NOT our untagged `EdgeFnIdentityDataSource` registered in `registerEdgeFnDataSources()`.**
+   - `IdentityDataSourceImpl.getAllIdentities` calls `IdentityAPI.getAllIdentities` over Dio against the synthetic Supabase functions URL with no auth → throws an HTTP-level exception → caught by `_exceptionThrower.throwException` → re-thrown as a `Failure` → interactor emits `Left(GetAllIdentitiesFailure(...))`.
+   - Back in `getAllIdentitiesAsSynchronize`, the `if (uiState is GetAllIdentitiesSuccess)` branch is skipped. The `else if (uiState is GetAllIdentitiesFailure)` branch dispatches the failure to `consumeState` for telemetry. No exception bubbles out. ⚠️ Safe by environment — composer boots with empty `listFromIdentities`.
+9. `await setupEmailContent(arguments)` (setup_email_content_extension.dart:26) — switch on `currentEmailActionType`. For `.compose` (and any not in the listed cases) falls into the `default:` branch → just sets `emailContentsViewState.value = Right(LoadEmailContentCompleted())`. **No interactor execute.** Other action types (editDraft / editAsNewEmail / reply* / forward / reopenComposerBrowser / etc.) DO fire `getEmailContentInteractor.execute` (which routes through `EmailRepositoryImpl(tag)` → tagged `EmailDataSource` → composer's `EmailDataSourceImpl(tag)` over JMAP, NOT our EdgeFn) — but those only run when the composer is opened from a draft/reply/forward action, not from the new-compose button.
+10. The `if (screenDisplayMode.value.isNotContentVisible() && ...isWebDesktop) { await setupSelectedIdentityWithoutApplySignature(); }` block — `setupSelectedIdentityWithoutApplySignature()` (setup_selected_identity_extension.dart:47) only does Rx mutations on `identitySelected`. No execute.
+11. `richTextWebController?.updateFormattingOptions(...)` — UI state, no execute.
+
+**onReady() interactor.execute() count: 1 (`getAllIdentitiesInteractor.execute`). The call routes to a TAGGED JMAP `IdentityDataSourceImpl` — not our EdgeFn impl. Fails with HTTP exception, caught and converted to a Failure. No crash.**
+
+---
+
+## 3. EdgeFn DataSource cross-reference
+
+| DataSource method | Fires at composer boot? | EdgeFn impl status |
+|-------------------|------------------------|---------------------|
+| `EmailDataSource.*` (any) | No | N/A — not invoked at compose-action boot |
+| `ThreadDataSource.*` (any) | No | N/A |
+| `MailboxDataSource.*` (any) | No | N/A |
+| `IdentityDataSource.getAllIdentities` | **Yes**, but routed to JMAP `IdentityDataSourceImpl(tag: composerId)` instead of `EdgeFnIdentityDataSource` | ✅ EdgeFn impl exists (untagged), but the tagged composer slot bypasses it. Failure caught; safe. |
+
+**Total interactor.execute calls at composer boot: 1.**
+
+**❌ count fired at boot: 0** — the one execute that fires hits the JMAP path (not our EdgeFn), and the JMAP impl's HTTP failure is caught by the interactor's `_exceptionThrower` chain.
+
+**No `_todo`/UnimplementedError throw fires at composer boot.** No EdgeFn email/thread/mailbox method is invoked. Composer boots cleanly without crashing.
+
+---
+
+## 4. Recommendations
+
+### EdgeFn DataSource changes for composer boot
+**None required.** The composer-boot path doesn't invoke any `_todo` method on our EdgeFn data sources.
+
+### Functional gap (NOT a crash, but UX-degrading)
+The composer's `From:` dropdown (`listFromIdentities`) is empty at boot because:
+1. `MailScreen` doesn't pass a `Session` via `Get.arguments`, so `MailboxDashBoardController._setUpComponentsFromSession` never runs at dashboard boot, so `dashboard.listIdentities` is always `[]`.
+2. `MailboxDashBoardController.openComposer` therefore injects an empty `identities` list into the args.
+3. Composer's `setupListIdentities` falls back to `getAllIdentitiesAsSynchronize`, which routes through the **tagged** JMAP `IdentityDataSourceImpl` (registered by `IdentityInteractorsBindings.bindingsDataSource`), not our untagged `EdgeFnIdentityDataSource`. JMAP call fails → empty list.
+
+Fix options (NOT applied here — out of scope for the boot-trace task; flagging only):
+- Surgical patch `_tmail/.../identity_interactors_bindings.dart:bindingsDataSource()` to delegate the tagged `IdentityDataSource` slot to the untagged global registration when present (similar pattern to `web_auth_redirect_processor_extension` neutralization in commit `d48713c3c`).
+- OR: register the EdgeFn impl with every dynamically-allocated composer tag — requires intercepting `ComposerManager.addComposer` to pre-populate the tagged slot before `ComposerBindings.dependencies()` runs.
+- OR: trigger `MailboxDashBoardController._getAllIdentities()` (untagged) at dashboard mount via a fix-up in `dashboard_controller_fixups.dart`. This populates `_identities` so that `openComposer` injects them via `withIdentity`, short-circuiting the JMAP fetch. Cheapest fix; recommended.
+
+### Get.find dependencies
+All Get.find calls in `ComposerController`'s constructor body, field initializers, and inherited `BaseController` field initializers resolve cleanly under `MailScreenTmailBindings.initialize()` + the per-composer `ComposerBindings(...).dependencies()` chain. **No unsatisfied finds.**
+
+### Interactor execute calls at composer boot (summary)
+
+| # | Call site | Interactor | Tagged DataSource | EdgeFn Status | Boot risk |
+|---|-----------|------------|-------------------|---------------|-----------|
+| 1 | `setupListIdentities` → `getAllIdentitiesAsSynchronize` | `GetAllIdentitiesInteractor` | `IdentityDataSourceImpl(JMAP)` (tagged) | Bypassed; EdgeFn untagged not used | Safe — failure caught |
+
+**Composer is expected to boot and render without crashing for the standard "compose" button click.** The user will see an empty `From:` dropdown until one of the three fix options above lands. Other action types (editDraft / reply / forward) will additionally invoke `getEmailContentInteractor.execute` against a tagged JMAP `EmailDataSourceImpl` — that path is NOT exercised at vanilla compose-button boot, but should be tracked separately if/when those flows are wired.
