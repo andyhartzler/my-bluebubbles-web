@@ -135,6 +135,11 @@ echo "Installing dependencies..."
 write_flutter_env
 flutter pub get
 
+# Patch linagora git deps for Flutter 3.24 compatibility (they use 3.27+ APIs).
+# Required for the tmail-flutter source fork to build. See tool/patch_pub_cache.sh.
+echo "Patching linagora git deps in pub-cache for Flutter 3.24 compatibility..."
+bash tool/patch_pub_cache.sh
+
 if grep -q "build_runner" pubspec.yaml; then
   echo "Running code generation..."
   flutter pub run build_runner build --delete-conflicting-outputs
