@@ -207,8 +207,7 @@ class _AiScribeSuggestionWidgetState extends State<AiScribeSuggestionWidget>
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 8,
-      children: [
+            children: [
         AiScribeSuggestionHeader(
           title: widget.aiAction.getLabel(localizations),
           imagePaths: widget.imagePaths,

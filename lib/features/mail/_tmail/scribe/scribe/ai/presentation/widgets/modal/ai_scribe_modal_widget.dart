@@ -45,7 +45,7 @@ class AiScribeModalWidget extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: AIScribeSizes.fieldSpacing,
+
         children: [
           if (hasContent)
             Flexible(

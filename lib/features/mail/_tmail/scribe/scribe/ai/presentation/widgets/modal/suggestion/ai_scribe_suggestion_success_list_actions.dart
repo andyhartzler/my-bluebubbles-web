@@ -26,7 +26,7 @@ class AiScribeSuggestionSuccessListActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      spacing: AIScribeSizes.successSpacing,
+
       children: [
         AiScribeSuggestionSuccessToolbar(suggestionText: suggestionText, onLoadSuggestion: onLoadSuggestion, imagePaths: imagePaths),
         AiScribeSuggestionSuccessActions(

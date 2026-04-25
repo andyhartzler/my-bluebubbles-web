@@ -24,6 +24,24 @@ class MaterialDateRangePickerDialog extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => const SizedBox.shrink();
+
+  // tmail's date-range filter dialog static entry point. We stubbed the
+  // package; this no-op satisfies the call sites in
+  // features/base/mixin/date_range_picker_mixin.dart so the project compiles.
+  static Future<void> showDateRangePicker(
+    BuildContext context, {
+    String? confirmText,
+    String? cancelText,
+    String? last7daysTitle,
+    String? last30daysTitle,
+    String? last6monthsTitle,
+    String? lastYearTitle,
+    DateTime? initStartDate,
+    DateTime? initEndDate,
+    DateTime? firstDate,
+    DateTime? lastDate,
+    Function(DateTime? startDate, DateTime? endDate)? onCallbackAction,
+  }) async {}
 }
 
 class CupertinoDateRangePickerDialog extends StatelessWidget {

@@ -16,8 +16,7 @@ class AiScribeSuggestionError extends StatelessWidget {
     return Padding(
       padding: const EdgeInsetsDirectional.only(bottom: 8, start: 8),
       child: Row(
-        spacing: 8,
-        children: [
+                children: [
           SvgPicture.asset(
             imagePaths.icWarning,
             width: 22,

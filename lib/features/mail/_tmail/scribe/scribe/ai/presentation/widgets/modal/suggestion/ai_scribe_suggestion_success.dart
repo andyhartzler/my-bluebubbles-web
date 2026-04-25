@@ -23,8 +23,7 @@ class AiScribeSuggestionSuccess extends StatelessWidget {
     return Padding(
       padding: const EdgeInsetsDirectional.only(bottom: 8),
       child: Column(
-        spacing: 8,
-        mainAxisSize: MainAxisSize.min,
+                mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Flexible(

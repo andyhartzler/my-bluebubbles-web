@@ -19,8 +19,7 @@ class AiScribeSuggestionLoading extends StatelessWidget {
     return Padding(
       padding: const EdgeInsetsDirectional.only(bottom: 8, start: 8),
       child: Row(
-        spacing: 8,
-        children: [
+                children: [
           _SparklePulseIcon(
             asset: imagePaths.icSparkle,
             color: AppColor.blue00B7FF,

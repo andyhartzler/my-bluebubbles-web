@@ -17,8 +17,7 @@ class AiScribeSuggestionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      spacing: 8,
-      children: [
+            children: [
         Expanded(
           child: Text(
             title,
@@ -30,7 +29,7 @@ class AiScribeSuggestionHeader extends StatelessWidget {
         TMailButtonWidget.fromIcon(
           icon: imagePaths.icCloseDialog,
           iconSize: 20,
-          iconColor: AppColor.gray424244.withValues(alpha: 0.72),
+          iconColor: AppColor.gray424244.withOpacity(0.72),
           padding: const EdgeInsets.all(3),
           borderRadius: 20,
           backgroundColor: Colors.transparent,

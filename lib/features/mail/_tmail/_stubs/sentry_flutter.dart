@@ -105,10 +105,13 @@ class SentryManager {
   Future<void> captureException(
     Object exception, {
     StackTrace? stackTrace,
+    String? message,
     Map<String, dynamic>? extras,
   }) async {}
   void addBreadcrumb({String? message, String? category}) {}
   Future<void> close() async {}
+  Future<void> clearUser() async {}
+  Future<void> setUser({String? id, String? email}) async {}
 }
 
 class SentryConfig {
@@ -116,4 +119,9 @@ class SentryConfig {
   final String? environment;
   final String? release;
   const SentryConfig({this.dsn, this.environment, this.release});
+}
+
+extension SentryManagerExt on SentryManager {
+  Future<void> clearUser() async {}
+  Future<void> setUser({String? id, String? email}) async {}
 }

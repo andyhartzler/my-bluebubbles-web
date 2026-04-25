@@ -70,7 +70,7 @@ class _ColorsMapWidgetState extends State<ColorsMapWidget> {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 10,
+
       runSpacing: 10,
       children: [
         TMailButtonWidget.fromIcon(
