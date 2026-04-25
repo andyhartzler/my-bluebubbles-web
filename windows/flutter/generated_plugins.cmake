@@ -5,9 +5,13 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   connectivity_plus
+  desktop_drop
+  desktop_webview_window
   dynamic_color
   emoji_picker_flutter
   file_selector_windows
+  firebase_core
+  flutter_inappwebview_windows
   flutter_secure_storage_windows
   geolocator_windows
   irondash_engine_context
@@ -24,6 +28,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   share_plus
   super_native_extensions
   url_launcher_windows
+  window_to_front
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

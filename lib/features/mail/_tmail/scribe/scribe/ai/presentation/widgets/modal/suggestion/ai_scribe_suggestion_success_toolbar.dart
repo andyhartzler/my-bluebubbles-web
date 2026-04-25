@@ -1,10 +1,10 @@
-import 'package:core/presentation/utils/app_toast.dart';
-import 'package:core/presentation/views/button/tmail_button_widget.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/app_toast.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/button/tmail_button_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:bluebubbles/features/mail/_tmail/scribe/scribe.dart';
-import 'package:core/presentation/resources/image_paths.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
 
 class AiScribeSuggestionSuccessToolbar extends StatelessWidget {
   final String suggestionText;

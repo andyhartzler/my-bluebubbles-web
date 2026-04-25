@@ -1,4 +1,4 @@
-import 'package:core/utils/app_logger.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
 import 'package:jmap_dart_client/jmap/core/capability/capability_properties.dart';
 import 'package:json_annotation/json_annotation.dart';
 

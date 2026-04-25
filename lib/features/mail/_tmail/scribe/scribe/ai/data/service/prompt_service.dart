@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:core/utils/app_logger.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
 import 'package:dio/dio.dart';
 import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/domain/model/ai_message.dart';
 import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/domain/model/prompt_data.dart';

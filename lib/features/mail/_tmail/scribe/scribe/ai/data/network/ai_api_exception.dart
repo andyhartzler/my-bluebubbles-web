@@ -1,4 +1,4 @@
-import 'package:core/domain/exceptions/app_base_exception.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/domain/exceptions/app_base_exception.dart';
 
 class AIApiException extends AppBaseException {
   final int? statusCode;

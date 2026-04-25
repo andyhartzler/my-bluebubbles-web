@@ -3,6 +3,8 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  desktop_drop
+  desktop_webview_window
   dynamic_color
   emoji_picker_flutter
   file_selector_linux
@@ -13,11 +15,13 @@ list(APPEND FLUTTER_PLUGIN_LIST
   media_kit_libs_linux
   media_kit_video
   objectbox_flutter_libs
+  open_file_linux
   pasteboard
   printing
   record_linux
   super_native_extensions
   url_launcher_linux
+  window_to_front
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

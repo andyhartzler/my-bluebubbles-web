@@ -1,5 +1,5 @@
-import 'package:core/presentation/state/failure.dart';
-import 'package:core/presentation/state/success.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
 import 'package:dartz/dartz.dart';
 import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/domain/constants/ai_prompts.dart';
 import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/domain/repository/ai_scribe_repository.dart';

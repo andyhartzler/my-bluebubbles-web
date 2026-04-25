@@ -1,4 +1,4 @@
-import 'package:core/data/network/dio_client.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/data/network/dio_client.dart';
 import 'package:get/get.dart';
 import 'package:bluebubbles/features/mail/_tmail/scribe/scribe.dart';
 import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/data/datasource_impl/ai_datasource_impl.dart';

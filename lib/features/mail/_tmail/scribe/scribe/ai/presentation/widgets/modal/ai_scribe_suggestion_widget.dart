@@ -1,7 +1,7 @@
 import 'dart:math' hide log;
 
-import 'package:core/presentation/resources/image_paths.dart';
-import 'package:core/utils/platform_info.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/platform_info.dart';
 import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:bluebubbles/features/mail/_tmail/scribe/scribe.dart';

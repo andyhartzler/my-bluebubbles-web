@@ -1,4 +1,4 @@
-import 'package:core/presentation/resources/image_paths.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
 import 'package:bluebubbles/features/mail/_tmail/scribe/scribe.dart';
 
 class AiScribeActionContextMenuAction
