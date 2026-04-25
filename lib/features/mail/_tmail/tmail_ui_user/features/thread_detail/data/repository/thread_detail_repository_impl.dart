@@ -1,0 +1,140 @@
+import 'package:bluebubbles/features/mail/_tmail/core/data/model/source_type/data_source_type.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/list_extensions.dart';
+import 'package:jmap_dart_client/jmap/account_id.dart';
+import 'package:jmap_dart_client/jmap/core/properties/properties.dart';
+import 'package:jmap_dart_client/jmap/core/session/session.dart';
+import 'package:jmap_dart_client/jmap/mail/email/email.dart';
+import 'package:jmap_dart_client/jmap/mail/email/email_comparator.dart';
+import 'package:jmap_dart_client/jmap/mail/email/email_comparator_property.dart';
+import 'package:jmap_dart_client/jmap/mail/mailbox/mailbox.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/email_property.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/extensions/list_email_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/presentation/extensions/email_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread_detail/data/data_source/thread_detail_data_source.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread_detail/domain/exceptions/empty_thread_detail_exception.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread_detail/domain/model/email_in_thread_detail_info.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread_detail/domain/repository/thread_detail_repository.dart';
+
+class ThreadDetailRepositoryImpl implements ThreadDetailRepository {
+  const ThreadDetailRepositoryImpl(this.threadDetailDataSource);
+
+  final Map<DataSourceType, ThreadDetailDataSource> threadDetailDataSource;
+
+  @override
+  Future<List<EmailInThreadDetailInfo>> getThreadById(
+    ThreadId threadId,
+    Session session,
+    AccountId accountId,
+    MailboxId sentMailboxId,
+    String ownEmailAddress,
+  ) async {
+    final originalEmailIds = await threadDetailDataSource[DataSourceType.network]!
+      .getThreadById(threadId, accountId);
+
+    if (originalEmailIds.isEmpty) {
+      throw const EmptyThreadDetailException();
+    }
+    
+    final filteredEmailIds = await Future.wait(
+      originalEmailIds
+        .chunks(20)
+        .map((emailIds) => _filterBadEmails(
+          session,
+          accountId,
+          emailIds,
+          sentMailboxId,
+          ownEmailAddress,
+        ))
+    );
+
+    return filteredEmailIds
+      .reduce((prev, curr) => prev..addAll(curr))
+      .sortWithResult(EmailComparator(
+        EmailComparatorProperty.receivedAt
+      )..setIsAscending(true))
+      .toEmailsInThreadDetailInfo();
+  }
+
+  Future<Map<Email, bool>> _filterBadEmails(
+    Session session,
+    AccountId accountId,
+    List<EmailId> emailIds,
+    MailboxId sentMailboxId,
+    String ownEmailAddress,
+  ) async {
+    int retry = 3;
+    while (retry > 0) {
+      try {
+        final emails = await threadDetailDataSource[DataSourceType.network]!
+          .getEmailsByIds(
+            session,
+            accountId,
+            emailIds,
+            properties: Properties({
+              EmailProperty.id,
+              EmailProperty.mailboxIds,
+              EmailProperty.from,
+              EmailProperty.to,
+              EmailProperty.cc,
+              EmailProperty.bcc,
+              EmailProperty.receivedAt,
+              EmailProperty.keywords,
+            }),
+          );
+        return {
+          for (final email in emails)
+            email: email.checkEmailValidForThreadDetail(
+              sentMailboxId,
+              ownEmailAddress,
+            ),
+        };
+      } catch (e) {
+        retry--;
+
+        if (retry <= 0) rethrow;
+      }
+    }
+    return {};
+  }
+
+  @override
+  Future<List<Email>> getEmailsByIds(
+    Session session,
+    AccountId accountId,
+    List<EmailId> emailIds, {
+    Properties? properties,
+  }) {
+    return threadDetailDataSource[DataSourceType.network]!
+      .getEmailsByIds(session, accountId, emailIds, properties: properties);
+  }
+
+  @override
+  Future<bool> getThreadDetailStatus() {
+    return threadDetailDataSource[DataSourceType.local]!
+      .getThreadDetailStatus();
+  }
+}
+
+extension SortListEmailInThreadDetailInfo on Map<Email, bool> {
+  Map<Email, bool> sortWithResult(
+    EmailComparator comparator,
+  ) {
+    final originalEmails = keys.toList();
+    final sortedEmails = originalEmails.sortWithResult(comparator);
+    return {
+      for (final email in sortedEmails)
+        email: this[email] ?? false,
+    };
+  }
+
+  List<EmailInThreadDetailInfo> toEmailsInThreadDetailInfo() {
+    return entries.map(
+      (entry) => EmailInThreadDetailInfo(
+        emailId: entry.key.id!,
+        keywords: entry.key.keywords,
+        mailboxIds: entry.key.mailboxIds,
+        isValidToDisplay: entry.value,
+      ),
+    ).toList();
+  }
+}

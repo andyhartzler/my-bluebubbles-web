@@ -1,0 +1,54 @@
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/html/html_utils.dart';
+import 'package:flutter/material.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/mixin/message_dialog_action_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/composer_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/manager/attachment_text_detector.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/manager/attachment_keyword_config_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/route_navigation.dart';
+
+extension AttachmentDetectionExtension on ComposerController {
+
+  Future<List<String>> validateAttachmentReminder({
+    required String emailContent,
+    required String emailSubject,
+  }) async {
+    try {
+      final fullContent = '$emailSubject $emailContent';
+      final plainText = HtmlUtils.extractPlainText(fullContent);
+      final attachmentKeywordConfig = await AttachmentKeywordConfigManager().getConfig();
+      final keywords = await AttachmentTextDetector.matchedKeywordsUnique(
+        plainText,
+        includeList: attachmentKeywordConfig.includeList,
+        excludeList: attachmentKeywordConfig.excludeList,
+      );
+      return keywords;
+    } catch (e) {
+      logWarning('$runtimeType::validateAttachmentReminder:Error $e');
+      return [];
+    }
+  }
+
+  Future<void> showAttachmentReminderModal({
+    required BuildContext context,
+    required List<String> keywords,
+    required VoidCallback onConfirmAction,
+    required VoidCallback onCancelAction,
+  }) {
+    final appLocalizations = AppLocalizations.of(context);
+    String formattedKeywords = keywords.map((k) => '"$k"').join(', ');
+    log('$runtimeType::showAttachmentReminderModal:formattedKeywords = $formattedKeywords');
+    return MessageDialogActionManager().showConfirmDialogAction(
+      key: const Key('attachment_reminder_modal'),
+      context,
+      title: appLocalizations.attachmentReminderModalTitle,
+      appLocalizations.attachmentReminderModalMessage(formattedKeywords),
+      appLocalizations.sendMessage,
+      cancelTitle: appLocalizations.cancel,
+      onConfirmAction: onConfirmAction,
+      onCancelAction: onCancelAction,
+      onCloseButtonAction: popBack,
+    );
+  }
+}

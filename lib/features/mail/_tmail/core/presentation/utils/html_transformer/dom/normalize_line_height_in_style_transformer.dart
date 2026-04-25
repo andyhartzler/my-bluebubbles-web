@@ -1,0 +1,54 @@
+import 'package:bluebubbles/features/mail/_tmail/core/data/network/dio_client.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/html_transformer/base/dom_transformer.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
+import 'package:flutter/widgets.dart' show visibleForTesting;
+import 'package:html/dom.dart';
+
+class NormalizeLineHeightInStyleTransformer extends DomTransformer {
+  const NormalizeLineHeightInStyleTransformer();
+
+  static const _removableLineHeights = ['1px', '100%'];
+  static final _multipleSpacesRegex = RegExp(r' {2,}');
+  static final _lineHeightPattern = RegExp(
+    r'line-height\s*:\s*(?:' +
+        _removableLineHeights.map(RegExp.escape).join('|') +
+        r')\s*;?',
+    caseSensitive: false,
+  );
+
+  @visibleForTesting
+  static RegExp get lineHeightPattern => _lineHeightPattern;
+
+  @override
+  Future<void> process({
+    required Document document,
+    required DioClient dioClient,
+    Map<String, String>? mapUrlDownloadCID,
+  }) async {
+    try {
+      
+
+      final elements = document.querySelectorAll('[style*="line-height"]');
+
+      for (final element in elements) {
+        final originalStyle = element.attributes['style'];
+        if (originalStyle == null) continue;
+
+        var updatedStyle = originalStyle.replaceAll(_lineHeightPattern, '').trim();
+
+        // Remove extra spaces (>=2 spaces → 1 space)
+        updatedStyle = updatedStyle.replaceAll(_multipleSpacesRegex, ' ');
+
+        if (updatedStyle != originalStyle) {
+          if (updatedStyle.isEmpty) {
+            element.attributes.remove('style');
+          } else {
+            element.attributes['style'] = updatedStyle;
+          }
+        }
+      }
+    } catch (e) {
+      logWarning('$runtimeType::process: Exception = $e');
+    }
+  }
+}

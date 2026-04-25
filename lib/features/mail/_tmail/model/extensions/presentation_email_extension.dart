@@ -1,0 +1,220 @@
+import 'dart:ui';
+
+import 'package:collection/collection.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/data/constants/constant.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/domain/extensions/datetime_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/color_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/html/html_utils.dart';
+import 'package:http_parser/http_parser.dart';
+import 'package:jmap_dart_client/jmap/mail/email/email.dart';
+import 'package:jmap_dart_client/jmap/mail/email/email_address.dart';
+import 'package:jmap_dart_client/jmap/mail/email/keyword_identifier.dart';
+import 'package:jmap_dart_client/jmap/mail/mailbox/mailbox.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/eml_attachment.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/presentation_email.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/extensions/email_address_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/extensions/list_email_address_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/extensions/presentation_mailbox_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/extensions/utc_date_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/mailbox/presentation_mailbox.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/mailbox/select_mode.dart';
+
+extension PresentationEmailExtension on PresentationEmail {
+
+  List<Color> get avatarColors {
+    if (from?.isNotEmpty == true) {
+      return from!.first.avatarColors;
+    } else {
+      return AppColor.mapGradientColor.first;
+    }
+  }
+
+  int get countRecipients =>
+      to.numberEmailAddress() +
+      cc.numberEmailAddress() +
+      bcc.numberEmailAddress();
+
+  int getCountMailAddressWithoutMe(String userName) {
+    final uniqueEmails = <String>{};
+    final newTo = to ?? {};
+    final newCc = cc ?? {};
+    final newBcc = bcc ?? {};
+    final newFrom = from ?? {};
+
+    for (final email in <EmailAddress>[...newTo, ...newCc, ...newBcc, ...newFrom]) {
+      if (email.emailAddress != userName) {
+        uniqueEmails.add(email.emailAddress);
+      }
+    }
+
+    return uniqueEmails.length;
+  }
+
+  String getReceivedAt(String newLocale, {String? pattern}) {
+    final emailTime = receivedAt;
+    if (emailTime != null) {
+      return emailTime.formatDateToLocal(
+        pattern: pattern ?? emailTime.value.toLocal().toPattern(),
+        locale: newLocale);
+    }
+    return '';
+  }
+
+  String getSentAt(String newLocale, {String? pattern}) {
+    if (sentAt != null) {
+      return sentAt!.formatDateToLocal(
+        pattern: pattern ?? sentAt!.value.toLocal().toPattern(),
+        locale: newLocale,
+      );
+    }
+    return '';
+  }
+
+  Set<EmailAddress> get listEmailAddressSender => {...?from, ...?replyTo};
+
+  PresentationEmail toggleSelect() {
+    return copyWith(
+        selectMode: selectMode == SelectMode.INACTIVE
+          ? SelectMode.ACTIVE
+          : SelectMode.INACTIVE,
+      )
+      ..searchSnippetSubject = searchSnippetSubject
+      ..searchSnippetPreview = searchSnippetPreview;
+  }
+
+  PresentationEmail toSelectedEmail({required SelectMode selectMode}) {
+    return copyWith(selectMode: selectMode)
+      ..searchSnippetSubject = searchSnippetSubject
+      ..searchSnippetPreview = searchSnippetPreview;
+  }
+
+  Email toEmail() {
+    return Email(
+      id: id,
+      blobId: blobId,
+      keywords: keywords,
+      size: size,
+      receivedAt: receivedAt,
+      hasAttachment: hasAttachment,
+      preview: preview,
+      subject: subject,
+      sentAt: sentAt,
+      from: from,
+      to: to,
+      cc: cc,
+      bcc: bcc,
+      replyTo: replyTo,
+      htmlBody: htmlBody,
+      bodyValues: bodyValues,
+      mailboxIds: mailboxIds,
+      headers: emailHeader?.toSet(),
+      headerCalendarEvent: headerCalendarEvent,
+      xPriorityHeader: xPriorityHeader,
+      importanceHeader: importanceHeader,
+      priorityHeader: priorityHeader,
+      listPostHeader: listPostHeader,
+      listUnsubscribeHeader: listUnsubscribeHeader,
+      threadId: threadId,
+      messageId: messageId,
+      references: references,
+    );
+  }
+
+  String recipientsName() {
+    final allEmailAddress = to.emailAddressToListString() + cc.emailAddressToListString() + bcc.emailAddressToListString();
+    return allEmailAddress.isNotEmpty ? allEmailAddress.join(', ') : '';
+  }
+
+  PresentationEmail toSearchPresentationEmail(Map<MailboxId, PresentationMailbox> mapMailboxes) {
+    mailboxIds?.removeWhere((key, value) => !value);
+
+    final matchedMailbox = findMailboxContain(mapMailboxes);
+
+    return copyWith(mailboxContain: matchedMailbox)
+      ..searchSnippetSubject = searchSnippetSubject
+      ..searchSnippetPreview = searchSnippetPreview;
+  }
+
+  PresentationMailbox? findMailboxContain(Map<MailboxId, PresentationMailbox> mapMailbox) {
+    final newMailboxIds = mailboxIds;
+    newMailboxIds?.removeWhere((key, value) => !value);
+
+    if (newMailboxIds?.isNotEmpty == true) {
+      final firstMailboxId = newMailboxIds!.keys.first;
+      if (mapMailbox.containsKey(firstMailboxId)) {
+        return mapMailbox[firstMailboxId];
+      }
+    }
+    return null;
+  }
+
+  PresentationEmail withRouteWeb(Uri routeWeb) {
+    return copyWith(routeWeb: routeWeb)
+      ..searchSnippetSubject = searchSnippetSubject
+      ..searchSnippetPreview = searchSnippetPreview;
+  }
+
+  PresentationEmail updateKeywords(Map<KeyWordIdentifier, bool> newKeywords) {
+    final combinedMap = {...(keywords ?? {}), ...newKeywords};
+    combinedMap.removeWhere((key, value) => !value);
+    log('PresentationEmailExtension::updateKeywords:combinedMap = $combinedMap');
+    return copyWith(keywords: combinedMap)
+      ..searchSnippetSubject = searchSnippetSubject
+      ..searchSnippetPreview = searchSnippetPreview;
+  }
+
+  PresentationEmail syncPresentationEmail({PresentationMailbox? mailboxContain, Uri? routeWeb}) {
+    return copyWith(routeWeb: routeWeb, mailboxContain: mailboxContain)
+      ..searchSnippetSubject = searchSnippetSubject
+      ..searchSnippetPreview = searchSnippetPreview;
+  }
+
+  bool isBelongToOneOfTheMailboxes(List<MailboxId> mailboxIdsSource) {
+    final mapMailboxIds = mailboxIds;
+    mapMailboxIds?.removeWhere((key, value) => !value);
+
+    if (mapMailboxIds?.isNotEmpty == true) {
+      final listMailboxId = mapMailboxIds!.keys.toList();
+      log('PresentationEmailExtension::isBelongToOneOfTheMailboxes():listMailboxId: $listMailboxId');
+      final listMailboxIdValid = listMailboxId.where((mailboxId) => mailboxIdsSource.contains(mailboxId));
+      log('PresentationEmailExtension::isBelongToOneOfTheMailboxes():listMailboxIdValid: $listMailboxIdValid');
+      return listMailboxIdValid.isNotEmpty;
+    }
+
+    return false;
+  }
+
+  EMLAttachment createEMLAttachment() {
+    return EMLAttachment(
+      blobId: blobId,
+      name: getEmailTitle().isEmpty ? '${blobId?.value}.eml' : '${getEmailTitle()}.eml',
+      type: MediaType.parse(Constant.octetStreamMimeType)
+    );
+  }
+
+  String? _sanitizeSearchSnippet(String? searchSnippet) {
+    if (searchSnippet == null) return null;
+    return HtmlUtils.unescapeHtml(HtmlUtils.removeWhitespace(searchSnippet));
+  }
+
+  String? get sanitizedSearchSnippetSubject => _sanitizeSearchSnippet(searchSnippetSubject);
+  String? get sanitizedSearchSnippetPreview => _sanitizeSearchSnippet(searchSnippetPreview);
+
+  MailboxId? get firstMailboxIdAvailable =>
+      mailboxIds?.entries.firstWhereOrNull((element) => element.value)?.key;
+
+  void resyncKeywords(Map<KeyWordIdentifier, bool> newKeywords) {
+    keywords?.addAll(newKeywords);
+    keywords?.removeWhere((key, value) => !value);
+  }
+
+  bool get isDeletePermanentlyEnabled {
+    return mailboxContain?.isTrash ?? mailboxContain?.isSpam ?? false;
+  }
+
+  bool isReplyAllEnabled(String ownerEmailAddress) {
+    final countMailAddress = getCountMailAddressWithoutMe(ownerEmailAddress);
+    return countMailAddress > 1;
+  }
+}

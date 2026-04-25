@@ -1,0 +1,9 @@
+import 'package:bluebubbles/features/mail/_tmail/core/domain/exceptions/app_base_exception.dart';
+
+class SetMailboxRightsException extends AppBaseException {
+  const SetMailboxRightsException(
+      [super.message = 'Failed to update mailbox rights.']);
+
+  @override
+  String get exceptionName => 'SetMailboxRightsException';
+}

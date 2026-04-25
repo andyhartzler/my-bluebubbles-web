@@ -1,0 +1,2688 @@
+{
+  "initializing_data": "Inizializzazione dei dati...",
+  "@initializing_data": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "login_text_slogan": "Twake Mail",
+  "@login_text_slogan": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "prefix_https": "https://",
+  "@prefix_https": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "email": "e-mail",
+  "@email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "password": "password",
+  "@password": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "login": "Accedi",
+  "@login": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "login_text_login_to_continue": "Per favore, accedi per continuare",
+  "@login_text_login_to_continue": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unknown_error_login_message": "Si è verificato un errore sconosciuto. Si prega di riprovare",
+  "@unknown_error_login_message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "storage": "STOCCAGGIO",
+  "@storage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forward": "Inoltrare",
+  "@forward": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no_emails": "Nessuna e-mail in questa casella di posta",
+  "@no_emails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hint_content_email_composer": "Inizia a scrivere la tua e-mail qui",
+  "@hint_content_email_composer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "header_email_quoted": "Il {sentDate}, da {emailAddress}",
+  "@header_email_quoted": {
+    "type": "text",
+    "placeholders_order": [
+      "sentDate",
+      "emailAddress"
+    ],
+    "placeholders": {
+      "sentDate": {},
+      "emailAddress": {}
+    }
+  },
+  "prefix_reply_email": "Re:",
+  "@prefix_reply_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "prefix_forward_email": "Fwd:",
+  "@prefix_forward_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "your_email_being_sent": "La tua e-mail viene inviata…",
+  "@your_email_being_sent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "your_email_should_have_at_least_one_recipient": "La tua e-mail deve avere almeno un destinatario",
+  "@your_email_should_have_at_least_one_recipient": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_sent": "Messaggio inviato",
+  "@message_sent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "move_to_trash": "Sposta nel cestino",
+  "@move_to_trash": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_star": "Preferito",
+  "@mark_as_star": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "move_to_spam": "Sposta nello spam",
+  "@move_to_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_multiple_item_as_read": "Elemento {count} contrassegnato come letto",
+  "@marked_multiple_item_as_read": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "marked_multiple_item_as_unread": "Elemento {count} contrassegnato come non letto",
+  "@marked_multiple_item_as_unread": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "an_error_occurred": "Errore! Si è verificato un errore. Si prega di riprovare più tardi.",
+  "@an_error_occurred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attachment_download_failed": "Download degli allegati non riuscito",
+  "@attachment_download_failed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "can_not_upload_this_file_as_attachments": "Non è possibile caricare questo file come allegato",
+  "@can_not_upload_this_file_as_attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attachments_uploaded_successfully": "Allegati caricati con successo",
+  "@attachments_uploaded_successfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "undo_action": "DISFARE",
+  "@undo_action": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_unstar": "Rimuovere dal preferito",
+  "@mark_as_unstar": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "search_mail": "Cerca nella posta",
+  "@search_mail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "prefix_suggestion_search": "Cerca per",
+  "@prefix_suggestion_search": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no_emails_matching_your_search": "Nessuna e-mail corrisponde alla tua ricerca",
+  "@no_emails_matching_your_search": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "results": "Risultati",
+  "@results": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "my_folders": "LE MIE CARTELLE",
+  "@my_folders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reply": "Rispondi",
+  "@reply": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "search_folder": "Cerca nella cartella",
+  "@search_folder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "new_folder": "Nuova cartella",
+  "@new_folder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reply_all": "Rispondi a tutti",
+  "@reply_all": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unread_email_notification": "nuovo",
+  "@unread_email_notification": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "cancel": "Cancella",
+  "@cancel": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "to_email_address_prefix": "A",
+  "@to_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hint_text_email_address": "Nome o indirizzo e-mail",
+  "@hint_text_email_address": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subject_email": "Oggetto",
+  "@subject_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no_mail_selected": "Nessuna e-mail selezionata",
+  "@no_mail_selected": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bcc_email_address_prefix": "Bcc",
+  "@bcc_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "from_email_address_prefix": "Da",
+  "@from_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "cc_email_address_prefix": "Cc",
+  "@cc_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "preparing_to_export": "Preparazione per l'esportazione",
+  "@preparing_to_export": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you_need_to_grant_files_permission_to_download_attachments": "È necessario concedere ai file il permesso per scaricare gli allegati",
+  "@you_need_to_grant_files_permission_to_download_attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "count_attachment": "{count} allegati",
+  "@count_attachment": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "error_message_sent": "Messaggio di errore inviato",
+  "@error_message_sent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "count_email_selected": "{count} selezionato",
+  "@count_email_selected": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "user_cancel_download_file": "L'utente annulla la scarica del file",
+  "@user_cancel_download_file": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_unread": "Segna come non letto",
+  "@mark_as_unread": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_read": "Segna come letto",
+  "@mark_as_read": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attach_file_prepare_text": "Preparazione per allegare file...",
+  "@attach_file_prepare_text": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "browse": "Sfoglia",
+  "@browse": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_unstar_multiple_item": "{count} elemento rimosso dal preferito",
+  "@marked_unstar_multiple_item": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "downloading_file": "Scarica di {fileName}",
+  "@downloading_file": {
+    "type": "text",
+    "placeholders_order": [
+      "fileName"
+    ],
+    "placeholders": {
+      "fileName": {}
+    }
+  },
+  "pick_attachments": "Scegli gli allegati",
+  "@pick_attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "photos_and_videos": "Foto e video",
+  "@photos_and_videos": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_star_multiple_item": "{count} elemento contrassegnato preferito",
+  "@marked_star_multiple_item": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "message_dialog_send_email_without_recipient": "La tua e-mail deve avere almeno uno destinatario",
+  "@message_dialog_send_email_without_recipient": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "edit": "Modifica",
+  "@edit": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hint_search_emails": "Cerca e-mail e file",
+  "@hint_search_emails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "compose": "Componi",
+  "@compose": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete": "Elimina",
+  "@delete": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "move": "Muovi",
+  "@move": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "spam": "Spam",
+  "@spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "flag": "Segna",
+  "@flag": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "read": "Letto",
+  "@read": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unread": "Non letto",
+  "@unread": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "the_feature_is_under_development": "Questa funzione è in fase di sviluppo.",
+  "@the_feature_is_under_development": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_message_toast": "Hai contrassegnato i messaggi come \"{action}\"",
+  "@marked_message_toast": {
+    "type": "text",
+    "placeholders_order": [
+      "action"
+    ],
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "folders": "Cartelle",
+  "@folders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "logout": "Esci",
+  "@logout": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "with_attachments": "Con allegati",
+  "@with_attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "starred": "Preferito",
+  "@starred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "filter_message_toast": "Hai filtrato i messaggi per \"{filterOption}\"",
+  "@filter_message_toast": {
+    "type": "text",
+    "placeholders_order": [
+      "filterOption"
+    ],
+    "placeholders": {
+      "filterOption": {}
+    }
+  },
+  "disable_filter_message_toast": "Hai disabilitato i messaggi filtrati",
+  "@disable_filter_message_toast": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "with_unread": "Con Non letti",
+  "@with_unread": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "with_starred": "Con Preferiti",
+  "@with_starred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_has_been_sent_successfully": "Il messaggio è stato inviato con successo",
+  "@message_has_been_sent_successfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_has_been_sent_failure": "Impossibile inviare il messaggio",
+  "@message_has_been_sent_failure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "done": "Fatto",
+  "@done": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "this_folder_name_is_already_taken": "Questo nome di cartella è già usato",
+  "@this_folder_name_is_already_taken": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "drafts_saved": "Bozza salvata",
+  "@drafts_saved": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "discard": "Scartare",
+  "@discard": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "rename": "Rinomina",
+  "@rename": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "this_field_cannot_be_blank": "Questo campo non può essere vuoto",
+  "@this_field_cannot_be_blank": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "there_is_already_folder_with_the_same_name": "Esiste già una cartella con lo stesso nome",
+  "@there_is_already_folder_with_the_same_name": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "email_address_is_not_in_the_correct_format": "L'indirizzo e-mail non è nel formato corretto",
+  "@email_address_is_not_in_the_correct_format": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "preparing_to_save": "Prepariamo a salvare",
+  "@preparing_to_save": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "new_message": "Nuovo messaggio",
+  "@new_message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "details": "Dettagli",
+  "@details": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hide": "Nascondere",
+  "@hide": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "copy_email_address": "Copia l'indirizzo e-mail",
+  "@copy_email_address": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "compose_email": "Componi un'e-mail",
+  "@compose_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "email_address_copied_to_clipboard": "Indirizzo e-mail copiato negli appunti",
+  "@email_address_copied_to_clipboard": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "minimize": "Minimizzare",
+  "@minimize": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "fullscreen": "A schermo intero",
+  "@fullscreen": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "close": "Chiudi",
+  "@close": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "send": "Inviare",
+  "@send": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attachments": "Allegati",
+  "@attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "show_all": "Mostra tutti",
+  "@show_all": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_dialog_send_email_without_a_subject": "Sei sicuro di inviare messaggi senza oggetto?",
+  "@message_dialog_send_email_without_a_subject": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "app_name": "Twake Mail",
+  "@app_name": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "search_emails": "Cerca nelle e-mail",
+  "@search_emails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "select_all": "Seleziona tutti",
+  "@select_all": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_all_as_read": "Segna tutti come letti",
+  "@mark_all_as_read": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "filter_messages": "Filtra i messaggi",
+  "@filter_messages": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "not_starred": "Non preferiti",
+  "@not_starred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "select": "Selezionare",
+  "@select": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "more": "Di più",
+  "@more": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "back": "Indietro",
+  "@back": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "expand": "Espandere",
+  "@expand": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "collapse": "Ridurre",
+  "@collapse": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "save_to_drafts": "Salva in bozze",
+  "@save_to_drafts": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hint_compose_email": "Inizia a comporre una lettera...",
+  "@hint_compose_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attach_file": "Allega un file",
+  "@attach_file": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "show": "Mostra",
+  "@show": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "add_recipients": "Aggiungi destinatari",
+  "@add_recipients": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sending_failed": "Invio fallito",
+  "@sending_failed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "send_anyway": "Inviare lo stesso",
+  "@send_anyway": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "empty_subject": "Soggetto vuoto",
+  "@empty_subject": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_dialog_send_email_with_email_address_invalid": "Verifica la correttezza degli indirizzi e-mail e riprova",
+  "@message_dialog_send_email_with_email_address_invalid": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "fix_email_addresses": "Correggi gli indirizzi e-mail",
+  "@fix_email_addresses": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "the_total_size_of_attachments_in_an_email_exceeds_the_limit": "La dimensione totale degli allegati in un'email supera il limite.",
+  "@the_total_size_of_attachments_in_an_email_exceeds_the_limit": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "your_download_has_started": "Il tuo scaricamento è iniziato",
+  "@your_download_has_started": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moved_to_trash": "Spostato nel Cestino",
+  "@moved_to_trash": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no_internet_connection": "Nessuna connessione internet",
+  "@no_internet_connection": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "page_name": "Twake Mail",
+  "@page_name": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_delete_all_email_in_trash_button": "Tutti i messaggi nel Cestino verranno eliminati se raggiungi il limite dello spazio.",
+  "@message_delete_all_email_in_trash_button": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "empty_trash_now": "Svuota il cestino ora",
+  "@empty_trash_now": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "empty_trash_folder": "Svuota la cartella del cestino",
+  "@empty_trash_folder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "empty_trash_dialog_message": "Stai per eliminare definitivamente tutti gli elementi nel Cestino. Vuoi continuare?",
+  "@empty_trash_dialog_message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_all": "Elimina tutti",
+  "@delete_all": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toast_message_delete_multiple_email_permanently_success": "{count} messaggi sono stati eliminati per sempre",
+  "@toast_message_delete_multiple_email_permanently_success": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "toast_message_delete_a_email_permanently_success": "Il messaggio è stato eliminato per sempre",
+  "@toast_message_delete_a_email_permanently_success": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_permanently": "Elimina definitivamente",
+  "@delete_permanently": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_messages_forever": "Elimina i messaggi per sempre",
+  "@delete_messages_forever": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_message_forever": "Elimina i messaggi per sempre",
+  "@delete_message_forever": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_single_message_dialog": "Stai per eliminare definitivamente questo messaggio. Vuoi continuare?",
+  "@delete_single_message_dialog": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_multiple_messages_dialog": "Stai per eliminare definitivamente {count} elementi nel {mailboxName}. Vuoi continuare?",
+  "@delete_multiple_messages_dialog": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "message_dialog_upload_attachments_exceeds_maximum_size": "Hai raggiunto la dimensione massima del file. Carica file la cui dimensione totale è inferiore a {maxSize}",
+  "@message_dialog_upload_attachments_exceeds_maximum_size": {
+    "type": "text",
+    "placeholders_order": [
+      "maxSize"
+    ],
+    "placeholders": {
+      "maxSize": {}
+    }
+  },
+  "message_dialog_send_email_exceeds_maximum_size": "Impossibile inviare il tuo messaggio perché supera la dimensione massima di {maxSize}",
+  "@message_dialog_send_email_exceeds_maximum_size": {
+    "type": "text",
+    "placeholders_order": [
+      "maxSize"
+    ],
+    "placeholders": {
+      "maxSize": {}
+    }
+  },
+  "remove_from_spam": "Rimuovi dallo spam",
+  "@remove_from_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_as_spam": "Contrassegnato come spam",
+  "@marked_as_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_as_not_spam": "Contrassegnato come non spam",
+  "@marked_as_not_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toast_message_empty_trash_folder_success": "Tutti i messaggi sono stati eliminati per sempre",
+  "@toast_message_empty_trash_folder_success": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "version": "Versione",
+  "@version": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "got_it": "Capito",
+  "@got_it": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_starred": "Contrassegna come preferito",
+  "@mark_as_starred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sign_out": "Esci",
+  "@sign_out": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "maximum_files_size": "Dimensione massima dei file",
+  "@maximum_files_size": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "exchange": "Scambio",
+  "@exchange": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "move_message": "Sposta il messaggio",
+  "@move_message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forwarded_message": "Messaggio inoltrato",
+  "@forwarded_message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "date": "Data",
+  "@date": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_spam": "Segna come spam",
+  "@mark_as_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "star": "Preferito",
+  "@star": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "un_star": "Rimuovi dal preferito",
+  "@un_star": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "un_spam": "Rimuovi dallo spam",
+  "@un_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "settings": "Impostazioni",
+  "@settings": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "manage_account": "Gestisci profilo",
+  "@manage_account": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "profiles": "Profili",
+  "@profiles": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "identities": "Identità",
+  "@identities": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "new_identity": "Nuova identità",
+  "@new_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "loginInputUrlMessage": "Per login e accedere al tuo messaggio, connettiti al tuo server JMAP",
+  "@loginInputUrlMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requiredUrl": "L'indirizzo del server è obbligatorio",
+  "@requiredUrl": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "jmapStandard": "Standard JMAP",
+  "@jmapStandard": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "recent": "Recente",
+  "@recent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "last30Days": "Ultimi 30 giorni",
+  "@last30Days": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "name": "Nome",
+  "@name": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "create": "Crea",
+  "@create": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "html_template": "Modello HTML",
+  "@html_template": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you_are_changed_your_identity_successfully": "Hai cambiato la tua identità con successo",
+  "@you_are_changed_your_identity_successfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "anyTime": "In qualsiasi momento",
+  "@anyTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "loginInputSSOMessage": "Acceso con il mio account SSO",
+  "@loginInputSSOMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "loginInputCredentialMessage": "Inserisci le tue credenziali per accedere",
+  "@loginInputCredentialMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "next": "Prossimo",
+  "@next": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "signIn": "Registrazione",
+  "@signIn": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requiredEmail": "Email è richiesta",
+  "@requiredEmail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requiredPassword": "La password è richiesta",
+  "@requiredPassword": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "jmapBasedMailSolution": "Basato su JMAP\nsoluzione di posta collaborativa del team",
+  "@jmapBasedMailSolution": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "encryptedMailbox": "Casella di posta crittografata",
+  "@encryptedMailbox": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "manageEmailAsATeam": "Gestisci l'email come una team",
+  "@manageEmailAsATeam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "multipleIntegrations": "Integrazioni multiple",
+  "@multipleIntegrations": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reply_to_address": "Indirizzo di risposta",
+  "@reply_to_address": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bcc_to_address": "Indirizzo di Bcc",
+  "@bcc_to_address": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "signature": "Firma",
+  "@signature": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "plain_text": "Testo normale",
+  "@plain_text": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you_have_created_a_new_identity": "Hai creato una nuova identità",
+  "@you_have_created_a_new_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "all_identities": "Tutte le identità",
+  "@all_identities": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "default_value": "Predefinito",
+  "@default_value": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_identity": "Elimina identità",
+  "@delete_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_confirmation_dialog_delete_identity": "Sei sicuro di voler eliminare questa identità?",
+  "@message_confirmation_dialog_delete_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "identity_has_been_deleted": "L'identità è stata eliminata",
+  "@identity_has_been_deleted": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_failed": "Eliminazione non riuscita",
+  "@delete_failed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "edit_identity": "Modifica identità",
+  "@edit_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "save": "Salva",
+  "@save": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hasAttachment": "Con attaccamento",
+  "@hasAttachment": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "last7Days": "Ultimi 7 giorni",
+  "@last7Days": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "fromMe": "Da me",
+  "@fromMe": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showingResultsFor": "Mostriamo i risultati per:",
+  "@showingResultsFor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "last6Months": "Ultimi 6 mesi",
+  "@last6Months": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "lastYears": "Ultimi anni",
+  "@lastYears": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisEmailAddressInvalid": "Questo indirizzo email non è valido",
+  "@thisEmailAddressInvalid": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "canNotVerifySSOConfiguration": "Impossibile verificare la configurazione SSO, chiedi un consiglio all'amministratore di sistema",
+  "@canNotVerifySSOConfiguration": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "canNotGetToken": "Impossibile ottenere il token, chiedi un consiglio all'amministratore di sistema",
+  "@canNotGetToken": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ssoNotAvailable": "Accesso singolo (SSO) non è disponibile",
+  "@ssoNotAvailable": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noPreviewAvailable": "Nessuna anteprima disponibile",
+  "@noPreviewAvailable": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "wrongUrlMessage": "L'URL del server non è valido, si prega di riprovare",
+  "@wrongUrlMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subject": "Oggetto",
+  "@subject": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hasTheWords": "Include le parole",
+  "@hasTheWords": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "doesNotHave": "Non include",
+  "@doesNotHave": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "nameOrEmailAddress": "Nome o indirizzo e-mail",
+  "@nameOrEmailAddress": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enterSearchTerm": "Inserisci il termine di ricerca",
+  "@enterSearchTerm": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "allMails": "Tutte le mail",
+  "@allMails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "allTime": "Durante tutto il tempo",
+  "@allTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "search": "Ricerca",
+  "@search": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "clearFilter": "Pulire i filtri",
+  "@clearFilter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "advancedSearch": "Ricerca avanzata",
+  "@advancedSearch": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDuplicateTagFilterMail": "l'hai già inserito",
+  "@messageDuplicateTagFilterMail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageAndRegion": "Lingua e Regione",
+  "@languageAndRegion": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "language": "Lingua",
+  "@language": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageEnglish": "Inglese",
+  "@languageEnglish": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageVietnamese": "Vietnamita",
+  "@languageVietnamese": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageFrench": "Francese",
+  "@languageFrench": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageRussian": "Russo",
+  "@languageRussian": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogSendEmailUploadingAttachment": "Impossibile inviare il messaggio perché è in corso il caricamento di un allegato",
+  "@messageDialogSendEmailUploadingAttachment": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveAndClose": "Salva e chiudi",
+  "@saveAndClose": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "insertImage": "Inserisci immagine",
+  "@insertImage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectFromFile": "Seleziona da file",
+  "@selectFromFile": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "chooseImage": "Scegli immagine",
+  "@chooseImage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "urlLink": "URL",
+  "@urlLink": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "insert": "Inserisci",
+  "@insert": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "insertImageErrorFileEmpty": "Scegli un'immagine o inserisci l'URL di un'immagine",
+  "@insertImageErrorFileEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "insertImageErrorDuplicate": "Inserisci un'immagine o un URL immagine, non entrambi",
+  "@insertImageErrorDuplicate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "chooseAColor": "Scegli un colore",
+  "@chooseAColor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "resetToDefault": "Riportare alle condizioni originali",
+  "@resetToDefault": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "setColor": "Imposta il colore",
+  "@setColor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatBold": "Grassetto",
+  "@formatBold": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatItalic": "Corsivo",
+  "@formatItalic": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatUnderline": "Sottolineato",
+  "@formatUnderline": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatStrikethrough": "Barrato",
+  "@formatStrikethrough": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatTextColor": "Colore del testo",
+  "@formatTextColor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatTextBackgroundColor": "Colore di sfondo del testo",
+  "@formatTextBackgroundColor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "codeView": "Vista codice",
+  "@codeView": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "headerStyle": "Stile",
+  "@headerStyle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "fontFamily": "Famiglia di font",
+  "@fontFamily": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "paragraph": "Paragrafo",
+  "@paragraph": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "alignLeft": "Allineare a sinistra",
+  "@alignLeft": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "alignRight": "Allinea a destra",
+  "@alignRight": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "alignCenter": "Allinea al centro",
+  "@alignCenter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "justifyFull": "Giustificare per intero",
+  "@justifyFull": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "outdent": "Rientro negativo",
+  "@outdent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "indent": "Rientro",
+  "@indent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailRulesSubtitle": "Creazione di regole per gestire i messaggi in arrivo. Scegli sia la condizione che attiva una regola sia le azioni che la regola eseguirà.",
+  "@emailRulesSubtitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addNewRule": "Aggiungi regola",
+  "@addNewRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "headerNameOfRules": "Nome delle regole",
+  "@headerNameOfRules": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "editRule": "Modifica la regola",
+  "@editRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteRule": "Elimina la regola",
+  "@deleteRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createNewRule": "Crea una nuova regola",
+  "@createNewRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "rulesNameHintTextInput": "Inserisci il nome della regola",
+  "@rulesNameHintTextInput": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "conditionValueHintTextInput": "Valore",
+  "@conditionValueHintTextInput": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "recipient": "Destinatario",
+  "@recipient": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "conditionTitleRulesFilter": "Se sono soddisfatte tutte le seguenti condizioni:",
+  "@conditionTitleRulesFilter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "contains": "Contiene",
+  "@contains": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notContains": "Non contiene",
+  "@notContains": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "exactlyEquals": "Esattamente uguale",
+  "@exactlyEquals": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notExactlyEquals": "Non esattamente uguale",
+  "@notExactlyEquals": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "actionTitleRulesFilter": "Eseguire la seguente azione:",
+  "@actionTitleRulesFilter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moveMessage": "Sposta il messaggio",
+  "@moveMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ruleFilterAddressFromField": "Da",
+  "@ruleFilterAddressFromField": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ruleFilterAddressToField": "A",
+  "@ruleFilterAddressToField": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ruleFilterAddressCcField": "Cc",
+  "@ruleFilterAddressCcField": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "newFilterWasCreated": "È stato creato un nuovo filtro",
+  "@newFilterWasCreated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yourFilterHasBeenUpdated": "Il tuo filtro è stato aggiornato",
+  "@yourFilterHasBeenUpdated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "numberedList": "Elenco numerato",
+  "@numberedList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailRules": "Regole e-mail",
+  "@emailRules": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "orderList": "Elenco ordinato",
+  "@orderList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bulletedList": "Elenco puntato",
+  "@bulletedList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moveTo": "Sposta in",
+  "@moveTo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noEndTime": "Nessun tempo di fine",
+  "@noEndTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "errorMessageWhenEndDateVacationIsInValid": "La data di fine deve essere maggiore della data di inizio",
+  "@errorMessageWhenEndDateVacationIsInValid": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noEndDate": "Nessuna data di fine",
+  "@noEndDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "errorMessageWhenStartDateVacationIsEmpty": "Inserisci una data di inizio valida",
+  "@errorMessageWhenStartDateVacationIsEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationSettingSaved": "Impostazioni di risposta automatica salvate",
+  "@vacationSettingSaved": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yourVacationResponderIsDisabledSuccessfully": "Il tuo risponditore automatico è stato disabilitato correttamente",
+  "@yourVacationResponderIsDisabledSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEnableVacationResponderAutomatically": "Il tuo risponditore automatico verrà attivato il {startDate}",
+  "@messageEnableVacationResponderAutomatically": {
+    "type": "text",
+    "placeholders_order": [
+      "startDate"
+    ],
+    "placeholders": {
+      "startDate": {}
+    }
+  },
+  "messageDisableVacationResponderAutomatically": "Il tuo risponditore automatico è stato interrotto il {endDate}",
+  "@messageDisableVacationResponderAutomatically": {
+    "type": "text",
+    "placeholders_order": [
+      "endDate"
+    ],
+    "placeholders": {
+      "endDate": {}
+    }
+  },
+  "messageConfirmationDialogDeleteRecipientForward": "Vuoi eliminare l'email {emailAddress}?",
+  "@messageConfirmationDialogDeleteRecipientForward": {
+    "type": "text",
+    "placeholders_order": [
+      "emailAddress"
+    ],
+    "placeholders": {
+      "emailAddress": {}
+    }
+  },
+  "addRecipients": "Aggiungi destinatari",
+  "@addRecipients": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageIsRequired": "Il messaggio è obbligatorio",
+  "@messageIsRequired": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageAddRecipientsSuccessfully": "Le email sono state aggiunte dall'elenco dei destinatari.",
+  "@toastMessageAddRecipientsSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "keepLocalCopyForwardLabel": "Conserva una copia dell'e-mail nella Posta in arrivo",
+  "@keepLocalCopyForwardLabel": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageLocalCopyDisable": "Mantieni la copia locale disabilitata.",
+  "@toastMessageLocalCopyDisable": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationSettingExplanation": "Invia una risposta automatica ai messaggi in arrivo.",
+  "@vacationSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageDeleteEmailRuleSuccessfully": "La regola è stata rimossa.",
+  "@toastMessageDeleteEmailRuleSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveChanges": "Salvare le modifiche",
+  "@saveChanges": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "endNow": "Finisci ora",
+  "@endNow": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationSetting": "Impostazione per la risposta automatica",
+  "@vacationSetting": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintSearchInputContact": "Inserisci il nome o l'e-mail",
+  "@hintSearchInputContact": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "endTime": "Tempo di fine",
+  "@endTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "backToSearchResults": "Torna ai risultati della ricerca",
+  "@backToSearchResults": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "clearAll": "Cancella tutto",
+  "@clearAll": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "format": "Formato",
+  "@format": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleQuickStyles": "Stili veloci",
+  "@titleQuickStyles": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleForeground": "Primo piano",
+  "@titleForeground": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "background": "Sfondo",
+  "@background": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "foreground": "Primo piano",
+  "@foreground": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleBackground": "Sfondo",
+  "@titleBackground": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectDate": "Seleziona la data",
+  "@selectDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "headerRecipients": "Destinatari",
+  "@headerRecipients": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forwarding": "Inoltro",
+  "@forwarding": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacation": "Risposta automatica",
+  "@vacation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "activated": "Attivato",
+  "@activated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deactivated": "Deattivato",
+  "@deactivated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "endDate": "Data di fine",
+  "@endDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "startDate": "Data di inizio",
+  "@startDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationStopsAt": "La risposta automatica si ferma a",
+  "@vacationStopsAt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message": "Messaggio",
+  "@message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintMessageBodyVacation": "Messaggi automatici",
+  "@hintMessageBodyVacation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noStartTime": "Nessun tempo di inizio",
+  "@noStartTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "errorMessageWhenMessageVacationIsEmpty": "Il corpo del messaggio non può essere vuoto",
+  "@errorMessageWhenMessageVacationIsEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yourVacationResponderIsEnabled": "Il tuo risponditore automatico è abilitato.",
+  "@yourVacationResponderIsEnabled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteRecipient": "Eliminare destinatari",
+  "@deleteRecipient": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageDeleteRecipientSuccessfully": "L'e-mail è stata rimossa dall'elenco dei destinatari.",
+  "@toastMessageDeleteRecipientSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "recipientsLabel": "Nome o indirizzo e-mail",
+  "@recipientsLabel": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageLocalCopyEnable": "Mantieni abilitata la copia locale.",
+  "@toastMessageLocalCopyEnable": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteEmailRule": "Elimina regola",
+  "@deleteEmailRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastErrorMessageWhenCreateNewRule": "Non hai inserito completamente le informazioni.",
+  "@toastErrorMessageWhenCreateNewRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "startTime": "Tempo di inizio",
+  "@startTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintSubjectInputVacationSetting": "Inserisci oggetto",
+  "@hintSubjectInputVacationSetting": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "contact": "Contatto",
+  "@contact": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quickStyles": "Stili veloci",
+  "@quickStyles": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "setDate": "Imposta la data",
+  "@setDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageErrorWhenSelectStartDateIsEmpty": "La data di inizio non può essere nulla.",
+  "@toastMessageErrorWhenSelectStartDateIsEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageErrorWhenSelectEndDateIsEmpty": "La data di fine non può essere nulla.",
+  "@toastMessageErrorWhenSelectEndDateIsEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageErrorWhenSelectDateIsInValid": "Il tempo di fine non può essere inferiore al tempo di inizio.",
+  "@toastMessageErrorWhenSelectDateIsInValid": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageConfirmationDialogDeleteAllRecipientForward": "Sei sicuro di voler rimuovere quei destinatari? In questo modo li rimuoverai dallo scambio di lettere.",
+  "@messageConfirmationDialogDeleteAllRecipientForward": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailRuleSettingExplanation": "Creazione di regole per gestire i messaggi in arrivo. Scegli sia la condizione che attiva una regola sia le azioni che la regola eseguirà.",
+  "@emailRuleSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageConfirmationDialogDeleteEmailRule": "Vuoi eliminare la regola \"{ruleName}\"?",
+  "@messageConfirmationDialogDeleteEmailRule": {
+    "type": "text",
+    "placeholders_order": [
+      "ruleName"
+    ],
+    "placeholders": {
+      "ruleName": {}
+    }
+  },
+  "vacationSettingToggleButtonAutoReply": "Rispondi automaticamente ai messaggi quando vengono ricevuti.",
+  "@vacationSettingToggleButtonAutoReply": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleFormat": "Formato",
+  "@titleFormat": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dateRangeAdvancedSearchFilter": "Da {startDate} a {endDate}",
+  "@dateRangeAdvancedSearchFilter": {
+    "type": "text",
+    "placeholders_order": [
+      "startDate",
+      "endDate"
+    ],
+    "placeholders": {
+      "startDate": {},
+      "endDate": {}
+    }
+  },
+  "customRange": "Gamma personalizzata",
+  "@customRange": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "myFolders": "Le mie cartelle",
+  "@myFolders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unknownError": "Si è verificato un errore sconosciuto, riprova",
+  "@unknownError": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleHeaderAttachment": "{count} Allegati ({totalSize})",
+  "@titleHeaderAttachment": {
+    "type": "text",
+    "placeholders_order": [
+      "count",
+      "totalSize"
+    ],
+    "placeholders": {
+      "count": {},
+      "totalSize": {}
+    }
+  },
+  "undo": "Annullare",
+  "@undo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "skip": "Saltare",
+  "@skip": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showAll": "Mostra tutti",
+  "@showAll": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectParentFolder": "Seleziona la cartella principale",
+  "@selectParentFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requestReadReceipt": "Richiedi conferma di lettura",
+  "@requestReadReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "appGridTittle": "Vai alle applicazioni",
+  "@appGridTittle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleReadReceiptRequestNotificationMessage": "Richiesto di conferma di lettura",
+  "@titleReadReceiptRequestNotificationMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subTitleReadReceiptRequestNotificationMessage": "Il mittente ha richiesto una conferma di lettura per questa email. Invia la conferma?",
+  "@subTitleReadReceiptRequestNotificationMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yes": "Sì",
+  "@yes": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no": "No",
+  "@no": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageNotSupportMdnWhenSendReceipt": "Il tuo account non supporta la funzionalità MDN",
+  "@toastMessageNotSupportMdnWhenSendReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageCannotFoundIdentityWhenSendReceipt": "Impossibile trovare l'identificativo fornito",
+  "@toastMessageCannotFoundIdentityWhenSendReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageCannotFoundEmailIdWhenSendReceipt": "Impossibile trovare l'e-mail ID fornito",
+  "@toastMessageCannotFoundEmailIdWhenSendReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subjectSendReceiptToSender": "Leggere: {subject}",
+  "@subjectSendReceiptToSender": {
+    "type": "text",
+    "placeholders_order": [
+      "subject"
+    ],
+    "placeholders": {
+      "subject": {}
+    }
+  },
+  "textBodySendReceiptToSender": "Il messaggio è stato letto da {receiver} il {time} \n\nOggetto: {subject} \n\nNota: questa notifica conferma solo che il messaggio è stato visualizzato sul computer del destinatario. Non vi è alcuna garanzia che il destinatario abbia letto o compreso il contenuto del messaggio.",
+  "@textBodySendReceiptToSender": {
+    "type": "text",
+    "placeholders_order": [
+      "sender",
+      "subject",
+      "time"
+    ],
+    "placeholders": {
+      "sender": {},
+      "subject": {},
+      "time": {}
+    }
+  },
+  "toastMessageSendReceiptSuccess": "È stata inviata una conferma di lettura.",
+  "@toastMessageSendReceiptSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moveConversation": "Sposta {numberOfConversation} conversazione",
+  "@moveConversation": {
+    "type": "text",
+    "placeholders_order": [
+      "numberOfConversation"
+    ],
+    "placeholders": {
+      "numberOfConversation": {}
+    }
+  },
+  "hintInputAutocompleteContact": "Inserisci il nome o l'indirizzo email",
+  "@hintInputAutocompleteContact": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "newer": "Più nuovo",
+  "@newer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "older": "Più vecchio",
+  "@older": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addRecipientButton": "Aggiungi il destinatario",
+  "@addRecipientButton": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "incorrectEmailFormat": "Formato e-mail non valido",
+  "@incorrectEmailFormat": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "remove": "Rimuovere",
+  "@remove": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "totalEmailSelected": "Deselezionare tutto ({count})",
+  "@totalEmailSelected": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "storageQuotas": "Spazio",
+  "@storageQuotas": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "textQuotasUsed": "{used} GB di {softLimit} GB utilizzati",
+  "@textQuotasUsed": {
+    "type": "text",
+    "placeholders_order": [
+      "used",
+      "softLimit"
+    ],
+    "placeholders": {
+      "used": {},
+      "softLimit": {}
+    }
+  },
+  "textQuotasRunningOutOfStorageTitle": "Stai esaurendo lo spazio di archiviazione ({progress}%).",
+  "@textQuotasRunningOutOfStorageTitle": {
+    "type": "text",
+    "placeholders_order": [
+      "progress"
+    ],
+    "placeholders": {
+      "progress": {}
+    }
+  },
+  "textQuotasOutOfStorage": "Spazio esaurito",
+  "@textQuotasOutOfStorage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "textQuotasRunOutOfStorageTitle": "Hai esaurito lo spazio di archiviazione",
+  "@textQuotasRunOutOfStorageTitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "textQuotasRunningOutOfStorageContent": "A breve non potrai più inviare email in Twake Mail. Pulisci il tuo spazio di archiviazione o aggiornalo per ottenere tutte le funzionalità di Twake Mail.",
+  "@textQuotasRunningOutOfStorageContent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "textQuotasRunOutOfStorageContent": "Ora non puoi temporaneamente inviare o ricevere e-mail.  Libera o aggiorna il tuo spazio di archiviazione per ottenere tutte le funzionalità di Twake Mail.",
+  "@textQuotasRunOutOfStorageContent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quickCreatingRule": "Crea una regola con questa email",
+  "@quickCreatingRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titlePageNotFound": "Spiacenti, non riusciamo a trovare questa pagina",
+  "@titlePageNotFound": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subTitlePageNotFound": "È possibile che questa pagina sia scomparsa o appartenga a un altro account.",
+  "@subTitlePageNotFound": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "page404": "Pagina 404",
+  "@page404": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "openInNewTab": "Apri in una nuova scheda",
+  "@openInNewTab": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reply_to": "Rispondi a",
+  "@reply_to": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bcc_to": "Bcc a",
+  "@bcc_to": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "html": "Html",
+  "@html": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "regards": "Saluti",
+  "@regards": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youHaveNewMessages": "Hai nuovi messaggi",
+  "@youHaveNewMessages": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "appTitlePushNotification": "Twake Mail",
+  "@appTitlePushNotification": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "totalNewMessagePushNotification": "{count} nuove email",
+  "@totalNewMessagePushNotification": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "countNewSpamEmails": "Hai {count} nuove email di spam!",
+  "@countNewSpamEmails": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "showDetails": "Mostra dettagli",
+  "@showDetails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dismiss": "Cancellare",
+  "@dismiss": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "privacyPolicy": "Politica sulla riservatezza",
+  "@privacyPolicy": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "disableSpamReport": "Disattivare rapporto di spam",
+  "@disableSpamReport": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enableSpamReport": "Attivare rapporto di spam",
+  "@enableSpamReport": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "required": "necessario",
+  "@required": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noEmailMatchYourCurrentFilter": "Siamo spiacenti, non ci sono email che corrispondono al tuo filtro attuale.",
+  "@noEmailMatchYourCurrentFilter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reduceSomeFiltersAndTryAgain": "Riduciamo alcuni filtri e riproviamo",
+  "@reduceSomeFiltersAndTryAgain": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendMessageFailure": "Impossibile inviare il messaggio.",
+  "@sendMessageFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendMessageFailureWithSetErrorTypeTooLarge": "Impossibile inviare il messaggio perché è troppo grande.",
+  "@sendMessageFailureWithSetErrorTypeTooLarge": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mailBoxes": "Caselle di posta",
+  "@mailBoxes": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveEmailAsDraftFailure": "Impossibile salvare il messaggio come bozza.",
+  "@saveEmailAsDraftFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveEmailAsDraftFailureWithSetErrorTypeTooLarge": "Impossibile salvare il messaggio come bozza perché è troppo grande.",
+  "@saveEmailAsDraftFailureWithSetErrorTypeTooLarge": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveEmailAsDraftFailureWithSetErrorTypeOverQuota": "Impossibile salvare il messaggio come bozza perché ha superato la quota.",
+  "@saveEmailAsDraftFailureWithSetErrorTypeOverQuota": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisImageCannotBeAdded": "Questa immagine non può essere aggiunta.",
+  "@thisImageCannotBeAdded": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMsgHideMailboxSuccess": "Questa casella di posta è stata nascosta dalla tua casella di posta principale",
+  "@toastMsgHideMailboxSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "searchForMailboxes": "Cerca le caselle di posta",
+  "@searchForMailboxes": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showMailbox": "Mostra caselle di posta",
+  "@showMailbox": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mailboxVisibility": "Visibilità della casella di posta",
+  "@mailboxVisibility": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mailboxVisibilitySubtitle": "Mostra/nascondi le tue caselle di posta, comprese quelle personali e del team.",
+  "@mailboxVisibilitySubtitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "personalFolders": "Cartelle personali",
+  "@personalFolders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageShowMailboxSuccess": "Questa casella di posta è già visualizzata nella tua casella di posta principale",
+  "@toastMessageShowMailboxSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "Bad credentials": "Credenziali sbagliate",
+  "@Bad credentials": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "profilesSettingExplanation": "Tue informazioni e opzioni per gestirle.",
+  "@profilesSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "setDefaultIdentity": "Imposta come identità predefinita",
+  "@setDefaultIdentity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "identitiesSettingExplanation": "Seleziona l'identità o l'indirizzo e-mail che desideri utilizzare per inviare e-mail",
+  "@identitiesSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createNewIdentity": "Crea una nuova identità",
+  "@createNewIdentity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you_have_created_a_new_default_identity": "Hai creato una nuova identità predefinita",
+  "@you_have_created_a_new_default_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendMessageFailureWithSetErrorTypeOverQuota": "Impossibile inviare il messaggio perché ha superato la quota.",
+  "@sendMessageFailureWithSetErrorTypeOverQuota": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "teamMailBoxes": "Caselle di posta del team",
+  "@teamMailBoxes": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hideMailBoxes": "Nascondere caselle di posta",
+  "@hideMailBoxes": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectAllMessagesOfThisPage": "Seleziona tutti i messaggi di questa pagina",
+  "@selectAllMessagesOfThisPage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  }
+}

@@ -1,0 +1,23 @@
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/presentation/action/email_ui_action.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/model/dashboard_routes.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread_detail/presentation/extension/handle_mail_shortcut_actions_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread_detail/presentation/thread_detail_controller.dart';
+
+extension CloseThreadDetailAction on ThreadDetailController {
+  void closeThreadDetailAction() {
+    if (isSearchRunning) {
+      mailboxDashBoardController.dispatchRoute(DashboardRoutes.searchEmail);
+    } else {
+      mailboxDashBoardController.dispatchRoute(DashboardRoutes.thread);
+    }
+    mailboxDashBoardController
+      .dispatchEmailUIAction(CloseEmailInThreadDetailAction());
+    Future.delayed(Duration.zero, () {
+      mailboxDashBoardController.dispatchEmailUIAction(EmailUIAction());
+    });
+
+    onKeyboardShortcutDispose();
+
+    reset();
+  }
+}

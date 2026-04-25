@@ -1,0 +1,51 @@
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/color_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/button/tmail_button_widget.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/direction_utils.dart';
+import 'package:flutter/material.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/extensions/presentation_mailbox_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/presentation/extensions/expand_mode_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/presentation/model/mailbox_node.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/presentation/utils/mailbox_method_action_define.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
+
+class MailboxExpandButton extends StatelessWidget {
+  final GlobalKey itemKey;
+  final MailboxNode mailboxNode;
+  final ImagePaths imagePaths;
+  final Color? color;
+  final OnClickExpandMailboxNodeAction? onExpandFolderActionClick;
+
+  const MailboxExpandButton({
+    super.key,
+    required this.itemKey,
+    required this.mailboxNode,
+    required this.imagePaths,
+    required this.onExpandFolderActionClick,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TMailButtonWidget.fromIcon(
+      key: const Key('expand_mailbox_button'),
+      icon: mailboxNode.expandMode.getIcon(
+        imagePaths,
+        DirectionUtils.isDirectionRTLByLanguage(context),
+      ),
+      iconColor: color ?? _expandIconColor,
+      iconSize: 17,
+      margin: const EdgeInsetsDirectional.only(start: 8),
+      padding: const EdgeInsets.all(3),
+      backgroundColor: Colors.transparent,
+      tooltipMessage: mailboxNode.expandMode.getTooltipMessage(AppLocalizations.of(context)),
+      onTapActionCallback: () => onExpandFolderActionClick?.call(mailboxNode, itemKey),
+    );
+  }
+
+  Color get _expandIconColor {
+    return mailboxNode.item.allowedToDisplay
+        ? Colors.black
+        : AppColor.steelGray200;
+  }
+}

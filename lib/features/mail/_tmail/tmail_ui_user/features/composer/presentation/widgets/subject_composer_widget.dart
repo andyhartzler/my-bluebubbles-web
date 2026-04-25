@@ -1,0 +1,53 @@
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/text/text_field_builder.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/direction_utils.dart';
+import 'package:flutter/material.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/styles/subject_composer_widget_style.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
+
+class SubjectComposerWidget extends StatelessWidget {
+
+  final FocusNode? focusNode;
+  final TextEditingController textController;
+  final ValueChanged<String>? onTextChange;
+  final EdgeInsetsGeometry? margin;
+  final EdgeInsetsGeometry? padding;
+
+  const SubjectComposerWidget({
+    super.key,
+    required this.focusNode,
+    required this.textController,
+    required this.onTextChange,
+    this.margin,
+    this.padding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: SubjectComposerWidgetStyle.borderColor,
+            width: 1
+          )
+        ),
+      ),
+      margin: margin,
+      padding: padding,
+      child: TextFieldBuilder(
+        cursorColor: SubjectComposerWidgetStyle.cursorColor,
+        focusNode: focusNode,
+        onTextChange: onTextChange,
+        maxLines: 1,
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          hintText: AppLocalizations.of(context).subject,
+          hintStyle: SubjectComposerWidgetStyle.hintTextStyle,
+        ),
+        textDirection: DirectionUtils.getDirectionByLanguage(context),
+        textStyle: SubjectComposerWidgetStyle.inputTextStyle,
+        controller: textController,
+      ),
+    );
+  }
+}

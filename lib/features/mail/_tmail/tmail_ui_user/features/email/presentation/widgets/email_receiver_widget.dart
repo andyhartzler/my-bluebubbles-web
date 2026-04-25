@@ -1,0 +1,307 @@
+
+import 'package:collection/collection.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/color_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/responsive_utils.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/theme_utils.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/button/tmail_button_widget.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/platform_info.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:jmap_dart_client/jmap/mail/email/email_address.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/prefix_email_address.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/presentation_email.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/extensions/email_address_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/extensions/list_email_address_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/extensions/presentation_email_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/extensions/prefix_email_address_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/presentation/widgets/email_sender_builder.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/presentation/widgets/prefix_recipient_widget.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/utils/app_utils.dart';
+
+class EmailReceiverWidget extends StatefulWidget {
+
+  final PresentationEmail emailSelected;
+  final double maxWidth;
+  final double? maxHeight;
+  final OnOpenEmailAddressDetailAction? openEmailAddressDetailAction;
+
+  const EmailReceiverWidget({
+    Key? key,
+    required this.emailSelected,
+    this.maxWidth = 200,
+    this.maxHeight,
+    this.openEmailAddressDetailAction,
+  }) : super(key: key);
+
+  @override
+  State<EmailReceiverWidget> createState() => _EmailReceiverWidgetState();
+}
+
+class _EmailReceiverWidgetState extends State<EmailReceiverWidget> {
+
+  static const double _maxSizeFullDisplayEmailAddressArrowDownButton = 50.0;
+  static const double _offsetTop = 100.0;
+
+  final _imagePaths = Get.find<ImagePaths>();
+  final _responsiveUtils = Get.find<ResponsiveUtils>();
+
+  bool _isDisplayAll = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (PlatformInfo.isWeb) {
+      if (_isDisplayAll) {
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Container(
+                constraints: BoxConstraints(maxHeight: _maxHeight),
+                child: ListView(
+                  primary: false,
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  children: _buildListFullDisplayRecipients(),
+                ),
+              )
+            ),
+            _buildHideButton(),
+          ]
+        );
+      } else {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: _getMaxWidth(context),
+                maxHeight: 22,
+              ),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                children: _buildListRecipients(),
+              ),
+            ),
+            if (widget.emailSelected.countRecipients > 1)
+              _buildShowAllButton(),
+          ]
+        );
+      }
+    } else {
+      if (_isDisplayAll) {
+        return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: _buildListFullDisplayRecipients(),
+                )
+              ),
+              _buildHideButton(),
+            ]
+        );
+      } else {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 22,
+              constraints: BoxConstraints(maxWidth: _getMaxWidth(context)),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                children: _buildListRecipients(),
+              ),
+            ),
+            if (widget.emailSelected.countRecipients > 1)
+              _buildShowAllButton(),
+          ]
+        );
+      }
+    }
+  }
+
+  Widget _buildHideButton() {
+    return TMailButtonWidget.fromText(
+      text: AppLocalizations.of(context).hide,
+      textStyle: ThemeUtils.textStyleInter500().copyWith(
+        color: AppColor.gray6D7885,
+        fontSize: 14,
+        height: 1,
+        letterSpacing: -0.14,
+      ),
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: 8,
+        vertical: 3,
+      ),
+      backgroundColor: Colors.transparent,
+      onTapActionCallback: () => setState(() => _isDisplayAll = false),
+    );
+  }
+
+  Widget _buildShowAllButton() {
+    return TMailButtonWidget.fromIcon(
+      icon: _imagePaths.icChevronDownOutline,
+      iconColor: AppColor.steelGray400,
+      padding: const EdgeInsets.all(2),
+      iconSize: 20,
+      backgroundColor: Colors.transparent,
+      onTapActionCallback: () => setState(() => _isDisplayAll = true),
+    );
+  }
+
+  List<Widget> _buildListFullDisplayRecipients() {
+    return [
+      if (widget.emailSelected.to.numberEmailAddress() > 0)
+        _buildRecipientsWidgetToDisplayFull(
+          context: context,
+          prefixEmailAddress: PrefixEmailAddress.to,
+          listEmailAddress: PrefixEmailAddress.to.listEmailAddress(
+            widget.emailSelected,
+          ),
+          padding: const EdgeInsets.only(bottom: 4),
+        ),
+      if (widget.emailSelected.cc.numberEmailAddress() > 0)
+        _buildRecipientsWidgetToDisplayFull(
+          context: context,
+          prefixEmailAddress: PrefixEmailAddress.cc,
+          listEmailAddress: PrefixEmailAddress.cc.listEmailAddress(
+            widget.emailSelected,
+          ),
+          padding: const EdgeInsets.only(bottom: 4),
+        ),
+      if (widget.emailSelected.bcc.numberEmailAddress() > 0)
+        _buildRecipientsWidgetToDisplayFull(
+          context: context,
+          prefixEmailAddress: PrefixEmailAddress.bcc,
+          listEmailAddress: PrefixEmailAddress.bcc.listEmailAddress(
+            widget.emailSelected,
+          ),
+        ),
+    ];
+  }
+
+  List<Widget> _buildListRecipients() {
+    return [
+      if (widget.emailSelected.to.numberEmailAddress() > 0)
+        ..._buildRecipientsWidget(
+          context: context,
+          prefixEmailAddress: PrefixEmailAddress.to,
+          listEmailAddress: PrefixEmailAddress.to.listEmailAddress(
+            widget.emailSelected,
+          ),
+        ),
+      if (widget.emailSelected.cc.numberEmailAddress() > 0)
+        ..._buildRecipientsWidget(
+          context: context,
+          prefixEmailAddress: PrefixEmailAddress.cc,
+          listEmailAddress: PrefixEmailAddress.cc.listEmailAddress(
+            widget.emailSelected,
+          ),
+        ),
+      if (widget.emailSelected.bcc.numberEmailAddress() > 0)
+        ..._buildRecipientsWidget(
+          context: context,
+          prefixEmailAddress: PrefixEmailAddress.bcc,
+          listEmailAddress: PrefixEmailAddress.bcc.listEmailAddress(
+            widget.emailSelected,
+          ),
+        ),
+    ];
+  }
+
+  List<Widget> _buildRecipientsTag({required List<EmailAddress> listEmailAddress}) {
+    final isMobileResponsive = _responsiveUtils.isMobile(context);
+
+    return listEmailAddress
+      .mapIndexed((index, emailAddress) => TMailButtonWidget.fromText(
+        text: index == listEmailAddress.length - 1
+          ? emailAddress.asString()
+          : '${emailAddress.asString()},',
+        textStyle: ThemeUtils.textStyleInter400.copyWith(
+          fontSize: 14,
+          height: 1,
+          letterSpacing: -0.14,
+          color: isMobileResponsive ? AppColor.gray6D7885 : Colors.black,
+        ),
+        padding: const EdgeInsetsDirectional.all(4),
+        backgroundColor: Colors.transparent,
+        onTapActionCallback: () => widget.openEmailAddressDetailAction?.call(context, emailAddress),
+        onLongPressActionCallback: () => AppUtils.copyEmailAddressToClipboard(context, emailAddress.emailAddress),
+      ))
+      .toList();
+  }
+
+  Widget _buildRecipientsWidgetToDisplayFull({
+    required BuildContext context,
+    required PrefixEmailAddress prefixEmailAddress,
+    required List<EmailAddress> listEmailAddress,
+    EdgeInsetsGeometry? padding,
+  }) {
+    final bodyWidget = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        PrefixRecipientWidget(
+          prefixEmailAddress: prefixEmailAddress,
+          isMobileResponsive: _responsiveUtils.isMobile(context),
+          padding: const EdgeInsetsDirectional.symmetric(vertical: 4),
+        ),
+        Expanded(
+          child: Wrap(
+            runSpacing: 4,
+            children: _buildRecipientsTag(listEmailAddress: listEmailAddress)
+          )
+        )
+      ],
+    );
+
+    if (padding != null) {
+      return Padding(padding: padding, child: bodyWidget);
+    } else {
+      return bodyWidget;
+    }
+  }
+
+  List<Widget> _buildRecipientsWidget({
+    required BuildContext context,
+    required PrefixEmailAddress prefixEmailAddress,
+    required List<EmailAddress> listEmailAddress,
+  }) {
+    return [
+      PrefixRecipientWidget(
+        prefixEmailAddress: prefixEmailAddress,
+        isMobileResponsive: _responsiveUtils.isMobile(context),
+        padding: const EdgeInsetsDirectional.only(top: 4),
+      ),
+      ..._buildRecipientsTag(listEmailAddress: listEmailAddress).map(
+        (child) => Align(alignment: AlignmentDirectional.topStart, child: child),
+      ),
+    ];
+  }
+
+  double _getMaxWidth(BuildContext context) {
+    if (_responsiveUtils.isPortraitMobile(context)) {
+      return widget.maxWidth - _maxSizeFullDisplayEmailAddressArrowDownButton;
+    } else if (_responsiveUtils.isWebDesktop(context)) {
+      return widget.maxWidth / 2;
+    } else {
+      return widget.maxWidth * 3/4;
+    }
+  }
+
+  double get _maxHeight {
+    return _isDisplayAll && widget.maxHeight != null
+      ? widget.maxHeight! / 2 - _offsetTop
+      : double.infinity;
+  }
+}

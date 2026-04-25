@@ -1,0 +1,68 @@
+import 'package:dartz/dartz.dart';
+import 'package:jmap_dart_client/jmap/mail/email/keyword_identifier.dart';
+import 'package:bluebubbles/features/mail/_tmail/labels/model/label.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/extensions/keyword_identifier_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/action/dashboard_action.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/mailbox_dashboard_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/model/search/quick_search_filter.dart';
+
+extension SelectSearchFilterActionExtension on MailboxDashBoardController {
+  void selectKeywordSearchFilter(KeyWordIdentifier keyword) {
+    final listHasKeywordFiltered = searchController.listHasKeywordFiltered;
+    listHasKeywordFiltered.add(keyword.value);
+    searchController.updateFilterEmail(
+      hasKeywordOption: Some(listHasKeywordFiltered),
+    );
+    dispatchAction(StartSearchEmailAction());
+  }
+
+  void selectUnreadSearchFilter() {
+    searchController.updateFilterEmail(unreadOption: const Some(true));
+    dispatchAction(StartSearchEmailAction());
+  }
+
+  void deleteStarredSearchFilter() {
+    final listHasKeywordFiltered = searchController.listHasKeywordFiltered;
+    listHasKeywordFiltered.remove(KeyWordIdentifier.emailFlagged.value);
+    searchController.updateFilterEmail(
+      hasKeywordOption: Some(listHasKeywordFiltered),
+    );
+  }
+
+  void deleteUnreadSearchFilter() {
+    searchController.updateFilterEmail(unreadOption: const None());
+  }
+
+  void deleteEventsSearchFilter() {
+    final listHasKeywordFiltered = searchController.listHasKeywordFiltered;
+    listHasKeywordFiltered.remove(KeyWordIdentifierExtension.eventsMail.value);
+    searchController.updateFilterEmail(
+      hasKeywordOption: Some(listHasKeywordFiltered),
+    );
+  }
+
+  void deleteQuickSearchFilter({required QuickSearchFilter filter}) {
+    switch (filter) {
+      case QuickSearchFilter.labels:
+        searchController.updateFilterEmail(labelOption: const None());
+        break;
+      case QuickSearchFilter.starred:
+        deleteStarredSearchFilter();
+        break;
+      case QuickSearchFilter.unread:
+        deleteUnreadSearchFilter();
+        break;
+      case QuickSearchFilter.events:
+        deleteEventsSearchFilter();
+        break;
+      default:
+        break;
+    }
+    dispatchAction(StartSearchEmailAction());
+  }
+
+  void onSelectLabelFilter(Label? newLabel) {
+    searchController.updateFilterEmail(labelOption: optionOf(newLabel));
+    dispatchAction(StartSearchEmailAction());
+  }
+}

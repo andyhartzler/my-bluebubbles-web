@@ -1,0 +1,54 @@
+
+import 'package:flutter/cupertino.dart';
+import 'package:jmap_dart_client/jmap/mail/email/email_address.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/model.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/model/filter_filter.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
+
+extension PrefixEmailAddressExtension on PrefixEmailAddress {
+
+  String asName(BuildContext context) {
+    switch(this) {
+      case PrefixEmailAddress.to:
+        return AppLocalizations.of(context).to_email_address_prefix;
+      case PrefixEmailAddress.cc:
+        return AppLocalizations.of(context).cc_email_address_prefix;
+      case PrefixEmailAddress.bcc:
+        return AppLocalizations.of(context).bcc_email_address_prefix;
+      case PrefixEmailAddress.replyTo:
+        return AppLocalizations.of(context).reply_to_email_address_prefix;
+      case PrefixEmailAddress.from:
+        return AppLocalizations.of(context).from_email_address_prefix;
+    }
+  }
+
+  List<EmailAddress> listEmailAddress(PresentationEmail email) {
+    switch(this) {
+      case PrefixEmailAddress.to:
+        return email.to?.toList() ?? List.empty();
+      case PrefixEmailAddress.cc:
+        return email.cc?.toList() ?? List.empty();
+      case PrefixEmailAddress.bcc:
+        return email.bcc?.toList() ?? List.empty();
+      case PrefixEmailAddress.replyTo:
+        return email.replyTo?.toList() ?? List.empty();
+      case PrefixEmailAddress.from:
+        return email.from?.toList() ?? List.empty();
+    }
+  }
+
+  FilterField get filterField {
+    switch(this) {
+      case PrefixEmailAddress.from:
+        return FilterField.from;
+      case PrefixEmailAddress.to:
+        return FilterField.to;
+      case PrefixEmailAddress.cc:
+        return FilterField.cc;
+      case PrefixEmailAddress.bcc:
+        return FilterField.bcc;
+      case PrefixEmailAddress.replyTo:
+        return FilterField.replyTo;
+    }
+  }
+}

@@ -1,0 +1,22 @@
+import 'package:bluebubbles/features/mail/_tmail/core/domain/exceptions/app_base_exception.dart';
+
+class NotFoundDataWithThisKeyException extends AppBaseException {
+  const NotFoundDataWithThisKeyException([super.message]);
+
+  @override
+  String get exceptionName => 'NotFoundDataWithThisKeyException';
+}
+
+class NotFoundSentryConfigurationException extends AppBaseException {
+  const NotFoundSentryConfigurationException([super.message]);
+
+  @override
+  String get exceptionName => 'NotFoundSentryConfigurationException';
+}
+
+class NotFoundSentryUserException extends AppBaseException {
+  const NotFoundSentryUserException([super.message]);
+
+  @override
+  String get exceptionName => 'NotFoundSentryUserException';
+}

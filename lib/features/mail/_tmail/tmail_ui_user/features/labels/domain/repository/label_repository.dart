@@ -1,0 +1,22 @@
+import 'package:jmap_dart_client/jmap/account_id.dart';
+import 'package:jmap_dart_client/jmap/core/session/session.dart';
+import 'package:jmap_dart_client/jmap/core/state.dart';
+import 'package:bluebubbles/features/mail/_tmail/labels/model/label.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/domain/model/edit_label_request.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/domain/model/label_changes_result.dart';
+
+abstract class LabelRepository {
+  Future<({List<Label> labels, State? newState})> getAllLabels(AccountId accountId);
+
+  Future<Label> createNewLabel(AccountId accountId, Label labelData);
+
+  Future<Label> editLabel(AccountId accountId, EditLabelRequest labelRequest);
+
+  Future<void> deleteLabel(AccountId accountId, Label label);
+
+  Future<LabelChangesResult> getLabelChanges(
+    Session session,
+    AccountId accountId,
+    State sinceState,
+  );
+}

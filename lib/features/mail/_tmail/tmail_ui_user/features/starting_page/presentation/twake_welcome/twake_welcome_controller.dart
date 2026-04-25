@@ -1,0 +1,234 @@
+import 'dart:async';
+
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/platform_info.dart';
+import 'package:dartz/dartz.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:jmap_dart_client/jmap/core/session/session.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/oidc/oidc_configuration.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/reloadable/reloadable_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/home/domain/state/auto_sign_in_via_deep_link_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/home/domain/state/get_session_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/data/network/config/oidc_constant.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/domain/exceptions/authentication_exception.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/domain/usecases/remove_company_server_login_info_interactor.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/presentation/login_form_type.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/presentation/model/login_arguments.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/starting_page/domain/state/sign_in_twake_workplace_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/starting_page/domain/state/sign_up_twake_workplace_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/starting_page/domain/usecase/sign_in_twake_workplace_interactor.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/starting_page/domain/usecase/sign_up_twake_workplace_interactor.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/deep_links/deep_link_data.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/deep_links/deep_links_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/deep_links/open_app_deep_link_data.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/app_routes.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/route_navigation.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/route_utils.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/utils/app_config.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/utils/app_utils.dart';
+
+class TwakeWelcomeController extends ReloadableController {
+
+  final SignInTwakeWorkplaceInteractor _signInTwakeWorkplaceInteractor;
+  final SignUpTwakeWorkplaceInteractor _signUpTwakeWorkplaceInteractor;
+
+  RemoveCompanyServerLoginInfoInteractor? _removeCompanyServerLoginInfoInteractor;
+
+  DeepLinksManager? _deepLinksManager;
+  StreamSubscription<DeepLinkData?>? _deepLinkDataStreamSubscription;
+
+  TwakeWelcomeController(
+    this._signInTwakeWorkplaceInteractor,
+    this._signUpTwakeWorkplaceInteractor,
+  );
+
+  @override
+  void onInit() {
+    super.onInit();
+    if (PlatformInfo.isMobile) {
+      _registerDeepLinks();
+    }
+  }
+
+  void _registerDeepLinks() {
+    _deepLinksManager = getBinding<DeepLinksManager>();
+    _deepLinksManager?.clearPendingDeepLinkData();
+    _deepLinkDataStreamSubscription = _deepLinksManager
+        ?.pendingDeepLinkData.stream
+        .listen(_handlePendingDeepLinkDataStream);
+  }
+
+  void _handlePendingDeepLinkDataStream(DeepLinkData? deepLinkData) {
+    log('TwakeWelcomeController::_handlePendingDeepLinkDataStream:DeepLinkData = $deepLinkData');
+    _deepLinksManager?.handleDeepLinksWhenAppRunning(
+      deepLinkData: deepLinkData,
+      onSuccessCallback: (deepLinkData) {
+        if (deepLinkData is! OpenAppDeepLinkData) return;
+
+        if (currentContext != null) {
+          SmartDialog.showLoading(msg: AppLocalizations.of(currentContext!).loadingPleaseWait);
+        }
+
+        _deepLinksManager?.autoSignInViaDeepLink(
+          openAppDeepLinkData: deepLinkData,
+          onAutoSignInSuccessCallback: _handleAutoSignInViaDeepLinkSuccess,
+          onFailureCallback: SmartDialog.dismiss,
+        );
+      },
+    );
+  }
+
+  void _handleAutoSignInViaDeepLinkSuccess(AutoSignInViaDeepLinkSuccess success) {
+    if (PlatformInfo.isMobile) {
+      removeCompanyServerLoginInfo();
+    }
+    synchronizeTokenAndGetSession(
+      baseUri: success.baseUri,
+      tokenOIDC: success.tokenOIDC,
+      oidcConfiguration: success.oidcConfiguration,
+    );
+  }
+
+  void handleUseCompanyServer() {
+    popAndPush(
+      AppRoutes.login,
+      arguments: LoginArguments(LoginFormType.dnsLookupForm));
+  }
+
+  void onClickPrivacyPolicy() {
+    AppUtils.launchLink(AppConfig.linagoraPrivacyUrl);
+  }
+
+  void onClickSignIn(BuildContext context) {
+    SmartDialog.showLoading(msg: AppLocalizations.of(context).loadingPleaseWait);
+
+    final baseUri = Uri.tryParse(AppConfig.saasJmapServerUrl);
+
+    if (baseUri == null) {
+      consumeState(Stream.value(Left(SignInTwakeWorkplaceFailure(SaasServerUriIsNull()))));
+      return;
+    }
+
+    consumeState(_signInTwakeWorkplaceInteractor.execute(
+      baseUri: baseUri,
+      oidcConfiguration: OIDCConfiguration(
+        authority: AppConfig.saasRegistrationUrl,
+        clientId: OIDCConstant.clientId,
+        scopes: AppConfig.oidcScopes,
+        isTWP: true,
+      )
+    ));
+  }
+
+  void onSignUpTwakeWorkplace(BuildContext context) {
+    SmartDialog.showLoading(msg: AppLocalizations.of(context).loadingPleaseWait);
+
+    final baseUri = Uri.tryParse(AppConfig.saasJmapServerUrl);
+
+    if (baseUri == null) {
+      consumeState(Stream.value(Left(SignUpTwakeWorkplaceFailure(SaasServerUriIsNull()))));
+      return;
+    }
+
+    consumeState(_signUpTwakeWorkplaceInteractor.execute(
+      baseUri: baseUri,
+      oidcConfiguration: OIDCConfiguration(
+        authority: AppConfig.saasRegistrationUrl,
+        clientId: OIDCConstant.clientId,
+        scopes: AppConfig.oidcScopes,
+        isTWP: true,
+      )
+    ));
+  }
+
+  void removeCompanyServerLoginInfo() {
+    _removeCompanyServerLoginInfoInteractor =
+        getBinding<RemoveCompanyServerLoginInfoInteractor>();
+    if (_removeCompanyServerLoginInfoInteractor != null) {
+      consumeState(_removeCompanyServerLoginInfoInteractor!.execute());
+    }
+  }
+
+  @override
+  void handleSuccessViewState(Success success) {
+    if (success is SignInTwakeWorkplaceSuccess) {
+      if (PlatformInfo.isMobile) {
+        removeCompanyServerLoginInfo();
+      }
+      synchronizeTokenAndGetSession(
+        baseUri: success.baseUri,
+        tokenOIDC: success.tokenOIDC,
+        oidcConfiguration: success.oidcConfiguration,
+      );
+    } else if (success is SignUpTwakeWorkplaceSuccess) {
+      if (PlatformInfo.isMobile) {
+        removeCompanyServerLoginInfo();
+      }
+      synchronizeTokenAndGetSession(
+        baseUri: success.baseUri,
+        tokenOIDC: success.tokenOIDC,
+        oidcConfiguration: success.oidcConfiguration,
+      );
+    } else {
+      super.handleSuccessViewState(success);
+    }
+  }
+
+  @override
+  void handleFailureViewState(Failure failure) {
+    if (failure is SignInTwakeWorkplaceFailure) {
+      _handleSignInTwakeWorkplaceFailure(failure);
+    } else if (failure is SignUpTwakeWorkplaceFailure) {
+      _handleSignUpTwakeWorkplaceFailure(failure);
+    } else {
+      super.handleFailureViewState(failure);
+    }
+  }
+
+  @override
+  void handleReloaded(Session session) {
+    SmartDialog.dismiss();
+
+    popAndPush(
+      RouteUtils.generateNavigationRoute(AppRoutes.dashboard),
+      arguments: session);
+  }
+
+  @override
+  void handleGetSessionFailure(GetSessionFailure failure) {
+    SmartDialog.dismiss();
+
+    toastManager.showMessageFailure(failure);
+  }
+
+  @override
+  void handleUrgentExceptionOnMobile({Failure? failure, Exception? exception}) {
+    SmartDialog.dismiss();
+    super.handleUrgentExceptionOnMobile(failure: failure, exception: exception);
+  }
+
+  void _handleSignInTwakeWorkplaceFailure(SignInTwakeWorkplaceFailure failure) {
+    SmartDialog.dismiss();
+
+    toastManager.showMessageFailure(failure);
+  }
+
+  void _handleSignUpTwakeWorkplaceFailure(SignUpTwakeWorkplaceFailure failure) {
+    SmartDialog.dismiss();
+
+    toastManager.showMessageFailure(failure);
+  }
+
+  @override
+  void onClose() {
+    if (PlatformInfo.isMobile) {
+      _deepLinkDataStreamSubscription?.cancel();
+      _removeCompanyServerLoginInfoInteractor = null;
+    }
+    super.onClose();
+  }
+}

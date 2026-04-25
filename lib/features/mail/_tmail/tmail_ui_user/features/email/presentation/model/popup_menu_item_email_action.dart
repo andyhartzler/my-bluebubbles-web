@@ -1,0 +1,36 @@
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
+import 'package:flutter/material.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/email_action_type.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/model/popup_menu_item_action.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/extensions/email_action_type_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
+
+class PopupMenuItemEmailAction
+    extends PopupMenuItemActionRequiredIcon<EmailActionType> {
+  final AppLocalizations appLocalizations;
+  final ImagePaths imagePaths;
+
+  PopupMenuItemEmailAction(
+    super.action,
+    this.appLocalizations,
+    this.imagePaths, {
+    super.key,
+    super.category,
+    super.submenu,
+  });
+
+  @override
+  String get actionIcon => action.getIcon(imagePaths);
+
+  @override
+  String get actionName => action.getTitle(appLocalizations);
+
+  @override
+  Color get actionIconColor => action.getPopupMenuIconColor();
+
+  @override
+  Color get actionNameColor => action.getPopupMenuTitleColor();
+
+  @override
+  String get hoverIcon => imagePaths.icThumbsUp;
+}

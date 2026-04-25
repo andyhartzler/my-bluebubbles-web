@@ -1,0 +1,361 @@
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/mail/mail_address.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get_utils/src/get_utils/get_utils.dart';
+import 'package:dartz/dartz.dart';
+import 'package:http_parser/http_parser.dart';
+import 'package:jmap_dart_client/jmap/account_id.dart';
+import 'package:jmap_dart_client/jmap/core/capability/capability_identifier.dart';
+import 'package:jmap_dart_client/jmap/core/id.dart';
+import 'package:jmap_dart_client/jmap/core/properties/properties.dart';
+import 'package:jmap_dart_client/jmap/core/session/session.dart';
+import 'package:jmap_dart_client/jmap/core/unsigned_int.dart';
+import 'package:jmap_dart_client/jmap/mail/email/email_address.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/attachment.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/download/domain/state/download_attachment_for_web_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/download/domain/state/download_and_get_html_content_from_attachment_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/presentation/model/email_unsubscribe.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread/domain/constants/thread_constants.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/error/capability_validator.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/route_utils.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/utils/app_utils.dart';
+
+class EmailUtils {
+  static const double desktopItemMaxWidth = 260;
+  static const double desktopMoreButtonMaxWidth = 150;
+  static const double attachmentItemSpacing = 8;
+  static const double attachmentItemHeight = 36;
+  static const double attachmentIcon = 20;
+  static const int maxMobileVisibleAttachments = 3;
+  static const String defaultReplyPrefix = 'Re:';
+  static const String defaultForwardPrefix = 'Fwd:';
+
+  EmailUtils._();
+
+  static String applyPrefix({
+    required String subject,
+    required String defaultPrefix,
+    String? localizedPrefix,
+  }) {
+    final trimmed = subject.trim();
+    final lowerSubject = trimmed.toLowerCase();
+
+    final prefixes = <String>[
+      defaultPrefix.toLowerCase(),
+      if (localizedPrefix != null) localizedPrefix.toLowerCase(),
+    ];
+
+    final hasPrefix = prefixes.any(lowerSubject.startsWith);
+
+    if (hasPrefix) {
+      return subject;
+    }
+
+    final prefix = localizedPrefix ?? defaultPrefix;
+    return '$prefix $subject';
+  }
+
+  static Properties getPropertiesForEmailGetMethod(Session session, AccountId accountId) {
+    if (CapabilityIdentifier.jamesCalendarEvent.isSupported(session, accountId)) {
+      return ThreadConstants.propertiesCalendarEvent;
+    } else {
+      return ThreadConstants.propertiesDefault;
+    }
+  }
+
+  static Properties getPropertiesForEmailChangeMethod(Session session, AccountId accountId) {
+    if (CapabilityIdentifier.jamesCalendarEvent.isSupported(session, accountId)) {
+      return ThreadConstants.propertiesCalendarEvent;
+    } else {
+      return ThreadConstants.propertiesUpdatedDefault;
+    }
+  }
+
+  static EmailUnsubscribe? parsingUnsubscribe(String listUnsubscribe) {
+    if (listUnsubscribe.isEmpty) {
+      return null;
+    }
+
+    final regExpMailtoLinks = RegExp(r'mailto:([^>,]*)');
+    final allMatchesMailtoLinks = regExpMailtoLinks.allMatches(listUnsubscribe);
+    final listMailtoLinks = allMatchesMailtoLinks
+      .map((match) => match.group(0))
+      .nonNulls
+      .toList();
+    log('EmailUtils::parsingUnsubscribe:listMailtoLinks: $listMailtoLinks');
+
+    final regExpHttpLinks = RegExp(r'http([^>,]*)');
+    final allMatchesHttpLinks = regExpHttpLinks.allMatches(listUnsubscribe);
+    final listHttpLinks = allMatchesHttpLinks
+      .map((match) => match.group(0))
+      .nonNulls
+      .toList();
+    log('EmailUtils::parsingUnsubscribe:listHttpLinks: $listHttpLinks');
+
+    if (listMailtoLinks.isNotEmpty || listHttpLinks.isNotEmpty) {
+      return EmailUnsubscribe(
+        httpLinks: listHttpLinks,
+        mailtoLinks: listMailtoLinks
+      );
+    } else {
+      return null;
+    }
+  }
+
+  static bool checkingIfAttachmentActionIsEnabled(Either<Failure, Success>? state) {
+    return state?.fold(
+      (failure) {
+        return failure is DownloadAttachmentForWebFailure
+          || failure is DownloadAndGetHtmlContentFromAttachmentFailure;
+      },
+      (success) {
+        return success is DownloadAttachmentForWebSuccess
+          || success is DownloadAndGetHtmlContentFromAttachmentSuccess
+          || success is IdleDownloadAttachmentForWeb;
+      }) ?? false;
+  }
+
+  static bool isSameDomain({
+    required String emailAddress,
+    required String internalDomain
+  }) {
+    log('EmailUtils::isSameDomain: emailAddress = $emailAddress | internalDomain = $internalDomain');
+    return EmailUtils.isEmailAddressValid(emailAddress) &&
+      emailAddress.split('@').last.toLowerCase() == internalDomain.toLowerCase();
+  }
+
+  static bool isEmailAddressValid(String address) {
+    try {
+      MailAddress mailAddress = MailAddress.validateAddress(address);
+      return GetUtils.isEmail(mailAddress.stripDetails().asString()) && mailAddress.asString().isNotEmpty;
+    } catch(e) {
+      logWarning('EmailUtils::isEmailAddressValid: Exception = $e');
+      return false;
+    }
+  }
+
+  static bool isValidEmail(String address) {
+    try {
+      return isEmailAddressValid(address) ||
+          AppUtils.isEmailLocalhost(address);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static List<String> extractMailtoLinksFromListPost(String listPost) {
+    try {
+      if (listPost.trim().isEmpty) return [];
+
+      final decodedInput = Uri.decodeComponent(listPost);
+
+      final mailtoRegex = RegExp(r'<(mailto:[^<>]+)>');
+
+      final matches = mailtoRegex.allMatches(decodedInput);
+
+      if (matches.isEmpty) {
+        log('EmailUtils::extractMailtoLinksFromListPost: Not found mailto link');
+        return [];
+      }
+
+      return matches.map((match) => match.group(1)!).toList();
+    } catch (e) {
+      logWarning('EmailUtils::extractMailtoLinksFromListPost:Exception = $e');
+      return [];
+    }
+  }
+
+  static ({
+    List<EmailAddress> toMailAddresses,
+    List<EmailAddress> ccMailAddresses,
+    List<EmailAddress> bccMailAddresses,
+  }) extractRecipientsFromListMailtoLink(List<String> mailtoLinks) {
+    try {
+      log('EmailUtils::extractRecipientsFromListMailtoLink: mailtoLinks: $mailtoLinks:');
+      if (mailtoLinks.isEmpty) {
+        return (
+          toMailAddresses: [],
+          ccMailAddresses: [],
+          bccMailAddresses: [],
+        );
+      }
+
+      final toMailAddresses = <EmailAddress>[];
+      final ccMailAddresses = <EmailAddress>[];
+      final bccMailAddresses = <EmailAddress>[];
+
+      for (var mailtoLink in mailtoLinks) {
+        final recipientRecord = extractRecipientsFromMailtoLink(mailtoLink);
+        toMailAddresses.addAll(recipientRecord.toMailAddresses);
+        ccMailAddresses.addAll(recipientRecord.ccMailAddresses);
+        bccMailAddresses.addAll(recipientRecord.bccMailAddresses);
+      }
+
+      return (
+        toMailAddresses: toMailAddresses,
+        ccMailAddresses: ccMailAddresses,
+        bccMailAddresses: bccMailAddresses
+      );
+    } catch (e) {
+      logWarning('EmailUtils::extractRecipientsFromListMailtoLink:Exception = $e');
+      return (
+        toMailAddresses: [],
+        ccMailAddresses: [],
+        bccMailAddresses: [],
+      );
+    }
+  }
+
+  static ({
+    List<EmailAddress> toMailAddresses,
+    List<EmailAddress> ccMailAddresses,
+    List<EmailAddress> bccMailAddresses,
+  }) extractRecipientsFromMailtoLink(String mailtoLink) {
+    try {
+      log('EmailUtils::extractRecipientsFromMailtoLink:mailtoLink: $mailtoLink:');
+      if (mailtoLink.isEmpty) {
+        return (
+          toMailAddresses: [],
+          ccMailAddresses: [],
+          bccMailAddresses: [],
+        );
+      }
+
+      final navigationRouter =
+          RouteUtils.generateNavigationRouterFromMailtoLink(mailtoLink);
+      log('EmailUtils::extractRecipientsFromMailtoLink:navigationRouter = $navigationRouter');
+      return (
+        toMailAddresses: navigationRouter.listEmailAddress ?? [],
+        ccMailAddresses: navigationRouter.cc ?? [],
+        bccMailAddresses: navigationRouter.bcc ?? [],
+      );
+    } catch (e) {
+      logWarning('EmailUtils::extractRecipientsFromMailtoLink:Exception = $e');
+      return (
+        toMailAddresses: [],
+        ccMailAddresses: [],
+        bccMailAddresses: [],
+      );
+    }
+  }
+
+  static ({
+    List<EmailAddress> toMailAddresses,
+    List<EmailAddress> ccMailAddresses,
+    List<EmailAddress> bccMailAddresses,
+  }) extractRecipientsFromListPost(String listPost) {
+    final mailtoLinks = extractMailtoLinksFromListPost(listPost);
+    return extractRecipientsFromListMailtoLink(mailtoLinks);
+  }
+
+  static Attachment? parsingAttachmentByUri(Uri uri) {
+    try {
+      final blobId = uri.path;
+      final queryParams = uri.queryParameters;
+      final name = queryParams['name'];
+      final size = queryParams['size'];
+      final type = queryParams['type'];
+      log('EmailUtils::parsingAttachmentByUri:blobId = $blobId | name = $name | size = $size | type = $type');
+      return Attachment(
+        blobId: Id(blobId),
+        name: name,
+        size: size?.isNotEmpty == true ? UnsignedInt(int.parse(size!)) : null,
+        type: type?.isNotEmpty == true ? MediaType.parse(type!) : null,
+      );
+    } catch (e) {
+      logWarning('EmailUtils::parsingAttachmentByUri:Exception = $e:');
+      return null;
+    }
+  }
+
+  static bool isReplyToListEnabled(String listPost) {
+    final recipientRecord = EmailUtils.extractRecipientsFromListPost(listPost);
+    return recipientRecord.toMailAddresses.isNotEmpty ||
+        recipientRecord.ccMailAddresses.isNotEmpty ||
+        recipientRecord.bccMailAddresses.isNotEmpty;
+  }
+
+  static List<Attachment> getAttachmentDisplayed({
+    required double maxWidth,
+    required List<Attachment> attachments,
+    required bool isMobile,
+    int maxVisibleAttachments = EmailUtils.maxMobileVisibleAttachments,
+    double attachmentItemWidth = EmailUtils.desktopItemMaxWidth,
+    double attachmentItemSpacing = EmailUtils.attachmentItemSpacing,
+    double showMoreButtonMaxWidth = EmailUtils.desktopMoreButtonMaxWidth,
+    double attachmentIcon = EmailUtils.attachmentIcon,
+  }) {
+    if (attachments.isEmpty) return [];
+
+    if (isMobile) {
+      return attachments.length <= maxVisibleAttachments
+          ? attachments
+          : attachments.sublist(0, maxVisibleAttachments);
+    }
+
+    final totalNeededWidth = attachments.length * attachmentItemWidth +
+        (attachments.length - 1) * attachmentItemSpacing;
+    if (totalNeededWidth <= maxWidth) {
+      return attachments;
+    }
+
+    final availableWidth = maxWidth -
+        showMoreButtonMaxWidth -
+        attachmentIcon -
+        attachmentItemSpacing * 4;
+
+    log('EmailUtils::getAttachmentDisplayed: availableWidth = $availableWidth, maxWidth = $maxWidth, showMoreButtonMaxWidth = $showMoreButtonMaxWidth, attachmentIcon = $attachmentIcon, attachmentItemSpacing = $attachmentItemSpacing');
+    double usedWidth = 0;
+    int visibleCount = 0;
+
+    for (int i = 0; i < attachments.length; i++) {
+      final nextWidth =
+          attachmentItemWidth + (i > 0 ? attachmentItemSpacing : 0);
+      if (usedWidth + nextWidth <= availableWidth) {
+        usedWidth += nextWidth;
+        visibleCount++;
+      } else {
+        break;
+      }
+    }
+
+    if (visibleCount == 0) visibleCount = 1;
+
+    return attachments.sublist(0, visibleCount);
+  }
+
+  static double estimateTextWidth({
+    required BuildContext context,
+    required String text,
+    TextStyle? textStyle,
+    Locale? locale,
+  }) {
+    try {
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: text,
+          style: textStyle ?? DefaultTextStyle.of(context).style,
+          locale: locale,
+        ),
+        maxLines: 1,
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      return textPainter.width;
+    } catch (e) {
+      return desktopMoreButtonMaxWidth;
+    }
+  }
+
+  static String getDomainByEmailAddress(String emailAddress) {
+    try {
+      MailAddress mailAddress = MailAddress.validateAddress(emailAddress);
+      return mailAddress.domain.asString();
+    } catch (e) {
+      logWarning('EmailUtils::getDomainByEmailAddress:Exception is $e');
+      return '';
+    }
+  }
+}

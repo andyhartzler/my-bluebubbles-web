@@ -1,0 +1,12 @@
+{
+  "downloading_file": "Ladataan {fileName}",
+  "@downloading_file": {
+    "type": "text",
+    "placeholders_order": [
+      "fileName"
+    ],
+    "placeholders": {
+      "fileName": {}
+    }
+  }
+}

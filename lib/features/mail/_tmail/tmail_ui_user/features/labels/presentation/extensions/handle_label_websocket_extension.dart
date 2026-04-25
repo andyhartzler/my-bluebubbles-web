@@ -1,0 +1,79 @@
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/either_view_state_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
+import 'package:get/get.dart';
+import 'package:jmap_dart_client/jmap/core/state.dart' as jmap;
+import 'package:bluebubbles/features/mail/_tmail/labels/extensions/list_label_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/domain/state/get_label_changes_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/presentation/label_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/presentation/utils/label_utils.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/push_notification/presentation/websocket/web_socket_message.dart';
+
+extension HandleLabelWebsocketExtension on LabelController {
+  void refreshLabelChanges({required jmap.State newState}) {
+    final skipReasons = <String>[
+      if (accountId == null) 'accountId is null',
+      if (session == null) 'session is null',
+      if (currentLabelState == null) 'currentLabelState is null',
+      if (currentLabelState == newState) 'state unchanged',
+      if (isLabelSettingEnabled.isFalse) 'label setting disabled',
+    ];
+    if (skipReasons.isNotEmpty) {
+      logWarning(
+        'HandleLabelWebsocketExtension::refreshLabelChanges: skip (${skipReasons.join(', ')})',
+      );
+      return;
+    }
+
+    webSocketQueueHandler?.enqueue(WebSocketMessage(newState: newState));
+  }
+
+  Future<void> handleWebSocketMessage(WebSocketMessage message) async {
+    try {
+      final refreshViewState = await getLabelChangesInteractor!
+          .execute(
+            session!,
+            accountId!,
+            currentLabelState!,
+          )
+          .last;
+
+      final refreshState =
+          refreshViewState.foldSuccessWithResult<GetLabelChangesSuccess>();
+
+      if (refreshState is GetLabelChangesSuccess) {
+        await _handleGetLabelChangesSuccess(refreshState);
+      } else if (refreshState != null) {
+        onDataFailureViewState(refreshState);
+      } else {
+        logWarning('HandleLabelWebsocketExtension::handleWebSocketMessage: refreshState is null');
+      }
+    } catch (e, stackTrace) {
+      logWarning(
+          'HandleLabelWebsocketExtension::handleWebSocketMessage: Exception $e');
+      onError(e, stackTrace);
+    }
+
+    if (currentLabelState != null) {
+      webSocketQueueHandler
+          ?.removeMessagesUpToCurrent(currentLabelState!.value);
+    }
+  }
+
+  Future<void> _handleGetLabelChangesSuccess(
+    GetLabelChangesSuccess success,
+  ) async {
+    final result = success.changesResult;
+
+    setCurrentLabelState(result.newState);
+
+    LabelUtils.applyLabelChanges(
+      currentLabels: labels,
+      created: result.createdLabels,
+      updated: result.updatedLabels,
+      destroyedIds: result.destroyedLabelIds,
+    );
+
+    labels.sortByAlphabetically();
+    labels.refresh();
+  }
+}

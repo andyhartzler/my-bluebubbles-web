@@ -1,0 +1,342 @@
+import 'package:bluebubbles/features/mail/_tmail/core/core.dart';
+import 'package:dartz/dartz.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:jmap_dart_client/jmap/mail/vacation/vacation_response.dart';
+import 'package:rich_text_composer/rich_text_composer.dart';
+import 'package:rich_text_composer/views/commons/constants.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/base_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/widget/dialog_picker/date_time_dialog_picker.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/controller/rich_text_web_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/domain/exceptions/null_session_or_accountid_exception.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/state/update_vacation_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/usecases/update_vacation_interactor.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/presentation/extensions/handle_vacation_response_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/presentation/extensions/vacation_response_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/presentation/manage_account_dashboard_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/presentation/menu/settings/settings_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/presentation/model/account_menu_item.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/presentation/model/vacation/date_type.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/presentation/model/vacation/vacation_presentation.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/presentation/model/vacation/vacation_responder_status.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/route_navigation.dart';
+
+class VacationController extends BaseController {
+
+  final _accountDashBoardController = Get.find<ManageAccountDashBoardController>();
+  final _settingController = Get.find<SettingsController>();
+
+  final UpdateVacationInteractor _updateVacationInteractor;
+
+  final vacationPresentation = VacationPresentation.initialize().obs;
+  final errorMessageBody = Rxn<String>();
+
+  final subjectTextController = TextEditingController();
+  final subjectTextFocusNode = FocusNode();
+
+  final GlobalKey htmlKey = GlobalKey();
+
+  VacationResponse? currentVacation;
+  String? _vacationMessageHtmlText;
+
+  RichTextController? richTextControllerForMobile;
+  RichTextWebController? richTextControllerForWeb;
+
+  final ScrollController scrollController = ScrollController();
+  final ScrollController richTextButtonScrollController = ScrollController();
+
+  VacationController(this._updateVacationInteractor);
+
+  String? get vacationMessageHtmlText => _vacationMessageHtmlText;
+
+  @override
+  void onInit() {
+    if (PlatformInfo.isWeb) {
+      richTextControllerForWeb = RichTextWebController();
+    } else {
+      richTextControllerForMobile = RichTextController();
+    }
+    _initWorker();
+    _initFocusListener();
+    super.onInit();
+  }
+
+  @override
+  void handleSuccessViewState(Success success) {
+    if (success is UpdateVacationSuccess) {
+      _handleUpdateVacationSuccess(success);
+    } else {
+      super.handleSuccessViewState(success);
+    }
+  }
+
+  void _initWorker() {
+    ever(_accountDashBoardController.vacationResponse, (vacation) {
+      if (vacation is VacationResponse) {
+        currentVacation = vacation;
+        final newVacationPresentation = currentVacation?.toVacationPresentation();
+        _initializeValueForVacation(newVacationPresentation ?? VacationPresentation.initialize());
+      }
+    });
+  }
+
+  void _initFocusListener() {
+    subjectTextFocusNode.addListener(_onSubjectTextListener);
+  }
+
+  void _onSubjectTextListener() {
+    if (subjectTextFocusNode.hasFocus && PlatformInfo.isMobile) {
+      richTextControllerForMobile?.hideRichTextView();
+    }
+  }
+
+  void _initializeValueForVacation(VacationPresentation newVacation) {
+    vacationPresentation.value = newVacation;
+    subjectTextController.text = newVacation.subject ?? '';
+    updateMessageHtmlText(newVacation.messageHtmlText ?? '');
+    if (PlatformInfo.isWeb) {
+      richTextControllerForWeb?.editorController.setText(newVacation.messageHtmlText ?? '');
+    } else {
+      richTextControllerForMobile?.htmlEditorApi?.setText(newVacation.messageHtmlText ?? '');
+    }
+  }
+
+  bool get isVacationDeactivated => !vacationPresentation.value.isEnabled;
+
+  bool get isVacationStopEnabled => vacationPresentation.value.vacationStopEnabled;
+
+  bool get canChangeEndDate => !isVacationDeactivated && isVacationStopEnabled;
+
+  void updateVacationPresentation({
+    VacationResponderStatus? newStatus,
+    Option<DateTime>? startDateOption,
+    Option<TimeOfDay>? startTimeOption,
+    Option<DateTime>? endDateOption,
+    Option<TimeOfDay>? endTimeOption,
+    bool? vacationStopEnabled,
+    Option<String>? messagePlainTextOption,
+    Option<String>? messageHtmlTextOption,
+  }) {
+    final currentVacation = vacationPresentation.value;
+    final stopEnabled = vacationStopEnabled ?? currentVacation.vacationStopEnabled;
+    final newVacation = currentVacation.copyWith(
+        status: newStatus,
+        startDateOption: startDateOption,
+        startTimeOption: startTimeOption,
+        endDateOption: stopEnabled ? endDateOption : const None(),
+        endTimeOption: stopEnabled ? endTimeOption : const None(),
+        vacationStopEnabled: vacationStopEnabled,
+        messagePlainTextOption: messagePlainTextOption,
+        messageHtmlTextOption: messageHtmlTextOption
+    );
+    log('VacationController::updateVacationPresentation():newVacation: $newVacation');
+    vacationPresentation.value = newVacation;
+  }
+
+  void selectDate(BuildContext context, DateType dateType, DateTime? currentDate) async {
+    if (PlatformInfo.isMobile) {
+      richTextControllerForMobile?.htmlEditorApi?.unfocus();
+    }
+    FocusScope.of(context).unfocus();
+
+    final datePicked = await DateTimeDialogPicker().showTwakeDatePicker(
+      context: context,
+      initialDate: currentDate ?? DateTime.now(),
+    );
+
+    if (datePicked == null) {
+      return;
+    }
+
+    if (dateType == DateType.start) {
+      updateVacationPresentation(startDateOption: Some(datePicked));
+    } else {
+      updateVacationPresentation(endDateOption: Some(datePicked));
+    }
+  }
+
+  void selectTime(BuildContext context, DateType dateType, TimeOfDay? currentTime) async {
+    if (PlatformInfo.isMobile) {
+      richTextControllerForMobile?.htmlEditorApi?.unfocus();
+    }
+    FocusScope.of(context).unfocus();
+
+    final timePicked = await DateTimeDialogPicker().showTwakeTimePicker(
+      context: context,
+      initialTime: currentTime ?? TimeOfDay.now(),
+    );
+
+    if (timePicked == null) {
+      return;
+    }
+
+    if (dateType == DateType.start) {
+      updateVacationPresentation(startTimeOption: Some(timePicked));
+    } else {
+      updateVacationPresentation(endTimeOption: Some(timePicked));
+    }
+  }
+
+  void saveVacation(BuildContext context) async {
+    KeyboardUtils.hideKeyboard(context);
+
+    if (vacationPresentation.value.isEnabled) {
+      final fromDate = vacationPresentation.value.fromDate;
+      if (fromDate == null) {
+        if (currentOverlayContext != null && currentContext != null) {
+          appToast.showToastErrorMessage(
+            currentOverlayContext!,
+            AppLocalizations.of(currentContext!).errorMessageWhenStartDateVacationIsEmpty);
+        }
+        return;
+      }
+
+      final vacationStopEnabled = vacationPresentation.value.vacationStopEnabled;
+      final toDate = vacationPresentation.value.toDate;
+      if (vacationStopEnabled && toDate != null && toDate.isBefore(fromDate)) {
+        if (currentOverlayContext != null && currentContext != null) {
+          appToast.showToastErrorMessage(
+            currentOverlayContext!,
+            AppLocalizations.of(currentContext!).errorMessageWhenEndDateVacationIsInValid);
+        }
+        return;
+      }
+
+      final messageHtmlText = (PlatformInfo.isWeb ? _vacationMessageHtmlText : await _getMessageHtmlText()) ?? '';
+      if (messageHtmlText.isEmpty && context.mounted) {
+        if (currentOverlayContext != null && currentContext != null) {
+          appToast.showToastErrorMessage(
+            currentOverlayContext!,
+            AppLocalizations.of(currentContext!).errorMessageWhenMessageVacationIsEmpty);
+        }
+        return;
+      }
+
+      final subjectVacation = subjectTextController.text;
+
+      final newVacationPresentation = vacationPresentation.value.copyWith(
+        messageHtmlTextOption: Some(messageHtmlText),
+        subjectOption: Some(subjectVacation)
+      );
+      log('VacationController::saveVacation(): newVacationPresentation: $newVacationPresentation');
+      final newVacationResponse = newVacationPresentation.toVacationResponse();
+      log('VacationController::saveVacation(): newVacationResponse: $newVacationResponse');
+      _updateVacationAction(newVacationResponse);
+    } else {
+      final vacationDisabled = currentVacation != null
+          ? currentVacation!.clearAllExceptHtmlBody()
+          : VacationResponse(isEnabled: false);
+      log('VacationController::saveVacation(): vacationDisabled: $vacationDisabled');
+      _updateVacationAction(vacationDisabled);
+    }
+  }
+
+  void _updateVacationAction(VacationResponse vacationResponse) {
+    final accountId = _accountDashBoardController.accountId.value;
+    if (accountId != null) {
+      consumeState(_updateVacationInteractor.execute(accountId, vacationResponse));
+    } else {
+      consumeState(
+        Stream.value(Left(UpdateVacationFailure(const NullSessionOrAccountIdException()))),
+      );
+    }
+  }
+
+  void _handleUpdateVacationSuccess(UpdateVacationSuccess success) {
+    if (success.listVacationResponse.isNotEmpty &&
+        !success.isAuto &&
+        currentOverlayContext != null &&
+        currentContext != null) {
+      appToast.showToastSuccessMessage(
+        currentOverlayContext!,
+        AppLocalizations.of(currentContext!).vacationSettingSaved);
+    }
+
+    currentVacation = success.listVacationResponse.firstOrNull;
+    if (currentVacation != null) {
+      final newVacationPresentation = currentVacation!.toVacationPresentation();
+      _initializeValueForVacation(newVacationPresentation);
+    }
+    _accountDashBoardController.setUpVacation(currentVacation);
+  }
+
+  void updateMessageHtmlText(String? text) => _vacationMessageHtmlText = text;
+
+  Future<String>? _getMessageHtmlText() {
+    if (PlatformInfo.isWeb) {
+      return richTextControllerForWeb?.editorController.getText();
+    } else {
+      return richTextControllerForMobile?.htmlEditorApi?.getText();
+    }
+  }
+
+  void clearFocusEditor(BuildContext context) {
+    if (PlatformInfo.isMobile) {
+      richTextControllerForMobile?.htmlEditorApi?.unfocus();
+    }
+    KeyboardUtils.hideKeyboard(context);
+  }
+
+  void backToUniversalSettings(BuildContext context) {
+    clearFocusEditor(context);
+    _settingController.backToUniversalSettings();
+  }
+
+  void initRichTextForMobile(BuildContext context, HtmlEditorApi editorApi) {
+    richTextControllerForMobile?.onCreateHTMLEditor(
+      editorApi,
+      onFocus: () => onFocusHTMLEditor(context),
+      onEnterKeyDown: onEnterKeyDown,
+    );
+  }
+
+  void onFocusHTMLEditor(BuildContext context) async {
+    if (PlatformInfo.isAndroid) {
+      FocusScope.of(context).unfocus();
+      await Future.delayed(
+        const Duration(milliseconds: 300),
+        richTextControllerForMobile?.showDeviceKeyboard);
+    }
+
+    subjectTextFocusNode.unfocus();
+
+    await Scrollable.ensureVisible(htmlKey.currentContext!);
+    await Future.delayed(const Duration(milliseconds: 500), () {
+      scrollController.animateTo(
+        scrollController.position.pixels + defaultKeyboardToolbarHeight + ConstantsUI.htmlContentMinHeight,
+        duration: const Duration(milliseconds: 1),
+        curve: Curves.linear,
+      );
+    });
+  }
+
+  void onEnterKeyDown() {
+    if(scrollController.position.pixels < scrollController.position.maxScrollExtent) {
+      scrollController.animateTo(
+        scrollController.position.pixels + 20,
+        duration: const Duration(milliseconds: 1),
+        curve: Curves.linear,
+      );
+    }
+  }
+
+  void switchProfileSetting() {
+    _accountDashBoardController.selectAccountMenuItem(AccountMenuItem.profiles);
+  }
+
+  @override
+  void onClose() {
+    subjectTextFocusNode.removeListener(_onSubjectTextListener);
+    subjectTextFocusNode.dispose();
+    subjectTextController.dispose();
+    scrollController.dispose();
+    richTextButtonScrollController.dispose();
+    if (PlatformInfo.isWeb) {
+      richTextControllerForWeb?.onClose();
+    } else {
+      richTextControllerForMobile?.dispose();
+    }
+    super.onClose();
+  }
+}

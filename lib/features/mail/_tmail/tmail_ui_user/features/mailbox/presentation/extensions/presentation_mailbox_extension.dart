@@ -1,0 +1,191 @@
+
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
+import 'package:flutter/material.dart';
+import 'package:jmap_dart_client/jmap/core/id.dart';
+import 'package:jmap_dart_client/jmap/mail/email/keyword_identifier.dart';
+import 'package:jmap_dart_client/jmap/mail/mailbox/mailbox.dart';
+import 'package:bluebubbles/features/mail/_tmail/labels/extensions/label_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/extensions/mailbox_id_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/extensions/presentation_mailbox_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/mailbox/presentation_mailbox.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/presentation/model/presentation_label_mailbox.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/app_routes.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/navigation_router.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/route_utils.dart';
+
+extension PresentationMailboxExtension on PresentationMailbox {
+
+  String getDisplayName(BuildContext context) {
+    if (isLabelMailbox) {
+      return (this as PresentationLabelMailbox).label.safeDisplayName;
+    }
+
+    if (isDefault) {
+      switch(role!.value.toLowerCase()) {
+        case PresentationMailbox.inboxRole:
+          return AppLocalizations.of(context).inboxMailboxDisplayName;
+        case PresentationMailbox.favoriteRole:
+          return AppLocalizations.of(context).favoriteMailboxDisplayName;
+        case PresentationMailbox.actionRequiredRole:
+          return AppLocalizations.of(context).actionRequiredMailboxDisplayName;
+        case PresentationMailbox.archiveRole:
+          return AppLocalizations.of(context).archiveMailboxDisplayName;
+        case PresentationMailbox.draftsRole:
+          return AppLocalizations.of(context).draftsMailboxDisplayName;
+        case PresentationMailbox.sentRole:
+          return AppLocalizations.of(context).sentMailboxDisplayName;
+        case PresentationMailbox.outboxRole:
+          return AppLocalizations.of(context).outboxMailboxDisplayName;
+        case PresentationMailbox.trashRole:
+          return AppLocalizations.of(context).trashMailboxDisplayName;
+        case PresentationMailbox.spamRole:
+        case PresentationMailbox.junkRole:
+          return AppLocalizations.of(context).spamMailboxDisplayName;
+        case PresentationMailbox.templatesRole:
+          return AppLocalizations.of(context).templatesMailboxDisplayName;
+        case PresentationMailbox.recoveredRole:
+          return AppLocalizations.of(context).recoveredMailboxDisplayName;
+      }
+    }
+    return name?.name ?? '';
+  }
+
+  String getDisplayNameWithoutContext(AppLocalizations appLocalizations) {
+    if (isLabelMailbox) {
+      return (this as PresentationLabelMailbox).label.safeDisplayName;
+    }
+
+    if (isDefault) {
+      switch(role!.value.toLowerCase()) {
+        case PresentationMailbox.inboxRole:
+          return appLocalizations.inboxMailboxDisplayName;
+        case PresentationMailbox.favoriteRole:
+          return appLocalizations.favoriteMailboxDisplayName;
+        case PresentationMailbox.actionRequiredRole:
+          return appLocalizations.actionRequiredMailboxDisplayName;
+        case PresentationMailbox.archiveRole:
+          return appLocalizations.archiveMailboxDisplayName;
+        case PresentationMailbox.draftsRole:
+          return appLocalizations.draftsMailboxDisplayName;
+        case PresentationMailbox.sentRole:
+          return appLocalizations.sentMailboxDisplayName;
+        case PresentationMailbox.outboxRole:
+          return appLocalizations.outboxMailboxDisplayName;
+        case PresentationMailbox.trashRole:
+          return appLocalizations.trashMailboxDisplayName;
+        case PresentationMailbox.spamRole:
+        case PresentationMailbox.junkRole:
+          return appLocalizations.spamMailboxDisplayName;
+        case PresentationMailbox.templatesRole:
+          return appLocalizations.templatesMailboxDisplayName;
+        case PresentationMailbox.recoveredRole:
+          return appLocalizations.recoveredMailboxDisplayName;
+      }
+    }
+    return name?.name ?? '';
+  }
+
+  String getMailboxIcon(ImagePaths imagePaths) {
+    if (hasRole()) {
+      switch(role!.value) {
+        case PresentationMailbox.inboxRole:
+          return imagePaths.icMailboxInbox;
+        case PresentationMailbox.favoriteRole:
+          return imagePaths.icMailboxFavorite;
+        case PresentationMailbox.actionRequiredRole:
+          return imagePaths.icMailboxActionRequired;
+        case PresentationMailbox.draftsRole:
+          return imagePaths.icMailboxDrafts;
+        case PresentationMailbox.outboxRole:
+          return imagePaths.icMailboxOutbox;
+        case PresentationMailbox.archiveRole:
+          return imagePaths.icMailboxArchived;
+        case PresentationMailbox.sentRole:
+          return imagePaths.icMailboxSent;
+        case PresentationMailbox.trashRole:
+          return imagePaths.icMailboxTrash;
+        case PresentationMailbox.spamRole:
+        case PresentationMailbox.junkRole:
+          return imagePaths.icMailboxSpam;
+        case PresentationMailbox.templatesRole:
+          return imagePaths.icMailboxTemplate;
+        case PresentationMailbox.recoveredRole:
+          return imagePaths.icRecoverDeletedMessages;
+        case 'all_mail':
+          return imagePaths.icMailboxAllMail;
+        default:
+          return imagePaths.icFolderMailbox;
+      }
+    } else if (isChildOfTeamMailboxes) {
+      switch(name!.name.toLowerCase()) {
+        case 'inbox':
+          return imagePaths.icMailboxInbox;
+        case 'outbox':
+          return imagePaths.icMailboxOutbox;
+        case 'drafts':
+          return imagePaths.icMailboxDrafts;
+        case 'archive':
+          return imagePaths.icMailboxArchived;
+        case 'sent':
+          return imagePaths.icMailboxSent;
+        case 'trash':
+          return imagePaths.icMailboxTrash;
+        case 'spam':
+          return imagePaths.icMailboxSpam;
+        case 'templates':
+          return imagePaths.icMailboxTemplate;
+        case 'restored messages':
+          return imagePaths.icRecoverDeletedMessages;
+        default:
+          return imagePaths.icFolderMailbox;
+      }
+    } else {
+      return imagePaths.icFolderMailbox;
+    }
+  }
+
+  Uri get mailboxRouteWeb => RouteUtils.createUrlWebLocationBar(
+    AppRoutes.dashboard,
+    router: NavigationRouter(mailboxId: id)
+  );
+
+  String? get filterKeyword {
+    if (isFavorite) {
+      return KeyWordIdentifier.emailFlagged.value;
+    } else if (isLabelMailbox) {
+      return (this as PresentationLabelMailbox).label.keyword?.value;
+    } else {
+      return null;
+    }
+  }
+
+  bool get isCacheable => !isVirtualFolder && this is! PresentationLabelMailbox;
+
+  bool get isLabelMailbox => this is PresentationLabelMailbox;
+
+  String get browserRouteTitle => isLabelMailbox
+      ? 'Label-${(this as PresentationLabelMailbox).label.id?.value}'
+      : 'Mailbox-${mailboxId?.asString}';
+
+  Id? get labelId =>
+      isLabelMailbox ? (this as PresentationLabelMailbox).label.id : null;
+
+  MailboxId? get browserRouteMailboxId => isLabelMailbox ? null : mailboxId;
+
+  bool get isAllEmailTrashAndSpamFolder => id == PresentationMailbox.allEmailTrashAndSpamFolder.id;
+
+  bool get isAllEmail => id == PresentationMailbox.unifiedMailbox.id;
+
+  bool get isUnifiedMailbox => isAllEmail || isAllEmailTrashAndSpamFolder;
+
+  String getFolderNameForQuickSearch(AppLocalizations appLocalizations) {
+    if (isAllEmailTrashAndSpamFolder) {
+      return appLocalizations.allEmailTrashAndSpam;
+    } else if (isAllEmail) {
+      return appLocalizations.allEmail;
+    } else {
+      return getDisplayNameWithoutContext(appLocalizations);
+    }
+  }
+}

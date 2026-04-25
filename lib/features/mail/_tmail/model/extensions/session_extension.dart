@@ -1,0 +1,235 @@
+
+import 'dart:ui';
+
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/uri_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
+import 'package:get/get.dart';
+import 'package:get/get_utils/src/extensions/string_extensions.dart';
+import 'package:jmap_dart_client/jmap/account_id.dart';
+import 'package:jmap_dart_client/jmap/core/capability/calendar_event_capability.dart';
+import 'package:jmap_dart_client/jmap/core/capability/capability_identifier.dart';
+import 'package:jmap_dart_client/jmap/core/capability/capability_properties.dart';
+import 'package:jmap_dart_client/jmap/core/capability/core_capability.dart';
+import 'package:jmap_dart_client/jmap/core/capability/default_capability.dart';
+import 'package:jmap_dart_client/jmap/core/capability/empty_capability.dart';
+import 'package:jmap_dart_client/jmap/core/id.dart';
+import 'package:jmap_dart_client/jmap/core/session/session.dart';
+import 'package:jmap_dart_client/jmap/core/unsigned_int.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/error_type_handler/account_exception.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/error_type_handler/unknown_address_exception.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/error_type_handler/unknown_uri_exception.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/model.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/principals/capability_principals.dart';
+import 'package:uri/uri.dart';
+
+extension SessionExtension on Session {
+  String getDownloadUrl({String? jmapUrl}) {
+    final Uri downloadUrlValid;
+    if (jmapUrl != null) {
+      downloadUrlValid = downloadUrl.toQualifiedUrl(baseUrl: Uri.parse(jmapUrl));
+    } else if (downloadUrl.hasOrigin) {
+      downloadUrlValid = downloadUrl;
+    } else {
+      throw const UnknownUriException();
+    }
+
+    var baseUrl = '${downloadUrlValid.origin}${downloadUrlValid.path}?${downloadUrlValid.query}';
+    if (baseUrl.endsWith('/')) {
+      baseUrl = baseUrl.substring(0, baseUrl.length - 1);
+    }
+    final downloadUrlDecode = Uri.decodeFull(baseUrl);
+    return downloadUrlDecode;
+  }
+
+  String getSafetyDownloadUrl({String? jmapUrl}) {
+    try {
+      return getDownloadUrl(jmapUrl: jmapUrl);
+    } catch(_) {
+      return '';
+    }
+  }
+
+  Uri getUploadUri(AccountId accountId, {String? jmapUrl}) {
+    final Uri uploadUrlValid;
+    if (jmapUrl != null) {
+      uploadUrlValid = uploadUrl.toQualifiedUrl(baseUrl: Uri.parse(jmapUrl));
+    } else if (uploadUrl.hasOrigin) {
+      uploadUrlValid = uploadUrl;
+    } else {
+      throw const UnknownUriException();
+    }
+
+    final baseUrl = '${uploadUrlValid.origin}${uploadUrlValid.path}';
+    final uploadUriTemplate = UriTemplate(Uri.decodeFull(baseUrl));
+    final uploadUri = uploadUriTemplate.expand({
+      'accountId' : accountId.id.value
+    });
+    return Uri.parse(uploadUri);
+  }
+
+  T? getCapabilityProperties<T extends CapabilityProperties>(
+    AccountId accountId,
+    CapabilityIdentifier identifier
+  ) {
+    var capability = accounts[accountId]?.accountCapabilities[identifier];
+    if (capability == null || capability is EmptyCapability) {
+      capability = capabilities[identifier];
+    }
+    if (capability is T) {
+      return capability;
+    } else {
+      return null;
+    }
+  }
+
+  String getUserDisplayName() {
+    try {
+      final accountDisplayName = personalAccount.name.value;
+      if (accountDisplayName.isNotEmpty) {
+        return accountDisplayName;
+      } else {
+        return username.value;
+      }
+    } catch (e) {
+      logWarning('SessionExtension::getUserDisplayName:Exception: $e');
+      return '';
+    }
+  }
+
+  String getOwnEmailAddressOrEmpty() {
+    try {
+      return getOwnEmailAddress();
+    } catch (e) {
+      logWarning('SessionExtension::getOwnEmailAddressOrEmpty:Exception: $e');
+      return '';
+    }
+  }
+
+  String getOwnEmailAddress() {
+    return username.value.isEmail ? username.value
+        : _getOwnEmailAddressFromPersonalAccount()
+        ?? _getOwnEmailAddressFromPrincipalsCapability()
+        ?? (throw const UnknownAddressException());
+  }
+
+  String? _getOwnEmailAddressFromPersonalAccount() {
+    try {
+      return personalAccount.name.value.isEmail ? personalAccount.name.value : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _getOwnEmailAddressFromPrincipalsCapability() {
+    try {
+      var principalsCapability = getCapabilityProperties<DefaultCapability>(AccountId(Id(username.value)), capabilityPrincipals);
+      final sendTo = principalsCapability?.properties?['urn:ietf:params:jmap:calendars']?['sendTo'];
+      if (sendTo is Map<String, dynamic>) {
+        final wrappedAddress = sendTo['imip'];
+        if (wrappedAddress is String && wrappedAddress.startsWith('mailto:')) {
+          String address = wrappedAddress.substring("mailto:".length);
+          return address.isEmail ? address : null;
+        }
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
+  String generateOwnEmailAddressFromDomain(String domain) {
+    try {
+      final userName = username.value;
+      if (domain.trim().isEmpty || userName.trim().isEmpty) return '';
+
+      if (userName.endsWith(domain)) return userName;
+
+      return '$userName@$domain';
+    } catch (e) {
+      logWarning('$runtimeType::generateOwnEmailAddressFromDomain: Exception: $e');
+      return '';
+    }
+  }
+
+  String getOwnEmailAddressOrUsername() {
+    final emailAddress = getOwnEmailAddressOrEmpty();
+    if (emailAddress.isNotEmpty) return emailAddress;
+    return getUserDisplayName();
+  }
+
+  JmapAccount get personalAccount {
+    if (accounts.isNotEmpty) {
+      final listPersonalAccount = accounts.entries
+        .map((entry) => entry.value.toJmapAccount(entry.key))
+        .where((jmapAccount) => jmapAccount.isPersonal)
+        .toList();
+
+      if (listPersonalAccount.isNotEmpty) {
+        return listPersonalAccount.first;
+      }
+    }
+    throw const NotFoundPersonalAccountException();
+  }
+
+  AccountId get accountId => personalAccount.accountId;
+
+  AccountId? get safeAccountId {
+    try {
+      return personalAccount.accountId;
+    } catch (e) {
+      logWarning('SessionExtension::safeAccountId:Exception: $e');
+      return null;
+    }
+  }
+
+  ({
+    bool isAvailable,
+    CalendarEventCapability? calendarEventCapability
+  }) validateCalendarEventCapability(AccountId accountId) {
+    final capability = getCapabilityProperties<CalendarEventCapability>(
+      accountId,
+      CapabilityIdentifier.jamesCalendarEvent);
+    
+    return (isAvailable: capability != null, calendarEventCapability: capability);
+  }
+
+  bool validateAcceptCounterCalendarEventCapability(AccountId accountId) {
+    final capability = getCapabilityProperties<CalendarEventCapability>(
+      accountId,
+      CapabilityIdentifier.jamesCalendarEvent);
+
+    return capability?.counterSupport == true;
+  }
+
+  String? getLanguageForCalendarEvent(
+    Locale locale,
+    AccountId accountId,
+  ) {
+    final validation = validateCalendarEventCapability(accountId);
+    if (!validation.isAvailable) return null;
+
+    final supportedLanguages = validation.calendarEventCapability!.replySupportedLanguage;
+    if (supportedLanguages == null) return null;
+
+    final currentLanguage = locale.languageCode;
+    if (supportedLanguages.contains(currentLanguage)) {
+      return currentLanguage;
+    } else if (supportedLanguages.contains('en')) {
+      return 'en';
+    } else {
+      return supportedLanguages.firstOrNull;
+    }
+  }
+
+  UnsignedInt? getMaxObjectsInGet(AccountId accountId) {
+    try {
+      return getCapabilityProperties<CoreCapability>(
+        accountId,
+        CapabilityIdentifier.jmapCore
+      )?.maxObjectsInGet;
+    } catch (e) {
+      logWarning('SessionExtensions::getMaxObjectsInGet():Exception: $e');
+      return null;
+    }
+  }
+}

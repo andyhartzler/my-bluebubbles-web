@@ -1,0 +1,183 @@
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/responsive_utils.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/button/tmail_button_widget.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/email_action_type.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/presentation_email.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/extensions/presentation_mailbox_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/mailbox/presentation_mailbox.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread/presentation/mixin/base_email_item_tile.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread/presentation/styles/item_email_tile_styles.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
+
+class DesktopListEmailActionHoverWidget extends StatefulWidget {
+  final PresentationEmail presentationEmail;
+  final bool isHovered;
+  final bool canDeletePermanently;
+  final bool isSearchEmailRunning;
+  final bool isLabelMailboxOpened;
+  final PresentationMailbox? mailboxContain;
+  final OnPressEmailActionClick? emailActionClick;
+  final OnMoreActionClick? onMoreActionClick;
+
+  const DesktopListEmailActionHoverWidget({
+    super.key,
+    required this.presentationEmail,
+    required this.isHovered,
+    required this.canDeletePermanently,
+    required this.isSearchEmailRunning,
+    required this.isLabelMailboxOpened,
+    required this.mailboxContain,
+    required this.emailActionClick,
+    required this.onMoreActionClick,
+  });
+
+  @override
+  State<DesktopListEmailActionHoverWidget> createState() =>
+      _DesktopListEmailActionHoverWidgetState();
+}
+
+class _DesktopListEmailActionHoverWidgetState
+    extends State<DesktopListEmailActionHoverWidget> with BaseEmailItemTile {
+  bool _popupMenuVisible = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final listActionWidget = [
+      if (widget.isHovered) ...[
+        TMailButtonWidget.fromIcon(
+          icon: imagePaths.icOpenInNewTab,
+          iconColor: ItemEmailTileStyles.actionIconHoverColor,
+          iconSize: _getIconSize(),
+          padding: _getPaddingIcon(),
+          backgroundColor: Colors.transparent,
+          tooltipMessage: AppLocalizations.of(context).openInNewTab,
+          onTapActionCallback: () => widget.emailActionClick?.call(
+            EmailActionType.openInNewTab,
+            widget.presentationEmail,
+          ),
+        ),
+        if (!widget.presentationEmail.isDraft)
+          TMailButtonWidget.fromIcon(
+            icon: widget.presentationEmail.hasRead
+                ? imagePaths.icUnread
+                : imagePaths.icRead,
+            iconColor: ItemEmailTileStyles.actionIconHoverColor,
+            iconSize: _getIconSize(),
+            padding: _getPaddingIcon(),
+            margin: _getMarginIcon(),
+            backgroundColor: Colors.transparent,
+            tooltipMessage: widget.presentationEmail.hasRead
+                ? AppLocalizations.of(context).mark_as_unread
+                : AppLocalizations.of(context).mark_as_read,
+            onTapActionCallback: () => widget.emailActionClick?.call(
+              widget.presentationEmail.hasRead
+                  ? EmailActionType.markAsUnread
+                  : EmailActionType.markAsRead,
+              widget.presentationEmail,
+            ),
+          ),
+        if (widget.mailboxContain != null &&
+            widget.mailboxContain?.isDrafts == false) ...[
+          TMailButtonWidget.fromIcon(
+            icon: imagePaths.icMove,
+            iconColor: ItemEmailTileStyles.actionIconHoverColor,
+            iconSize: _getIconSize(),
+            padding: _getPaddingIcon(),
+            margin: _getMarginIcon(),
+            backgroundColor: Colors.transparent,
+            tooltipMessage: AppLocalizations.of(context).move,
+            onTapActionCallback: () => widget.emailActionClick?.call(
+              EmailActionType.moveToMailbox,
+              widget.presentationEmail,
+            ),
+          ),
+        ],
+        TMailButtonWidget.fromIcon(
+          icon: imagePaths.icDeleteComposer,
+          iconColor: ItemEmailTileStyles.actionIconHoverColor,
+          iconSize: _getIconSize(),
+          padding: _getPaddingIcon(),
+          margin: _getMarginIcon(),
+          backgroundColor: Colors.transparent,
+          tooltipMessage: widget.canDeletePermanently
+              ? AppLocalizations.of(context).delete_permanently
+              : AppLocalizations.of(context).move_to_trash,
+          onTapActionCallback: () => widget.emailActionClick?.call(
+            widget.canDeletePermanently
+                ? EmailActionType.deletePermanently
+                : EmailActionType.moveToTrash,
+            widget.presentationEmail,
+          ),
+        ),
+      ],
+      if (_shouldShowPopupMenu) ...[
+        TMailButtonWidget.fromIcon(
+          icon: imagePaths.icMoreVertical,
+          iconColor: ItemEmailTileStyles.actionIconHoverColor,
+          iconSize: _getIconSize(),
+          padding: _getPaddingIcon(),
+          margin: _getMarginIcon(),
+          backgroundColor: _popupMenuVisible
+              ? Theme.of(context).colorScheme.outline.withValues(alpha: 0.08)
+              : Colors.transparent,
+          tooltipMessage: AppLocalizations.of(context).more,
+          onTapActionAtPositionCallback: (position) {
+            _onPopupMenuVisibleChange(true);
+
+            widget.onMoreActionClick
+                ?.call(widget.presentationEmail, position)
+                .whenComplete(() => _onPopupMenuVisibleChange(false));
+          },
+        ),
+        const SizedBox(width: 16),
+      ] else ...[
+        buildMailboxContain(
+          context,
+          widget.isSearchEmailRunning || widget.isLabelMailboxOpened,
+          widget.presentationEmail,
+        ),
+        if (widget.presentationEmail.hasAttachment == true)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 8),
+            child: buildIconAttachment(),
+          ),
+        Padding(
+          padding: const EdgeInsetsDirectional.only(end: 20, start: 8),
+          child: buildDateTime(context, widget.presentationEmail),
+        ),
+      ]
+    ];
+
+    if (listActionWidget.isEmpty) return const SizedBox.shrink();
+
+    return Row(children: listActionWidget);
+  }
+
+  double _getIconSize() => 16;
+
+  EdgeInsetsGeometry _getPaddingIcon() {
+    return const EdgeInsets.all(5);
+  }
+
+  EdgeInsetsGeometry _getMarginIcon() {
+    return const EdgeInsetsDirectional.only(start: 11);
+  }
+
+  bool get _shouldShowPopupMenu => widget.isHovered || _popupMenuVisible;
+
+  void _onPopupMenuVisibleChange(bool visible) {
+    if (_popupMenuVisible != visible && mounted) {
+      setState(() {
+        _popupMenuVisible = visible;
+      });
+    }
+  }
+
+  @override
+  ImagePaths get imagePaths => Get.find<ImagePaths>();
+
+  @override
+  ResponsiveUtils get responsiveUtils => Get.find<ResponsiveUtils>();
+}

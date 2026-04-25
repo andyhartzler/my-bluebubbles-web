@@ -1,0 +1,88 @@
+import 'dart:async';
+
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
+import 'package:dartz/dartz.dart';
+import 'package:dio/dio.dart';
+import 'package:jmap_dart_client/jmap/account_id.dart';
+import 'package:jmap_dart_client/jmap/core/user_name.dart';
+import 'package:jmap_dart_client/jmap/mail/email/email.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/account/account_request.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/account/authentication_type.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/account/password.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/download/download_task_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/attachment.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/download/domain/state/download_all_attachments_for_web_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/domain/repository/account_repository.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/domain/repository/authentication_oidc_repository.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/domain/repository/credential_repository.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/download/domain/repository/download_repository.dart';
+
+class DownloadAllAttachmentsForWebInteractor {
+  const DownloadAllAttachmentsForWebInteractor(
+    this._downloadRepository,
+    this._accountRepository,
+    this._authenticationOIDCRepository,
+    this.credentialRepository,
+  );
+
+  final DownloadRepository _downloadRepository;
+  final AccountRepository _accountRepository;
+  final AuthenticationOIDCRepository _authenticationOIDCRepository;
+  final CredentialRepository credentialRepository;
+
+  Stream<Either<Failure, Success>> execute(
+    AccountId accountId,
+    EmailId emailId,
+    String baseDownloadAllUrl,
+    Attachment attachment,
+    DownloadTaskId taskId, {
+    StreamController<Either<Failure, Success>>? onReceiveController,
+    CancelToken? cancelToken,
+  }) async* {
+    try {
+      yield Right(StartDownloadAllAttachmentsForWeb(
+        taskId,
+        attachment,
+      ));
+      onReceiveController?.add(Right(StartDownloadAllAttachmentsForWeb(
+        taskId,
+        attachment,
+        cancelToken: cancelToken,
+      )));
+      final currentAccount = await _accountRepository.getCurrentAccount();
+      AccountRequest accountRequest;
+      if (currentAccount.authenticationType == AuthenticationType.oidc) {
+        final tokenOidc = await _authenticationOIDCRepository.getStoredTokenOIDC(currentAccount.id);
+        accountRequest = AccountRequest.withOidc(token: tokenOidc);
+      } else {
+        final authenticationInfoCache = await credentialRepository.getAuthenticationInfoStored();
+        accountRequest = AccountRequest.withBasic(
+          userName: UserName(authenticationInfoCache.username),
+          password: Password(authenticationInfoCache.password),
+        );
+      }
+
+      await _downloadRepository.downloadAllAttachmentsForWeb(
+        accountId,
+        emailId,
+        baseDownloadAllUrl,
+        attachment.name!,
+        accountRequest,
+        taskId,
+        onReceiveController: onReceiveController,
+        cancelToken: cancelToken
+      );
+
+      yield Right(DownloadAllAttachmentsForWebSuccess(taskId: taskId));
+    } catch (e) {
+      logWarning('DownloadAllAttachmentsForWebInteractor::execute():EXCEPTION: $e');
+      yield Left(DownloadAllAttachmentsForWebFailure(
+        exception: e,
+        taskId: taskId,
+        cancelToken: cancelToken,
+      ));
+    }
+  }
+}

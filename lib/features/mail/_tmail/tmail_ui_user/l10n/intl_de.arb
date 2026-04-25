@@ -1,0 +1,4400 @@
+{
+  "my_folders": "MEINE ORDNER",
+  "@my_folders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "new_folder": "Neuer Ordner",
+  "@new_folder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "initializing_data": "Daten werden initialisiert...",
+  "@initializing_data": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "email": "E-Mail",
+  "@email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "password": "Passwort",
+  "@password": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "login": "Anmelden",
+  "@login": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "prefix_https": "https://",
+  "@prefix_https": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "login_text_slogan": "Twake Mail",
+  "@login_text_slogan": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reply_all": "Alle antworten",
+  "@reply_all": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no_emails": "Keine E-Mails in diesem Postfach",
+  "@no_emails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "search_folder": "Ordner durchsuchen",
+  "@search_folder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_star": "Mit Stern markieren",
+  "@mark_as_star": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_multiple_item_as_read": "{count} Element als gelesen markiert",
+  "@marked_multiple_item_as_read": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "marked_multiple_item_as_unread": "{count} Element als ungelesen markiert",
+  "@marked_multiple_item_as_unread": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "photos_and_videos": "Fotos und Videos",
+  "@photos_and_videos": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attach_file_prepare_text": "Vorbereiten des Dateianhangs …",
+  "@attach_file_prepare_text": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attachments_uploaded_successfully": "Anhänge erfolgreich hochgeladen",
+  "@attachments_uploaded_successfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "login_text_login_to_continue": "Bitte melden Sie sich an, um fortzufahren",
+  "@login_text_login_to_continue": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unknown_error_login_message": "Ein unbekannter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+  "@unknown_error_login_message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reply": "Antworten",
+  "@reply": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forward": "Weiterleiten",
+  "@forward": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no_mail_selected": "Keine E-Mail ausgewählt",
+  "@no_mail_selected": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "from_email_address_prefix": "Von",
+  "@from_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "to_email_address_prefix": "An",
+  "@to_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unread_email_notification": "neu",
+  "@unread_email_notification": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bcc_email_address_prefix": "Bcc",
+  "@bcc_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "cc_email_address_prefix": "Cc",
+  "@cc_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hint_text_email_address": "Name oder E-Mail-Adresse",
+  "@hint_text_email_address": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subject_email": "Betreff",
+  "@subject_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hint_content_email_composer": "Beginnen Sie hier mit dem Schreiben Ihrer E-Mail",
+  "@hint_content_email_composer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "header_email_quoted": "Am {sentDate}, von {emailAddress}",
+  "@header_email_quoted": {
+    "type": "text",
+    "placeholders_order": [
+      "sentDate",
+      "emailAddress"
+    ],
+    "placeholders": {
+      "sentDate": {},
+      "emailAddress": {}
+    }
+  },
+  "prefix_reply_email": "Ant:",
+  "@prefix_reply_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "prefix_forward_email": "Wtr:",
+  "@prefix_forward_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "your_email_being_sent": "Ihre E-Mail wird gesendet …",
+  "@your_email_being_sent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "your_email_should_have_at_least_one_recipient": "Ihre E-Mail sollte mindestens einen Empfänger haben",
+  "@your_email_should_have_at_least_one_recipient": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_sent": "Nachricht gesendet",
+  "@message_sent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "error_message_sent": "Fehlernachricht gesendet",
+  "@error_message_sent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "count_email_selected": "{count} ausgewählt",
+  "@count_email_selected": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "mark_as_unread": "Ungelesen markieren",
+  "@mark_as_unread": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_read": "Als gelesen markieren",
+  "@mark_as_read": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "move_to_trash": "In Papierkorb verschieben",
+  "@move_to_trash": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "move_to_spam": "In Spam verschieben",
+  "@move_to_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "an_error_occurred": "Fehler! Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.",
+  "@an_error_occurred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attachment_download_failed": "Herunterladen von Anlagen fehlgeschlagen",
+  "@attachment_download_failed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "downloading_file": "{fileName} wird heruntergeladen",
+  "@downloading_file": {
+    "type": "text",
+    "placeholders_order": [
+      "fileName"
+    ],
+    "placeholders": {
+      "fileName": {}
+    }
+  },
+  "preparing_to_export": "Vorbereitungen für den Export",
+  "@preparing_to_export": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "cancel": "Abbrechen",
+  "@cancel": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "user_cancel_download_file": "Benutzer bricht das Herunterladen ab",
+  "@user_cancel_download_file": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you_need_to_grant_files_permission_to_download_attachments": "Sie müssen die Datei-Erlaubnis erteilen, um Anhänge herunterzuladen",
+  "@you_need_to_grant_files_permission_to_download_attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "count_attachment": "{count} Anhänge",
+  "@count_attachment": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "can_not_upload_this_file_as_attachments": "Diese Datei kann nicht als Anhang hochgeladen werden",
+  "@can_not_upload_this_file_as_attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "pick_attachments": "Anhänge auswählen",
+  "@pick_attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "browse": "Durchsuchen",
+  "@browse": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "undo_action": "RÜCKGÄNGIG",
+  "@undo_action": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "storage": "SPEICHER",
+  "@storage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_unstar": "Markierung aufheben",
+  "@mark_as_unstar": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_star_multiple_item": "{count} Elemente mit einem Stern markiert",
+  "@marked_star_multiple_item": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "search_mail": "E-Mails durchsuchen",
+  "@search_mail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "prefix_suggestion_search": "Suche nach",
+  "@prefix_suggestion_search": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no_emails_matching_your_search": "Es wurden keine E-Mails zu Ihrer Suche gefunden",
+  "@no_emails_matching_your_search": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "results": "Ergebnisse",
+  "@results": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_unstar_multiple_item": "{count} Elemente als nicht wichtig markiert",
+  "@marked_unstar_multiple_item": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "signIn": "Anmelden",
+  "@signIn": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requiredUrl": "Serveradresse ist erforderlich",
+  "@requiredUrl": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "next": "Weiter",
+  "@next": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requiredPassword": "Passwort ist erforderlich",
+  "@requiredPassword": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "loginInputCredentialMessage": "Geben Sie Ihre Anmeldedaten ein, um sich anzumelden",
+  "@loginInputCredentialMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requiredEmail": "E-Mail ist erforderlich",
+  "@requiredEmail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "fromMe": "Von mir",
+  "@fromMe": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "spam": "Spam",
+  "@spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "discard": "Verwerfen",
+  "@discard": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "skip": "Überspringen",
+  "@skip": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "this_field_cannot_be_blank": "Dieses Feld darf nicht leer sein",
+  "@this_field_cannot_be_blank": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "email_address_is_not_in_the_correct_format": "E-Mail-Adresse ist nicht im richtigen Format",
+  "@email_address_is_not_in_the_correct_format": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "copy_email_address": "E-Mail-Adresse kopieren",
+  "@copy_email_address": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "send": "Senden",
+  "@send": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reply_to": "Antwort an",
+  "@reply_to": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "html_template": "HTML-Vorlage",
+  "@html_template": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "html": "HTML",
+  "@html": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "read": "Gelesen",
+  "@read": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unread": "Ungelesen",
+  "@unread": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "rename": "Umbenennen",
+  "@rename": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "select": "Auswählen",
+  "@select": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "close": "Schließen",
+  "@close": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_failed": "Löschen fehlgeschlagen",
+  "@delete_failed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "jmapStandard": "JMAP-Standard",
+  "@jmapStandard": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attachments": "Anhänge",
+  "@attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "empty_subject": "Leerer Betreff",
+  "@empty_subject": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "collapse": "Einklappen",
+  "@collapse": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "identities": "Identitäten",
+  "@identities": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_all_as_read": "Alle als gelesen markieren",
+  "@mark_all_as_read": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "last6Months": "Letzte 6 Monate",
+  "@last6Months": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you_have_created_a_new_identity": "Sie haben eine neue Identität erstellt",
+  "@you_have_created_a_new_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "select_all": "Alles auswählen",
+  "@select_all": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hide": "Ausblenden",
+  "@hide": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "folders": "Ordner",
+  "@folders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_has_been_sent_successfully": "Nachricht wurde erfolgreich gesendet",
+  "@message_has_been_sent_successfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "there_is_already_folder_with_the_same_name": "Es gibt bereits einen Ordner mit demselben Namen",
+  "@there_is_already_folder_with_the_same_name": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "last7Days": "Letzte 7 Tage",
+  "@last7Days": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "edit": "Bearbeiten",
+  "@edit": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "save": "Speichern",
+  "@save": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "fullscreen": "Vollbild",
+  "@fullscreen": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "drafts_saved": "Entwurf gespeichert",
+  "@drafts_saved": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "minimize": "Minimieren",
+  "@minimize": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "encryptedMailbox": "Verschlüsselte Mailbox",
+  "@encryptedMailbox": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "empty_trash_now": "Papierkorb jetzt leeren",
+  "@empty_trash_now": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "the_feature_is_under_development": "Diese Funktion befindet sich in der Entwicklung.",
+  "@the_feature_is_under_development": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "compose": "Verfassen",
+  "@compose": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "send_anyway": "Trotzdem senden",
+  "@send_anyway": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "create": "Erstellen",
+  "@create": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "this_folder_name_is_already_taken": "Dieser Ordnername ist bereits vergeben",
+  "@this_folder_name_is_already_taken": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "all_identities": "Alle Identitäten",
+  "@all_identities": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "expand": "Aufklappen",
+  "@expand": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attach_file": "Datei anhängen",
+  "@attach_file": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "show": "Anzeigen",
+  "@show": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forwarded_message": "Weitergeleitete Nachricht",
+  "@forwarded_message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "date": "Datum",
+  "@date": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete": "Löschen",
+  "@delete": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "done": "Fertig",
+  "@done": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "identity_has_been_deleted": "Identität wurde gelöscht",
+  "@identity_has_been_deleted": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "back": "Zurück",
+  "@back": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "move_message": "Nachricht verschieben",
+  "@move_message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "signature": "Signatur",
+  "@signature": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "add_recipients": "Empfänger hinzufügen",
+  "@add_recipients": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "new_message": "Neue Nachricht",
+  "@new_message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "fix_email_addresses": "E-Mail-Adressen korrigieren",
+  "@fix_email_addresses": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hint_search_emails": "Nach E-Mails und Dateien suchen",
+  "@hint_search_emails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "email_address_copied_to_clipboard": "E-Mail-Adresse in die Zwischenablage kopiert",
+  "@email_address_copied_to_clipboard": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "move": "Verschieben",
+  "@move": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_message_forever": "Nachricht endgültig löschen",
+  "@delete_message_forever": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toast_message_empty_trash_folder_success": "Alle Nachrichten wurden endgültig gelöscht",
+  "@toast_message_empty_trash_folder_success": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "multipleIntegrations": "Mehrere Integrationen",
+  "@multipleIntegrations": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "profiles": "Profile",
+  "@profiles": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sign_out": "Abmelden",
+  "@sign_out": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "with_attachments": "Mit Anhängen",
+  "@with_attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "with_unread": "Mit ungelesenen",
+  "@with_unread": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_all": "Alle löschen",
+  "@delete_all": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "got_it": "Verstanden",
+  "@got_it": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "undo": "Rückgängig",
+  "@undo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no_internet_connection": "Keine Internetverbindung",
+  "@no_internet_connection": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_permanently": "Endgültig löschen",
+  "@delete_permanently": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "maximum_files_size": "Maximale Dateigröße",
+  "@maximum_files_size": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_spam": "Als Spam markieren",
+  "@mark_as_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_messages_forever": "Nachrichten endgültig löschen",
+  "@delete_messages_forever": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_as_spam": "Als Spam markiert",
+  "@marked_as_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "manage_account": "Konto verwalten",
+  "@manage_account": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "name": "Name",
+  "@name": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "lastYears": "Letzte Jahre",
+  "@lastYears": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleHeaderAttachment": "{count} Anhänge ({totalSize})",
+  "@titleHeaderAttachment": {
+    "type": "text",
+    "placeholders_order": [
+      "count",
+      "totalSize"
+    ],
+    "placeholders": {
+      "count": {},
+      "totalSize": {}
+    }
+  },
+  "compose_email": "E-Mail verfassen",
+  "@compose_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showAll": "Alle anzeigen",
+  "@showAll": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "filter_messages": "Nachrichten filtern",
+  "@filter_messages": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moved_to_trash": "In den Papierkorb verschoben",
+  "@moved_to_trash": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "version": "Version",
+  "@version": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createNewIdentity": "Neue Identität erstellen",
+  "@createNewIdentity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "new_identity": "Neue Identität",
+  "@new_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_identity": "Identität löschen",
+  "@delete_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "edit_identity": "Identität bearbeiten",
+  "@edit_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "recent": "Kürzlich",
+  "@recent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "last30Days": "Letzte 30 Tage",
+  "@last30Days": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_dialog_send_email_without_recipient": "Ihre E-Mail sollte mindestens einen Empfänger haben",
+  "@message_dialog_send_email_without_recipient": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "settings": "Einstellungen",
+  "@settings": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "personalFolders": "Persönliche Ordner",
+  "@personalFolders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "search_emails": "E-Mails durchsuchen",
+  "@search_emails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "folderNameCannotContainSpecialCharacters": "Ordnername darf keine Sonderzeichen enthalten",
+  "@folderNameCannotContainSpecialCharacters": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintInputCreateNewFolder": "Name des Ordners eingeben",
+  "@hintInputCreateNewFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteFolders": "Ordner löschen",
+  "@deleteFolders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "renameFolder": "Ordner umbenennen",
+  "@renameFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "movedToFolder": "Nach {destinationMailboxPath} verschoben",
+  "@movedToFolder": {
+    "type": "text",
+    "placeholders_order": [
+      "destinationMailboxPath"
+    ],
+    "placeholders": {
+      "destinationMailboxPath": {}
+    }
+  },
+  "hintSearchFolders": "Ordner durchsuchen",
+  "@hintSearchFolders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "newFolder": "Neuer Ordner",
+  "@newFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "nameOfFolderIsRequired": "Name des Ordners ist erforderlich",
+  "@nameOfFolderIsRequired": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendingQueue": "Warteschlange für den Versand",
+  "@sendingQueue": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "proceed": "Fortfahren",
+  "@proceed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youAreInOfflineMode": "Sie sind im Offline-Modus",
+  "@youAreInOfflineMode": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageHaveBeenDeletedSuccessfully": "Nachrichten wurden erfolgreich gelöscht",
+  "@messageHaveBeenDeletedSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "resend": "Erneut senden",
+  "@resend": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messagesHaveBeenResent": "Nachrichten wurden erneut gesendet",
+  "@messagesHaveBeenResent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unknownError": "Unbekannter Fehler aufgetreten, bitte versuchen Sie es erneut",
+  "@unknownError": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_message_toast": "Sie haben Nachrichten als „{action}“ markiert",
+  "@marked_message_toast": {
+    "type": "text",
+    "placeholders_order": [
+      "action"
+    ],
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "messageDuplicateTagFilterMail": "Sie haben das bereits eingegeben",
+  "@messageDuplicateTagFilterMail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerAttendeeAccepted": " hat die Einladung angenommen",
+  "@messageEventActionBannerAttendeeAccepted": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerAttendeeCounterDeclined": "Ihr Gegenvorschlag wurde abgelehnt",
+  "@messageEventActionBannerAttendeeCounterDeclined": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "who": "Wer",
+  "@who": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "organizer": "Organisator",
+  "@organizer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attendees": "Teilnehmer",
+  "@attendees": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "seeAllAttendees": "Alle Teilnehmer ansehen",
+  "@seeAllAttendees": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "link": "Link",
+  "@link": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quotaStateLabel": "{used} von {limit} belegt",
+  "@quotaStateLabel": {
+    "type": "text",
+    "placeholders_order": [
+      "used",
+      "limit"
+    ],
+    "placeholders": {
+      "used": {},
+      "limit": {}
+    }
+  },
+  "quotaErrorBannerTitle": "Sie haben keinen Speicherplatz mehr",
+  "@quotaErrorBannerTitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createFolderSuccessfullyMessage": "Sie haben den Ordner {folderName} erfolgreich erstellt",
+  "@createFolderSuccessfullyMessage": {
+    "type": "text",
+    "placeholders_order": [
+      "folderName"
+    ],
+    "placeholders": {
+      "folderName": {}
+    }
+  },
+  "addCondition": "Bedingung hinzufügen",
+  "@addCondition": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveAsDraft": "Als Entwurf speichern",
+  "@saveAsDraft": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moreAttachments": "+ {count} weitere",
+  "@moreAttachments": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "conditionTitleRulesFilterAfterCombiner": "eine der folgenden Bedingungen erfüllt ist:",
+  "@conditionTitleRulesFilterAfterCombiner": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "maskAsSeen": "Als gesehen markieren",
+  "@maskAsSeen": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "rejectIt": "Ablehnen",
+  "@rejectIt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "markAsSpam": "Als Spam markieren",
+  "@markAsSpam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forwardTo": "Weiterleiten an",
+  "@forwardTo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectAction": "Aktion auswählen",
+  "@selectAction": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forwardEmailHintText": "Weiterleitungsadresse hinzufügen",
+  "@forwardEmailHintText": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addAction": "Aktion hinzufügen",
+  "@addAction": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "duplicatedActionError": "Diese Aktion ist bereits hinzugefügt",
+  "@duplicatedActionError": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectAllMessagesOfThisPage": "Alle Nachrichten dieser Seite auswählen",
+  "@selectAllMessagesOfThisPage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "eventReplyWasSentUnsuccessfully": "Ereignisantwort wurde erfolglos gesendet!",
+  "@eventReplyWasSentUnsuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youWillAttendThisMeeting": "Sie werden an dieser Besprechung teilnehmen",
+  "@youWillAttendThisMeeting": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youMayAttendThisMeeting": "Sie werden vielleicht an dieser Besprechung teilnehmen",
+  "@youMayAttendThisMeeting": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "downloadMessageAsEMLFailed": "Herunterladen der Nachricht als EML fehlgeschlagen",
+  "@downloadMessageAsEMLFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "download": "Herunterladen",
+  "@download": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "zoomIn": "Hineinzoomen",
+  "@zoomIn": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "zoomOut": "Herauszoomen",
+  "@zoomOut": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enterSomeSuggestions": "Geben Sie einige Vorschläge ein",
+  "@enterSomeSuggestions": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enterASubject": "Geben Sie einen Betreff ein",
+  "@enterASubject": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_confirmation_dialog_delete_identity": "Sind Sie sicher, dass Sie diese Identität löschen möchten?",
+  "@message_confirmation_dialog_delete_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hasAttachment": "Hat Anhang",
+  "@hasAttachment": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "canNotGetToken": "Token kann nicht abgerufen werden, bitte wenden Sie sich an Ihren Systemadministrator",
+  "@canNotGetToken": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "singleSignOn": "Einmalanmeldung",
+  "@singleSignOn": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "repliedMessage": "Beantwortete Nachricht",
+  "@repliedMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "error": "Fehler",
+  "@error": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "preparing_to_save": "Vorbereitung auf das Speichern",
+  "@preparing_to_save": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "more": "Mehr",
+  "@more": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "save_to_drafts": "In Entwürfen speichern",
+  "@save_to_drafts": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "empty_trash_dialog_message": "Sie sind im Begriff, alle Elemente im Papierkorb endgültig zu löschen. Möchten Sie fortfahren?",
+  "@empty_trash_dialog_message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_single_message_dialog": "Sie sind im Begriff, diese Nachricht endgültig zu löschen. Möchten Sie fortfahren?",
+  "@delete_single_message_dialog": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you_have_created_a_new_default_identity": "Sie haben eine neue Standardidentität erstellt",
+  "@you_have_created_a_new_default_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "remove_from_spam": "Aus Spam entfernen",
+  "@remove_from_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_delete_all_email_in_trash_button": "Alle Nachrichten im Papierkorb werden gelöscht, wenn der Speicherplatz erschöpft ist.",
+  "@message_delete_all_email_in_trash_button": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showingResultsFor": "Ergebnisse werden angezeigt für:",
+  "@showingResultsFor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisEmailAddressInvalid": "Diese E-Mail Adresse ist ungültig",
+  "@thisEmailAddressInvalid": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "loginInputSSOMessage": "Mit meinem SSO-Konto anmelden",
+  "@loginInputSSOMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "canNotVerifySSOConfiguration": "SSO-Konfiguration kann nicht verifiziert werden, bitte wenden Sie sich an Ihren Systemadministrator",
+  "@canNotVerifySSOConfiguration": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageMarkAsMailboxReadHasSomeEmailFailure": "Sie haben {count} Nachrichten in „{mailboxName}“ als gelesen markiert",
+  "@toastMessageMarkAsMailboxReadHasSomeEmailFailure": {
+    "type": "text",
+    "placeholders_order": [
+      "mailboxName",
+      "count"
+    ],
+    "placeholders": {
+      "mailboxName": {},
+      "count": {}
+    }
+  },
+  "message_dialog_send_email_without_a_subject": "Sind Sie sicher, dass Sie Nachrichten ohne Betreff versenden möchten?",
+  "@message_dialog_send_email_without_a_subject": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ssoNotAvailable": "Einmalanmeldung (SSO) ist nicht verfügbar",
+  "@ssoNotAvailable": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noPreviewAvailable": "Keine Vorschau verfügbar",
+  "@noPreviewAvailable": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "default_value": "Standard",
+  "@default_value": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "loginInputUrlMessage": "Zum Anmelden und Abrufen Ihrer Nachricht verbinden Sie sich bitte mit Ihrem JMAP-Server",
+  "@loginInputUrlMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatTextColor": "Textfarbe",
+  "@formatTextColor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_dialog_send_email_with_email_address_invalid": "Überprüfen Sie die Korrektheit der E-Mail-Adressen und versuchen Sie es erneut",
+  "@message_dialog_send_email_with_email_address_invalid": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you_are_changed_your_identity_successfully": "Sie haben Ihre Identität erfolgreich geändert",
+  "@you_are_changed_your_identity_successfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hint_compose_email": "Beginnen Sie mit dem Verfassen eines Briefes ...",
+  "@hint_compose_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "jmapBasedMailSolution": "JMAP-basierte\nkollaborative Team-Mail-Lösung",
+  "@jmapBasedMailSolution": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "manageEmailAsATeam": "E-Mails im Team verwalten",
+  "@manageEmailAsATeam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_as_not_spam": "Als kein Spam markiert",
+  "@marked_as_not_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "filter_message_toast": "Sie haben Nachrichten nach „{filterOption}“ gefiltert",
+  "@filter_message_toast": {
+    "type": "text",
+    "placeholders_order": [
+      "filterOption"
+    ],
+    "placeholders": {
+      "filterOption": {}
+    }
+  },
+  "disable_filter_message_toast": "Sie haben gefilterte Nachrichten deaktiviert",
+  "@disable_filter_message_toast": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noEndDate": "Kein Enddatum",
+  "@noEndDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yourVacationResponderIsEnabled": "Ihr Urlaubsbeantworter ist aktiviert.",
+  "@yourVacationResponderIsEnabled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toast_message_delete_multiple_email_permanently_success": "{count} Nachrichten wurden endgültig gelöscht",
+  "@toast_message_delete_multiple_email_permanently_success": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "toast_message_delete_a_email_permanently_success": "Nachricht wurde endgültig gelöscht",
+  "@toast_message_delete_a_email_permanently_success": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subject": "Betreff",
+  "@subject": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hasTheWords": "Hat die Wörter",
+  "@hasTheWords": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "doesNotHave": "Hat nicht",
+  "@doesNotHave": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "folder": "Ordner",
+  "@folder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "nameOrEmailAddress": "Name oder E-Mail-Adresse",
+  "@nameOrEmailAddress": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enterSearchTerm": "Suchbegriff eingeben",
+  "@enterSearchTerm": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "search": "Suchen",
+  "@search": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "clearFilter": "Filter löschen",
+  "@clearFilter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "advancedSearch": "Erweiterte Suche",
+  "@advancedSearch": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectFolder": "Ordner auswählen",
+  "@selectFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageAndRegion": "Sprache & Region",
+  "@languageAndRegion": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageArabic": "Arabisch",
+  "@languageArabic": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageItalian": "Italienisch",
+  "@languageItalian": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveAndClose": "Speichern & schließen",
+  "@saveAndClose": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "insertImage": "Bild einfügen",
+  "@insertImage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "chooseImage": "Bild auswählen",
+  "@chooseImage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "urlLink": "URL",
+  "@urlLink": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatBold": "Fett",
+  "@formatBold": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatUnderline": "Unterstreichen",
+  "@formatUnderline": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatStrikethrough": "Durchstreichen",
+  "@formatStrikethrough": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "insertImageErrorFileEmpty": "Bitte wählen Sie entweder ein Bild aus oder geben Sie eine Bild-URL ein",
+  "@insertImageErrorFileEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "chooseAColor": "Wählen Sie eine Farbe aus",
+  "@chooseAColor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatTextBackgroundColor": "Text-Hintergrundfarbe",
+  "@formatTextBackgroundColor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "headerStyle": "Stil",
+  "@headerStyle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "justifyFull": "Blocksatz",
+  "@justifyFull": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "fontFamily": "Schriftfamilie",
+  "@fontFamily": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "paragraph": "Absatz",
+  "@paragraph": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "alignLeft": "Linksbündig",
+  "@alignLeft": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "alignRight": "Rechtsbündig",
+  "@alignRight": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "alignCenter": "Zentriert",
+  "@alignCenter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "outdent": "Ausrücken",
+  "@outdent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "indent": "Einrücken",
+  "@indent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "orderList": "Bestellliste",
+  "@orderList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "numberedList": "Nummerierte Liste",
+  "@numberedList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bulletedList": "Aufzählungsliste",
+  "@bulletedList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moveTo": "Verschieben nach",
+  "@moveTo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailRules": "E-Mail-Regeln",
+  "@emailRules": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addNewRule": "Regel hinzufügen",
+  "@addNewRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "headerNameOfRules": "Name der Regeln",
+  "@headerNameOfRules": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "editRule": "Regel bearbeiten",
+  "@editRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "conditionValueHintTextInput": "Wert",
+  "@conditionValueHintTextInput": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "conditionTitleRulesFilter": "Wenn alle der folgenden Bedingungen erfüllt sind:",
+  "@conditionTitleRulesFilter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "recipient": "Empfänger",
+  "@recipient": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notContains": "Enthält nicht",
+  "@notContains": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "exactlyEquals": "Genau gleich",
+  "@exactlyEquals": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notExactlyEquals": "Nicht genau gleich",
+  "@notExactlyEquals": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "actionTitleRulesFilter": "Folgende Aktionen durchführen:",
+  "@actionTitleRulesFilter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toFolder": "In den Ordner:",
+  "@toFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moveMessage": "Nachricht verschieben",
+  "@moveMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ruleFilterAddressFromField": "Von",
+  "@ruleFilterAddressFromField": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "newFilterWasCreated": "Neuer Filter wurde erstellt",
+  "@newFilterWasCreated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yourFilterHasBeenUpdated": "Ihr Filter wurde aktualisiert",
+  "@yourFilterHasBeenUpdated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "errorMessageWhenStartDateVacationIsEmpty": "Bitte geben Sie ein gültiges Anfangsdatum ein",
+  "@errorMessageWhenStartDateVacationIsEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationStopsAt": "Urlaub endet am",
+  "@vacationStopsAt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintMessageBodyVacation": "Urlaubsnachrichten",
+  "@hintMessageBodyVacation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noStartTime": "Keine Anfangszeit",
+  "@noStartTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noEndTime": "Keine Endzeit",
+  "@noEndTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "errorMessageWhenEndDateVacationIsInValid": "Enddatum muss größer sein als das Anfangsdatum",
+  "@errorMessageWhenEndDateVacationIsInValid": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yourVacationResponderIsDisabledSuccessfully": "Ihr Urlaubsbeantworter wurde erfolgreich deaktiviert",
+  "@yourVacationResponderIsDisabledSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageDeleteRecipientSuccessfully": "Die E-Mail-Adresse wurde aus der Empfängerliste entfernt.",
+  "@toastMessageDeleteRecipientSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDisableVacationResponderAutomatically": "Ihr Urlaubsbeantworter wurde am {endDate} gestoppt",
+  "@messageDisableVacationResponderAutomatically": {
+    "type": "text",
+    "placeholders_order": [
+      "endDate"
+    ],
+    "placeholders": {
+      "endDate": {}
+    }
+  },
+  "messageConfirmationDialogDeleteRecipientForward": "Möchten Sie die E-Mail-Adresse {emailAddress} löschen?",
+  "@messageConfirmationDialogDeleteRecipientForward": {
+    "type": "text",
+    "placeholders_order": [
+      "emailAddress"
+    ],
+    "placeholders": {
+      "emailAddress": {}
+    }
+  },
+  "addRecipients": "Empfänger hinzufügen",
+  "@addRecipients": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintInputAutocompleteContact": "Name oder E-Mail Adresse eingeben",
+  "@hintInputAutocompleteContact": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageConfirmationDialogDeleteEmailRule": "Möchten Sie die Regel „{ruleName}“ löschen?",
+  "@messageConfirmationDialogDeleteEmailRule": {
+    "type": "text",
+    "placeholders_order": [
+      "ruleName"
+    ],
+    "placeholders": {
+      "ruleName": {}
+    }
+  },
+  "toastErrorMessageWhenCreateNewRule": "Sie haben die Informationen nicht vollständig ausgefüllt.",
+  "@toastErrorMessageWhenCreateNewRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintSubjectInputVacationSetting": "Betreff eingeben",
+  "@hintSubjectInputVacationSetting": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationSetting": "Urlaubseinstellung",
+  "@vacationSetting": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "backToSearchResults": "Zurück zu den Suchergebnissen",
+  "@backToSearchResults": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "contact": "Kontakt",
+  "@contact": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintSearchInputContact": "Name oder E-Mail-Adresse eingeben",
+  "@hintSearchInputContact": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "format": "Format",
+  "@format": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "background": "Hintergrund",
+  "@background": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleBackground": "Hintergrund",
+  "@titleBackground": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleForeground": "Vordergrund",
+  "@titleForeground": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectDate": "Datum auswählen",
+  "@selectDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "setDate": "Datum festlegen",
+  "@setDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageErrorWhenSelectStartDateIsEmpty": "Das Anfangsdatum darf nicht Null sein.",
+  "@toastMessageErrorWhenSelectStartDateIsEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageErrorWhenSelectEndDateIsEmpty": "Das Enddatum darf nicht Null sein.",
+  "@toastMessageErrorWhenSelectEndDateIsEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectParentFolder": "Übergeordneten Ordner auswählen",
+  "@selectParentFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requestReadReceipt": "Lesebestätigung anfordern",
+  "@requestReadReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "appGridTittle": "Zu den Anwendungen gehen",
+  "@appGridTittle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subTitleReadReceiptRequestNotificationMessage": "Der Absender hat eine Lesebestätigung für diese E-Mail angefordert. Lesebestätigung senden?",
+  "@subTitleReadReceiptRequestNotificationMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleReadReceiptRequestNotificationMessage": "Lesebestätigung anfordern",
+  "@titleReadReceiptRequestNotificationMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yes": "Ja",
+  "@yes": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no": "Nein",
+  "@no": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageNotSupportMdnWhenSendReceipt": "Ihr Konto unterstützt die MDN-Fähigkeit nicht",
+  "@toastMessageNotSupportMdnWhenSendReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subjectSendReceiptToSender": "Lesen: {subject}",
+  "@subjectSendReceiptToSender": {
+    "type": "text",
+    "placeholders_order": [
+      "subject"
+    ],
+    "placeholders": {
+      "subject": {}
+    }
+  },
+  "toastMessageSendReceiptSuccess": "Es wurde eine Lesebestätigung gesendet.",
+  "@toastMessageSendReceiptSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createNewFolder": "Neuen Ordner erstellen",
+  "@createNewFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "openInNewTab": "In neuem Tab öffnen",
+  "@openInNewTab": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "totalNewMessagePushNotification": "{count} neue E-Mails",
+  "@totalNewMessagePushNotification": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "privacyPolicy": "Datenschutzerklärung",
+  "@privacyPolicy": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "countNewSpamEmails": "Sie haben {count} neue Spam-E-Mails!",
+  "@countNewSpamEmails": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "showDetails": "Details anzeigen",
+  "@showDetails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dismiss": "Ablehnen",
+  "@dismiss": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "disableSpamReport": "Spam-Bericht deaktivieren",
+  "@disableSpamReport": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enableSpamReport": "Spam-Bericht aktivieren",
+  "@enableSpamReport": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "required": "erforderlich",
+  "@required": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noEmailInYourCurrentFolder": "Es tut uns leid, es sind keine E-Mails in Ihrem aktuellen Ordner",
+  "@noEmailInYourCurrentFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noEmailMatchYourCurrentFilter": "Es tut uns leid, es gibt keine E-Mails, die Ihrem aktuellen Filter entsprechen.",
+  "@noEmailMatchYourCurrentFilter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hideFolder": "Ordner ausblenden",
+  "@hideFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisImageCannotBeAdded": "Dieses Bild kann nicht hinzugefügt werden.",
+  "@thisImageCannotBeAdded": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMsgHideFolderSuccess": "Dieser Ordner wurde aus Ihrem Hauptordner ausgeblendet",
+  "@toastMsgHideFolderSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "searchForFolders": "Suche nach Ordnern",
+  "@searchForFolders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showFolder": "Ordner anzeigen",
+  "@showFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageShowFolderSuccess": "Dieser Ordner wird bereits in Ihrem Hauptordner angezeigt",
+  "@toastMessageShowFolderSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "folderVisibility": "Sichtbarkeit von Ordnern",
+  "@folderVisibility": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forwardedMessage": "Weitergeleitete Nachricht",
+  "@forwardedMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "repliedAndForwardedMessage": "Beantwortete und weitergeleitete Nachricht",
+  "@repliedAndForwardedMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "cannotSelectThisImage": "Dieses Bild kann nicht ausgewählt werden.",
+  "@cannotSelectThisImage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogWhenStoreSendingEmailFirst": "Zum Glück können Sie immer noch",
+  "@messageDialogWhenStoreSendingEmailFirst": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogWhenStoreSendingEmailSecond": " senden, antworten oder weiterleiten ",
+  "@messageDialogWhenStoreSendingEmailSecond": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogWhenStoreSendingEmailTail": " Ordner.",
+  "@messageDialogWhenStoreSendingEmailTail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleRecipientSendingEmail": "An: {recipients}",
+  "@titleRecipientSendingEmail": {
+    "type": "text",
+    "placeholders_order": [
+      "recipients"
+    ],
+    "placeholders": {
+      "recipients": {}
+    }
+  },
+  "openFolderMenu": "Ordnermenü öffnen",
+  "@openFolderMenu": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageHasBeenSentSuccessfully": "Nachricht wurde erfolgreich gesendet.",
+  "@messageHasBeenSentSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteOfflineEmail": "Offline-E-Mail löschen",
+  "@deleteOfflineEmail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "pending": "Ausstehend",
+  "@pending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "connectedToTheInternet": "Mit dem Internet verbunden",
+  "@connectedToTheInternet": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "connectionError": "Verbindungsfehler",
+  "@connectionError": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "inboxMailboxDisplayName": "Posteingang",
+  "@inboxMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sentMailboxDisplayName": "Gesendet",
+  "@sentMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "outboxMailboxDisplayName": "Postausgang",
+  "@outboxMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "spamMailboxDisplayName": "Spam",
+  "@spamMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "draftsMailboxDisplayName": "Entwürfe",
+  "@draftsMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "trashMailboxDisplayName": "Papierkorb",
+  "@trashMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "templatesMailboxDisplayName": "Vorlagen",
+  "@templatesMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "archiveMailboxDisplayName": "Archiv",
+  "@archiveMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "pleaseChooseAnImageSizeCorrectly": "Bitte wählen Sie ein Bild mit einer Größe von weniger als {maxSize}KB aus",
+  "@pleaseChooseAnImageSizeCorrectly": {
+    "type": "text",
+    "placeholders_order": [
+      "maxSize"
+    ],
+    "placeholders": {
+      "maxSize": {}
+    }
+  },
+  "messageEventActionBannerOrganizerInvited": " hat Sie zu einer Besprechung eingeladen",
+  "@messageEventActionBannerOrganizerInvited": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerOrganizerUpdated": " hat eine Besprechung aktualisiert",
+  "@messageEventActionBannerOrganizerUpdated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerOrganizerCanceled": " hat eine Besprechung abgesagt",
+  "@messageEventActionBannerOrganizerCanceled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you": "Sie",
+  "@you": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "invitationMessageCalendarInformation": " hat Sie zu einer Besprechung eingeladen:",
+  "@invitationMessageCalendarInformation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "where": "Wo",
+  "@where": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteAllSpamEmails": "Alle Spam-E-Mails löschen",
+  "@deleteAllSpamEmails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteAllSpamEmailsNow": "Alle Spam-E-Mails jetzt löschen",
+  "@deleteAllSpamEmailsNow": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "folderCreatedTitle": "Ihr Ordner wurde gerade erstellt",
+  "@folderCreatedTitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "maybe": "Vielleicht",
+  "@maybe": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createFilters": "Filter erstellen",
+  "@createFilters": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "markedSingleMessageToast": "Nachricht wurde als {action} markiert",
+  "@markedSingleMessageToast": {
+    "type": "text",
+    "placeholders_order": [
+      "action"
+    ],
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "formattingOptions": "Formatierungsoptionen",
+  "@formattingOptions": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "embedCode": "Code einbetten",
+  "@embedCode": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dropFileHereToAttachThem": "Datei hier ablegen, um sie anzuhängen",
+  "@dropFileHereToAttachThem": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "canceled": "Abgebrochen",
+  "@canceled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "textSize": "Textgröße",
+  "@textSize": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attachmentList": "Liste der Anhänge",
+  "@attachmentList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "files": "Dateien",
+  "@files": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "downloadAll": "Alle herunterladen",
+  "@downloadAll": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sending": "Wird gesendet",
+  "@sending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "all": "Alle",
+  "@all": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "any": "Jede",
+  "@any": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "conditionTitleRulesFilterBeforeCombiner": "Wenn",
+  "@conditionTitleRulesFilterBeforeCombiner": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "confirmAllEmailHereAreSpam": "Bestätigen Sie, dass alle E-Mails hier Spam sind",
+  "@confirmAllEmailHereAreSpam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yourIdentities": "Ihre Identitäten",
+  "@yourIdentities": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "searchForIdentities": "Suche nach Identitäten",
+  "@searchForIdentities": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sortBy": "Sortieren nach",
+  "@sortBy": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "oldest": "Älteste",
+  "@oldest": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mostRecent": "Neueste",
+  "@mostRecent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "relevance": "Relevanz",
+  "@relevance": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "senderAscending": "Absendername: A - Z",
+  "@senderAscending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "senderDescending": "Absendername: Z - A",
+  "@senderDescending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subjectAscending": "Betreff: A - Z",
+  "@subjectAscending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subjectDescending": "Betreff: Z - A",
+  "@subjectDescending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notFoundSession": "Sitzung nicht gefunden",
+  "@notFoundSession": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dnsLookupLoginMessage": "Geben Sie bitte Ihre E-Mail-Adresse ein, um sich anzumelden und auf Ihre Nachricht zuzugreifen",
+  "@dnsLookupLoginMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enterYourPasswordToSignIn": "Geben Sie Ihr Passwort ein, um sich anzumelden",
+  "@enterYourPasswordToSignIn": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unsubscribe": "Abbestellen",
+  "@unsubscribe": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unsubscribeMail": "E-Mail abbestellen",
+  "@unsubscribeMail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unsubscribeMailDialogMessage": "Sind Sie sicher, dass Sie keine ähnlichen Nachrichten mehr erhalten möchten von",
+  "@unsubscribeMailDialogMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unsubscribedFromThisMailingList": "Von dieser Mailingliste abgemeldet",
+  "@unsubscribedFromThisMailingList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mailUnsubscribedMessage": "Sie haben sich von {senderName} abgemeldet",
+  "@mailUnsubscribedMessage": {
+    "type": "text",
+    "placeholders_order": [
+      "senderName"
+    ],
+    "placeholders": {
+      "senderName": {}
+    }
+  },
+  "cannotCompressInlineImage": "Bild kann nicht komprimiert werden",
+  "@cannotCompressInlineImage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "me": "Mich",
+  "@me": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "byContinuingYouAreAgreeingToOur": "Wenn Sie fortfahren, erklären Sie sich mit unserer",
+  "@byContinuingYouAreAgreeingToOur": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "archiveMessage": "Nachricht archivieren",
+  "@archiveMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "recoverDeletedMessages": "Gelöschte Nachrichten wiederherstellen",
+  "@recoverDeletedMessages": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deletionDate": "Löschungsdatum",
+  "@deletionDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "receptionDate": "Empfangsdatum",
+  "@receptionDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sender": "Absender",
+  "@sender": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addSender": "Absender hinzufügen",
+  "@addSender": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "last1Year": "Letztes 1 Jahr",
+  "@last1Year": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "restore": "Wiederherstellen",
+  "@restore": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "recoveredMailboxDisplayName": "Wiederhergestellt",
+  "@recoveredMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "restoreDeletedMessageFailed": "Wiederherstellen einer gelöschten Nachricht fehlgeschlagen",
+  "@restoreDeletedMessageFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "loadMore": "Mehr laden",
+  "@loadMore": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "doYouWantToProceed": "Möchten Sie fortfahren?",
+  "@doYouWantToProceed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "externalDomain": "Externe Domain",
+  "@externalDomain": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "printAll": "Alles drucken",
+  "@printAll": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "replyToEmailAddressPrefix": "Antworten an",
+  "@replyToEmailAddressPrefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "printingInProgress": "Druckvorgang läuft",
+  "@printingInProgress": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "printingFailed": "Druckvorgang fehlgeschlagen",
+  "@printingFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectFromFile": "Aus Datei auswählen",
+  "@selectFromFile": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "insert": "Einfügen",
+  "@insert": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "insertImageErrorDuplicate": "Bitte geben Sie entweder ein Bild oder eine Bild-URL ein, nicht beides",
+  "@insertImageErrorDuplicate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "contains": "Enthält",
+  "@contains": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message": "Nachricht",
+  "@message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteRecipient": "Empfänger entfernen",
+  "@deleteRecipient": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationSettingToggleButtonAutoReply": "Automatisch auf Nachrichten antworten, wenn sie empfangen werden.",
+  "@vacationSettingToggleButtonAutoReply": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "startTime": "Anfangszeit",
+  "@startTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "endTime": "Endzeit",
+  "@endTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageIsRequired": "Nachricht ist erforderlich",
+  "@messageIsRequired": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveChanges": "Änderungen speichern",
+  "@saveChanges": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "endNow": "Jetzt beenden",
+  "@endNow": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "newer": "Neuer",
+  "@newer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "older": "Älter",
+  "@older": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "textQuotasOutOfStorage": "Kein Speicherplatz mehr",
+  "@textQuotasOutOfStorage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quickCreatingRule": "Eine Regel mit dieser E-Mail erstellen",
+  "@quickCreatingRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titlePageNotFound": "Ups, wir können diese Seite nicht finden",
+  "@titlePageNotFound": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "wrongUrlMessage": "Server-URL ist nicht gültig, bitte versuchen Sie es erneut",
+  "@wrongUrlMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "language": "Sprache",
+  "@language": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageEnglish": "Englisch",
+  "@languageEnglish": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageVietnamese": "Vietnamesisch",
+  "@languageVietnamese": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageFrench": "Französisch",
+  "@languageFrench": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageRussian": "Russisch",
+  "@languageRussian": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteRule": "Regel löschen",
+  "@deleteRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createNewRule": "Neue Regel erstellen",
+  "@createNewRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "activated": "Aktiviert",
+  "@activated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "rulesNameHintTextInput": "Geben Sie den Namen der Regel ein",
+  "@rulesNameHintTextInput": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ruleFilterAddressToField": "An",
+  "@ruleFilterAddressToField": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacation": "Urlaub",
+  "@vacation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "headerRecipients": "Empfänger",
+  "@headerRecipients": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forwarding": "Weiterleitung",
+  "@forwarding": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteEmailRule": "Regel löschen",
+  "@deleteEmailRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "errorMessageWhenMessageVacationIsEmpty": "Nachrichtentext darf nicht leer sein",
+  "@errorMessageWhenMessageVacationIsEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationSettingExplanation": "Sendet eine automatische Antwort auf eingehende Nachrichten.",
+  "@vacationSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEnableVacationResponderAutomatically": "Ihr Urlaubsbeantworter wird am {startDate} aktiviert",
+  "@messageEnableVacationResponderAutomatically": {
+    "type": "text",
+    "placeholders_order": [
+      "startDate"
+    ],
+    "placeholders": {
+      "startDate": {}
+    }
+  },
+  "titleFormat": "Format",
+  "@titleFormat": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageErrorWhenSelectDateIsInValid": "Die Endzeit darf nicht kleiner als die Anfangszeit sein.",
+  "@toastMessageErrorWhenSelectDateIsInValid": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dateRangeAdvancedSearchFilter": "Von {startDate} bis {endDate}",
+  "@dateRangeAdvancedSearchFilter": {
+    "type": "text",
+    "placeholders_order": [
+      "startDate",
+      "endDate"
+    ],
+    "placeholders": {
+      "startDate": {},
+      "endDate": {}
+    }
+  },
+  "forwardingSettingExplanation": "Die unten aufgeführten E-Mail-Adressen werden Ihre E-Mails erhalten.",
+  "@forwardingSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addRecipientButton": "Empfänger hinzufügen",
+  "@addRecipientButton": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subTitlePageNotFound": "Es ist möglich, dass Ihre Zielseite verschwunden ist oder zu einem anderen Konto gehört.",
+  "@subTitlePageNotFound": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageConfirmationDialogDeleteAllRecipientForward": "Sind Sie sicher, dass Sie diese Empfänger entfernen möchten? Auf diese Weise werden sie aus der E-Mail-Kette entfernt.",
+  "@messageConfirmationDialogDeleteAllRecipientForward": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emptyListEmailForward": "Bitte geben Sie mindestens einen Empfänger ein",
+  "@emptyListEmailForward": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "customRange": "Benutzerdefinierter Bereich",
+  "@customRange": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "foreground": "Vordergrund",
+  "@foreground": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sending_failed": "Senden fehlgeschlagen",
+  "@sending_failed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "your_download_has_started": "Ihr Herunterladen hat begonnen",
+  "@your_download_has_started": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_multiple_messages_dialog": "Sie sind im Begriff, {count} Elemente in {mailboxName} endgültig zu löschen. Möchten Sie fortfahren?",
+  "@delete_multiple_messages_dialog": {
+    "type": "text",
+    "placeholders_order": [
+      "count",
+      "mailboxName"
+    ],
+    "placeholders": {
+      "count": {},
+      "mailboxName": {}
+    }
+  },
+  "message_dialog_upload_attachments_exceeds_maximum_size": "Sie haben die maximale Dateigröße erreicht. Bitte laden Sie Dateien hoch, deren Gesamtgröße kleiner ist als {maxSize}",
+  "@message_dialog_upload_attachments_exceeds_maximum_size": {
+    "type": "text",
+    "placeholders_order": [
+      "maxSize"
+    ],
+    "placeholders": {
+      "maxSize": {}
+    }
+  },
+  "profilesSettingExplanation": "Informationen über Sie und Optionen zur Verwaltung dieser Informationen.",
+  "@profilesSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "setDefaultIdentity": "Als Standardidentität festlegen",
+  "@setDefaultIdentity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "identitiesSettingExplanation": "Wählen Sie die Identität oder E-Mail-Adresse aus, die Sie zum Senden einer E-Mail verwenden möchten",
+  "@identitiesSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "resetToDefault": "Auf Standardwerte zurücksetzen",
+  "@resetToDefault": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "setColor": "Farbe festlegen",
+  "@setColor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatItalic": "Kursiv",
+  "@formatItalic": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageHasBeenSavedToTheSendingQueue": "Vorübergehendes Netzwerkproblem. Nachrichten stehen in der Warteschlange für einen erneuten Versuch, wenn eine Verbindung besteht.",
+  "@messageHasBeenSavedToTheSendingQueue": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "time": "Zeit",
+  "@time": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "location": "Ort",
+  "@location": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bannerDeleteAllSpamEmailsMessage": "Alle Nachrichten in Spam werden gelöscht, wenn der Speicherplatz erschöpft ist.",
+  "@bannerDeleteAllSpamEmailsMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerAttendeeCounter": " hat Änderungen zum Ereignis vorgeschlagen",
+  "@messageEventActionBannerAttendeeCounter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deactivated": "Deaktiviert",
+  "@deactivated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "startDate": "Anfangsdatum",
+  "@startDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "endDate": "Enddatum",
+  "@endDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationSettingSaved": "Urlaubseinstellungen gespeichert",
+  "@vacationSettingSaved": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "keepLocalCopyForwardLabel": "Eine Kopie der E-Mail im Posteingang behalten",
+  "@keepLocalCopyForwardLabel": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageDeleteEmailRuleSuccessfully": "Die Regel wurde entfernt.",
+  "@toastMessageDeleteEmailRuleSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageErrorNotSelectedFolderWhenCreateNewMailbox": "Sie haben keinen Speicherordner zum Speichern ausgewählt",
+  "@toastMessageErrorNotSelectedFolderWhenCreateNewMailbox": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "incorrectEmailFormat": "Falsches E-Mail-Format",
+  "@incorrectEmailFormat": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "remove": "Entfernen",
+  "@remove": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "totalEmailSelected": "Alle abwählen ({count})",
+  "@totalEmailSelected": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "storageQuotas": "Speicherung",
+  "@storageQuotas": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "page404": "Seite 404",
+  "@page404": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youHaveNewMessages": "Sie haben neue Nachrichten",
+  "@youHaveNewMessages": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerAttendeeDeclined": " hat die Einladung abgelehnt",
+  "@messageEventActionBannerAttendeeDeclined": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emptySpamMessageDialog": "Sie sind im Begriff, alle Elemente in Spam endgültig zu löschen. Möchten Sie fortfahren?",
+  "@emptySpamMessageDialog": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quotaWarningBannerTitle": "Ihnen geht der Speicherplatz aus (90 %).",
+  "@quotaWarningBannerTitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "newSubfolder": "Neuer Unterordner",
+  "@newSubfolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showMoreAttachment": "Mehr anzeigen (+{count})",
+  "@showMoreAttachment": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "youWillNotAttendThisMeeting": "Sie werden nicht an dieser Besprechung teilnehmen",
+  "@youWillNotAttendThisMeeting": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "print": "Drucken",
+  "@print": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "page": "Seite",
+  "@page": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "when": "Wann",
+  "@when": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "downloadMessageAsEML": "Nachricht als EML herunterladen",
+  "@downloadMessageAsEML": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageSubtitle": "Legen Sie die Sprache fest, die Sie in Twake Mail verwenden.",
+  "@languageSubtitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "anAttendee": "Ein Teilnehmer",
+  "@anAttendee": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "new_folder_is_created": "{nameMailbox} wird erstellt",
+  "@new_folder_is_created": {
+    "type": "text",
+    "placeholders_order": [
+      "nameMailbox"
+    ],
+    "placeholders": {
+      "nameMailbox": {}
+    }
+  },
+  "message_confirmation_dialog_delete_folder": "Der Ordner „{nameMailbox}“ und alle darin enthaltenen Unterordner und Nachrichten werden gelöscht und können nicht mehr wiederhergestellt werden. Möchten Sie den Löschvorgang fortsetzen?",
+  "@message_confirmation_dialog_delete_folder": {
+    "type": "text",
+    "placeholders_order": [
+      "nameMailbox"
+    ],
+    "placeholders": {
+      "nameMailbox": {}
+    }
+  },
+  "moveFolder": "Ordner verschieben",
+  "@moveFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteFolder": "Ordner löschen",
+  "@deleteFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "allFolders": "Alle Ordner",
+  "@allFolders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_dialog_send_email_exceeds_maximum_size": "Ihre Nachricht konnte nicht gesendet werden, da sie die maximale Größe von {maxSize} überschreitet",
+  "@message_dialog_send_email_exceeds_maximum_size": {
+    "type": "text",
+    "placeholders_order": [
+      "maxSize"
+    ],
+    "placeholders": {
+      "maxSize": {}
+    }
+  },
+  "toastMessageMarkAsMailboxReadSuccess": "Sie haben alle Nachrichten in \"{mailboxName}\" als gelesen markiert",
+  "@toastMessageMarkAsMailboxReadSuccess": {
+    "type": "text",
+    "placeholders_order": [
+      "mailboxName"
+    ],
+    "placeholders": {
+      "mailboxName": {}
+    }
+  },
+  "Bad credentials": "Ungültige Anmeldedaten",
+  "@Bad credentials": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "flag": "Kennzeichnen",
+  "@flag": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "un_spam": "Kein Spam",
+  "@un_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "not_starred": "Nicht markiert",
+  "@not_starred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "star": "Stern",
+  "@star": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageCannotFoundEmailIdWhenSendReceipt": "Die E-Mail-ID konnte nicht gefunden werden",
+  "@toastMessageCannotFoundEmailIdWhenSendReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogSendEmailUploadingAttachment": "Ihre Nachricht konnte nicht gesendet werden, da ein Anhang hochgeladen wird",
+  "@messageDialogSendEmailUploadingAttachment": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageLocalCopyDisable": "Lokale Kopie beibehalten deaktivieren.",
+  "@toastMessageLocalCopyDisable": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bcc_to": "Bcc to",
+  "@bcc_to": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteFoldersSuccessfully": "Ordner erfolgreich gelöscht",
+  "@deleteFoldersSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createNewFolderFailure": "Fehler beim Erstellen eines neuen Ordners",
+  "@createNewFolderFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteFoldersFailure": "Fehler beim Löschen der Ordner",
+  "@deleteFoldersFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ruleFilterAddressCcField": "Cc",
+  "@ruleFilterAddressCcField": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "exchange": "Austausch",
+  "@exchange": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selected": "Ausgewählt",
+  "@selected": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "page_name": "Twake Mail",
+  "@page_name": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "starred": "Wichtig",
+  "@starred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "allTime": "Seit jeher",
+  "@allTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "clearAll": "Alles leeren",
+  "@clearAll": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "app_name": "Twake Mail",
+  "@app_name": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quickStyles": "Schnellformatvorlagen",
+  "@quickStyles": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleQuickStyles": "Schnellformatvorlagen",
+  "@titleQuickStyles": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "un_star": "Markierung entfernen",
+  "@un_star": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notSelected": "Nicht ausgewählt",
+  "@notSelected": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageLocalCopyEnable": "Lokale Kopie beibehalten aktivieren.",
+  "@toastMessageLocalCopyEnable": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "with_starred": "Mit Stern markiert",
+  "@with_starred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no_internet_connection_try_again_later": "Keine Internetverbindung, versuche es später.",
+  "@no_internet_connection_try_again_later": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageCannotFoundIdentityWhenSendReceipt": "Die angegebene ID konnte nicht gefunden werden",
+  "@toastMessageCannotFoundIdentityWhenSendReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailRuleSettingExplanation": "Erstellen von Regeln zur Verwaltung eingehender Nachrichten. Sie wählen sowohl die Bedingung, die eine Regel auslöst, als auch die Aktion, die die Regel ausführt.",
+  "@emailRuleSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "empty_trash_folder": "Papierkorb leeren",
+  "@empty_trash_folder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageAddRecipientsSuccessfully": "Die E-Mails wurden der Empfängerliste hinzugefügt.",
+  "@toastMessageAddRecipientsSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "renameFolderFailure": "Fehler beim Umbenennen des Ordners",
+  "@renameFolderFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_starred": "Als wichtig markieren",
+  "@mark_as_starred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "pleaseAllowNotifications": "Bitte erlauben Sie Benachrichtigungen von Twake Mail in den Einstellungen des Geräts",
+  "@pleaseAllowNotifications": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "markAsSpamFailed": "Als Spam markieren ist fehlgeschlagen",
+  "@markAsSpamFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEmptyFolderDialog": "Die Nachrichten im Ordner {folder} werden dauerhaft gelöscht und Sie werden sie nicht wiederherstellen können",
+  "@messageEmptyFolderDialog": {
+    "type": "text",
+    "placeholders_order": [
+      "folder"
+    ],
+    "placeholders": {
+      "folder": {}
+    }
+  },
+  "findEmails": "E-Mails finden",
+  "@findEmails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailReadReceiptsToggleDescription": "Immer Lesebestätigungen für ausgehende Nachrichten anfordern",
+  "@emailReadReceiptsToggleDescription": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerAttendeeTentative": " hat mit 'Vielleicht' auf diese Einladung geantwortet",
+  "@messageEventActionBannerAttendeeTentative": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youAreOffline": "Sie sind offline. Es sieht so aus, als ob Sie nicht verbunden sind.",
+  "@youAreOffline": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notification": "Benachrichtigung",
+  "@notification": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailReadReceiptsSettingExplanation": "Lesebestätigungen sind Benachrichtigungen, die an Ihre Benutzer gesendet und von ihnen empfangen werden können, um zu bestätigen, dass E-Mails gelesen wurden.",
+  "@emailReadReceiptsSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "textBodySendReceiptToSender": "Die Nachricht wurde von {receiver} um  {time}  gelesen\n\nSubject: {subject} \n\nAchtung: Diese Empfangsbestätigung bestätigt lediglich, dass die Nachricht auf dem Computer des Empfängers angezeigt wurde. Es gibt keine Garantie, dass der Empfänger die Nachricht gelesen oder den Inhalt verstanden hat.",
+  "@textBodySendReceiptToSender": {
+    "type": "text",
+    "placeholders_order": [
+      "receiver",
+      "subject",
+      "time"
+    ],
+    "placeholders": {
+      "receiver": {},
+      "subject": {},
+      "time": {}
+    }
+  },
+  "discardChanges": "Änderungen verwerfen",
+  "@discardChanges": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "appTitlePushNotification": "Twake Mail",
+  "@appTitlePushNotification": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveEmailAsDraftFailure": "Fehler beim Speichern Ihrer Nachricht als Entwurf.",
+  "@saveEmailAsDraftFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogOfflineModeOnIOS": "Die Nachricht wird in der Sende-Warteschlange sein. Sie können es erneut versuchen, wenn Sie online sind.",
+  "@messageDialogOfflineModeOnIOS": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bannerProgressingRecoveryMessage": "Die Wiederherstellung ist im Gange. Sie können Twake Mail weiterhin verwenden",
+  "@bannerProgressingRecoveryMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailReadReceipts": "Lesebestätigungen für E-Mails",
+  "@emailReadReceipts": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "loadingPleaseWait": "Lädt... Bitte warten!",
+  "@loadingPleaseWait": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "tryAgain": "Versuchen Sie es erneut",
+  "@tryAgain": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "starIt": "Mit einem Stern markieren",
+  "@starIt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bannerMessageSendingQueueViewOnIOS": "Ihre Nachrichten wurden aufgrund von Netzwerkproblemen nicht gesendet. Sie sind sicher gespeichert. Sobald Sie wieder online sind, können Sie sie erneut senden, bearbeiten oder löschen.",
+  "@bannerMessageSendingQueueViewOnIOS": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emptyTrash": "Papierkorb leeren",
+  "@emptyTrash": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moveConversation": "Verschiebe {numberOfConversation} Nachrichten",
+  "@moveConversation": {
+    "type": "text",
+    "placeholders_order": [
+      "numberOfConversation"
+    ],
+    "placeholders": {
+      "numberOfConversation": {}
+    }
+  },
+  "open": "Öffnen",
+  "@open": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "progress": "Fortschritt",
+  "@progress": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "teamMailBoxes": "Team-Postfächer",
+  "@teamMailBoxes": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "creatingMessage": "Nachricht wird erstellt",
+  "@creatingMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notSelectedMailboxToMoveMessage": "Bitte wählen Sie ein Postfach, um die Nachricht zu verschieben",
+  "@notSelectedMailboxToMoveMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "warningMessageWhenExceedGenerallySizeInComposer": "Ihre Nachricht ist größer als die üblicherweise von Drittanbieter-E-Mail-Systemen akzeptierte Größe. Wenn Sie das Senden dieser Nachricht bestätigen, besteht das Risiko, dass sie vom Empfängersystem abgelehnt wird.",
+  "@warningMessageWhenExceedGenerallySizeInComposer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "continueAction": "Fortfahren",
+  "@continueAction": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reconnect": "Erneut verbinden",
+  "@reconnect": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendMessageFailureWithSetErrorTypeOverQuota": "Fehler beim Senden Ihrer Nachricht, da das Quotalimit überschritten wurde.",
+  "@sendMessageFailureWithSetErrorTypeOverQuota": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showLess": "Weniger anzeigen",
+  "@showLess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveEmailAsDraftFailureWithSetErrorTypeTooLarge": "Fehler beim Speichern Ihrer Nachricht als Entwurf, da sie zu groß ist.",
+  "@saveEmailAsDraftFailureWithSetErrorTypeTooLarge": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "restoreDeletedMessageSuccess": "Gelöschte Nachrichten erfolgreich wiederhergestellt",
+  "@restoreDeletedMessageSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dialogMessageSessionHasExpired": "Die aktuelle Sitzung ist abgelaufen. Bitte stellen Sie die Verbindung zum Server wieder her",
+  "@dialogMessageSessionHasExpired": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveMessage": "Nachricht speichern",
+  "@saveMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "clean": "Bereinigen",
+  "@clean": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "turnOnRequestReadReceipt": "Lesebestätigung anfordern einschalten",
+  "@turnOnRequestReadReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showNotifications": "Benachrichtigungen anzeigen",
+  "@showNotifications": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "goToSettings": "Zu den Einstellungen gehen",
+  "@goToSettings": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "savingMessage": "Nachricht wird gespeichert",
+  "@savingMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "canceling": "Wird abgebrochen",
+  "@canceling": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "savingMessageToDraftFolder": "Nachricht wird im Entwurfsordner gespeichert",
+  "@savingMessageToDraftFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "closeAnyway": "Trotzdem schließen",
+  "@closeAnyway": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendMessageFailureWithSetErrorTypeTooLarge": "Fehler beim Senden Ihrer Nachricht, da sie zu groß ist.",
+  "@sendMessageFailureWithSetErrorTypeTooLarge": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogDeleteSendingEmail": "Das Löschen einer Offline-E-Mail wird deren Inhalt dauerhaft entfernen. Sie können diese Aktion nicht rückgängig machen und die E-Mail nicht aus dem Papierkorb wiederherstellen.",
+  "@messageDialogDeleteSendingEmail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delivering": "Zustellen",
+  "@delivering": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "clearFolder": "Ordner leeren",
+  "@clearFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageMarkAsReadFolderAllFailure": "Der Ordner \"{folderName}\" konnte nicht als gelesen markiert werden",
+  "@toastMessageMarkAsReadFolderAllFailure": {
+    "type": "text",
+    "placeholders_order": [
+      "folderName"
+    ],
+    "placeholders": {
+      "folderName": {}
+    }
+  },
+  "warningMessageWhenSendEmailFailure": "Das Senden der Nachricht ist fehlgeschlagen.\nEin Fehler ist beim Versenden der E-Mail aufgetreten.",
+  "@warningMessageWhenSendEmailFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "warningMessageWhenSaveEmailToDraftsFailure": "Das Speichern der Nachricht im Entwurfsordner ist fehlgeschlagen.\nEin Fehler ist beim Speichern der E-Mail aufgetreten.",
+  "@warningMessageWhenSaveEmailToDraftsFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quotaWarningBannerMessage": "Bald werden Sie keine E-Mails mehr in Tmail senden können. Bitte bereinigen Sie Ihren Speicher oder erweitern Sie ihn, um alle Funktionen in Tmail weiterhin nutzen zu können.",
+  "@quotaWarningBannerMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "turnOffRequestReadReceipt": "Lesebestätigung anfordern ausschalten",
+  "@turnOffRequestReadReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emptySpamFolderFailed": "Das Leeren des Spam-Ordners ist fehlgeschlagen",
+  "@emptySpamFolderFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "regards": "Mit freundlichen Grüßen",
+  "@regards": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "allowsTwakeMailToNotifyYouWhenANewMessageArrivesOnYourPhone": "Erlaubt Twake Mail, Sie zu benachrichtigen, wenn eine neue Nachricht auf Ihrem Telefon ankommt",
+  "@allowsTwakeMailToNotifyYouWhenANewMessageArrivesOnYourPhone": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveEmailAsDraftFailureWithSetErrorTypeOverQuota": "\"Fehler beim Speichern Ihrer Nachricht als Entwurf, da das Quotalimit überschritten wurde.",
+  "@saveEmailAsDraftFailureWithSetErrorTypeOverQuota": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "folderVisibilitySubtitle": "Ordner anzeigen/ausblenden, einschließlich Ihrer persönlichen Ordner und Team-Postfächer.",
+  "@folderVisibilitySubtitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendMessageFailure": "Fehler beim Senden Ihrer Nachricht.",
+  "@sendMessageFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "generalSignatureImageUploadError": "Beim Hochladen des Bildes ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+  "@generalSignatureImageUploadError": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "restoreDeletedMessageCanceled": "Wiederherstellung der gelöschten Nachricht abgebrochen",
+  "@restoreDeletedMessageCanceled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sMimeGoodSignatureMessage": "Die Authentizität dieser Nachricht wurde durch eine SMime-Signatur verifiziert.",
+  "@sMimeGoodSignatureMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quotaErrorBannerMessage": "Bald werden Sie keine E-Mails mehr in Tmail senden können. Bitte bereinigen Sie Ihren Speicher oder erweitern Sie ihn, um alle Funktionen von Tmail nutzen zu können.",
+  "@quotaErrorBannerMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageConfirmationDialogDeleteMultipleFolder": "{numberOfMailbox} Ordner, alle darin enthaltenen Unterordner und Nachrichten werden gelöscht und können nicht wiederhergestellt werden. Möchten Sie den Löschvorgang fortsetzen?",
+  "@messageConfirmationDialogDeleteMultipleFolder": {
+    "type": "text",
+    "placeholders_order": [
+      "numberOfMailbox"
+    ],
+    "placeholders": {
+      "numberOfMailbox": {}
+    }
+  },
+  "status": "Status",
+  "@status": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "spamFolderNotFound": "Spam-Ordner nicht gefunden",
+  "@spamFolderNotFound": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bannerMessageSendingQueueView": "Nachrichten im Ordner 'Sende-Warteschlange' werden gesendet oder geplant, wenn eine Verbindung besteht.",
+  "@bannerMessageSendingQueueView": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sessionExpired": "Sitzung abgelaufen",
+  "@sessionExpired": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emptySpamFolder": "Spam-Ordner leeren",
+  "@emptySpamFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogWhenStoreSendingEmailThird": "E-Mails. Sie werden zugestellt, sobald Sie eine Verbindung zum Internet herstellen. Um diese E-Mails vor dem Senden zu bearbeiten, gehen Sie zu dem/der ",
+  "@messageDialogWhenStoreSendingEmailThird": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noSuitableBrowserForOIDC": "Kein geeigneter Browser für OIDC, bitte wenden Sie sich an Ihren Systemadministrator",
+  "@noSuitableBrowserForOIDC": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youHaveNotAddedConditionToRule": "Sie haben der Regel keine Bedingung hinzugefügt.",
+  "@youHaveNotAddedConditionToRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showMore": "Mehr anzeigen (+{count})",
+  "@showMore": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "requestReadReceiptHasBeenDisabled": "Lesebestätigung anfordern wurde deaktiviert",
+  "@requestReadReceiptHasBeenDisabled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendingMessage": "Nachricht wird gesendet",
+  "@sendingMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requestReadReceiptHasBeenEnabled": "Lesebestätigung anfordern wurde aktiviert",
+  "@requestReadReceiptHasBeenEnabled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisImageCannotBePastedIntoTheEditor": "Dieses Bild kann nicht in den Editor eingefügt werden.",
+  "@thisImageCannotBePastedIntoTheEditor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageWarningDialogForForwardsToOtherDomains": "Sie leiten E-Mails an eine andere Domain weiter. Dies könnte ein Sicherheitsrisiko darstellen oder als illegale Datenextraktion angesehen werden.",
+  "@messageWarningDialogForForwardsToOtherDomains": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youHaveNotAddedActionToRule": "Sie haben der Regel keine Aktion hinzugefügt.",
+  "@youHaveNotAddedActionToRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sMimeBadSignatureMessage": "Die Überprüfung der SMime-Signatur dieser Nachricht ist fehlgeschlagen.",
+  "@sMimeBadSignatureMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisFileCannotBePicked": "Diese Datei kann nicht ausgewählt werden.",
+  "@thisFileCannotBePicked": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mailToAttendees": "E-Mail an Teilnehmer",
+  "@mailToAttendees": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "canNotUploadFileToSignature": "Diese Datei kann nicht zur Signatur hochgeladen werden",
+  "@canNotUploadFileToSignature": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "warningMessageWhenClickCloseComposer": "Diese Nachricht im Entwurfsordner speichern und den Editor schließen?",
+  "@warningMessageWhenClickCloseComposer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notificationsDisabled": "Benachrichtigungen deaktiviert",
+  "@notificationsDisabled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youHaveNotSelectedAnyActionForRule": "Sie haben keine Aktion für die Regel ausgewählt.",
+  "@youHaveNotSelectedAnyActionForRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "descriptionWelcomeTo": "Der neue Open-Source-Standard für\nsichere professionelle E-Mails",
+  "@descriptionWelcomeTo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createTwakeIdFailed": "Erstellen der Twake-ID fehlgeschlagen. Bitte überprüfen Sie Ihre Eingaben.",
+  "@createTwakeIdFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createTwakeId": "Twake-ID erstellen",
+  "@createTwakeId": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageGerman": "Deutsch",
+  "@languageGerman": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "useCompanyServer": "Firmenserver verwenden",
+  "@useCompanyServer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "nameToBeDisplayed": "Name, der den Empfängern angezeigt wird",
+  "@nameToBeDisplayed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisFieldCannotContainOnlySpaces": "Dieses Feld darf nicht nur Leerzeichen enthalten",
+  "@thisFieldCannotContainOnlySpaces": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sigInSaasFailed": "Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Eingaben.",
+  "@sigInSaasFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youAreCurrentlyLoggedInWith": "Sie sind derzeit angemeldet mit",
+  "@youAreCurrentlyLoggedInWith": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "last15Days": "Letzte 15 Tage",
+  "@last15Days": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yesLogout": "Ja, abmelden",
+  "@yesLogout": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageSubaddressingFailure": "Es ist ein Fehler bei der Bearbeitung der Anfrage aufgetreten",
+  "@toastMessageSubaddressingFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageConfirmationLogout": "Möchten Sie sich abmelden bei",
+  "@messageConfirmationLogout": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_confirmation_dialog_allow_subaddressing": "Sie sind dabei, jedem zu erlauben, E-Mails direkt an Ihren Ordner „{nameMailbox}“ zu senden:",
+  "@message_confirmation_dialog_allow_subaddressing": {
+    "type": "text",
+    "placeholders_order": [
+      "nameMailbox"
+    ],
+    "placeholders": {
+      "nameMailbox": {}
+    }
+  },
+  "errorWhileFetchingSubaddress": "Fehler beim Abrufen der Subadresse",
+  "@errorWhileFetchingSubaddress": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "doYouWantToLogOutAndSwitchTo": "Möchten Sie sich abmelden und wechseln zu",
+  "@doYouWantToLogOutAndSwitchTo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "allow": "Zulassen",
+  "@allow": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "allowSubaddressing": "Subadressierung zulassen",
+  "@allowSubaddressing": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "copySubaddress": "Subadresse kopieren",
+  "@copySubaddress": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "parseEmailByBlobIdFailed": "E-Mail kann nicht nach Blob-ID geparst werden",
+  "@parseEmailByBlobIdFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageAllowSubaddressingSuccess": "Sie haben die Subadressierung für diesen Ordner erfolgreich zugelassen",
+  "@toastMessageAllowSubaddressingSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_confirmation_dialog_allow_subaddressing_mobile": "Sie sind dabei, jedem zu erlauben, E-Mails direkt an Ihren Ordner „{nameMailbox}“ zu senden, indem Sie die Adresse <{address}> verwenden",
+  "@message_confirmation_dialog_allow_subaddressing_mobile": {
+    "type": "text",
+    "placeholders_order": [
+      "nameMailbox",
+      "address"
+    ],
+    "placeholders": {
+      "nameMailbox": {},
+      "address": {}
+    }
+  },
+  "contactSupport": "Kundendienst kontaktieren",
+  "@contactSupport": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "editAsNewEmail": "Als neue E-Mail bearbeiten",
+  "@editAsNewEmail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageDisallowSubaddressingSuccess": "Sie haben die Subadressierung für diesen Ordner erfolgreich verboten",
+  "@toastMessageDisallowSubaddressingSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "getHelpOrReportABug": "Hilfe erhalten oder Fehler melden",
+  "@getHelpOrReportABug": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "handshakeException": "",
+  "@handshakeException": {
+    "type": "text",
+    "placeholders_order": [
+      "errorMessage"
+    ],
+    "placeholders": {
+      "errorMessage": {}
+    }
+  },
+  "badCredentials": "Falsche Anmeldedaten",
+  "@badCredentials": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "replyToList": "Auf Liste antworten",
+  "@replyToList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailSubaddressCopiedToClipboard": "E-Mail-Subadresse in die Zwischenablage kopiert",
+  "@emailSubaddressCopiedToClipboard": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "disallowSubaddressing": "Subadressierung verbieten",
+  "@disallowSubaddressing": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emptyTrashFolderFailed": "Leeren des Papierkorbs fehlgeschlagen",
+  "@emptyTrashFolderFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "switchAccountConfirmation": "Kontowechselbestätigung",
+  "@switchAccountConfirmation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "cannotOpenNewWindow": "Neues Fenster kann nicht geöffnet werden",
+  "@cannotOpenNewWindow": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "downloadAttachmentInEMLPreviewWarningMessage": "Anhang wird heruntergeladen. Sie können nur eine Datei auf einmal herunterladen.",
+  "@downloadAttachmentInEMLPreviewWarningMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reply_to_email_address_prefix": "Antworten auf",
+  "@reply_to_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "logoutConfirmation": "Abmeldebestätigung",
+  "@logoutConfirmation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveAndRefresh": "Speichern & auffrischen",
+  "@saveAndRefresh": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unexpectedError": "Unerwarteter Fehler: {errorMessage}",
+  "@unexpectedError": {
+    "type": "text",
+    "placeholders_order": [
+      "errorMessage"
+    ],
+    "placeholders": {
+      "errorMessage": {}
+    }
+  },
+  "previewEmailFromEMLFileFailed": "Vorschau dieser eml-Datei nicht möglich",
+  "@previewEmailFromEMLFileFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisHtmlAttachmentCannotBePreviewed": "Dieser HTML-Anhang kann nicht in der Vorschau angezeigt werden",
+  "@thisHtmlAttachmentCannotBePreviewed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "recoverDeletedMessagesBannerContent": "Sie können Nachrichten wiederherstellen, die während des letzten {period} gelöscht wurden",
+  "@recoverDeletedMessagesBannerContent": {
+    "type": "text",
+    "placeholders_order": [
+      "period"
+    ],
+    "placeholders": {
+      "period": {}
+    }
+  },
+  "downloadAttachmentHasBeenCancelled": "Das Herunterladen des Anhangs wurde abgebrochen",
+  "@downloadAttachmentHasBeenCancelled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageWarningDialogWhenExpiredOIDCTokenAndReconnection": "Ihre Sitzung ist abgelaufen. Wir müssen Sie zur Anmeldeseite zurückbringen, um sie aufzufrischen. Vielleicht möchten Sie die E-Mail, die Sie gerade bearbeiten, vorher speichern.",
+  "@messageWarningDialogWhenExpiredOIDCTokenAndReconnection": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  }
+}

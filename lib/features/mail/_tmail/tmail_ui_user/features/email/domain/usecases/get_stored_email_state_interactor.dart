@@ -1,0 +1,26 @@
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
+import 'package:dartz/dartz.dart';
+import 'package:jmap_dart_client/jmap/account_id.dart';
+import 'package:jmap_dart_client/jmap/core/session/session.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/domain/repository/email_repository.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/domain/state/get_stored_state_email_state.dart';
+
+class GetStoredEmailStateInteractor {
+  final EmailRepository _emailRepository;
+
+  GetStoredEmailStateInteractor(this._emailRepository);
+
+  Stream<Either<Failure, Success>> execute(Session session, AccountId accountId) async* {
+    try {
+      final state = await _emailRepository.getEmailState(session, accountId);
+      if (state != null) {
+        yield Right<Failure, Success>(GetStoredEmailStateSuccess(state));
+      } else {
+        yield Left<Failure, Success>(NotFoundEmailState());
+      }
+    } catch (e) {
+      yield Left<Failure, Success>(GetStoredEmailStateFailure(e));
+    }
+  }
+}

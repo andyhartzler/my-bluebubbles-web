@@ -1,0 +1,5 @@
+
+enum MarkStarAction {
+  markStar,
+  unMarkStar
+}

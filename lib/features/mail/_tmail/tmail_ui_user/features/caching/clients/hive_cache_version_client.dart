@@ -1,0 +1,29 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/caching/clients/cache_version_client.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/exceptions/thrower/exception_thrower.dart';
+
+class HiveCacheVersionClient extends CacheVersionClient {
+
+  final SharedPreferences _sharedPreferences;
+  final ExceptionThrower _exceptionThrower;
+
+  HiveCacheVersionClient(this._sharedPreferences, this._exceptionThrower);
+
+  @override
+  String get versionKey => 'HiveCacheVersion';
+
+  @override
+  Future<int?> getLatestVersion() {
+    return Future.sync(() {
+      final latestVersion = _sharedPreferences.getInt(versionKey);
+      return latestVersion;
+    }).catchError(_exceptionThrower.throwException);
+  }
+
+  @override
+  Future<bool> storeVersion(int newVersion) {
+    return Future.sync(() async {
+      return await _sharedPreferences.setInt(versionKey, newVersion);
+    }).catchError(_exceptionThrower.throwException);
+  }
+}

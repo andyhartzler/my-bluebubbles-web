@@ -1,0 +1,53 @@
+
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/color_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/theme_utils.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/button/tmail_button_widget.dart';
+import 'package:flutter/material.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/presentation/widgets/copy_subaddress_widget.dart';
+
+class EmailAddressWithCopyWidget extends StatelessWidget {
+  final String label;
+  final String copyLabelIcon;
+  final OnCopyButtonAction onCopyButtonAction;
+  final TextStyle? textStyle;
+  final Color? copyIconColor;
+  final EdgeInsetsGeometry? copyIconMargin;
+
+  const EmailAddressWithCopyWidget({
+    super.key,
+    required this.label,
+    required this.copyLabelIcon,
+    required this.onCopyButtonAction,
+    this.textStyle,
+    this.copyIconColor,
+    this.copyIconMargin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: SelectableText(
+            label,
+            style: textStyle ?? ThemeUtils.textStyleM3BodyMedium,
+            maxLines: 1,
+          ),
+        ),
+        if (label.isNotEmpty)
+          TMailButtonWidget.fromIcon(
+            key: const ValueKey('copy_email_address'),
+            icon: copyLabelIcon,
+            backgroundColor: Colors.transparent,
+            iconSize: 20,
+            iconColor: copyIconColor ??
+                AppColor.textSecondary.withValues(alpha: 0.48),
+            padding: const EdgeInsets.all(5),
+            margin: copyIconMargin,
+            onTapActionCallback: onCopyButtonAction,
+          ),
+      ],
+    );
+  }
+}

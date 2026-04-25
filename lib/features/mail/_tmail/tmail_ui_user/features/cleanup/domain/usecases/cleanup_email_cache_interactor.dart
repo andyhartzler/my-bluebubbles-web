@@ -1,0 +1,20 @@
+import 'package:bluebubbles/features/mail/_tmail/core/core.dart';
+import 'package:dartz/dartz.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/cleanup/domain/model/email_cleanup_rule.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/cleanup/domain/repository/cleanup_repository.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/cleanup/domain/state/cleanup_email_cache_state.dart';
+
+class CleanupEmailCacheInteractor {
+  final CleanupRepository cleanupRepository;
+
+  CleanupEmailCacheInteractor(this.cleanupRepository);
+
+  Future<Either<Failure, Success>> execute(EmailCleanupRule cleanupRule) async {
+    try {
+      await cleanupRepository.cleanEmailCache(cleanupRule);
+      return Right<Failure, Success>(CleanupEmailCacheSuccess());
+    } catch (e) {
+      return Left(CleanupEmailCacheFailure(e));
+    }
+  }
+}

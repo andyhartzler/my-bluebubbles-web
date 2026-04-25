@@ -1,0 +1,11 @@
+
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/color_extension.dart';
+import 'package:flutter/material.dart';
+
+class LabelMailboxItemWidgetStyles {
+  static const double labelFolderTextSize = 14;
+
+  static const Color teamMailboxEmailTextColor = AppColor.steelGray400;
+
+  static const FontWeight labelFolderTextFontWeight = FontWeight.w400;
+}

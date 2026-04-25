@@ -1,0 +1,4 @@
+enum MailboxSubscribeState {
+  enabled,
+  disabled
+}

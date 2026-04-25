@@ -1,0 +1,43 @@
+import 'package:bluebubbles/features/mail/_tmail/forward/forward/tmail_forward.dart';
+import 'package:jmap_dart_client/jmap/account_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/domain/exceptions/set_method_exception.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/data/datasource/forwarding_datasource.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/model/add_recipients_in_forwarding_request.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/model/delete_recipient_in_forwarding_request.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/model/edit_local_copy_in_forwarding_request.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/repository/forwarding_repository.dart';
+
+class ForwardingRepositoryImpl extends ForwardingRepository {
+  final ForwardingDataSource dataSource;
+
+  ForwardingRepositoryImpl(this.dataSource);
+
+  @override
+  Future<(TMailForward, SetMethodException?)> addRecipientsInForwarding(
+    AccountId accountId,
+    AddRecipientInForwardingRequest addRequest,
+  ) {
+    return dataSource.addRecipientsInForwarding(accountId, addRequest);
+  }
+
+  @override
+  Future<(TMailForward, SetMethodException?)> deleteRecipientInForwarding(
+    AccountId accountId,
+    DeleteRecipientInForwardingRequest deleteRequest,
+  ) {
+    return dataSource.deleteRecipientInForwarding(accountId, deleteRequest);
+  }
+
+  @override
+  Future<(TMailForward, SetMethodException?)> editLocalCopyInForwarding(
+    AccountId accountId,
+    EditLocalCopyInForwardingRequest editRequest,
+  ) {
+    return dataSource.editLocalCopyInForwarding(accountId, editRequest);
+  }
+
+  @override
+  Future<TMailForward> getForward(AccountId accountId) {
+    return dataSource.getForward(accountId);
+  }
+}

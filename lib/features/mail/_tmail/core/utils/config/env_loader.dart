@@ -1,0 +1,44 @@
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+class EnvLoader {
+  const EnvLoader._();
+
+  static const String envFileName = 'env.file';
+  static const String appFCMConfigurationPath = "configurations/env.fcm";
+
+  static Future<void> loadEnvFile() async {
+    await loadConfigFromEnv();
+    final mapEnvData = Map<String, String>.from(dotenv.env);
+    await loadFcmConfigFileToEnv(
+      currentMapEnvData: mapEnvData,
+      onCallBack: () async {
+        await loadConfigFromEnv();
+      },
+    );
+  }
+
+  static Future<void> loadFcmConfigFileToEnv({
+    Map<String, String>? currentMapEnvData,
+    Future<void> Function()? onCallBack,
+  }) async {
+    try {
+      await dotenv.load(
+        fileName: appFCMConfigurationPath,
+        mergeWith: currentMapEnvData ?? {},
+      );
+    } catch (e) {
+      logWarning('EnvLoader::loadFcmConfigFileToEnv: Exception = $e');
+      // FCM config is optional; reload base config to restore dotenv.env state
+      await onCallBack?.call();
+    }
+  }
+
+  static Future<void> loadConfigFromEnv() async {
+    try {
+      await dotenv.load(fileName: envFileName);
+    } catch (e) {
+      logWarning('EnvLoader::loadConfigFromEnv:Exception = $e');
+    }
+  }
+}

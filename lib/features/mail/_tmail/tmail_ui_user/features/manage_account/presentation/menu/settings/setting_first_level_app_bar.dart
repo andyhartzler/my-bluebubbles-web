@@ -1,0 +1,80 @@
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/responsive_utils.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/theme_utils.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/button/multi_click_widget.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/button/tmail_button_widget.dart';
+import 'package:flutter/material.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/presentation/model/account_menu_item.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
+
+class SettingFirstLevelAppBar extends StatelessWidget {
+  final AccountMenuItem accountMenuItem;
+  final ImagePaths imagePaths;
+  final ResponsiveUtils responsiveUtils;
+  final VoidCallback onBackAction;
+  final VoidCallback? onMultiClickAction;
+
+  const SettingFirstLevelAppBar({
+    super.key,
+    required this.accountMenuItem,
+    required this.imagePaths,
+    required this.responsiveUtils,
+    required this.onBackAction,
+    this.onMultiClickAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final appLocalizations = AppLocalizations.of(context);
+
+    Widget titleWidget = Text(
+      accountMenuItem.getName(appLocalizations),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: ThemeUtils.textStyleM3BodyLarge,
+    );
+
+    if (onMultiClickAction != null) {
+      titleWidget = MultiClickWidget(
+        onMultiTap: onMultiClickAction!,
+        child: titleWidget,
+      );
+    }
+
+    return Container(
+      height: 64,
+      padding: _getPadding(context),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          PositionedDirectional(
+            start: 0,
+            child: TMailButtonWidget.fromIcon(
+              key: const ValueKey('settings_first_level_close_button'),
+              icon: imagePaths.icArrowBack,
+              tooltipMessage: appLocalizations.back,
+              backgroundColor: Colors.transparent,
+              onTapActionCallback: onBackAction,
+            ),
+          ),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 50),
+              child: titleWidget,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  EdgeInsetsGeometry _getPadding(BuildContext context) {
+    if (responsiveUtils.isPortraitMobile(context)) {
+      return const EdgeInsetsDirectional.symmetric(horizontal: 16);
+    } else if (responsiveUtils.isLandscapeMobile(context)) {
+      return const EdgeInsetsDirectional.symmetric(horizontal: 24);
+    } else {
+      return const EdgeInsetsDirectional.symmetric(horizontal: 32);
+    }
+  }
+}

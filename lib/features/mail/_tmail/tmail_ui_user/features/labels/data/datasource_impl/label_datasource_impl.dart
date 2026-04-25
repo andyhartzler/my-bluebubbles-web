@@ -1,0 +1,59 @@
+import 'package:jmap_dart_client/jmap/account_id.dart';
+import 'package:jmap_dart_client/jmap/core/session/session.dart';
+import 'package:jmap_dart_client/jmap/core/state.dart';
+import 'package:bluebubbles/features/mail/_tmail/labels/model/label.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/data/datasource/label_datasource.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/data/model/label_change_response.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/data/network/label_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/domain/model/edit_label_request.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/exceptions/thrower/exception_thrower.dart';
+
+class LabelDatasourceImpl extends LabelDatasource {
+  final LabelApi _labelApi;
+  final ExceptionThrower _exceptionThrower;
+
+  LabelDatasourceImpl(this._labelApi, this._exceptionThrower);
+
+  @override
+  Future<({List<Label> labels, State? newState})> getAllLabels(AccountId accountId) {
+    return Future.sync(() async {
+      return await _labelApi.getAllLabels(accountId);
+    }).catchError(_exceptionThrower.throwException);
+  }
+
+  @override
+  Future<Label> createNewLabel(AccountId accountId, Label labelData) {
+    return Future.sync(() async {
+      return await _labelApi.createNewLabel(accountId, labelData);
+    }).catchError(_exceptionThrower.throwException);
+  }
+
+  @override
+  Future<Label> editLabel(AccountId accountId, EditLabelRequest labelRequest) {
+    return Future.sync(() async {
+      return await _labelApi.editLabel(accountId, labelRequest);
+    }).catchError(_exceptionThrower.throwException);
+  }
+
+  @override
+  Future<void> deleteLabel(AccountId accountId, Label label) {
+    return Future.sync(() async {
+      return await _labelApi.deleteLabel(accountId, label);
+    }).catchError(_exceptionThrower.throwException);
+  }
+
+  @override
+  Future<LabelChangeResponse> getLabelChanges(
+    Session session,
+    AccountId accountId,
+    State sinceState,
+  ) {
+    return Future.sync(() async {
+      return await _labelApi.getLabelChangesWithResult(
+        session,
+        accountId,
+        sinceState,
+      );
+    }).catchError(_exceptionThrower.throwException);
+  }
+}

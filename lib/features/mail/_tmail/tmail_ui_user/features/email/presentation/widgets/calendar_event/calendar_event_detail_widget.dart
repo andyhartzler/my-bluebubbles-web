@@ -1,0 +1,96 @@
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/string_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/html_viewer/html_content_viewer_on_web_widget.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/html_viewer/html_content_viewer_widget.dart';
+import 'package:flutter/material.dart';
+import 'package:jmap_dart_client/jmap/mail/calendar/calendar_event.dart';
+import 'package:jmap_dart_client/jmap/mail/calendar/properties/attendee/calendar_attendee.dart';
+import 'package:jmap_dart_client/jmap/mail/calendar/properties/calendar_organizer.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/presentation_email.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/presentation/styles/calendar_event_detail_widget_styles.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/presentation/widgets/calendar_event/event_body_content_widget.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/presentation/widgets/calendar_event/event_title_widget.dart';
+
+typedef OnMailtoAttendeesAction = Function(
+  CalendarOrganizer? organizer,
+  List<CalendarAttendee>? participants,
+  String? eventTitle,
+);
+
+class CalendarEventDetailWidget extends StatelessWidget {
+
+  final CalendarEvent calendarEvent;
+  final String emailContent;
+  final OnMailtoDelegateAction? onMailtoDelegateAction;
+  final PresentationEmail? presentationEmail;
+  final ScrollController? scrollController;
+  final bool isInsideThreadDetailView;
+  final OnIFrameClickAction? onIFrameClickAction;
+
+  const CalendarEventDetailWidget({
+    super.key,
+    required this.calendarEvent,
+    required this.emailContent,
+    this.onMailtoDelegateAction,
+    this.presentationEmail,
+    this.scrollController,
+    this.isInsideThreadDetailView = false,
+    this.onIFrameClickAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final eventDesc = _generateEventDescriptionAsHtml();
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: const ShapeDecoration(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          side: BorderSide(
+            width: CalendarEventDetailWidgetStyles.borderStrokeWidth,
+            color: CalendarEventDetailWidgetStyles.borderStrokeColor,
+          ),
+          borderRadius: BorderRadius.all(Radius.circular(CalendarEventDetailWidgetStyles.borderRadius)),
+        ),
+      ),
+      margin: const EdgeInsetsDirectional.symmetric(
+        vertical: CalendarEventDetailWidgetStyles.verticalMargin,
+        horizontal: CalendarEventDetailWidgetStyles.horizontalMargin),
+      padding: const EdgeInsets.all(CalendarEventDetailWidgetStyles.contentPadding),
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (calendarEvent.title?.isNotEmpty == true)
+            EventTitleWidget(title: calendarEvent.title!),
+          if (eventDesc.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: CalendarEventDetailWidgetStyles.fieldTopPadding),
+              child: EventBodyContentWidget(
+                content: eventDesc,
+                onMailtoDelegateAction: onMailtoDelegateAction,
+                scrollController: scrollController,
+                isInsideThreadDetailView: isInsideThreadDetailView,
+                onIFrameClickAction: onIFrameClickAction,
+              )
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _generateEventDescriptionAsHtml() {
+    final descriptions = calendarEvent.description?.trimmed ?? '';
+    final emailContentTrimmed = emailContent.trimmed;
+
+    if (descriptions.isEmpty && emailContentTrimmed.isEmpty) {
+      return '';
+    }
+
+    return '''
+      $descriptions
+      <br>
+      $emailContentTrimmed
+    ''';
+  }
+}

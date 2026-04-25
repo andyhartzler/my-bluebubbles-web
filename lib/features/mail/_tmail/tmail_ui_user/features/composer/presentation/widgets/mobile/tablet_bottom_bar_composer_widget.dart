@@ -1,0 +1,118 @@
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/button/tmail_button_widget.dart';
+import 'package:flutter/material.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
+import 'package:scribe/scribe/ai/presentation/widgets/button/ai_assistant_button.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/model/ui_keys.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/styles/mobile/tablet_bottom_bar_composer_widget_style.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
+
+class TabletBottomBarComposerWidget extends StatelessWidget {
+
+  final ImagePaths imagePaths;
+  final bool hasReadReceipt;
+  final bool isMarkAsImportant;
+  final VoidCallback deleteComposerAction;
+  final VoidCallback saveToDraftAction;
+  final VoidCallback sendMessageAction;
+  final VoidCallback requestReadReceiptAction;
+  final VoidCallback toggleMarkAsImportantAction;
+  final OnOpenAiAssistantModal? onOpenAiAssistantModal;
+
+  const TabletBottomBarComposerWidget({
+    super.key,
+    required this.imagePaths,
+    required this.hasReadReceipt,
+    required this.isMarkAsImportant,
+    required this.deleteComposerAction,
+    required this.saveToDraftAction,
+    required this.sendMessageAction,
+    required this.requestReadReceiptAction,
+    required this.toggleMarkAsImportantAction,
+    this.onOpenAiAssistantModal,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: TabletBottomBarComposerWidgetStyle.padding,
+      color: TabletBottomBarComposerWidgetStyle.backgroundColor,
+      child: PointerInterceptor(
+        child: Row(
+          children: [
+            const Spacer(),
+            if (onOpenAiAssistantModal != null) ...[
+              AiAssistantButton(
+                imagePaths: imagePaths,
+                margin: const EdgeInsetsDirectional.only(
+                  start: TabletBottomBarComposerWidgetStyle.space,
+                ),
+                onOpenAiAssistantModal: onOpenAiAssistantModal!,
+              ),
+              const SizedBox(width: TabletBottomBarComposerWidgetStyle.space),
+            ],
+            TMailButtonWidget.fromIcon(
+              icon: imagePaths.icDeleteMailbox,
+              borderRadius: TabletBottomBarComposerWidgetStyle.iconRadius,
+              padding: TabletBottomBarComposerWidgetStyle.iconPadding,
+              iconSize: TabletBottomBarComposerWidgetStyle.iconSize,
+              tooltipMessage: AppLocalizations.of(context).delete,
+              onTapActionCallback: deleteComposerAction,
+            ),
+            const SizedBox(width: TabletBottomBarComposerWidgetStyle.space),
+            TMailButtonWidget.fromIcon(
+              icon: imagePaths.icMarkAsImportant,
+              borderRadius: TabletBottomBarComposerWidgetStyle.iconRadius,
+              padding: TabletBottomBarComposerWidgetStyle.iconPadding,
+              iconSize: TabletBottomBarComposerWidgetStyle.iconSize,
+              iconColor: isMarkAsImportant
+                  ? TabletBottomBarComposerWidgetStyle.selectedIconColor
+                  : TabletBottomBarComposerWidgetStyle.iconColor,
+              tooltipMessage: isMarkAsImportant
+                  ? AppLocalizations.of(context).turnOffMarkAsImportant
+                  : AppLocalizations.of(context).turnOnMarkAsImportant,
+              onTapActionCallback: toggleMarkAsImportantAction,
+            ),
+            const SizedBox(width: TabletBottomBarComposerWidgetStyle.space),
+            TMailButtonWidget.fromIcon(
+              icon: imagePaths.icReadReceipt,
+              borderRadius: TabletBottomBarComposerWidgetStyle.iconRadius,
+              padding: TabletBottomBarComposerWidgetStyle.iconPadding,
+              iconSize: TabletBottomBarComposerWidgetStyle.iconSize,
+              iconColor: hasReadReceipt
+                ? TabletBottomBarComposerWidgetStyle.selectedIconColor
+                : TabletBottomBarComposerWidgetStyle.iconColor,
+              tooltipMessage: hasReadReceipt
+                ? AppLocalizations.of(context).turnOffRequestReadReceipt
+                : AppLocalizations.of(context).turnOnRequestReadReceipt,
+              onTapActionCallback: requestReadReceiptAction,
+            ),
+            const SizedBox(width: TabletBottomBarComposerWidgetStyle.space),
+            TMailButtonWidget.fromIcon(
+              icon: imagePaths.icSaveToDraft,
+              borderRadius: TabletBottomBarComposerWidgetStyle.iconRadius,
+              padding: TabletBottomBarComposerWidgetStyle.iconPadding,
+              iconSize: TabletBottomBarComposerWidgetStyle.iconSize,
+              tooltipMessage: AppLocalizations.of(context).saveAsDraft,
+              onTapActionCallback: saveToDraftAction,
+            ),
+            const SizedBox(width: TabletBottomBarComposerWidgetStyle.sendButtonSpace),
+            TMailButtonWidget(
+              key: const ValueKey(UiKeys.sendEmailButton),
+              text: AppLocalizations.of(context).send,
+              icon: imagePaths.icSend,
+              iconAlignment: TextDirection.rtl,
+              padding: TabletBottomBarComposerWidgetStyle.sendButtonPadding,
+              iconSize: TabletBottomBarComposerWidgetStyle.iconSize,
+              iconSpace: TabletBottomBarComposerWidgetStyle.sendButtonIconSpace,
+              textStyle: TabletBottomBarComposerWidgetStyle.sendButtonTextStyle,
+              backgroundColor: TabletBottomBarComposerWidgetStyle.sendButtonBackgroundColor,
+              borderRadius: TabletBottomBarComposerWidgetStyle.sendButtonRadius,
+              onTapActionCallback: sendMessageAction,
+            )
+          ]
+        ),
+      ),
+    );
+  }
+}

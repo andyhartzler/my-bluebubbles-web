@@ -1,0 +1,151 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/core.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_appauth/flutter_appauth.dart';
+import 'package:get/get.dart';
+import 'package:jmap_dart_client/http/http_client.dart';
+import 'package:scribe/scribe/ai/data/service/prompt_service.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/contact/data/network/contact_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/data/network/email_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/data/network/mdn_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/home/data/network/session_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/data/local/account_cache_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/data/local/authentication_info_cache_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/data/local/oidc_configuration_cache_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/data/local/token_oidc_cache_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/data/network/authentication_client/authentication_client_base.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/data/network/dns_lookup/dns_lookup_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/data/network/interceptors/authorization_interceptors.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/data/network/oidc_http_client.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/login/data/utils/library_platform/app_auth_plugin/app_auth_plugin.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/data/local/mailbox_cache_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/data/local/state_cache_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/data/network/mailbox_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/data/network/linagora_ecosystem_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/data/network/forwarding_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/data/network/identity_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/data/network/rule_filter_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/data/network/vacation_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/push_notification/data/keychain/keychain_sharing_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/push_notification/data/network/fcm_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/push_notification/data/network/web_socket_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/quotas/data/network/quotas_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/server_settings/data/network/server_settings_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread/data/network/thread_api.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/exceptions/thrower/remote_exception_thrower.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/exceptions/thrower/send_email_exception_thrower.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/utils/ios_sharing_manager.dart';
+import 'package:uuid/uuid.dart';
+
+class NetworkBindings extends Bindings {
+
+  @override
+  void dependencies() {
+    _bindingConnection();
+    _bindingBaseOption();
+    _bindingDio();
+    _bindingSharing();
+    _bindingInterceptors();
+    _bindingApi();
+    _bindingTransformer();
+    _bindingServices();
+    _bindingException();
+  }
+
+  void _bindingBaseOption() {
+    final headers = <String, dynamic>{
+      HttpHeaders.acceptHeader: Constant.acceptHeaderDefault,
+      HttpHeaders.contentTypeHeader: Constant.contentTypeHeaderDefault
+    };
+    Get.put(BaseOptions(headers: headers));
+  }
+
+  void _bindingDio() {
+    Get.put(Dio(Get.find<BaseOptions>()));
+    Get.put(DioClient(Get.find<Dio>()));
+    Get.put(const FlutterAppAuth());
+    Get.put(AppAuthWebPlugin());
+    Get.put(OIDCHttpClient(Get.find<DioClient>()));
+    Get.put(AuthenticationClientBase());
+    Get.put(Dio(), tag: 'prompt');
+  }
+
+  void _bindingSharing() {
+    Get.put(IOSSharingManager(
+      Get.find<KeychainSharingManager>(),
+      Get.find<StateCacheManager>(),
+      Get.find<TokenOidcCacheManager>(),
+      Get.find<AuthenticationInfoCacheManager>(),
+      Get.find<OidcConfigurationCacheManager>(),
+      Get.find<OIDCHttpClient>(),
+      Get.find<MailboxCacheManager>(),
+    ));
+  }
+
+  void _bindingInterceptors() {
+    final dio = Get.find<Dio>();
+    Get.put(DynamicUrlInterceptors());
+    Get.put(AuthorizationInterceptors(
+      dio,
+        Get.find<AuthenticationClientBase>(),
+        Get.find<TokenOidcCacheManager>(),
+        Get.find<AccountCacheManager>(),
+        Get.find<IOSSharingManager>(),
+    ));
+    dio.interceptors.add(Get.find<DynamicUrlInterceptors>());
+    dio.interceptors.add(Get.find<AuthorizationInterceptors>());
+    if (BuildUtils.isDebugMode) {
+      dio.interceptors.add(LogInterceptor(requestBody: true));
+    }
+    SentryDioHelper.addIfAvailable(dio);
+  }
+
+  void _bindingApi() {
+    Get.put(HttpClient(Get.find<Dio>()));
+    Get.put(DownloadClient(Get.find<DioClient>(), Get.find<CompressFileUtils>()));
+    Get.put(DownloadManager(Get.find<DownloadClient>(), Get.find<DeviceInfoPlugin>()));
+    Get.put(MailboxAPI(Get.find<HttpClient>(), Get.find<Uuid>()));
+    Get.put(SessionAPI(Get.find<HttpClient>()));
+    Get.put(ThreadAPI(Get.find<HttpClient>()));
+    Get.put(EmailAPI(
+      Get.find<HttpClient>(),
+      Get.find<DownloadManager>(),
+      Get.find<DioClient>(),
+      Get.find<Uuid>(),
+    ));
+    Get.put(RuleFilterAPI(Get.find<HttpClient>()));
+    Get.put(VacationAPI(Get.find<HttpClient>()));
+    Get.put(ContactAPI(Get.find<HttpClient>()));
+    Get.put(IdentityAPI(Get.find<HttpClient>()));
+    Get.put(MdnAPI(Get.find<HttpClient>()));
+    Get.put(ForwardingAPI(Get.find<HttpClient>()));
+    Get.put(QuotasAPI(Get.find<HttpClient>()));
+    Get.put(FcmApi(Get.find<HttpClient>()));
+    Get.put(ServerSettingsAPI(Get.find<HttpClient>()));
+    Get.put(WebSocketApi(Get.find<DioClient>()));
+    Get.put(LinagoraEcosystemApi(Get.find<DioClient>()));
+  }
+
+  void _bindingConnection() {
+    Get.put(Connectivity());
+  }
+
+  void _bindingException() {
+    Get.put(RemoteExceptionThrower());
+    Get.put(SendEmailExceptionThrower());
+  }
+
+  void _bindingTransformer() {
+    Get.put(const HtmlEscape());
+    Get.put(HtmlTransform(Get.find<DioClient>(), Get.find<HtmlEscape>()));
+  }
+
+  void _bindingServices() {
+    Get.put(DnsLookupManager());
+    Get.put(PromptService(Get.find<Dio>(tag: 'prompt')));
+  }
+}

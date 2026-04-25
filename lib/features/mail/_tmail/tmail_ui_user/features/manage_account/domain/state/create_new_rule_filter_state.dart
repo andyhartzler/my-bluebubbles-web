@@ -1,0 +1,18 @@
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
+import 'package:rule_filter/rule_filter/tmail_rule.dart';
+
+class CreateNewRuleFilterSuccess extends UIState {
+
+  final List<TMailRule> newListRules;
+
+  CreateNewRuleFilterSuccess(this.newListRules);
+
+  @override
+  List<Object?> get props => [newListRules];
+}
+
+class CreateNewRuleFilterFailure extends FeatureFailure {
+
+  CreateNewRuleFilterFailure(dynamic exception) : super(exception: exception);
+}

@@ -1,0 +1,45 @@
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
+import 'package:dartz/dartz.dart';
+import 'package:jmap_dart_client/jmap/account_id.dart';
+import 'package:jmap_dart_client/jmap/core/id.dart';
+import 'package:jmap_dart_client/jmap/core/session/session.dart';
+import 'package:jmap_dart_client/jmap/identities/identity.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/public_asset/domain/exceptions/public_asset_exceptions.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/public_asset/domain/state/create_public_asset_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/public_asset/domain/repository/public_asset_repository.dart';
+
+class CreatePublicAssetInteractor {
+  CreatePublicAssetInteractor(this._publicAssetRepository);
+
+  final PublicAssetRepository _publicAssetRepository;
+
+  Stream<Either<Failure, Success>> execute(
+    Session session,
+    AccountId accountId,
+    {
+      required Id blobId,
+      required IdentityId? identityId
+    }
+  ) async* {
+    try {
+      yield Right<Failure, Success>(CreatingPublicAssetState());
+      final publicAsset = await _publicAssetRepository.createPublicAsset(
+        session,
+        accountId,
+        blobId: blobId,
+        identityId: identityId);
+      yield Right<Failure, Success>(CreatePublicAssetSuccessState(publicAsset));
+    } catch (exception) {
+      logWarning('CreatePublicAssetInteractor::execute():error: $exception');
+
+      if (exception is PublicAssetQuotaExceededException) {
+        yield Left<Failure, Success>(PublicAssetOverQuotaFailureState(
+          publicAssetQuotaExceededException: exception));
+      } else {
+        yield Left<Failure, Success>(CreatePublicAssetFailureState(exception: exception));
+      } 
+    }
+  }
+}

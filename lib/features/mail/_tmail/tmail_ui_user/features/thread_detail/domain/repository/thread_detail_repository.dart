@@ -1,0 +1,25 @@
+import 'package:jmap_dart_client/jmap/account_id.dart';
+import 'package:jmap_dart_client/jmap/core/properties/properties.dart';
+import 'package:jmap_dart_client/jmap/core/session/session.dart';
+import 'package:jmap_dart_client/jmap/mail/email/email.dart';
+import 'package:jmap_dart_client/jmap/mail/mailbox/mailbox.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread_detail/domain/model/email_in_thread_detail_info.dart';
+
+abstract class ThreadDetailRepository {
+  Future<List<EmailInThreadDetailInfo>> getThreadById(
+    ThreadId threadId,
+    Session session,
+    AccountId accountId,
+    MailboxId sentMailboxId,
+    String ownEmailAddress,
+  );
+
+  Future<List<Email>> getEmailsByIds(
+    Session session,
+    AccountId accountId,
+    List<EmailId> emailIds, {
+    Properties? properties,
+  });
+
+  Future<bool> getThreadDetailStatus();
+}

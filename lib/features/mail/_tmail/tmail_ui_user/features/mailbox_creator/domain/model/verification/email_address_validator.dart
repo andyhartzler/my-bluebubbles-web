@@ -1,0 +1,20 @@
+
+import 'package:bluebubbles/features/mail/_tmail/core/core.dart';
+import 'package:dartz/dartz.dart';
+import 'package:get/get.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_creator/domain/exceptions/verify_name_exception.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_creator/domain/model/verification/new_name_request.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_creator/domain/model/verification/validator.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_creator/domain/state/verify_name_view_state.dart';
+
+class EmailAddressValidator extends Validator<NewNameRequest> {
+
+  @override
+  Either<Failure, Success> validate(NewNameRequest value) {
+    if (value.value != null && GetUtils.isEmail(value.value!)) {
+      return Right<Failure, Success>(VerifyNameViewState());
+    } else {
+      return Left<Failure, Success>(VerifyNameFailure(const EmailAddressInvalidException()));
+    }
+  }
+}

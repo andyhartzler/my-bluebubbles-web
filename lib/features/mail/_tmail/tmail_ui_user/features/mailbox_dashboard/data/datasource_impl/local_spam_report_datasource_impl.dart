@@ -1,0 +1,86 @@
+import 'package:jmap_dart_client/jmap/account_id.dart';
+import 'package:jmap_dart_client/jmap/core/session/session.dart';
+import 'package:jmap_dart_client/jmap/core/unsigned_int.dart';
+import 'package:jmap_dart_client/jmap/core/user_name.dart';
+import 'package:jmap_dart_client/jmap/mail/mailbox/mailbox.dart';
+import 'package:jmap_dart_client/jmap/mail/mailbox/mailbox_filter_condition.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/data/datasource/spam_report_datasource.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/domain/model/spam_report_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/domain/model/unread_spam_emails_response.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/data/local/preferences_setting_manager.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/model/preferences/spam_report_config.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/exceptions/thrower/exception_thrower.dart';
+
+class LocalSpamReportDataSourceImpl extends SpamReportDataSource {
+  final PreferencesSettingManager _preferencesSettingManager;
+  final ExceptionThrower _exceptionThrower;
+
+  LocalSpamReportDataSourceImpl(
+    this._preferencesSettingManager,
+    this._exceptionThrower,
+  );
+
+  @override
+  Future<int> getLastTimeDismissedSpamReportedMilliseconds() async {
+    return Future.sync(() async {
+      final spamReportConfig = await _preferencesSettingManager.getSpamReportConfig();
+      return spamReportConfig.lastTimeDismissedMilliseconds;
+    }).catchError(_exceptionThrower.throwException);
+  }
+
+  @override
+  Future<void> storeLastTimeDismissedSpamReported(
+    DateTime lastTimeDismissedSpamReported,
+  ) async {
+    return Future.sync(() async {
+      return await _preferencesSettingManager.updateSpamReport(
+        lastTimeDismissedMilliseconds:
+            lastTimeDismissedSpamReported.millisecondsSinceEpoch,
+      );
+    }).catchError(_exceptionThrower.throwException);
+  }
+
+  @override
+  Future<void> deleteLastTimeDismissedSpamReported() {
+    return Future.sync(() async {
+      return await _preferencesSettingManager.updateSpamReport(
+        lastTimeDismissedMilliseconds: 0,
+      );
+    }).catchError(_exceptionThrower.throwException);
+  }
+
+  @override
+  Future<UnreadSpamEmailsResponse> findNumberOfUnreadSpamEmails(
+    Session session,
+    AccountId accountId,
+    {
+      MailboxFilterCondition? mailboxFilterCondition,
+      UnsignedInt? limit
+    }
+  ) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<SpamReportState> getSpamReportState() {
+    return Future.sync(() async {
+      final spamReportConfig =
+        await _preferencesSettingManager.getSpamReportConfig();
+      return spamReportConfig.spamReportState;
+    }).catchError(_exceptionThrower.throwException);
+  }
+
+  @override
+  Future<void> storeSpamReportState(SpamReportState spamReportState) {
+    return Future.sync(() async {
+      return await _preferencesSettingManager.updateSpamReport(
+        isEnabled: spamReportState == SpamReportState.enabled,
+      );
+    }).catchError(_exceptionThrower.throwException);
+  }
+
+  @override
+  Future<Mailbox> getSpamMailboxCached(AccountId accountId, UserName userName) {
+    throw UnimplementedError();
+  }
+}

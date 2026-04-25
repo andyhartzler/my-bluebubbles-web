@@ -1,0 +1,38 @@
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
+import 'package:html/parser.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/presentation/composer_controller.dart';
+
+extension SanitizeSignatureInEmailContentExtension on ComposerController {
+
+  Future<void> restoreCollapsibleSignatureButton(String? emailContent) async {
+    try {
+      if (emailContent == null) return;
+
+      final emailDocument = parse(emailContent);
+      final existedSignatureButton = emailDocument.querySelector('.tmail-signature-button');
+      if (existedSignatureButton != null) return;
+
+      final signature = emailDocument.querySelector('.tmail-signature');
+      if (signature == null) return;
+
+      restoringSignatureButton = true;
+      await applySignature(signature.innerHtml);
+    } catch (e) {
+      logWarning('SanitizeSignatureInEmailContentExtension::restoreCollapsibleSignatureButton:Exception = $e');
+    }
+  }
+
+  void synchronizeInitEmailDraftHash(String? emailContent) {
+    try {
+      final emailDocument = parse(emailContent);
+      final signatureButton = emailDocument.querySelector('.tmail-signature-button');
+      if (signatureButton == null) return;
+
+      restoringSignatureButton = false;
+      synchronizeInitDraftHash = true;
+      initEmailDraftHash();
+    } catch (e) {
+      logWarning('SanitizeSignatureInEmailContentExtension::synchronizeInitEmailDraftHash:Exception = $e');
+    }
+  }
+}

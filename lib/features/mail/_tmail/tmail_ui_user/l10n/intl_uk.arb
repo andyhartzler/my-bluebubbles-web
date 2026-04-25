@@ -1,0 +1,5170 @@
+{
+  "initializing_data": "Ініціалізація даних...",
+  "@initializing_data": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "email": "електронна пошта",
+  "@email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "password": "пароль",
+  "@password": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "add_recipients": "Додати одержувачів",
+  "@add_recipients": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "preparing_to_export": "Підготовка до експорту",
+  "@preparing_to_export": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "cancel": "Скасувати",
+  "@cancel": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "downloading_file": "Завантаження {fileName}",
+  "@downloading_file": {
+    "type": "text",
+    "placeholders_order": [
+      "fileName"
+    ],
+    "placeholders": {
+      "fileName": {}
+    }
+  },
+  "photos_and_videos": "Фото та відео",
+  "@photos_and_videos": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "browse": "Перегляд",
+  "@browse": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "select_all": "Вибрати все",
+  "@select_all": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete": "Видалити",
+  "@delete": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "new_folder": "Нова папка",
+  "@new_folder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "rename": "Перейменувати",
+  "@rename": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "name": "Ім'я",
+  "@name": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "me": "Я",
+  "@me": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "create": "Створити",
+  "@create": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "folder": "Папка",
+  "@folder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sender": "Відправник",
+  "@sender": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "restore": "Відновити",
+  "@restore": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "pending": "Очікує на розгляд",
+  "@pending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "settings": "Налаштування",
+  "@settings": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "status": "Статус",
+  "@status": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "close": "Закрити",
+  "@close": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "move": "Перемістити",
+  "@move": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "edit": "Редагувати",
+  "@edit": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "save": "Зберегти",
+  "@save": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yes": "Так",
+  "@yes": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no": "Ні",
+  "@no": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "canceled": "Скасовано",
+  "@canceled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "back": "Назад",
+  "@back": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "recipient": "Одержувач",
+  "@recipient": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "view": "Переглянути",
+  "@view": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "login_text_slogan": "Twake Mail",
+  "@login_text_slogan": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "loginInputUrlMessage": "Щоб увійти та отримати доступ до свого повідомлення, будь ласка, підключіться до вашого JMAP-сервера",
+  "@loginInputUrlMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "loginInputCredentialMessage": "Введіть свої облікові дані для входу",
+  "@loginInputCredentialMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "badCredentials": "Недійсні облікові дані",
+  "@badCredentials": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "next": "Далі",
+  "@next": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "prefix_https": "https://",
+  "@prefix_https": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "login": "Вхід",
+  "@login": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "signIn": "Увійти",
+  "@signIn": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requiredEmail": "Потрібно вказати електронну пошту",
+  "@requiredEmail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requiredPassword": "Потрібен пароль",
+  "@requiredPassword": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requiredUrl": "Потрібна адреса сервера",
+  "@requiredUrl": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "jmapBasedMailSolution": "На основі JMAP\nрішення для спільної роботи з поштою для команди",
+  "@jmapBasedMailSolution": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "jmapStandard": "Стандарт JMAP",
+  "@jmapStandard": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "encryptedMailbox": "Зашифрована поштова скринька",
+  "@encryptedMailbox": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "manageEmailAsATeam": "Керування електронною поштою в команді",
+  "@manageEmailAsATeam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "multipleIntegrations": "Кілька інтеграцій",
+  "@multipleIntegrations": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unknownError": "Сталася невідома помилка, спробуйте ще раз",
+  "@unknownError": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unexpectedError": "Неочікувана помилка: {errorMessage}",
+  "@unexpectedError": {
+    "type": "text",
+    "placeholders_order": [
+      "errorMessage"
+    ],
+    "placeholders": {
+      "errorMessage": {}
+    }
+  },
+  "handshakeException": "Помилка рукостискання в клієнті: {errorMessage}",
+  "@handshakeException": {
+    "type": "text",
+    "placeholders_order": [
+      "errorMessage"
+    ],
+    "placeholders": {
+      "errorMessage": {}
+    }
+  },
+  "search_folder": "Пошук у папці",
+  "@search_folder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "personalFolders": "Особисті папки",
+  "@personalFolders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reply_all": "Відповісти всім",
+  "@reply_all": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reply": "Відповідь",
+  "@reply": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forward": "Вперед",
+  "@forward": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no_mail_selected": "Електронну адресу не вибрано",
+  "@no_mail_selected": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "from_email_address_prefix": "Від",
+  "@from_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "to_email_address_prefix": "До",
+  "@to_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unread_email_notification": "новий",
+  "@unread_email_notification": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bcc_email_address_prefix": "Bcc",
+  "@bcc_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reply_to_email_address_prefix": "Відповісти на",
+  "@reply_to_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "cc_email_address_prefix": "Cc",
+  "@cc_email_address_prefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hint_text_email_address": "Ім'я або адреса електронної пошти",
+  "@hint_text_email_address": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subject_email": "Суб'єкт",
+  "@subject_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hint_content_email_composer": "Почніть писати свій електронний лист тут",
+  "@hint_content_email_composer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "header_email_quoted": "{sentDate}, від {emailAddress}",
+  "@header_email_quoted": {
+    "type": "text",
+    "placeholders_order": [
+      "sentDate",
+      "emailAddress"
+    ],
+    "placeholders": {
+      "sentDate": {},
+      "emailAddress": {}
+    }
+  },
+  "prefix_reply_email": "Ре:",
+  "@prefix_reply_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "prefix_forward_email": "Переадресація:",
+  "@prefix_forward_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "your_email_being_sent": "Ваш електронний лист надсилається...",
+  "@your_email_being_sent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_dialog_send_email_without_recipient": "Ваш електронний лист повинен мати принаймні одного одержувача",
+  "@message_dialog_send_email_without_recipient": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "count_email_selected": "Вибрано {count}",
+  "@count_email_selected": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "mark_as_unread": "Позначити як непрочитане",
+  "@mark_as_unread": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_read": "Позначити як прочитане",
+  "@mark_as_read": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "move_to_trash": "Перемістити в кошик",
+  "@move_to_trash": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_starred": "Позначити як зірочку",
+  "@mark_as_starred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "move_to_spam": "Перемістити до спаму",
+  "@move_to_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_multiple_item_as_read": "Позначено {count} елемент як прочитаний",
+  "@marked_multiple_item_as_read": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "marked_multiple_item_as_unread": "Позначено {count} елемент як непрочитаний",
+  "@marked_multiple_item_as_unread": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "an_error_occurred": "Помилка! Сталася помилка. Будь ласка, спробуйте пізніше.",
+  "@an_error_occurred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attachment_download_failed": "Не вдалося завантажити вкладений файл",
+  "@attachment_download_failed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "user_cancel_download_file": "Користувач скасував завантаження файлу",
+  "@user_cancel_download_file": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you_need_to_grant_files_permission_to_download_attachments": "Вам потрібно надати файлам дозвіл на завантаження вкладень",
+  "@you_need_to_grant_files_permission_to_download_attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleHeaderAttachment": "{count} Вкладенням ({totalSize})",
+  "@titleHeaderAttachment": {
+    "type": "text",
+    "placeholders_order": [
+      "count",
+      "totalSize"
+    ],
+    "placeholders": {
+      "count": {},
+      "totalSize": {}
+    }
+  },
+  "attach_file_prepare_text": "Підготовка до прикріплення файлу...",
+  "@attach_file_prepare_text": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "can_not_upload_this_file_as_attachments": "Неможливо завантажити цей файл як вкладення",
+  "@can_not_upload_this_file_as_attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attachments_uploaded_successfully": "Вкладення успішно завантажено",
+  "@attachments_uploaded_successfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "pick_attachments": "Вибрати вкладення",
+  "@pick_attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "movedToFolder": "Переміщено до {destinationMailboxPath}",
+  "@movedToFolder": {
+    "type": "text",
+    "placeholders_order": [
+      "destinationMailboxPath"
+    ],
+    "placeholders": {
+      "destinationMailboxPath": {}
+    }
+  },
+  "undo": "Відмінити",
+  "@undo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_star_multiple_item": "Позначено зірочкою {count} елемент",
+  "@marked_star_multiple_item": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "marked_unstar_multiple_item": "Позначено зняти зірочку з {count} елемента",
+  "@marked_unstar_multiple_item": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "search_mail": "Пошук пошти",
+  "@search_mail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "prefix_suggestion_search": "Пошук для",
+  "@prefix_suggestion_search": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no_emails_matching_your_search": "Немає електронних листів, що відповідають вашому пошуку",
+  "@no_emails_matching_your_search": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "results": "Результати",
+  "@results": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hint_search_emails": "Пошук електронних листів та файлів",
+  "@hint_search_emails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "compose": "Написати",
+  "@compose": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "spam": "Спам",
+  "@spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "flag": "Прапор",
+  "@flag": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "read": "Читати",
+  "@read": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unread": "Непрочитане",
+  "@unread": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "the_feature_is_under_development": "Ця функція перебуває в розробці.",
+  "@the_feature_is_under_development": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_message_toast": "Ви позначили повідомлення як \"{action}\"",
+  "@marked_message_toast": {
+    "type": "text",
+    "placeholders_order": [
+      "action"
+    ],
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "folders": "Папки",
+  "@folders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sign_out": "Вийти із",
+  "@sign_out": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintSearchFolders": "Пошук папок",
+  "@hintSearchFolders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "with_attachments": "З вкладеннями",
+  "@with_attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "starred": "Позначено зірочкою",
+  "@starred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "filter_message_toast": "Ви відфільтрували повідомлення за \"{filterOption}\"",
+  "@filter_message_toast": {
+    "type": "text",
+    "placeholders_order": [
+      "filterOption"
+    ],
+    "placeholders": {
+      "filterOption": {}
+    }
+  },
+  "disable_filter_message_toast": "Ви вимкнули фільтровані повідомлення",
+  "@disable_filter_message_toast": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "with_unread": "З непрочитаними",
+  "@with_unread": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "with_starred": "Зірочкою",
+  "@with_starred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_has_been_sent_successfully": "Повідомлення успішно надіслано",
+  "@message_has_been_sent_successfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "done": "Готово",
+  "@done": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "newFolder": "Нова папка",
+  "@newFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "nameOfFolderIsRequired": "Потрібно вказати назву папки",
+  "@nameOfFolderIsRequired": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "folderNameCannotContainSpecialCharacters": "Назва папки не може містити спеціальні символи",
+  "@folderNameCannotContainSpecialCharacters": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "this_folder_name_is_already_taken": "Ця назва папки вже зайнята",
+  "@this_folder_name_is_already_taken": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "new_folder_is_created": "{nameMailbox} створено",
+  "@new_folder_is_created": {
+    "type": "text",
+    "placeholders_order": [
+      "nameMailbox"
+    ],
+    "placeholders": {
+      "nameMailbox": {}
+    }
+  },
+  "createNewFolderFailure": "Помилка створення нової папки",
+  "@createNewFolderFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "drafts_saved": "Чернетку збережено",
+  "@drafts_saved": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "discard": "Відкинути",
+  "@discard": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "skip": "Пропустити",
+  "@skip": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintInputCreateNewFolder": "Введіть назву папки",
+  "@hintInputCreateNewFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteFoldersSuccessfully": "Папки видалено успішно",
+  "@deleteFoldersSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteFoldersFailure": "Помилка видалення папок",
+  "@deleteFoldersFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteFolders": "Видалити папки",
+  "@deleteFolders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_confirmation_dialog_delete_folder": "Папку «{nameMailbox}» та всі її підпапки й повідомлення буде видалено без можливості відновлення. Продовжити видалення?",
+  "@message_confirmation_dialog_delete_folder": {
+    "type": "text",
+    "placeholders_order": [
+      "nameMailbox"
+    ],
+    "placeholders": {
+      "nameMailbox": {}
+    }
+  },
+  "message_confirmation_dialog_allow_subaddressing": "Ви збираєтеся дозволити будь-кому надсилати електронні листи безпосередньо до вашої папки \"{nameMailbox}\", використовуючи:",
+  "@message_confirmation_dialog_allow_subaddressing": {
+    "type": "text",
+    "placeholders_order": [
+      "nameMailbox"
+    ],
+    "placeholders": {
+      "nameMailbox": {}
+    }
+  },
+  "message_confirmation_dialog_allow_subaddressing_mobile": "Ви збираєтеся дозволити будь-кому надсилати електронні листи безпосередньо до вашої папки \"{nameMailbox}\", використовуючи адресу <{address}>",
+  "@message_confirmation_dialog_allow_subaddressing_mobile": {
+    "type": "text",
+    "placeholders_order": [
+      "nameMailbox",
+      "address"
+    ],
+    "placeholders": {
+      "nameMailbox": {},
+      "address": {}
+    }
+  },
+  "renameFolder": "Перейменувати папку",
+  "@renameFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "renameFolderFailure": "Помилка перейменування папки",
+  "@renameFolderFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "this_field_cannot_be_blank": "Це поле не може бути порожнім",
+  "@this_field_cannot_be_blank": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "there_is_already_folder_with_the_same_name": "Папка з такою назвою вже існує",
+  "@there_is_already_folder_with_the_same_name": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "email_address_is_not_in_the_correct_format": "Адреса електронної пошти має неправильний формат",
+  "@email_address_is_not_in_the_correct_format": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "preparing_to_save": "Підготовка до збереження",
+  "@preparing_to_save": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "new_message": "Нове повідомлення",
+  "@new_message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hide": "Приховати",
+  "@hide": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "copy_email_address": "Копіювати адресу електронної пошти",
+  "@copy_email_address": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "compose_email": "Написати електронного листа",
+  "@compose_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "email_address_copied_to_clipboard": "Адреса електронної пошти скопійована в буфер обміну",
+  "@email_address_copied_to_clipboard": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailSubaddressCopiedToClipboard": "Підадреса електронної пошти скопійована в буфер обміну",
+  "@emailSubaddressCopiedToClipboard": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "minimize": "Мінізувати",
+  "@minimize": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "fullscreen": "Повноекранний режим",
+  "@fullscreen": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "send": "Надіслати",
+  "@send": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attachments": "Вкладенням",
+  "@attachments": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showAll": "Показати всі",
+  "@showAll": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_dialog_send_email_without_a_subject": "Ви впевнені, що хочете надсилати повідомлення без теми?",
+  "@message_dialog_send_email_without_a_subject": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "app_name": "Twake Mail",
+  "@app_name": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "search_emails": "Пошук електронних листів",
+  "@search_emails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "filter_messages": "Фільтрувати повідомлення",
+  "@filter_messages": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "not_starred": "Без зірочок",
+  "@not_starred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "select": "Виберіть",
+  "@select": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selected": "Вибрано",
+  "@selected": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notSelected": "Не вибрано",
+  "@notSelected": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "more": "Більше",
+  "@more": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "expand": "Розгорнути",
+  "@expand": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "collapse": "Згорнути",
+  "@collapse": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "save_to_drafts": "Зберегти в чернетках",
+  "@save_to_drafts": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hint_compose_email": "Почніть складати листа...",
+  "@hint_compose_email": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attach_file": "Додати файл",
+  "@attach_file": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "show": "Показати",
+  "@show": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sending_failed": "Не вдалося надіслати",
+  "@sending_failed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "send_anyway": "Надіслати все одно",
+  "@send_anyway": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "empty_subject": "Порожня тема",
+  "@empty_subject": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_dialog_send_email_with_email_address_invalid": "Перевірте правильність адрес електронної пошти та спробуйте ще раз",
+  "@message_dialog_send_email_with_email_address_invalid": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "fix_email_addresses": "Виправити адреси електронної пошти",
+  "@fix_email_addresses": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "your_download_has_started": "Ваше завантаження розпочалося",
+  "@your_download_has_started": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moved_to_trash": "Переміщено в кошик",
+  "@moved_to_trash": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no_internet_connection": "Немає підключення до Інтернету",
+  "@no_internet_connection": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "no_internet_connection_try_again_later": "Немає інтернет-з’єднання, спробуйте пізніше.",
+  "@no_internet_connection_try_again_later": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "page_name": "Twake Mail",
+  "@page_name": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_delete_all_email_in_trash_button": "Усі повідомлення в Кошику будуть видалені, якщо ви досягнете обмеженого обсягу пам’яті.",
+  "@message_delete_all_email_in_trash_button": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "empty_trash_now": "Очистіть кошик зараз",
+  "@empty_trash_now": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "empty_trash_folder": "Очистити папку «Кошик»",
+  "@empty_trash_folder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "empty_trash_dialog_message": "Ви збираєтеся остаточно видалити всі елементи з кошика. Продовжити?",
+  "@empty_trash_dialog_message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_all": "Видалити все",
+  "@delete_all": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toast_message_delete_multiple_email_permanently_success": "{count} Повідомлення видалено назавжди",
+  "@toast_message_delete_multiple_email_permanently_success": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "toast_message_delete_a_email_permanently_success": "Повідомлення видалено назавжди",
+  "@toast_message_delete_a_email_permanently_success": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_permanently": "Видалити назавжди",
+  "@delete_permanently": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_messages_forever": "Видалити повідомленнями назавжди",
+  "@delete_messages_forever": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_message_forever": "Видалити повідомлення назавжди",
+  "@delete_message_forever": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_multiple_messages_dialog": "Ви збираєтеся остаточно видалити {count} елементів у {mailboxName}. Продовжити?",
+  "@delete_multiple_messages_dialog": {
+    "type": "text",
+    "placeholders_order": [
+      "count",
+      "mailboxName"
+    ],
+    "placeholders": {
+      "count": {},
+      "mailboxName": {}
+    }
+  },
+  "delete_single_message_dialog": "Ви збираєтеся остаточно видалити це повідомлення. Продовжити?",
+  "@delete_single_message_dialog": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toast_message_empty_trash_folder_success": "Усі повідомлення видалено назавжди",
+  "@toast_message_empty_trash_folder_success": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "version": "Версія",
+  "@version": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_dialog_send_email_exceeds_maximum_size": "Ваше повідомлення не вдалося надіслати, оскільки його розмір перевищує максимальний розмір {maxSize}",
+  "@message_dialog_send_email_exceeds_maximum_size": {
+    "type": "text",
+    "placeholders_order": [
+      "maxSize"
+    ],
+    "placeholders": {
+      "maxSize": {}
+    }
+  },
+  "message_dialog_upload_attachments_exceeds_maximum_size": "Ви досягли максимального розміру файлу. Будь ласка, завантажте файли, загальний розмір яких менший за {maxSize}",
+  "@message_dialog_upload_attachments_exceeds_maximum_size": {
+    "type": "text",
+    "placeholders_order": [
+      "maxSize"
+    ],
+    "placeholders": {
+      "maxSize": {}
+    }
+  },
+  "got_it": "Зрозуміло",
+  "@got_it": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "maximum_files_size": "Максимальний розмір файлів",
+  "@maximum_files_size": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "exchange": "Обмін",
+  "@exchange": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forwarded_message": "Переслане повідомлення",
+  "@forwarded_message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "date": "Дата",
+  "@date": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mark_as_spam": "Позначити як спам",
+  "@mark_as_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "remove_from_spam": "Вилучити зі спаму",
+  "@remove_from_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_as_spam": "Позначено як спам",
+  "@marked_as_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "marked_as_not_spam": "Позначено як не спам",
+  "@marked_as_not_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "star": "Зірка",
+  "@star": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "un_star": "Зняти зірочку",
+  "@un_star": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "un_spam": "Видалити спам",
+  "@un_spam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "manage_account": "Керування обліковим записом",
+  "@manage_account": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "profiles": "Профілі",
+  "@profiles": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "profilesSettingExplanation": "Інформація про вас та варіанти керування нею.",
+  "@profilesSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "identities": "Ідентичності",
+  "@identities": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "setDefaultIdentity": "Встановити як ідентифікатор за замовчуванням",
+  "@setDefaultIdentity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "identitiesSettingExplanation": "Виберіть ідентифікаційний номер або адресу електронної пошти, яку ви хочете використовувати для надсилання електронних листів",
+  "@identitiesSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createNewIdentity": "Створити нову ідентичність",
+  "@createNewIdentity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "new_identity": "Нова ідентичність",
+  "@new_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "nameToBeDisplayed": "Ім'я, яке буде відображатися одержувачам",
+  "@nameToBeDisplayed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reply_to": "Відповісти на",
+  "@reply_to": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bcc_to": "Bcc до",
+  "@bcc_to": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "signature": "Підпис",
+  "@signature": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "html_template": "HTML-шаблон",
+  "@html_template": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "html": "Html",
+  "@html": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you_have_created_a_new_identity": "Ви створили нову ідентичність",
+  "@you_have_created_a_new_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you_have_created_a_new_default_identity": "Ви створили нову ідентифікацію за замовчуванням",
+  "@you_have_created_a_new_default_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "all_identities": "Усі ідентифікаційні дані",
+  "@all_identities": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "default_value": "За замовчуванням",
+  "@default_value": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_identity": "Видалити ідентифікаційні дані",
+  "@delete_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message_confirmation_dialog_delete_identity": "Ви впевнені, що хочете видалити цю особу?",
+  "@message_confirmation_dialog_delete_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "identity_has_been_deleted": "Особистість видалено",
+  "@identity_has_been_deleted": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delete_failed": "Видалити не вдалося",
+  "@delete_failed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "edit_identity": "Редагувати ідентифікацію",
+  "@edit_identity": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you_are_changed_your_identity_successfully": "Ви успішно змінили свою особу",
+  "@you_are_changed_your_identity_successfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hasAttachment": "Має вкладення",
+  "@hasAttachment": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "last7Days": "Останні 7 днів",
+  "@last7Days": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "last15Days": "Останні 15 днів",
+  "@last15Days": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "fromMe": "Від мене",
+  "@fromMe": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "recent": "Нещодавні",
+  "@recent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showingResultsFor": "Показані результати для запиту:",
+  "@showingResultsFor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "last30Days": "Останні 30 днів",
+  "@last30Days": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "last6Months": "Останні 6 місяців",
+  "@last6Months": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "lastYears": "Останні роки",
+  "@lastYears": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisEmailAddressInvalid": "Ця адреса електронної пошти недійсна",
+  "@thisEmailAddressInvalid": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "loginInputSSOMessage": "Увійти за допомогою мого облікового запису SSO",
+  "@loginInputSSOMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "canNotVerifySSOConfiguration": "Не вдається перевірити конфігурацію єдиного входу, зверніться до системного адміністратора",
+  "@canNotVerifySSOConfiguration": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "canNotGetToken": "Не вдається отримати токен, зверніться до системного адміністратора",
+  "@canNotGetToken": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moveFolder": "Перемістити папку",
+  "@moveFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteFolder": "Видалити папку",
+  "@deleteFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageMarkAsMailboxReadSuccess": "Ви позначили всі повідомлення в \"{mailboxName}\" як прочитані",
+  "@toastMessageMarkAsMailboxReadSuccess": {
+    "type": "text",
+    "placeholders_order": [
+      "mailboxName"
+    ],
+    "placeholders": {
+      "mailboxName": {}
+    }
+  },
+  "toastMessageMarkAsMailboxReadHasSomeEmailFailure": "Ви позначили {count} повідомлень у \"{mailboxName}\" як прочитані",
+  "@toastMessageMarkAsMailboxReadHasSomeEmailFailure": {
+    "type": "text",
+    "placeholders_order": [
+      "mailboxName",
+      "count"
+    ],
+    "placeholders": {
+      "mailboxName": {},
+      "count": {}
+    }
+  },
+  "allFolders": "Усі папки",
+  "@allFolders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "singleSignOn": "Єдиний вхід",
+  "@singleSignOn": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ssoNotAvailable": "Єдиний вхід (SSO) недоступний",
+  "@ssoNotAvailable": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noPreviewAvailable": "Попередній перегляд недоступний",
+  "@noPreviewAvailable": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "wrongUrlMessage": "URL-адреса сервера недійсна, спробуйте ще раз",
+  "@wrongUrlMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subject": "Тема",
+  "@subject": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hasTheWords": "Має слова",
+  "@hasTheWords": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "doesNotHave": "Не має",
+  "@doesNotHave": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "nameOrEmailAddress": "Ім'я або адреса електронної пошти",
+  "@nameOrEmailAddress": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enterSearchTerm": "Введіть пошуковий термін",
+  "@enterSearchTerm": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "allTime": "Весь час",
+  "@allTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "search": "Пошук",
+  "@search": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "clearFilter": "Очистити фільтр",
+  "@clearFilter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "advancedSearch": "Розширений пошук",
+  "@advancedSearch": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectFolder": "Вибрати папку",
+  "@selectFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDuplicateTagFilterMail": "ви вже це ввели",
+  "@messageDuplicateTagFilterMail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageAndRegion": "Мова та регіон",
+  "@languageAndRegion": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageSubtitle": "Встановіть мову, яку ви використовуєте в Twake Mail.",
+  "@languageSubtitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "language": "Мова",
+  "@language": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageEnglish": "Англійська",
+  "@languageEnglish": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageGerman": "Німецька",
+  "@languageGerman": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageVietnamese": "В'єтнамська",
+  "@languageVietnamese": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageFrench": "Французька",
+  "@languageFrench": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageRussian": "Російська",
+  "@languageRussian": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageArabic": "Арабська",
+  "@languageArabic": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "languageItalian": "італійська",
+  "@languageItalian": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogSendEmailUploadingAttachment": "Ваше повідомлення не вдалося надіслати, оскільки воно завантажує вкладення",
+  "@messageDialogSendEmailUploadingAttachment": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveAndClose": "Зберегти та закрити",
+  "@saveAndClose": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "insertImage": "Вставити зображення",
+  "@insertImage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectFromFile": "Вибрати з файлу",
+  "@selectFromFile": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "chooseImage": "Виберіть зображення",
+  "@chooseImage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "urlLink": "URL",
+  "@urlLink": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "insert": "Вставка",
+  "@insert": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "insertImageErrorFileEmpty": "Будь ласка, виберіть зображення або введіть URL-адресу зображення",
+  "@insertImageErrorFileEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "insertImageErrorDuplicate": "Будь ласка, введіть або зображення, або URL-адресу зображення, а не обидва",
+  "@insertImageErrorDuplicate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "chooseAColor": "Виберіть колір",
+  "@chooseAColor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "resetToDefault": "Скинути до заводських налаштувань",
+  "@resetToDefault": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "setColor": "Встановити колір",
+  "@setColor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatBold": "Жирний шрифт",
+  "@formatBold": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatItalic": "Курсив",
+  "@formatItalic": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatUnderline": "Підкреслення",
+  "@formatUnderline": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatStrikethrough": "Закреслення",
+  "@formatStrikethrough": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatTextColor": "Колір тексту",
+  "@formatTextColor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formatTextBackgroundColor": "Колір фону тексту",
+  "@formatTextBackgroundColor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "headerStyle": "Стиль",
+  "@headerStyle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "fontFamily": "Сімейство шрифтів",
+  "@fontFamily": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "paragraph": "Абзац",
+  "@paragraph": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "alignLeft": "Вирівняти за лівим краєм",
+  "@alignLeft": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "alignRight": "Вирівняти по правому краю",
+  "@alignRight": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "alignCenter": "Вирівняти по центру",
+  "@alignCenter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "justifyFull": "Вирівняти повністю",
+  "@justifyFull": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "outdent": "Зменшити відступ",
+  "@outdent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "indent": "Відступ",
+  "@indent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "orderList": "Список замовлень",
+  "@orderList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "numberedList": "Нумерований список",
+  "@numberedList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bulletedList": "Маркований список",
+  "@bulletedList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moveTo": "Перемістити до",
+  "@moveTo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailRules": "Правила електронної пошти",
+  "@emailRules": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addNewRule": "Додати правило",
+  "@addNewRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "headerNameOfRules": "Назва правил",
+  "@headerNameOfRules": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "editRule": "Редагувати правило",
+  "@editRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteRule": "Видалити правило",
+  "@deleteRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createNewRule": "Створити нове правило",
+  "@createNewRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "rulesNameHintTextInput": "Введіть назву правила",
+  "@rulesNameHintTextInput": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "conditionValueHintTextInput": "Значення",
+  "@conditionValueHintTextInput": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "conditionTitleRulesFilter": "Якщо виконано всі наступні умови:",
+  "@conditionTitleRulesFilter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "contains": "Містить",
+  "@contains": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notContains": "Не містить",
+  "@notContains": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "exactlyEquals": "Точно дорівнює",
+  "@exactlyEquals": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notExactlyEquals": "Не зовсім дорівнює",
+  "@notExactlyEquals": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "actionTitleRulesFilter": "Виконайте такі дії:",
+  "@actionTitleRulesFilter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toFolder": "До папки:",
+  "@toFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moveMessage": "Перемістити повідомлення",
+  "@moveMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ruleFilterAddressFromField": "Від",
+  "@ruleFilterAddressFromField": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ruleFilterAddressToField": "До",
+  "@ruleFilterAddressToField": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ruleFilterAddressCcField": "Cc",
+  "@ruleFilterAddressCcField": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "newFilterWasCreated": "Новий фільтр створено",
+  "@newFilterWasCreated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yourFilterHasBeenUpdated": "Ваш фільтр оновлено",
+  "@yourFilterHasBeenUpdated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "headerRecipients": "Одержувачі",
+  "@headerRecipients": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forwarding": "Пересилання",
+  "@forwarding": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacation": "Відпустка",
+  "@vacation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "activated": "Активовано",
+  "@activated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deactivated": "Деактивовано",
+  "@deactivated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "startDate": "Дата початку",
+  "@startDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "endDate": "Дата завершення",
+  "@endDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationStopsAt": "Відпустка зупиняється о",
+  "@vacationStopsAt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "message": "Повідомлення",
+  "@message": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintMessageBodyVacation": "Повідомлення про відпустку",
+  "@hintMessageBodyVacation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "errorMessageWhenStartDateVacationIsEmpty": "Будь ласка, введіть дійсну дату початку",
+  "@errorMessageWhenStartDateVacationIsEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "errorMessageWhenEndDateVacationIsInValid": "Дата завершення має бути більшою за дату початку",
+  "@errorMessageWhenEndDateVacationIsInValid": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "errorMessageWhenMessageVacationIsEmpty": "Текст повідомлення не може бути порожнім",
+  "@errorMessageWhenMessageVacationIsEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationSettingSaved": "Налаштування відпустки збережено",
+  "@vacationSettingSaved": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yourVacationResponderIsEnabled": "Ваш автовідповідач увімкнено.",
+  "@yourVacationResponderIsEnabled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yourVacationResponderIsDisabledSuccessfully": "Вашу автоматичну відповідь успішно вимкнено",
+  "@yourVacationResponderIsDisabledSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEnableVacationResponderAutomatically": "Ваш автовідповідач буде активовано {startDate}",
+  "@messageEnableVacationResponderAutomatically": {
+    "type": "text",
+    "placeholders_order": [
+      "startDate"
+    ],
+    "placeholders": {
+      "startDate": {}
+    }
+  },
+  "messageDisableVacationResponderAutomatically": "Ваша відповідь на запитання про відпустку зупинилася {endDate}",
+  "@messageDisableVacationResponderAutomatically": {
+    "type": "text",
+    "placeholders_order": [
+      "endDate"
+    ],
+    "placeholders": {
+      "endDate": {}
+    }
+  },
+  "messageConfirmationDialogDeleteRecipientForward": "Ви хочете видалити електронну пошту {emailAddress}?",
+  "@messageConfirmationDialogDeleteRecipientForward": {
+    "type": "text",
+    "placeholders_order": [
+      "emailAddress"
+    ],
+    "placeholders": {
+      "emailAddress": {}
+    }
+  },
+  "deleteRecipient": "Вилучити одержувачів",
+  "@deleteRecipient": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageDeleteRecipientSuccessfully": "Електронний лист видалено зі списку одержувачів.",
+  "@toastMessageDeleteRecipientSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageConfirmationDialogDeleteAllRecipientForward": "Ви впевнені, що хочете вилучити цих одержувачів? Це призведе до їх видалення з ланцюжка розсилки електронної пошти.",
+  "@messageConfirmationDialogDeleteAllRecipientForward": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addRecipients": "Додати Одержувачів",
+  "@addRecipients": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintInputAutocompleteContact": "Введіть ім'я або адресу електронної пошти",
+  "@hintInputAutocompleteContact": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageAddRecipientsSuccessfully": "Електронні листи додано зі списку одержувачів.",
+  "@toastMessageAddRecipientsSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageLocalCopyEnable": "Залишити локальне копіювання ввімкненим.",
+  "@toastMessageLocalCopyEnable": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageLocalCopyDisable": "Вимкнути локальне копіювання.",
+  "@toastMessageLocalCopyDisable": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailRuleSettingExplanation": "Створення правил для обробки вхідних повідомлень. Ви обираєте як умову, яка запускає правило, так і дії, які воно виконуватиме.",
+  "@emailRuleSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageConfirmationDialogDeleteEmailRule": "Ви хочете видалити правило \"{ruleName}\"?",
+  "@messageConfirmationDialogDeleteEmailRule": {
+    "type": "text",
+    "placeholders_order": [
+      "ruleName"
+    ],
+    "placeholders": {
+      "ruleName": {}
+    }
+  },
+  "deleteEmailRule": "Видалити правило",
+  "@deleteEmailRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageDeleteEmailRuleSuccessfully": "Правило було вилучено.",
+  "@toastMessageDeleteEmailRuleSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationSettingExplanation": "Надсилає автоматичну відповідь на вхідні повідомлення.",
+  "@vacationSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationSettingToggleButtonAutoReply": "Автоматично відповідати на повідомлення після їх отримання.",
+  "@vacationSettingToggleButtonAutoReply": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "startTime": "Час початку",
+  "@startTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "endTime": "Час завершення",
+  "@endTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintSubjectInputVacationSetting": "Введіть тему",
+  "@hintSubjectInputVacationSetting": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveChanges": "Зберегти зміни",
+  "@saveChanges": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageIsRequired": "Повідомлення обов'язкове",
+  "@messageIsRequired": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "endNow": "Кінець зараз",
+  "@endNow": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "vacationSetting": "Налаштування відпустки",
+  "@vacationSetting": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "backToSearchResults": "Назад до результатів пошуку",
+  "@backToSearchResults": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "clearAll": "Очистити все",
+  "@clearAll": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "contact": "Контакти",
+  "@contact": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hintSearchInputContact": "Введіть ім'я або електронну пошту",
+  "@hintSearchInputContact": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quickStyles": "Швидкі стилі",
+  "@quickStyles": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "format": "Формат",
+  "@format": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "background": "Передісторія",
+  "@background": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "foreground": "Передній план",
+  "@foreground": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleFormat": "Формат",
+  "@titleFormat": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleQuickStyles": "Швидкі стилі",
+  "@titleQuickStyles": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleBackground": "Передісторія",
+  "@titleBackground": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleForeground": "Передній план",
+  "@titleForeground": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectDate": "Виберіть дату",
+  "@selectDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "setDate": "Встановити дату",
+  "@setDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageErrorWhenSelectStartDateIsEmpty": "Дата початку не може бути нульовою.",
+  "@toastMessageErrorWhenSelectStartDateIsEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageErrorWhenSelectEndDateIsEmpty": "Кінцева дата не може бути нульовою.",
+  "@toastMessageErrorWhenSelectEndDateIsEmpty": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageErrorWhenSelectDateIsInValid": "Час завершення не може бути меншим за час початку.",
+  "@toastMessageErrorWhenSelectDateIsInValid": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dateRangeAdvancedSearchFilter": "З {startDate} до {endDate}",
+  "@dateRangeAdvancedSearchFilter": {
+    "type": "text",
+    "placeholders_order": [
+      "startDate",
+      "endDate"
+    ],
+    "placeholders": {
+      "startDate": {},
+      "endDate": {}
+    }
+  },
+  "customRange": "Користувацький діапазон",
+  "@customRange": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectParentFolder": "Вибрати батьківську папку",
+  "@selectParentFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "allowSubaddressing": "Дозволити підадресацію",
+  "@allowSubaddressing": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "allow": "Дозволити",
+  "@allow": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "disallowSubaddressing": "Заборонити підадресацію",
+  "@disallowSubaddressing": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageAllowSubaddressingSuccess": "Ви успішно дозволили підадресацію для цієї папки",
+  "@toastMessageAllowSubaddressingSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageDisallowSubaddressingSuccess": "Ви успішно заборонили субадресацію для цієї папки",
+  "@toastMessageDisallowSubaddressingSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageSubaddressingFailure": "Під час обробки запиту сталася помилка",
+  "@toastMessageSubaddressingFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requestReadReceipt": "Запит на підтвердження прочитанням",
+  "@requestReadReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "appGridTittle": "Перейти до програм",
+  "@appGridTittle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleReadReceiptRequestNotificationMessage": "Запит на підтвердження прочитання",
+  "@titleReadReceiptRequestNotificationMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "contactSupport": "Зверніться до служби підтримки",
+  "@contactSupport": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subTitleReadReceiptRequestNotificationMessage": "Відправник запросив сповіщення про прочитання для цього електронного листа. Надіслати сповіщення про прочитання?",
+  "@subTitleReadReceiptRequestNotificationMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageNotSupportMdnWhenSendReceipt": "Ваш обліковий запис не підтримує функцію MDN",
+  "@toastMessageNotSupportMdnWhenSendReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageCannotFoundIdentityWhenSendReceipt": "Вказаний ідентифікатор особи не знайдено",
+  "@toastMessageCannotFoundIdentityWhenSendReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageCannotFoundEmailIdWhenSendReceipt": "Вказаний ідентифікатор електронної пошти не знайдено",
+  "@toastMessageCannotFoundEmailIdWhenSendReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subjectSendReceiptToSender": "Читати: {subject}",
+  "@subjectSendReceiptToSender": {
+    "type": "text",
+    "placeholders_order": [
+      "subject"
+    ],
+    "placeholders": {
+      "subject": {}
+    }
+  },
+  "textBodySendReceiptToSender": "Повідомлення було прочитано {receiver} о {time} \n\nТема: {subject} \n\nПримітка: Це підтвердження прочитання лише підтверджує, що повідомлення було відображено на комп'ютері одержувача. Немає гарантії, що одержувач прочитав або зрозумів зміст повідомлення.",
+  "@textBodySendReceiptToSender": {
+    "type": "text",
+    "placeholders_order": [
+      "receiver",
+      "subject",
+      "time"
+    ],
+    "placeholders": {
+      "receiver": {},
+      "subject": {},
+      "time": {}
+    }
+  },
+  "toastMessageSendReceiptSuccess": "Сповіщення про прочитання надіслано.",
+  "@toastMessageSendReceiptSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moveConversation": "Перемістити розмову ({numberOfConversation})",
+  "@moveConversation": {
+    "type": "text",
+    "placeholders_order": [
+      "numberOfConversation"
+    ],
+    "placeholders": {
+      "numberOfConversation": {}
+    }
+  },
+  "messageConfirmationDialogDeleteMultipleFolder": "Папка {numberOfMailbox} та всі її підпапки й повідомлення будуть видалені без можливості відновлення. Продовжити видалення?",
+  "@messageConfirmationDialogDeleteMultipleFolder": {
+    "type": "text",
+    "placeholders_order": [
+      "numberOfMailbox"
+    ],
+    "placeholders": {
+      "numberOfMailbox": {}
+    }
+  },
+  "toastMessageErrorNotSelectedFolderWhenCreateNewMailbox": "Ви не вибрали папку для збереження",
+  "@toastMessageErrorNotSelectedFolderWhenCreateNewMailbox": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createNewFolder": "Створити нову папку",
+  "@createNewFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "newer": "Новіший",
+  "@newer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "older": "Старші",
+  "@older": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forwardingSettingExplanation": "Ваші електронні листи надходитимуть на вказані нижче адреси електронної пошти.",
+  "@forwardingSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addRecipientButton": "Додати одержувача",
+  "@addRecipientButton": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "incorrectEmailFormat": "Неправильний формат електронної пошти",
+  "@incorrectEmailFormat": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "remove": "Вилучити",
+  "@remove": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "totalEmailSelected": "Зняти вибір усіх ({count})",
+  "@totalEmailSelected": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "storageQuotas": "Зберігання",
+  "@storageQuotas": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "textQuotasOutOfStorage": "Немає місця для зберігання",
+  "@textQuotasOutOfStorage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quickCreatingRule": "Створити правило з цією електронною адресою",
+  "@quickCreatingRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titlePageNotFound": "Ой, ми не можемо знайти цю сторінку",
+  "@titlePageNotFound": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subTitlePageNotFound": "Можливо, ваша цільова сторінка зникла або належить іншому обліковому запису.",
+  "@subTitlePageNotFound": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "page404": "Сторінка 404",
+  "@page404": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "openInNewTab": "Відкрити в новій вкладці",
+  "@openInNewTab": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "copySubaddress": "Копіювати підадресу",
+  "@copySubaddress": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "regards": "З повагою",
+  "@regards": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youHaveNewMessages": "У вас є нові повідомлення",
+  "@youHaveNewMessages": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "appTitlePushNotification": "Twake Mail",
+  "@appTitlePushNotification": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "totalNewMessagePushNotification": "{count} нових електронних листів",
+  "@totalNewMessagePushNotification": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "privacyPolicy": "Політика конфіденційності",
+  "@privacyPolicy": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "countNewSpamEmails": "У вас є {count} нових спам-листів!",
+  "@countNewSpamEmails": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "showDetails": "Показати деталі",
+  "@showDetails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dismiss": "Відхилити",
+  "@dismiss": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "disableSpamReport": "Вимкнути звіт про спам",
+  "@disableSpamReport": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enableSpamReport": "Увімкнути Звіт про Спам",
+  "@enableSpamReport": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "required": "обов'язковий",
+  "@required": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noEmailInYourCurrentFolder": "У вашій поточній папці немає електронних листів",
+  "@noEmailInYourCurrentFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noEmailMatchYourCurrentFilter": "Немає електронних листів, що відповідають вашому поточному фільтру.",
+  "@noEmailMatchYourCurrentFilter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendMessageFailure": "Не вдалося надіслати ваше повідомлення.",
+  "@sendMessageFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendMessageFailureWithSetErrorTypeTooLarge": "Не вдалося надіслати ваше повідомлення, оскільки воно занадто велике.",
+  "@sendMessageFailureWithSetErrorTypeTooLarge": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendMessageFailureWithSetErrorTypeOverQuota": "Не вдалося надіслати ваше повідомлення, оскільки воно перевищило квоту.",
+  "@sendMessageFailureWithSetErrorTypeOverQuota": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveEmailAsDraftFailure": "Не вдалося зберегти ваше повідомлення як чернетки.",
+  "@saveEmailAsDraftFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveEmailAsDraftFailureWithSetErrorTypeTooLarge": "Не вдалося зберегти ваше повідомлення як чернетки, оскільки воно занадто велике.",
+  "@saveEmailAsDraftFailureWithSetErrorTypeTooLarge": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveEmailAsDraftFailureWithSetErrorTypeOverQuota": "Не вдалося зберегти ваше повідомлення як чернетки, оскільки воно перевищило квоту.",
+  "@saveEmailAsDraftFailureWithSetErrorTypeOverQuota": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "teamMailBoxes": "Командні поштові скриньки",
+  "@teamMailBoxes": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hideFolder": "Приховати папку",
+  "@hideFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisImageCannotBeAdded": "Це зображення не можна додати.",
+  "@thisImageCannotBeAdded": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMsgHideFolderSuccess": "Цю папку приховано від вашої основної папки",
+  "@toastMsgHideFolderSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "searchForFolders": "Пошук для папок",
+  "@searchForFolders": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showFolder": "Показати папку",
+  "@showFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageShowFolderSuccess": "Ця папка вже відображається у вашій основній папці",
+  "@toastMessageShowFolderSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "folderVisibility": "Видимість папки",
+  "@folderVisibility": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "folderVisibilitySubtitle": "Показати/приховати ваші папки, включаючи особисті папки та поштові скриньки команди.",
+  "@folderVisibilitySubtitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emptyListEmailForward": "Будь ласка, введіть принаймні одного одержувача",
+  "@emptyListEmailForward": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forwardedMessage": "Переслане повідомлення",
+  "@forwardedMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "repliedMessage": "Відповідь на повідомлення",
+  "@repliedMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "repliedAndForwardedMessage": "Відповіли та переслали повідомлення",
+  "@repliedAndForwardedMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emptyTrash": "Очистити кошик",
+  "@emptyTrash": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "cannotSelectThisImage": "Не вдається вибрати це зображення.",
+  "@cannotSelectThisImage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageHasBeenSavedToTheSendingQueue": "Тимчасова проблема з мережею. Повідомлення поставлені в чергу для повторної спроби після підключення.",
+  "@messageHasBeenSavedToTheSendingQueue": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendingQueue": "Черга надсилання",
+  "@sendingQueue": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bannerMessageSendingQueueView": "Повідомлення в папці черги надсилання будуть надіслані або заплановані під час підключення до Інтернету.",
+  "@bannerMessageSendingQueueView": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "proceed": "Продовжити",
+  "@proceed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youAreInOfflineMode": "Ви в офлайн-режимі",
+  "@youAreInOfflineMode": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogWhenStoreSendingEmailFirst": "На щастя, ви все ще можете",
+  "@messageDialogWhenStoreSendingEmailFirst": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogWhenStoreSendingEmailSecond": " надіслати, відповісти або переслати ",
+  "@messageDialogWhenStoreSendingEmailSecond": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogWhenStoreSendingEmailThird": "електронні листи. Вони будуть доставлені, коли ви підключитеся до Інтернету. Щоб редагувати ці електронні листи перед надсиланням, перейдіть до ",
+  "@messageDialogWhenStoreSendingEmailThird": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogWhenStoreSendingEmailTail": " папка.",
+  "@messageDialogWhenStoreSendingEmailTail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "titleRecipientSendingEmail": "До: {recipients}",
+  "@titleRecipientSendingEmail": {
+    "type": "text",
+    "placeholders_order": [
+      "recipients"
+    ],
+    "placeholders": {
+      "recipients": {}
+    }
+  },
+  "openFolderMenu": "Відкрити меню папки",
+  "@openFolderMenu": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageHasBeenSentSuccessfully": "Повідомлення успішно надіслано.",
+  "@messageHasBeenSentSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteOfflineEmail": "Видалити офлайн-електронну пошту",
+  "@deleteOfflineEmail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogDeleteSendingEmail": "Видалення офлайн-електронного листа призведе до остаточного видалення його вмісту. Ви не зможете скасувати цю дію або відновити електронний лист із папки «Кошик».",
+  "@messageDialogDeleteSendingEmail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageHaveBeenDeletedSuccessfully": "Повідомлення успішно видалено",
+  "@messageHaveBeenDeletedSuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "delivering": "Доставка",
+  "@delivering": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "error": "Помилка",
+  "@error": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "errorWhileFetchingSubaddress": "Помилка під час отримання підадреси",
+  "@errorWhileFetchingSubaddress": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "connectedToTheInternet": "Підключено до інтернету",
+  "@connectedToTheInternet": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "resend": "Надіслати повторно",
+  "@resend": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messagesHaveBeenResent": "Повідомлення надіслано повторно",
+  "@messagesHaveBeenResent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "connectionError": "Помилка підключення",
+  "@connectionError": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "inboxMailboxDisplayName": "Вхідні",
+  "@inboxMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sentMailboxDisplayName": "Надіслано",
+  "@sentMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "outboxMailboxDisplayName": "Вихідні",
+  "@outboxMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "spamMailboxDisplayName": "Спам",
+  "@spamMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "draftsMailboxDisplayName": "Чернетки",
+  "@draftsMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "trashMailboxDisplayName": "Сміття",
+  "@trashMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "templatesMailboxDisplayName": "Шаблони",
+  "@templatesMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "archiveMailboxDisplayName": "Архів",
+  "@archiveMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "pleaseChooseAnImageSizeCorrectly": "Будь ласка, виберіть зображення розміром менше ніж {maxSize} КБ",
+  "@pleaseChooseAnImageSizeCorrectly": {
+    "type": "text",
+    "placeholders_order": [
+      "maxSize"
+    ],
+    "placeholders": {
+      "maxSize": {}
+    }
+  },
+  "messageEventActionBannerOrganizerInvited": " запросив вас на зустріч",
+  "@messageEventActionBannerOrganizerInvited": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerOrganizerUpdated": " оновив інформацію про зустріч",
+  "@messageEventActionBannerOrganizerUpdated": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerOrganizerCanceled": " скасував зустріч",
+  "@messageEventActionBannerOrganizerCanceled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "anAttendee": "Учасник",
+  "@anAttendee": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "you": "Ви",
+  "@you": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerAttendeeAccepted": " прийняв це запрошення",
+  "@messageEventActionBannerAttendeeAccepted": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerAttendeeTentative": " відповів(ла) «Можливо» на це запрошення",
+  "@messageEventActionBannerAttendeeTentative": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerAttendeeDeclined": " відхилив це запрошення",
+  "@messageEventActionBannerAttendeeDeclined": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerAttendeeCounter": " запропонував зміни до заходу",
+  "@messageEventActionBannerAttendeeCounter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEventActionBannerAttendeeCounterDeclined": "Вашу зустрічну пропозицію було відхилено",
+  "@messageEventActionBannerAttendeeCounterDeclined": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "invitationMessageCalendarInformation": " запросив вас на зустріч:",
+  "@invitationMessageCalendarInformation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "when": "Коли",
+  "@when": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "where": "Де",
+  "@where": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "who": "Хто",
+  "@who": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "organizer": "Організатор",
+  "@organizer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "time": "Час",
+  "@time": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "location": "Розташування",
+  "@location": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attendees": "Учасники",
+  "@attendees": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "seeAllAttendees": "Переглянути всіх учасників",
+  "@seeAllAttendees": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "link": "Посилання",
+  "@link": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteAllSpamEmails": "Видалити всі спам-листи",
+  "@deleteAllSpamEmails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emptySpamFolder": "Очистити папку «Спам»",
+  "@emptySpamFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emptySpamMessageDialog": "Ви збираєтеся остаточно видалити всі елементи зі спаму. Продовжити?",
+  "@emptySpamMessageDialog": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bannerDeleteAllSpamEmailsMessage": "Усі повідомлення у спамі будуть видалені, якщо ви досягнете обмеженого обсягу пам’яті.",
+  "@bannerDeleteAllSpamEmailsMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteAllSpamEmailsNow": "Видалити всі спам-листи зараз",
+  "@deleteAllSpamEmailsNow": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quotaStateLabel": "Використано {used} з {limit}",
+  "@quotaStateLabel": {
+    "type": "text",
+    "placeholders_order": [
+      "used",
+      "limit"
+    ],
+    "placeholders": {
+      "used": {},
+      "limit": {}
+    }
+  },
+  "quotaErrorBannerTitle": "У вас закінчилося місце для зберігання",
+  "@quotaErrorBannerTitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quotaWarningBannerTitle": "У вас закінчується пам'ять (90%).",
+  "@quotaWarningBannerTitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quotaWarningBannerMessage": "Незабаром ви не зможете надсилати електронні листи в Tmail. Будь ласка, очистіть своє сховище або оновіть його, щоб отримати доступ до всіх функцій Tmail.",
+  "@quotaWarningBannerMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quotaErrorBannerMessage": "Незабаром ви не зможете надсилати електронні листи в Tmail. Будь ласка, очистіть своє сховище або оновіть його, щоб отримати доступ до всіх функцій Tmail.",
+  "@quotaErrorBannerMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createFolderSuccessfullyMessage": "Ви успішно створили папку {folderName}",
+  "@createFolderSuccessfullyMessage": {
+    "type": "text",
+    "placeholders_order": [
+      "folderName"
+    ],
+    "placeholders": {
+      "folderName": {}
+    }
+  },
+  "createFilters": "Створити фільтри",
+  "@createFilters": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "maybe": "Можливо",
+  "@maybe": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enterASubject": "Введіть в тему",
+  "@enterASubject": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enterSomeSuggestions": "Введіть кілька пропозицій",
+  "@enterSomeSuggestions": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "markedSingleMessageToast": "Повідомлення позначено як {action}",
+  "@markedSingleMessageToast": {
+    "type": "text",
+    "placeholders_order": [
+      "action"
+    ],
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "clean": "Чистий",
+  "@clean": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "clearFolder": "Очистити папку",
+  "@clearFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageEmptyFolderDialog": "Повідомлення в папці {folder} будуть видалені назавжди, і ви не зможете їх відновити",
+  "@messageEmptyFolderDialog": {
+    "type": "text",
+    "placeholders_order": [
+      "folder"
+    ],
+    "placeholders": {
+      "folder": {}
+    }
+  },
+  "addCondition": "Додати умову",
+  "@addCondition": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "formattingOptions": "Параметри форматування",
+  "@formattingOptions": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "embedCode": "Вбудувати код",
+  "@embedCode": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showMoreAttachment": "Показати більше (+{count})",
+  "@showMoreAttachment": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "saveAsDraft": "Зберегти як чернетку",
+  "@saveAsDraft": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dropFileHereToAttachThem": "Перетягніть файл сюди, щоб прикріпити його",
+  "@dropFileHereToAttachThem": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "newSubfolder": "Нова підпапка",
+  "@newSubfolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "textSize": "Розмір тексту",
+  "@textSize": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageDialogOfflineModeOnIOS": "Повідомлення буде в черзі надсилання. Ви можете спробувати ще раз, коли будете онлайн.",
+  "@messageDialogOfflineModeOnIOS": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bannerMessageSendingQueueViewOnIOS": "Ваші повідомлення не було надіслано через проблеми з мережею. Вони безпечно зберігаються. Коли ви знову будете онлайн, ви зможете надіслати їх повторно, відредагувати або видалити.",
+  "@bannerMessageSendingQueueViewOnIOS": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moreAttachments": "+ {count} більше",
+  "@moreAttachments": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "attachmentList": "Список вкладень",
+  "@attachmentList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "files": "файли",
+  "@files": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "downloadAll": "Завантажити все",
+  "@downloadAll": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "toastMessageMarkAsReadFolderAllFailure": "Папку \"{folderName}\" не вдалося позначити як прочитану",
+  "@toastMessageMarkAsReadFolderAllFailure": {
+    "type": "text",
+    "placeholders_order": [
+      "folderName"
+    ],
+    "placeholders": {
+      "folderName": {}
+    }
+  },
+  "sending": "Надсилання",
+  "@sending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "all": "Усі",
+  "@all": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "any": "Будь-який",
+  "@any": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "conditionTitleRulesFilterBeforeCombiner": "Якщо",
+  "@conditionTitleRulesFilterBeforeCombiner": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "conditionTitleRulesFilterAfterCombiner": "виконано наступні умови:",
+  "@conditionTitleRulesFilterAfterCombiner": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "maskAsSeen": "Позначити як побачене",
+  "@maskAsSeen": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "starIt": "Позначити зірочкою",
+  "@starIt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "rejectIt": "Відхилити це",
+  "@rejectIt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "markAsSpam": "Позначити як спам",
+  "@markAsSpam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forwardTo": "Переслати до",
+  "@forwardTo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectAction": "Виберіть дію",
+  "@selectAction": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "forwardEmailHintText": "Додати адресу для пересилання",
+  "@forwardEmailHintText": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addAction": "Додати дію",
+  "@addAction": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "duplicatedActionError": "Цю дію вже додано",
+  "@duplicatedActionError": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notSelectedMailboxToMoveMessage": "Будь ласка, виберіть поштову скриньку для переміщення повідомлення",
+  "@notSelectedMailboxToMoveMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "confirmAllEmailHereAreSpam": "Підтвердіть, що всі електронні листи тут є спамом",
+  "@confirmAllEmailHereAreSpam": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yourIdentities": "Ваші ідентичності",
+  "@yourIdentities": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "searchForIdentities": "Пошук ідентифікаційних даних",
+  "@searchForIdentities": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sortBy": "Сортувати за",
+  "@sortBy": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mostRecent": "Найновіші",
+  "@mostRecent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "oldest": "Найстаріший",
+  "@oldest": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "relevance": "Релевантність",
+  "@relevance": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "senderAscending": "Ім'я відправника: від А до Я",
+  "@senderAscending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "senderDescending": "Ім'я відправника: Я - А",
+  "@senderDescending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subjectAscending": "Тема: від А до Я",
+  "@subjectAscending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subjectDescending": "Тема: Я - А",
+  "@subjectDescending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notFoundSession": "Сеанс не знайдено",
+  "@notFoundSession": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dnsLookupLoginMessage": "Щоб увійти та переглянути своє повідомлення, будь ласка, введіть свою електронну адресу",
+  "@dnsLookupLoginMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enterYourPasswordToSignIn": "Введіть свій пароль для входу",
+  "@enterYourPasswordToSignIn": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unsubscribe": "Скасувати підписку",
+  "@unsubscribe": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unsubscribeMail": "Відписатися від розсилки",
+  "@unsubscribeMail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unsubscribeMailDialogMessage": "Ви впевнені, що хочете більше не отримувати подібні повідомлення від",
+  "@unsubscribeMailDialogMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "unsubscribedFromThisMailingList": "Відписався від цього списку розсилки",
+  "@unsubscribedFromThisMailingList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mailUnsubscribedMessage": "Ви відписуєтесь від {senderName}",
+  "@mailUnsubscribedMessage": {
+    "type": "text",
+    "placeholders_order": [
+      "senderName"
+    ],
+    "placeholders": {
+      "senderName": {}
+    }
+  },
+  "cannotCompressInlineImage": "Не вдається стиснути зображення",
+  "@cannotCompressInlineImage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "byContinuingYouAreAgreeingToOur": "Продовжуючи, ви погоджуєтеся з нашими",
+  "@byContinuingYouAreAgreeingToOur": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "archiveMessage": "Архів повідомлення",
+  "@archiveMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "recoverDeletedMessages": "Відновлення видалених повідомлень",
+  "@recoverDeletedMessages": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "recoverDeletedMessagesBannerContent": "Ви можете відновити повідомлення, видалені в минулому {period}",
+  "@recoverDeletedMessagesBannerContent": {
+    "type": "text",
+    "placeholders_order": [
+      "period"
+    ],
+    "placeholders": {
+      "period": {}
+    }
+  },
+  "deletionDate": "Дата видалення",
+  "@deletionDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "receptionDate": "Дата прийому",
+  "@receptionDate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addSender": "Додати відправника",
+  "@addSender": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "last1Year": "Останній 1 рік",
+  "@last1Year": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "recoveredMailboxDisplayName": "Відновлено",
+  "@recoveredMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "restoreDeletedMessageFailed": "Не вдалося відновити видалене повідомлення",
+  "@restoreDeletedMessageFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "restoreDeletedMessageSuccess": "Успішно відновлено видалені повідомлення",
+  "@restoreDeletedMessageSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "open": "Відчинено",
+  "@open": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "bannerProgressingRecoveryMessage": "Відновлення триває. Ви можете продовжувати користуватися Twake Mail",
+  "@bannerProgressingRecoveryMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "restoreDeletedMessageCanceled": "Відновлення видаленого повідомлення скасовано",
+  "@restoreDeletedMessageCanceled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "loadMore": "Завантажити більше",
+  "@loadMore": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageWarningDialogForForwardsToOtherDomains": "Ви перенаправляєте електронні листи на інший домен. Це може бути загрозою безпеці або вважатися незаконним вилученням даних.",
+  "@messageWarningDialogForForwardsToOtherDomains": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "externalDomain": "Зовнішній домен",
+  "@externalDomain": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "printAll": "Роздрукувати все",
+  "@printAll": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "replyToEmailAddressPrefix": "Відповісти",
+  "@replyToEmailAddressPrefix": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "printingInProgress": "Триває друк",
+  "@printingInProgress": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "printingFailed": "Помилка друку",
+  "@printingFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailReadReceipts": "Сповіщення про прочитання електронної пошти",
+  "@emailReadReceipts": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailReadReceiptsSettingExplanation": "Сповіщення про прочитання – це сповіщення, які можна надсилати користувачам та від них, щоб перевірити, чи було прочитано пошту.",
+  "@emailReadReceiptsSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emailReadReceiptsToggleDescription": "Завжди запитувати сповіщення про прочитання для вихідних повідомлень",
+  "@emailReadReceiptsToggleDescription": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectAllMessagesOfThisPage": "Вибрати всі повідомлення на цій сторінці",
+  "@selectAllMessagesOfThisPage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noSuitableBrowserForOIDC": "Немає відповідного браузера для OIDC, зверніться до системного адміністратора",
+  "@noSuitableBrowserForOIDC": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "eventReplyWasSentUnsuccessfully": "Відповідь на подію не вдалося надіслати!",
+  "@eventReplyWasSentUnsuccessfully": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youWillAttendThisMeeting": "Ви будете присутні на цій зустрічі",
+  "@youWillAttendThisMeeting": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youWillNotAttendThisMeeting": "Ви не будете присутні на цій зустрічі",
+  "@youWillNotAttendThisMeeting": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youMayAttendThisMeeting": "Ви можете бути присутніми на цій зустрічі",
+  "@youMayAttendThisMeeting": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youAcceptedTheProposedTimeForThisMeeting": "Ви прийняли запропонований час для цієї зустрічі",
+  "@youAcceptedTheProposedTimeForThisMeeting": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "downloadMessageAsEML": "Завантажити повідомлення як EML",
+  "@downloadMessageAsEML": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "downloadMessageAsEMLFailed": "Не вдалося завантажити повідомлення як EML",
+  "@downloadMessageAsEMLFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "download": "Завантажити",
+  "@download": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "print": "Друк",
+  "@print": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "page": "Сторінка",
+  "@page": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "zoomIn": "Збільшити масштаб",
+  "@zoomIn": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "zoomOut": "Зменшити масштаб",
+  "@zoomOut": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "warningMessageWhenExceedGenerallySizeInComposer": "Розмір вашого повідомлення перевищує загальноприйнятий розмір поштових систем третіх сторін. Якщо ви підтвердите надсилання цього листа, існує ризик, що його буде відхилено системою одержувача.",
+  "@warningMessageWhenExceedGenerallySizeInComposer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "continueAction": "Продовжити",
+  "@continueAction": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisFileCannotBePicked": "Цей файл не можна вибрати.",
+  "@thisFileCannotBePicked": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "loadingPleaseWait": "Завантаження... Будь ласка, зачекайте!",
+  "@loadingPleaseWait": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "progress": "Прогрес",
+  "@progress": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendingMessage": "Надсилання повідомлення",
+  "@sendingMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "warningMessageWhenSendEmailFailure": "Не вдалося надіслати повідомлення.\nПід час надсилання пошти сталася помилка.",
+  "@warningMessageWhenSendEmailFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "closeAnyway": "Все одно закрити",
+  "@closeAnyway": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveMessage": "Зберегти повідомлення",
+  "@saveMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "discardChanges": "Відхилити зміни",
+  "@discardChanges": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "warningMessageWhenClickCloseComposer": "Зберегти це повідомлення в папці чернеток і закрити редактор?",
+  "@warningMessageWhenClickCloseComposer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "savingMessage": "Збереження повідомлення",
+  "@savingMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "creatingMessage": "Створення повідомлення",
+  "@creatingMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "savingMessageToDraftFolder": "Збереження повідомлення в папці чернеток",
+  "@savingMessageToDraftFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "warningMessageWhenSaveEmailToDraftsFailure": "Не вдалося зберегти повідомлення в папці чернеток.\nПід час збереження пошти сталася помилка.",
+  "@warningMessageWhenSaveEmailToDraftsFailure": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "canceling": "Скасування",
+  "@canceling": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mailToAttendees": "Лист для учасників",
+  "@mailToAttendees": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showMore": "Показати більше (+{count})",
+  "@showMore": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "showLess": "Показати менше",
+  "@showLess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notification": "Сповіщення",
+  "@notification": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "notificationsDisabled": "Сповіщення вимкнено",
+  "@notificationsDisabled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "pleaseAllowNotifications": "Будь ласка, дозвольте сповіщення від Twake Mail у налаштуваннях пристрою",
+  "@pleaseAllowNotifications": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "goToSettings": "Перейдіть до налаштувань",
+  "@goToSettings": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "allowsTwakeMailToNotifyYouWhenANewMessageArrivesOnYourPhone": "Дозволяє Twake Mail повідомляти вас про надходження нового повідомлення на ваш телефон",
+  "@allowsTwakeMailToNotifyYouWhenANewMessageArrivesOnYourPhone": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showNotifications": "Показати сповіщення",
+  "@showNotifications": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "turnOnRequestReadReceipt": "Увімкнути запит на підтвердження прочитання",
+  "@turnOnRequestReadReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "turnOffRequestReadReceipt": "Вимкнути запит на підтвердження прочитання",
+  "@turnOffRequestReadReceipt": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requestReadReceiptHasBeenEnabled": "Запит на підтвердження прочитання ввімкнено",
+  "@requestReadReceiptHasBeenEnabled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "requestReadReceiptHasBeenDisabled": "Запит на підтвердження прочитання вимкнено",
+  "@requestReadReceiptHasBeenDisabled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reconnect": "Знову підключитися",
+  "@reconnect": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sMimeGoodSignatureMessage": "Справжність цього повідомлення була підтверджена за допомогою підпису SMime.",
+  "@sMimeGoodSignatureMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sMimeBadSignatureMessage": "Це повідомлення не пройшло перевірку підпису SMime.",
+  "@sMimeBadSignatureMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emptySpamFolderFailed": "Не вдалося очистити папку зі спамом",
+  "@emptySpamFolderFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "emptyTrashFolderFailed": "Не вдалося очистити папку «Кошик»",
+  "@emptyTrashFolderFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "markAsSpamFailed": "Не вдалося позначити як спам",
+  "@markAsSpamFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "canNotUploadFileToSignature": "Не вдається завантажити цей файл до підпису",
+  "@canNotUploadFileToSignature": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "generalSignatureImageUploadError": "Під час завантаження зображення сталася помилка. Спробуйте ще раз.",
+  "@generalSignatureImageUploadError": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisImageCannotBePastedIntoTheEditor": "Це зображення не можна вставити в редактор.",
+  "@thisImageCannotBePastedIntoTheEditor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "spamFolderNotFound": "Папку зі спамом не знайдено",
+  "@spamFolderNotFound": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youHaveNotAddedConditionToRule": "Ви не додали умову до правила.",
+  "@youHaveNotAddedConditionToRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youHaveNotAddedActionToRule": "Ви не додали дію до правила.",
+  "@youHaveNotAddedActionToRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youHaveNotSelectedAnyActionForRule": "Ви не вибрали жодної дії для правила.",
+  "@youHaveNotSelectedAnyActionForRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "tryAgain": "Спробуйте ще раз",
+  "@tryAgain": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youAreOffline": "Ви офлайн. Схоже, ви не підключені.",
+  "@youAreOffline": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "findEmails": "Знайти електронні листи",
+  "@findEmails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisFieldCannotContainOnlySpaces": "Це поле не може містити лише пробіли",
+  "@thisFieldCannotContainOnlySpaces": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "descriptionWelcomeTo": "Новий стандарт відкритого коду для\n безпечна професійна електронна пошта",
+  "@descriptionWelcomeTo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createTwakeId": "Створити Twake ID",
+  "@createTwakeId": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "useCompanyServer": "Використовувати сервер компанії",
+  "@useCompanyServer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sigInSaasFailed": "Не вдалося ввійти. Будь ласка, перевірте ще раз.",
+  "@sigInSaasFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createTwakeIdFailed": "Не вдалося створити ідентифікатор Twake. Перевірте ще раз.",
+  "@createTwakeIdFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "yesLogout": "Так, вийти",
+  "@yesLogout": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "logoutConfirmation": "Підтвердження виходу",
+  "@logoutConfirmation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageConfirmationLogout": "Ви хочете вийти з",
+  "@messageConfirmationLogout": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "switchAccountConfirmation": "Підтвердження зміни облікового запису",
+  "@switchAccountConfirmation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youAreCurrentlyLoggedInWith": "Ви зараз увійшли в систему за допомогою",
+  "@youAreCurrentlyLoggedInWith": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "doYouWantToLogOutAndSwitchTo": "Ви хочете вийти та перейти до",
+  "@doYouWantToLogOutAndSwitchTo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "getHelpOrReportABug": "Отримайте допомогу або повідомте про помилку",
+  "@getHelpOrReportABug": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "replyToList": "Відповісти до списку",
+  "@replyToList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "parseEmailByBlobIdFailed": "Не вдається проаналізувати електронну пошту за ідентифікатором блобу",
+  "@parseEmailByBlobIdFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "previewEmailFromEMLFileFailed": "Не вдається переглянути цей EML-файл",
+  "@previewEmailFromEMLFileFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "cannotOpenNewWindow": "Не вдається відкрити нове вікно",
+  "@cannotOpenNewWindow": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "downloadAttachmentInEMLPreviewWarningMessage": "Завантаження вкладеного файлу. Ви можете завантажити лише один файл за раз.",
+  "@downloadAttachmentInEMLPreviewWarningMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "editAsNewEmail": "Редагувати як нову електронну адресу",
+  "@editAsNewEmail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thisHtmlAttachmentCannotBePreviewed": "Цей HTML-файл неможливо переглянути",
+  "@thisHtmlAttachmentCannotBePreviewed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "downloadAttachmentHasBeenCancelled": "Завантаження вкладеного файлу скасовано",
+  "@downloadAttachmentHasBeenCancelled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sizeDescending": "Розмір за спаданням",
+  "@sizeDescending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sizeAscending": "Розмір за зростанням",
+  "@sizeAscending": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "markAsImportant": "Позначити як важливе",
+  "@markAsImportant": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "markAsImportantIsEnabled": "Позначення як важливого ввімкнено",
+  "@markAsImportantIsEnabled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "markAsImportantIsDisabled": "Позначення як важливого вимкнено",
+  "@markAsImportantIsDisabled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "turnOnMarkAsImportant": "Увімкнути позначку як важливе",
+  "@turnOnMarkAsImportant": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "turnOffMarkAsImportant": "Вимкнути позначку як важливе",
+  "@turnOffMarkAsImportant": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "preferences": "Параметри",
+  "@preferences": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "senderSetImportantFlag": "Важливий прапорець, встановлений відправником",
+  "@senderSetImportantFlag": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "senderImportantSettingExplanation": "Увімкнення відображення позначки важливих електронних листів у вашій поштовій скриньці. Ця функція контролюється відправником і тому може призвести до зловживань.",
+  "@senderImportantSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "senderImportantSettingToggleDescription": "Відображати позначку важливості, встановлену відправником",
+  "@senderImportantSettingToggleDescription": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hideAll": "Приховати все",
+  "@hideAll": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youHaveAnotherEventAtThatSameTime": "У вас є інша подія в той самий час",
+  "@youHaveAnotherEventAtThatSameTime": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "exitFullscreen": "Вийти з повноекранного режиму",
+  "@exitFullscreen": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageClipped": "[Повідомлення обрізано]",
+  "@messageClipped": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "viewEntireMessage": "Переглянути все повідомлення",
+  "@viewEntireMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "retry": "Повторити спробу",
+  "@retry": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "refresh": "Оновити",
+  "@refresh": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deepRefresh": "Глибоке оновлення",
+  "@deepRefresh": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "pullDownToRefresh": "Потягніть униз, щоб оновити",
+  "@pullDownToRefresh": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "releaseTo": "Відпустити для",
+  "@releaseTo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "pullHarderFor": "Потягніть сильніше для",
+  "@pullHarderFor": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveAsTemplate": "Зберегти як шаблон",
+  "@saveAsTemplate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "savingTemplate": "Збереження шаблону",
+  "@savingTemplate": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "savingMessageToTemplateFolder": "Збереження повідомлення в папці шаблонів",
+  "@savingMessageToTemplateFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveMessageToTemplateSuccess": "Повідомлення успішно збережено в папці шаблонів",
+  "@saveMessageToTemplateSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "updateMessageToTemplateSuccess": "Оновлення повідомлення в папці шаблонів успішно",
+  "@updateMessageToTemplateSuccess": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveMessageToTemplateFailed": "Не вдалося зберегти повідомлення в папку шаблонів",
+  "@saveMessageToTemplateFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "saveMessageToTemplateCancelled": "Збереження повідомлення в папці шаблонів скасовано",
+  "@saveMessageToTemplateCancelled": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "invalidArguments": "Недійсні аргументи: \"{description}\"",
+  "@invalidArguments": {
+    "type": "text",
+    "placeholders_order": [
+      "description"
+    ],
+    "placeholders": {
+      "description": {}
+    }
+  },
+  "exportTraceLog": "Експорт журналу трасування",
+  "@exportTraceLog": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageExportTraceLogDialog": "Журнал повідомлень про помилки мобільного API було відстежено. Бажаєте експортувати його?",
+  "@messageExportTraceLogDialog": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youNeedToGrantFilesPermissionToExportFile": "Вам потрібно надати файлам дозвіл на експорт файлів",
+  "@youNeedToGrantFilesPermissionToExportFile": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "exportTraceLogSuccess": "Експортувати успішні журнали відстеження за адресою \"{path}\"",
+  "@exportTraceLogSuccess": {
+    "type": "text",
+    "placeholders_order": [
+      "path"
+    ],
+    "placeholders": {
+      "path": {}
+    }
+  },
+  "noLogsHaveBeenRecordedYet": "Жодних журналів ще не записано.",
+  "@noLogsHaveBeenRecordedYet": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "thread": "Нитка",
+  "@thread": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "threadSettingExplanation": "Перегляд кількох пов’язаних електронних листів, як-от розмови",
+  "@threadSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "threadToggleDescription": "Увімкнути ланцюжок",
+  "@threadToggleDescription": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "exportTraceLogFailed": "Не вдалося експортувати журнал трасування",
+  "@exportTraceLogFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "support": "Підтримка",
+  "@support": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addRecipientsFailed": "Не вдалося додати одержувача.",
+  "@addRecipientsFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "editLocalCopyInForwardFailed": "Не вдалося редагувати локальну копію в прямому ефірі.",
+  "@editLocalCopyInForwardFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteRecipientsFailed": "Не вдалося видалити одержувачів.",
+  "@deleteRecipientsFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youDoNotHaveAnyEmailInYourCurrentFolder": "У вас немає електронних адрес\n у цій папці.",
+  "@youDoNotHaveAnyEmailInYourCurrentFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "startToComposeEmails": "Почніть складати електронні листи.",
+  "@startToComposeEmails": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createFilter": "Створити фільтр",
+  "@createFilter": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createFilterRuleFailed": "Не вдалося створити правило фільтра",
+  "@createFilterRuleFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "youAreNotInvitedToThisEventPleaseContactTheOrganizer": "Вас не запрошено на цю подію. Будь ласка, зв’яжіться з організатором.",
+  "@youAreNotInvitedToThisEventPleaseContactTheOrganizer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "countMessageInSpam": "{count} повідомлення у спамі",
+  "@countMessageInSpam": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "daysAgo": "{days,plural, =0{}=1{ (1 день тому)}other{ ({days} днів тому)}}",
+  "@daysAgo": {
+    "type": "text",
+    "placeholders_order": [
+      "days"
+    ],
+    "placeholders": {
+      "days": {}
+    }
+  },
+  "copy": "Копіювати",
+  "@copy": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "editEmail": "Редагувати електронну пошту",
+  "@editEmail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createARule": "Створити правило",
+  "@createARule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enterSubjectKeywords": "Введіть ключові слова теми...",
+  "@enterSubjectKeywords": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addAnEmailAddress": "Додати адресу електронної пошти",
+  "@addAnEmailAddress": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dialogRecoverDeletedMessagesDescription": "Ви можете відновити повідомлення, видалені протягом останніх {period} днів. Відновлені електронні листи будуть поміщені у вашу папку «відновлені».",
+  "@dialogRecoverDeletedMessagesDescription": {
+    "type": "text",
+    "placeholders_order": [
+      "period"
+    ],
+    "placeholders": {
+      "period": {}
+    }
+  },
+  "enterName": "Введіть ім'я",
+  "@enterName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enterEmailAddress": "Введіть адресу електронної пошти",
+  "@enterEmailAddress": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "archiveAndDownload": "Архів та завантаження",
+  "@archiveAndDownload": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "creatingAnArchiveForDownloading": "Створення архіву для завантаження",
+  "@creatingAnArchiveForDownloading": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ok": "OK",
+  "@ok": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "keepACopyInInbox": "Зберегти копію у Вхідних",
+  "@keepACopyInInbox": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "keepACopyInInboxDescription": "Зберігайте переслані електронні листи у своїй поштовій скриньці, а також надсилайте їх одержувачам",
+  "@keepACopyInInboxDescription": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dialogWarningTitleForForwardsToOtherDomains": "Ви перенаправляєте електронні листи на інший домен.",
+  "@dialogWarningTitleForForwardsToOtherDomains": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "dialogWarningMessageForForwardsToOtherDomains": "Це може бути загрозою безпеці або вважатися незаконним вилученням даних. Ви хочете продовжити?",
+  "@dialogWarningMessageForForwardsToOtherDomains": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "hideSignature": "Приховати підпис",
+  "@hideSignature": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showSignature": "Показати підпис",
+  "@showSignature": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "archiveMessagesFailed": "Не вдалося архівувати повідомлення",
+  "@archiveMessagesFailed": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "singularAttachmentTitleHeader": "{count} Вкладення ({totalSize})",
+  "@singularAttachmentTitleHeader": {
+    "type": "text",
+    "placeholders_order": [
+      "count",
+      "totalSize"
+    ],
+    "placeholders": {
+      "count": {},
+      "totalSize": {}
+    }
+  },
+  "attachment": "Вкладення",
+  "@attachment": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "increaseYourSpace": "Збільште свій простір",
+  "@increaseYourSpace": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quotaAvailableLabel": "{count} доступно",
+  "@quotaAvailableLabel": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "paywallUrlNotAvailable": "URL-адреса платного доступу недоступна",
+  "@paywallUrlNotAvailable": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quotaBannerWarningTitle": "У вас закінчується місце для зберігання (90%)",
+  "@quotaBannerWarningTitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quotaBannerWarningSubtitleWithPremium": "Щоб продовжувати надсилати повідомлення та користуватися всіма функціями Twake Mail, подумайте про очищення або оновлення вашого сховища.",
+  "@quotaBannerWarningSubtitleWithPremium": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "quotaBannerWarningSubtitleWithoutPremium": "Щоб продовжувати надсилати повідомлення та користуватися всіма функціями Twake Mail, будь ласка, подумайте про очищення.",
+  "@quotaBannerWarningSubtitleWithoutPremium": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "manageMyStorage": "Керувати моїм сховищем",
+  "@manageMyStorage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addARule": "Додати а правило",
+  "@addARule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "noRulesConfigured": "Не налаштовано жодних правил",
+  "@noRulesConfigured": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageExplanationNoRulesConfigured": "Почніть зі створення першого правила для автоматизації\nуправління електронною поштою.",
+  "@messageExplanationNoRulesConfigured": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createMyFirstRule": "Створити моє перше правило",
+  "@createMyFirstRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createANewRule": "Створити Нове Правило",
+  "@createANewRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ruleName": "Назва правила",
+  "@ruleName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "condition": "Хвороба",
+  "@condition": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addACondition": "Додати Умову",
+  "@addACondition": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "actionsToPerform": "Дії для виконання",
+  "@actionsToPerform": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "addAnAction": "Додати Дію",
+  "@addAnAction": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createRule": "Створити Правило",
+  "@createRule": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "preview": "Попередній перегляд",
+  "@preview": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "ruleFilterConditionPreviewMessage": "{conditionCombinerName} умов: {conditionValue}",
+  "@ruleFilterConditionPreviewMessage": {
+    "type": "text",
+    "placeholders_order": [
+      "conditionCombinerName",
+      "conditionValue"
+    ],
+    "placeholders": {
+      "conditionCombinerName": {},
+      "conditionValue": {}
+    }
+  },
+  "actions": "Дії",
+  "@actions": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createANewFolder": "Створити Нову Папку",
+  "@createANewFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "subtitleDisplayTheFolderNameLocationInFolderCreationModal": "Нова папка буде створена всередині {folderName}",
+  "@subtitleDisplayTheFolderNameLocationInFolderCreationModal": {
+    "type": "text",
+    "placeholders_order": [
+      "folderName"
+    ],
+    "placeholders": {
+      "folderName": {}
+    }
+  },
+  "folderName": "Назва папки",
+  "@folderName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "enterTheFolderName": "Введіть назву папку",
+  "@enterTheFolderName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "selectTheFolderLocation": "Виберіть розташування папки",
+  "@selectTheFolderLocation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "createFolder": "Створити папку",
+  "@createFolder": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "sendMessage": "Надіслати повідомлення",
+  "@sendMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attachmentReminderModalTitle": "Забули прикріпити файл?",
+  "@attachmentReminderModalTitle": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "attachmentReminderModalMessage": "Ви написали {keyword} у своєму повідомленні, але не додали жодних вкладень. Ви все ще хочете надіслати?",
+  "@attachmentReminderModalMessage": {
+    "type": "text",
+    "placeholders_order": [
+      "keyword"
+    ],
+    "placeholders": {
+      "keyword": {}
+    }
+  },
+  "spamReports": "Звіти про спам",
+  "@spamReports": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "spamReportsSettingExplanation": "Нагадує вам про необхідність періодично модерувати спам-листи",
+  "@spamReportsSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "spamReportToggleDescription": "Увімкнути звіт про спам",
+  "@spamReportToggleDescription": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "showMoreAttachmentButton": "Показати ще +{count}",
+  "@showMoreAttachmentButton": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "hideAttachmentButton": "Приховати {count}",
+  "@hideAttachmentButton": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "defaultIdentitySetupSuccessful": "Налаштування ідентифікації за замовчуванням успішне",
+  "@defaultIdentitySetupSuccessful": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "storageSettingExplanation": "Слідкуйте за наявним простором.",
+  "@storageSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "storageIsAlmostFullMessage": "Сховище майже заповнене. Ви можете звільнити місце, видаливши непотрібні файли, або оформити підписку, щоб отримати додаткове місце.",
+  "@storageIsAlmostFullMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "upgradeStorage": "Оновіть сховище",
+  "@upgradeStorage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "storageUsedMessage": "використано {limit}",
+  "@storageUsedMessage": {
+    "type": "text",
+    "placeholders_order": [
+      "limit"
+    ],
+    "placeholders": {
+      "limit": {}
+    }
+  },
+  "storageAvailableMessage": "Доступно: {count}",
+  "@storageAvailableMessage": {
+    "type": "text",
+    "placeholders_order": [
+      "count"
+    ],
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "mailHasBeenStarred": "Пошту позначено зірочкою",
+  "@mailHasBeenStarred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mailHasBeenUnstarred": "З пошти знято зірочку",
+  "@mailHasBeenUnstarred": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "keyboardShortcuts": "Комбінації клавіш",
+  "@keyboardShortcuts": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "keyboardShortcutsSettingExplanation": "Дії поштової скриньки та електронної пошти",
+  "@keyboardShortcutsSettingExplanation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "navigationAndClosing": "Навігація та закриття",
+  "@navigationAndClosing": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "readingAndReplying": "Читання та відповіді",
+  "@readingAndReplying": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "messageManagementAndSelection": "Управління повідомленнями та вибір",
+  "@messageManagementAndSelection": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "navigation": "Навігація",
+  "@navigation": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "reading": "Читання",
+  "@reading": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "closeMailComposer": "Закрити редактор пошти",
+  "@closeMailComposer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "removeFocusFromSearch": "Вилучити фокус із пошуку",
+  "@removeFocusFromSearch": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "closeModalWindow": "Закрити модальне вікно",
+  "@closeModalWindow": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "openNewMessage": "Відкрити нове повідомлення",
+  "@openNewMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mailComposer": "Компонувальник пошти",
+  "@mailComposer": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "focusOnSearch": "Зосередьтеся на пошуку",
+  "@focusOnSearch": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "openedModal": "Відкрито модальне вікно",
+  "@openedModal": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mailboxList": "Список поштових скриньок",
+  "@mailboxList": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "openedMailView": "Відкрито перегляд пошти",
+  "@openedMailView": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "mailboxListWithSelectedMail": "Список поштових скриньок (вибрана пошта)",
+  "@mailboxListWithSelectedMail": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "replyToAll": "Відповісти до всіх",
+  "@replyToAll": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "deleteMessage": "Видалити повідомлення",
+  "@deleteMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moveFolderContent": "Переміщення вмісту папки",
+  "@moveFolderContent": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "moveFolderContentToastMessage": "Не вдалося перемістити всі електронні листи з цієї папки до іншої папки.",
+  "@moveFolderContentToastMessage": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "favoriteMailboxDisplayName": "Позначено зірочкою",
+  "@favoriteMailboxDisplayName": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "insertLink": "Вставити посилання",
+  "@insertLink": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "goTo": "Перейти до",
+  "@goTo": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "change": "Зміна",
+  "@change": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "removeLink": "Вилучити посилання",
+  "@removeLink": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "text": "Текст",
+  "@text": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "typeOrPasteLink": "Введіть або вставте посилання",
+  "@typeOrPasteLink": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "apply": "Застосувати",
+  "@apply": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  },
+  "manageYourTwakeAccount": "Керуйте своїм обліковим записом Twake",
+  "@manageYourTwakeAccount": {
+    "type": "text",
+    "placeholders_order": [],
+    "placeholders": {}
+  }
+}

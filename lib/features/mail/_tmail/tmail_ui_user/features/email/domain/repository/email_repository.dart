@@ -1,0 +1,208 @@
+import 'dart:async';
+
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/html_transformer/transform_configuration.dart';
+import 'package:dio/dio.dart';
+import 'package:email_recovery/email_recovery/email_recovery_action.dart';
+import 'package:email_recovery/email_recovery/email_recovery_action_id.dart';
+import 'package:jmap_dart_client/jmap/account_id.dart';
+import 'package:jmap_dart_client/jmap/core/error/set_error.dart';
+import 'package:jmap_dart_client/jmap/core/id.dart';
+import 'package:jmap_dart_client/jmap/core/properties/properties.dart';
+import 'package:jmap_dart_client/jmap/core/session/session.dart';
+import 'package:jmap_dart_client/jmap/core/state.dart' as jmap;
+import 'package:jmap_dart_client/jmap/mail/email/email.dart';
+import 'package:jmap_dart_client/jmap/mail/email/keyword_identifier.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/email_content.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/mark_star_action.dart';
+import 'package:bluebubbles/features/mail/_tmail/model/email/read_actions.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer/domain/model/email_request.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/domain/model/detailed_email.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/domain/model/email_print.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/domain/model/move_to_mailbox_request.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/domain/model/restore_deleted_message_request.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/domain/model/view_entire_message_request.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/domain/model/create_new_mailbox_request.dart';
+
+abstract class EmailRepository {
+  Future<Email> getEmailContent(
+    Session session,
+    AccountId accountId,
+    EmailId emailId,
+    {Properties? additionalProperties});
+
+  Future<void> sendEmail(
+    Session session,
+    AccountId accountId,
+    EmailRequest emailRequest,
+    {
+      CreateNewMailboxRequest? mailboxRequest,
+      CancelToken? cancelToken
+    }
+  );
+
+  Future<({
+    List<EmailId> emailIdsSuccess,
+    Map<Id, SetError> mapErrors,
+  })> markAsRead(
+    Session session,
+    AccountId accountId,
+    List<EmailId> emailIds,
+    ReadActions readActions,
+  );
+
+  Future<({
+    List<EmailId> emailIdsSuccess,
+    Map<Id, SetError> mapErrors,
+  })> moveToMailbox(
+    Session session,
+    AccountId accountId,
+    MoveToMailboxRequest moveRequest,
+  );
+
+  Future<({
+    List<EmailId> emailIdsSuccess,
+    Map<Id, SetError> mapErrors,
+  })> markAsStar(
+    Session session,
+    AccountId accountId,
+    List<EmailId> emailIds,
+    MarkStarAction markStarAction
+  );
+
+  Future<List<EmailContent>> transformEmailContent(
+    List<EmailContent> emailContents,
+    Map<String, String> mapCidImageDownloadUrl,
+    TransformConfiguration transformConfiguration
+  );
+
+  Future<Email> saveEmailAsDrafts(
+    Session session,
+    AccountId accountId,
+    Email email,
+    {CancelToken? cancelToken}
+  );
+
+  Future<bool> removeEmailDrafts(
+    Session session,
+    AccountId accountId,
+    EmailId emailId,
+    {CancelToken? cancelToken}
+  );
+
+  Future<Email> updateEmailDrafts(
+    Session session,
+    AccountId accountId,
+    Email newEmail,
+    EmailId oldEmailId,
+    {CancelToken? cancelToken}
+  );
+
+  Future<Email> saveEmailAsTemplate(
+    Session session,
+    AccountId accountId,
+    Email email,
+    {
+      CreateNewMailboxRequest? createNewMailboxRequest,
+      CancelToken? cancelToken
+    }
+  );
+
+  Future<Email> updateEmailTemplate(
+    Session session,
+    AccountId accountId,
+    Email newEmail,
+    EmailId oldEmailId,
+    {CancelToken? cancelToken}
+  );
+
+  Future<({
+    List<EmailId> emailIdsSuccess,
+    Map<Id, SetError> mapErrors,
+  })> deleteMultipleEmailsPermanently(
+    Session session,
+    AccountId accountId,
+    List<EmailId> emailIds,
+  );
+
+  Future<bool> deleteEmailPermanently(
+    Session session,
+    AccountId accountId,
+    EmailId emailId,
+    {CancelToken? cancelToken}
+  );
+
+  Future<jmap.State?> getEmailState(Session session, AccountId accountId);
+
+  Future<void> storeDetailedNewEmail(Session session, AccountId accountId, DetailedEmail detailedEmail);
+
+  Future<Email> getDetailedEmailById(Session session, AccountId accountId, EmailId emailId);
+
+  Future<void> storeEmail(Session session, AccountId accountId, Email email);
+
+  Future<Email> getStoredEmail(Session session, AccountId accountId, EmailId emailId);
+
+  Future<void> storeOpenedEmail(Session session, AccountId accountId, DetailedEmail detailedEmail);
+
+  Future<DetailedEmail> getStoredOpenedEmail(Session session, AccountId accountId, EmailId emailId);
+
+  Future<DetailedEmail> getStoredNewEmail(Session session, AccountId accountId, EmailId emailId);
+
+  Future<String> transformHtmlEmailContent(
+    String htmlContent,
+    TransformConfiguration configuration
+  );
+
+  Future<void> unsubscribeMail(Session session, AccountId accountId, EmailId emailId);
+
+  Future<EmailRecoveryAction> restoreDeletedMessage(RestoredDeletedMessageRequest restoredDeletedMessageRequest);
+
+  Future<EmailRecoveryAction> getRestoredDeletedMessage(EmailRecoveryActionId emailRecoveryActionId);
+
+  Future<void> printEmail(EmailPrint emailPrint);
+
+  Future<String> generateEntireMessageAsDocument(ViewEntireMessageRequest entireMessageRequest);
+
+  Future<void> addLabelToEmail(
+    Session session,
+    AccountId accountId,
+    EmailId emailId,
+    KeyWordIdentifier labelKeyword,
+  );
+
+  Future<({
+    List<EmailId> emailIdsSuccess,
+    Map<Id, SetError> mapErrors,
+  })> addLabelToThread(
+    Session session,
+    AccountId accountId,
+    List<EmailId> emailIds,
+    KeyWordIdentifier labelKeyword,
+  );
+
+  Future<void> removeLabelFromEmail(
+    Session session,
+    AccountId accountId,
+    EmailId emailId,
+    KeyWordIdentifier labelKeyword,
+  );
+
+  Future<({
+    List<EmailId> emailIdsSuccess,
+    Map<Id, SetError> mapErrors,
+  })> removeLabelFromThread(
+    Session session,
+    AccountId accountId,
+    List<EmailId> emailIds,
+    KeyWordIdentifier labelKeyword,
+  );
+
+  Future<({
+    List<EmailId> emailIdsSuccess,
+    Map<Id, SetError> mapErrors,
+  })> addListLabelToListEmail(
+    Session session,
+    AccountId accountId,
+    List<EmailId> emailIds,
+    List<KeyWordIdentifier> labelKeywords,
+  );
+}

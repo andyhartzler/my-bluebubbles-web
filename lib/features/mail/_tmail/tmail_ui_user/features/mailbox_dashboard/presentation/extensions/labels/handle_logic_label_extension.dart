@@ -1,0 +1,106 @@
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
+import 'package:get/get.dart';
+import 'package:jmap_dart_client/jmap/mail/email/email.dart';
+import 'package:jmap_dart_client/jmap/mail/email/keyword_identifier.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/email/presentation/action/email_ui_action.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/mailbox_dashboard_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/extensions/update_current_emails_flags_extension.dart';
+
+extension HandleLogicLabelExtension on MailboxDashBoardController  {
+  bool get isLabelCapabilitySupported {
+    final accountId = this.accountId.value;
+    final session = sessionCurrent;
+
+    if (accountId == null || session == null) return false;
+
+    return labelController.isLabelCapabilitySupported(session, accountId);
+  }
+
+  bool get isLabelAvailable {
+    return labelController.isLabelSettingEnabled.isTrue &&
+        isLabelCapabilitySupported;
+  }
+
+  void registerLabelReactiveObxListener() {
+    workerObxVariables.add(
+      ever(
+        labelController.isLabelSettingEnabled,
+        _onLabelSettingEnabledChanged,
+      ),
+    );
+  }
+
+  void _onLabelSettingEnabledChanged(bool isEnabled) {
+    log('$runtimeType::_onLabelSettingEnabledChanged: isEnabled is $isEnabled');
+    final isLabelAvailable = isEnabled && isLabelCapabilitySupported;
+    injectWebSocket(
+      session: sessionCurrent,
+      accountId: accountId.value,
+      isLabelAvailable: isLabelAvailable,
+    );
+  }
+
+  void syncLabelForEmail(
+    EmailId emailId,
+    KeyWordIdentifier labelKeyword,
+    bool shouldRemove,
+  ) {
+    _syncLabelForEmailList(emailId, labelKeyword, shouldRemove);
+    _refreshLabelSettingEnabled();
+
+    if (isEmailOpened) {
+      _syncLabelForOpenedEmail(emailId, labelKeyword, shouldRemove);
+    }
+  }
+
+  void _syncLabelForOpenedEmail(
+    EmailId emailId,
+    KeyWordIdentifier labelKeyword,
+    bool shouldRemove,
+  ) {
+    dispatchEmailUIAction(
+      SyncUpdateLabelForEmailOnMemory(
+        emailId: emailId,
+        labelKeyword: labelKeyword,
+        shouldRemove: shouldRemove,
+      ),
+    );
+  }
+
+  void _syncLabelForEmailList(
+    EmailId emailId,
+    KeyWordIdentifier labelKeyword,
+    bool shouldRemove,
+  ) {
+    updateEmailFlagByEmailIds(
+      [emailId],
+      isLabelAdded: !shouldRemove,
+      labelKeywords: [labelKeyword],
+    );
+  }
+
+  void _refreshLabelSettingEnabled() {
+    labelController.isLabelSettingEnabled.refresh();
+  }
+
+  void syncListLabelForListEmail(
+    List<EmailId> emailIds,
+    List<KeyWordIdentifier> labelKeywords,
+    {bool shouldRemove = false}
+  ) {
+    _syncLabelsForEmailList(emailIds, labelKeywords, shouldRemove);
+    _refreshLabelSettingEnabled();
+  }
+
+  void _syncLabelsForEmailList(
+    List<EmailId> emailIds,
+    List<KeyWordIdentifier> labelKeywords,
+    bool shouldRemove,
+  ) {
+    updateEmailFlagByEmailIds(
+      emailIds,
+      labelKeywords: labelKeywords,
+      isLabelAdded: !shouldRemove,
+    );
+  }
+}

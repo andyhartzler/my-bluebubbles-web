@@ -1,0 +1,28 @@
+
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/color_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/responsive_utils.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/theme_utils.dart';
+import 'package:flutter/material.dart';
+
+class SelectionWebAppBarThreadWidgetStyle {
+  static const double height = 56;
+  static const double iconSize = 20;
+
+  static const Color backgroundColor = Colors.white;
+  static const Color iconColor = AppColor.steelGrayA540;
+
+  static EdgeInsetsGeometry getPadding(BuildContext context, ResponsiveUtils responsiveUtils) {
+    if (responsiveUtils.isMobile(context) || responsiveUtils.isTabletLarge(context)) {
+      return const EdgeInsets.symmetric(horizontal: 16);
+    } else {
+      return const EdgeInsets.symmetric(horizontal: 24);
+    }
+  }
+
+  static TextStyle emailCounterStyle =
+      ThemeUtils.defaultTextStyleInterFont.copyWith(
+    fontSize: 15,
+    fontWeight: FontWeight.w400,
+    color: AppColor.steelGrayA540,
+  );
+}

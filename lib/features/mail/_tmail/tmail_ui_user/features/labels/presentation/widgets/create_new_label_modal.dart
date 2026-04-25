@@ -1,0 +1,570 @@
+import 'dart:async';
+import 'dart:math' as math;
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/color_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/extensions/hex_color_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/resources/image_paths.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/failure.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/responsive_utils.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/utils/theme_utils.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/button/default_close_button_widget.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/color/color_picker_modal.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/color/colors_map_widget.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/presentation/views/dialog/modal_list_action_button_widget.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/app_logger.dart';
+import 'package:bluebubbles/features/mail/_tmail/core/utils/platform_info.dart';
+import 'package:dartz/dartz.dart' as dartz;
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:jmap_dart_client/jmap/account_id.dart';
+import 'package:bluebubbles/features/mail/_tmail/labels/labels.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/base/widget/label_input_field_builder.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/home/data/exceptions/session_exceptions.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/domain/exceptions/label_exceptions.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/domain/model/edit_label_request.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/domain/state/create_new_label_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/domain/state/edit_label_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/domain/usecases/create_new_label_interactor.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/domain/usecases/edit_label_interactor.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/presentation/models/label_action_type.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_creator/domain/model/verification/duplicate_name_validator.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_creator/domain/model/verification/empty_name_validator.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_creator/domain/model/verification/name_with_space_only_validator.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_creator/domain/model/verification/validator.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_creator/domain/state/verify_name_view_state.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_creator/domain/usecases/verify_name_interactor.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_creator/presentation/extensions/validator_failure_extension.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/exceptions/logic_exception.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/routes/route_navigation.dart';
+
+typedef OnLabelActionCallback = Function(Label label);
+
+enum LabelPositiveButtonState {
+  enabled,
+  disabled,
+  progressing;
+}
+
+class CreateNewLabelModal extends StatefulWidget {
+  final List<Label> labels;
+  final AccountId? accountId;
+  final ImagePaths imagePaths;
+  final LabelActionType actionType;
+  final Label? selectedLabel;
+
+  const CreateNewLabelModal({
+    super.key,
+    required this.labels,
+    required this.accountId,
+    required this.imagePaths,
+    this.actionType = LabelActionType.create,
+    this.selectedLabel,
+  });
+
+  @override
+  State<CreateNewLabelModal> createState() => _CreateNewLabelModalState();
+}
+
+class _CreateNewLabelModalState extends State<CreateNewLabelModal> {
+  final ValueNotifier<String?> _labelNameErrorTextNotifier =
+      ValueNotifier(null);
+  final ValueNotifier<Color?> _labelSelectedColorNotifier = ValueNotifier(null);
+  final ValueNotifier<LabelPositiveButtonState> _createLabelStateNotifier =
+      ValueNotifier(LabelPositiveButtonState.disabled);
+  final TextEditingController _nameInputController = TextEditingController();
+  final FocusNode _nameInputFocusNode = FocusNode();
+  final TextEditingController _descriptionInputController =
+      TextEditingController();
+  final FocusNode _descriptionInputFocusNode = FocusNode();
+
+  List<String> _labelDisplayNameList = <String>[];
+  Color? _selectedColor;
+  StreamSubscription? _streamSubscription;
+  CreateNewLabelInteractor? _createNewLabelInteractor;
+  EditLabelInteractor? _editLabelInteractor;
+  VerifyNameInteractor? _verifyNameInteractor;
+  AccountId? _accountId;
+
+  @override
+  void initState() {
+    super.initState();
+    _accountId = widget.accountId;
+    _initInteractors();
+    final selectedLabel = widget.selectedLabel;
+    final labels = widget.labels;
+    if (selectedLabel != null) {
+      _selectedColor = selectedLabel.color?.value.toColor();
+      _labelDisplayNameList =
+          labels.getDisplayNameListWithoutSelectedLabel(selectedLabel);
+    } else {
+      _labelDisplayNameList = labels.displayNameNotNullList;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (selectedLabel != null) {
+        _nameInputController.text = selectedLabel.safeDisplayName;
+        _nameInputFocusNode.requestFocus();
+        _descriptionInputController.text = selectedLabel.safeDescription;
+        _createLabelStateNotifier.value = LabelPositiveButtonState.enabled;
+        _labelSelectedColorNotifier.value = _selectedColor;
+      }
+    });
+  }
+
+  void _initInteractors() {
+    _createNewLabelInteractor = getBinding<CreateNewLabelInteractor>();
+    _editLabelInteractor = getBinding<EditLabelInteractor>();
+    _verifyNameInteractor = getBinding<VerifyNameInteractor>();
+  }
+
+  void _disposeInteractors() {
+    _createNewLabelInteractor = null;
+    _editLabelInteractor = null;
+    _verifyNameInteractor = null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final appLocalizations = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+
+    return ValueListenableBuilder<LabelPositiveButtonState>(
+      valueListenable: _createLabelStateNotifier,
+      builder: (_, labelState, __) => PopScope(
+        canPop: labelState != LabelPositiveButtonState.progressing,
+        child: LayoutBuilder(builder: (_, constraints) {
+      final currentScreenWidth = constraints.maxWidth;
+      final currentScreenHeight = constraints.maxHeight;
+      final isMobile = currentScreenWidth < ResponsiveUtils.minTabletWidth;
+
+      Widget bodyWidget = Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.all(Radius.circular(16)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 24,
+              offset: const Offset(0, 2),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 2,
+            ),
+          ],
+        ),
+        width: math.min(
+          currentScreenWidth - 32,
+          554,
+        ),
+        constraints: BoxConstraints(maxHeight: currentScreenHeight - 100),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTitle(appLocalizations, isMobile, theme),
+                _buildSubTitle(appLocalizations),
+                Flexible(
+                  child: SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.only(
+                        start: 32,
+                        end: 32,
+                        bottom: isMobile ? 0 : 16,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLabelNameInputField(appLocalizations),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: _buildLabelDescriptionInputField(
+                              appLocalizations,
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 26, bottom: 16),
+                            child: Text(
+                              appLocalizations.chooseALabelColor,
+                              style: ThemeUtils.textStyleInter600().copyWith(
+                                fontSize: 14,
+                                height: 18 / 14,
+                                color: Colors.black,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Flexible(
+                            child: Padding(
+                              padding: isMobile
+                                  ? EdgeInsetsDirectional.zero
+                                  : const EdgeInsetsDirectional.only(
+                                      start: 32,
+                                      end: 16,
+                                    ),
+                              child: ValueListenableBuilder(
+                                valueListenable: _labelSelectedColorNotifier,
+                                builder: (_, value, __) {
+                                  return ColorsMapWidget(
+                                    imagePaths: widget.imagePaths,
+                                    customColor: value,
+                                    onOpenColorPicker: () =>
+                                        _openColorPickerModal(appLocalizations),
+                                    onSelectColorCallback: _updateLabelColor,
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          ValueListenableBuilder(
+                            valueListenable: _createLabelStateNotifier,
+                            builder: (_, state, __) {
+                              return ModalListActionButtonWidget(
+                                positiveLabel: widget.actionType
+                                    .getModalPositiveAction(appLocalizations),
+                                negativeLabel: appLocalizations.cancel,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 25,
+                                ),
+                                isPositiveActionEnabled:
+                                    state == LabelPositiveButtonState.enabled,
+                                isProgressing: state ==
+                                    LabelPositiveButtonState.progressing,
+                                onPositiveAction: _onCreateNewLabel,
+                                onNegativeAction: _onCloseModal,
+                                positiveKey: widget.actionType
+                                    .getModalPositiveActionKey(),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            DefaultCloseButtonWidget(
+              iconClose: widget.imagePaths.icCloseDialog,
+              onTapActionCallback: _onCloseModal,
+            ),
+          ],
+        ),
+      );
+
+      bodyWidget = Center(child: bodyWidget);
+
+      if (PlatformInfo.isMobile) {
+        bodyWidget = GestureDetector(
+          onTap: _onCloseModal,
+          child: Scaffold(
+            backgroundColor: AppColor.blackAlpha20,
+            body: GestureDetector(
+              onTap: _clearInputFocus,
+              child: bodyWidget,
+            ),
+          ),
+        );
+      }
+
+      return bodyWidget;
+        }),
+      ),
+    );
+  }
+
+  Widget _buildTitle(
+    AppLocalizations appLocalizations,
+    bool isMobile,
+    ThemeData theme,
+  ) {
+    return Container(
+      height: 64,
+      alignment: Alignment.center,
+      padding: EdgeInsetsDirectional.only(
+        start: 32,
+        end: 32,
+        top: 16,
+        bottom: isMobile ? 0 : 16,
+      ),
+      child: Text(
+        widget.actionType.getModalTitle(appLocalizations),
+        style: theme.textTheme.headlineSmall?.copyWith(
+          color: AppColor.m3SurfaceBackground,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _buildSubTitle(AppLocalizations appLocalizations) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsetsDirectional.only(
+          start: 32,
+          end: 32,
+          bottom: 24,
+        ),
+        child: Text(
+          widget.actionType.getModalSubtitle(appLocalizations),
+          style: ThemeUtils.textStyleInter400.copyWith(
+            color: AppColor.steelGrayA540,
+            fontSize: 13,
+            height: 20 / 13,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLabelNameInputField(AppLocalizations appLocalizations) {
+    return ValueListenableBuilder(
+      valueListenable: _labelNameErrorTextNotifier,
+      builder: (_, errorText, __) {
+        return LabelInputFieldBuilder(
+          key: const Key('label_name_input_field'),
+          label: appLocalizations.labelName,
+          hintText: appLocalizations.pleaseEnterNameYourNewLabel,
+          textEditingController: _nameInputController,
+          focusNode: _nameInputFocusNode,
+          errorText: errorText,
+          arrangeHorizontally: false,
+          isLabelHasColon: false,
+          labelStyle: ThemeUtils.textStyleInter600().copyWith(
+            fontSize: 14,
+            height: 18 / 14,
+            color: Colors.black,
+          ),
+          runSpacing: 16,
+          inputFieldMaxWidth: double.infinity,
+          onTextChange: (value) => _onLabelNameInputChanged(
+            appLocalizations,
+            value,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLabelDescriptionInputField(AppLocalizations appLocalizations) {
+    return LabelInputFieldBuilder(
+      key: const Key('label_description_input_field'),
+      label: appLocalizations.labelDescription,
+      hintText: appLocalizations.labelDescriptionHintText,
+      textEditingController: _descriptionInputController,
+      focusNode: _descriptionInputFocusNode,
+      arrangeHorizontally: false,
+      isLabelHasColon: false,
+      hasMaxLines: false,
+      isFillContainer: true,
+      labelStyle: ThemeUtils.textStyleInter600().copyWith(
+        fontSize: 14,
+        height: 18 / 14,
+        color: Colors.black,
+      ),
+      runSpacing: 16,
+      inputFieldMaxWidth: double.infinity,
+      inputFieldHeight: 84,
+      textAlignVertical: TextAlignVertical.top,
+      inputAction: TextInputAction.newline,
+    );
+  }
+
+  void _onLabelNameInputChanged(
+    AppLocalizations appLocalizations,
+    String value,
+  ) {
+    final errorText = _verifyLabelName(appLocalizations, value);
+    _labelNameErrorTextNotifier.value = errorText;
+    _createLabelStateNotifier.value = errorText == null
+        ? LabelPositiveButtonState.enabled
+        : LabelPositiveButtonState.disabled;
+  }
+
+  String? _verifyLabelName(AppLocalizations appLocalizations, String value) {
+    if (_verifyNameInteractor == null) {
+      return null;
+    }
+    final result = _verifyNameInteractor!.execute(
+      value,
+      _validators,
+    );
+
+    return result.fold(
+      (failure) => failure is VerifyNameFailure
+          ? failure.getMessageLabelError(appLocalizations)
+          : null,
+      (_) => null,
+    );
+  }
+
+  List<Validator> get _validators => [
+        EmptyNameValidator(),
+        NameWithSpaceOnlyValidator(),
+        DuplicateNameValidator(_labelDisplayNameList),
+      ];
+
+  void _clearInputFocus() {
+    _nameInputFocusNode.unfocus();
+    _descriptionInputFocusNode.unfocus();
+  }
+
+  void _onCreateNewLabel() {
+    _clearInputFocus();
+
+    _createLabelStateNotifier.value = LabelPositiveButtonState.progressing;
+
+    final newLabel = Label(
+      displayName: _nameInputController.text,
+      color: _selectedColor != null
+          ? HexColor(_selectedColor!.toHexTriplet())
+          : null,
+      description: _descriptionInputController.text.trim().isEmpty
+          ? null
+          : _descriptionInputController.text.trim(),
+    );
+
+    switch (widget.actionType) {
+      case LabelActionType.create:
+        _performCreateLabel(newLabel);
+        break;
+      case LabelActionType.edit:
+        _performEditLabel(newLabel);
+        break;
+      case LabelActionType.delete:
+        break;
+    }
+  }
+
+  void _onCloseModal() {
+    if (_createLabelStateNotifier.value == LabelPositiveButtonState.progressing) {
+      return;
+    }
+    _clearInputFocus();
+    popBack();
+  }
+
+  void _updateLabelColor(Color? color) {
+    _selectedColor = color;
+  }
+
+  void _onLabelColorChanged(Color? color) {
+    _updateLabelColor(color);
+    _labelSelectedColorNotifier.value = color;
+  }
+
+  Future<void> _openColorPickerModal(AppLocalizations appLocalizations) async {
+    await Get.generalDialog(
+      barrierDismissible: true,
+      barrierLabel: 'color-picker-modal',
+      pageBuilder: (_, __, ___) => ColorPickerModal(
+        imagePaths: widget.imagePaths,
+        modalTitle: appLocalizations.chooseCustomColour,
+        modalSubtitle: appLocalizations.chooseAColourForThisLabel,
+        initialColor: _selectedColor,
+        onSelectColorCallback: _onLabelColorChanged,
+      ),
+    );
+  }
+
+  void _performCreateLabel(Label newLabel) {
+    if (_createNewLabelInteractor == null) {
+      popBack(result: CreateNewLabelFailure(const InteractorNotInitialized()));
+      return;
+    }
+
+    if (_accountId == null) {
+      popBack(result: CreateNewLabelFailure(NotFoundAccountIdException()));
+      return;
+    }
+
+    _streamSubscription = _createNewLabelInteractor!
+        .execute(_accountId!, newLabel)
+        .listen(_handleDataStream, onError: _handleErrorStream);
+  }
+
+  void _handleDataStream(dartz.Either<Failure, Success> newState) {
+    newState.fold((failure) {
+      if (failure is CreateNewLabelFailure || failure is EditLabelFailure) {
+        popBack(result: failure);
+      }
+    }, (success) {
+      if (success is CreateNewLabelSuccess || success is EditLabelSuccess) {
+        popBack(result: success);
+      }
+    });
+  }
+
+  void _handleErrorStream(Object error, StackTrace stackTrace) {
+    logWarning(
+        'CreateNewLabelModal::_handleErrorStream: Error: $error, StackTrace: $stackTrace');
+
+    switch (widget.actionType) {
+      case LabelActionType.create:
+        popBack(result: CreateNewLabelFailure(error));
+        break;
+      case LabelActionType.edit:
+        popBack(result: EditLabelFailure(error));
+        break;
+      case LabelActionType.delete:
+        break;
+    }
+  }
+
+  void _performEditLabel(Label newLabel) {
+    final currentLabelId = widget.selectedLabel?.id;
+    if (currentLabelId == null) {
+      popBack(result: EditLabelFailure(const LabelIdIsNull()));
+      return;
+    }
+
+    final currentLabelKeyword = widget.selectedLabel?.keyword;
+    if (currentLabelKeyword == null) {
+      popBack(result: EditLabelFailure(const LabelKeywordIsNull()));
+      return;
+    }
+
+    final labelRequest = EditLabelRequest(
+      labelId: currentLabelId,
+      labelKeyword: currentLabelKeyword,
+      newLabel: newLabel,
+    );
+
+    if (_editLabelInteractor == null) {
+      popBack(result: EditLabelFailure(const InteractorNotInitialized()));
+      return;
+    }
+    if (_accountId == null) {
+      popBack(result: EditLabelFailure(NotFoundAccountIdException()));
+      return;
+    }
+    _streamSubscription = _editLabelInteractor!
+        .execute(_accountId!, labelRequest)
+        .listen(_handleDataStream, onError: _handleErrorStream);
+  }
+
+  @override
+  void dispose() {
+    _nameInputFocusNode.dispose();
+    _nameInputController.dispose();
+    _descriptionInputFocusNode.dispose();
+    _descriptionInputController.dispose();
+    _labelNameErrorTextNotifier.dispose();
+    _labelSelectedColorNotifier.dispose();
+    _createLabelStateNotifier.dispose();
+    _labelDisplayNameList = [];
+    _streamSubscription?.cancel();
+    _streamSubscription = null;
+    _accountId = null;
+    _disposeInteractors();
+    super.dispose();
+  }
+}
