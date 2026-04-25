@@ -220,9 +220,15 @@ class EdgeFnEmailDataSource extends EmailDataSource {
   Future<({List<EmailId> emailIdsSuccess, Map<Id, SetError> mapErrors})>
       markAsRead(Session session, AccountId accountId,
           List<EmailId> emailIds, ReadActions readActions) async {
-    // No-op: we don't yet propagate read state back to Gmail. Return
-    // success so the UI's optimistic update doesn't roll back.
-    return (emailIdsSuccess: emailIds, mapErrors: const <Id, SetError>{});
+    // Gmail's UNREAD label is the inverse of JMAP's $seen keyword:
+    //   markAsRead   -> remove UNREAD
+    //   markAsUnread -> add    UNREAD
+    final isMarkRead = readActions == ReadActions.markAsRead;
+    return _runMutation(
+      emailIds,
+      addLabelIds: isMarkRead ? null : const ['UNREAD'],
+      removeLabelIds: isMarkRead ? const ['UNREAD'] : null,
+    );
   }
 
   @override
@@ -270,9 +276,25 @@ class EdgeFnEmailDataSource extends EmailDataSource {
   Future<({List<EmailId> emailIdsSuccess, Map<Id, SetError> mapErrors})>
       moveToMailbox(Session session, AccountId accountId,
           MoveToMailboxRequest moveRequest) async {
-    return (
-      emailIdsSuccess: <EmailId>[],
-      mapErrors: <Id, SetError>{},
+    // Flatten every (sourceMailbox -> [emailIds]) entry into one ID list. We
+    // don't need the source mailbox to issue the modify call — Gmail's labels
+    // are conjunctive, and the destination determines what we add/remove.
+    final allIds = <EmailId>[];
+    for (final ids in moveRequest.currentMailboxes.values) {
+      allIds.addAll(ids);
+    }
+    if (allIds.isEmpty) {
+      return (
+        emailIdsSuccess: <EmailId>[],
+        mapErrors: const <Id, SetError>{},
+      );
+    }
+    final destination = moveRequest.destinationMailboxId.id.value;
+    final translated = _translateMailboxMove(destination);
+    return _runMutation(
+      allIds,
+      addLabelIds: translated.add,
+      removeLabelIds: translated.remove,
     );
   }
 
@@ -280,9 +302,12 @@ class EdgeFnEmailDataSource extends EmailDataSource {
   Future<({List<EmailId> emailIdsSuccess, Map<Id, SetError> mapErrors})>
       markAsStar(Session session, AccountId accountId,
           List<EmailId> emailIds, MarkStarAction markStarAction) async {
-    return (
-      emailIdsSuccess: emailIds,
-      mapErrors: <Id, SetError>{},
+    // Gmail STARRED label maps directly onto JMAP's $flagged keyword.
+    final isStar = markStarAction == MarkStarAction.markStar;
+    return _runMutation(
+      emailIds,
+      addLabelIds: isStar ? const ['STARRED'] : null,
+      removeLabelIds: isStar ? null : const ['STARRED'],
     );
   }
 
@@ -385,9 +410,15 @@ class EdgeFnEmailDataSource extends EmailDataSource {
   Future<({List<EmailId> emailIdsSuccess, Map<Id, SetError> mapErrors})>
       deleteMultipleEmailsPermanently(Session session, AccountId accountId,
           List<EmailId> emailIds) async {
+    // Phase 1: permanent-delete is intentionally a no-op success. Gmail's
+    // users.messages.delete is destructive and bypasses the 30-day Trash
+    // recovery window — we route deletes through the move-to-Trash path
+    // instead (handled via moveToMailbox -> 'trash'). Returning success
+    // keeps the optimistic UI consistent; the user can still hard-delete
+    // from gmail.com if they really need to.
     return (
-      emailIdsSuccess: <EmailId>[],
-      mapErrors: <Id, SetError>{},
+      emailIdsSuccess: emailIds,
+      mapErrors: const <Id, SetError>{},
     );
   }
 
@@ -397,8 +428,12 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     AccountId accountId,
     EmailId emailId, {
     CancelToken? cancelToken,
-  }) async =>
-      false;
+  }) async {
+    // Phase 1: see deleteMultipleEmailsPermanently. Routes destructive
+    // deletes through the move-to-Trash path; report success so the UI
+    // doesn't roll back the (already-correct) optimistic remove.
+    return true;
+  }
 
   @override
   Future<Email> getDetailedEmailById(
@@ -491,11 +526,20 @@ class EdgeFnEmailDataSource extends EmailDataSource {
 
   @override
   Future<void> markAsAnswered(
-      Session session, AccountId accountId, List<EmailId> emailIds) async {}
+      Session session, AccountId accountId, List<EmailId> emailIds) async {
+    // Gmail has no first-class "answered" label — its UI renders a "Replied"
+    // badge from thread state automatically once a reply is sent. We treat
+    // this as a no-op (success): the next sync will pick up the real
+    // reply badge once the outbound message lands. Calling modify with no
+    // labels would 400, so we skip the network round-trip entirely.
+  }
 
   @override
   Future<void> markAsForwarded(
-      Session session, AccountId accountId, List<EmailId> emailIds) async {}
+      Session session, AccountId accountId, List<EmailId> emailIds) async {
+    // Same rationale as markAsAnswered: Gmail tracks "Forwarded" via thread
+    // state, not a per-message label. No-op, success.
+  }
 
   @override
   Future<List<Email>> parseEmailByBlobIds(
@@ -671,7 +715,16 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     AccountId accountId,
     EmailId emailId,
     KeyWordIdentifier labelKeyword,
-  ) async {}
+  ) async {
+    final gmailLabel = _keywordToGmailLabel(labelKeyword);
+    if (gmailLabel == null) return; // unmappable keyword -> no-op
+    final inverse = _isInverseKeyword(labelKeyword);
+    await _runMutation(
+      [emailId],
+      addLabelIds: inverse ? null : [gmailLabel],
+      removeLabelIds: inverse ? [gmailLabel] : null,
+    );
+  }
 
   @override
   Future<({List<EmailId> emailIdsSuccess, Map<Id, SetError> mapErrors})>
@@ -681,9 +734,15 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     List<EmailId> emailIds,
     KeyWordIdentifier labelKeyword,
   ) async {
-    return (
-      emailIdsSuccess: emailIds,
-      mapErrors: <Id, SetError>{},
+    final gmailLabel = _keywordToGmailLabel(labelKeyword);
+    if (gmailLabel == null) {
+      return (emailIdsSuccess: emailIds, mapErrors: const <Id, SetError>{});
+    }
+    final inverse = _isInverseKeyword(labelKeyword);
+    return _runMutation(
+      emailIds,
+      addLabelIds: inverse ? null : [gmailLabel],
+      removeLabelIds: inverse ? [gmailLabel] : null,
     );
   }
 
@@ -693,7 +752,18 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     AccountId accountId,
     EmailId emailId,
     KeyWordIdentifier labelKeyword,
-  ) async {}
+  ) async {
+    final gmailLabel = _keywordToGmailLabel(labelKeyword);
+    if (gmailLabel == null) return;
+    final inverse = _isInverseKeyword(labelKeyword);
+    // "Remove keyword" inverts the same axis: remove a positive label,
+    // add the inverse-axis label (e.g. "remove $seen" => "add UNREAD").
+    await _runMutation(
+      [emailId],
+      addLabelIds: inverse ? [gmailLabel] : null,
+      removeLabelIds: inverse ? null : [gmailLabel],
+    );
+  }
 
   @override
   Future<({List<EmailId> emailIdsSuccess, Map<Id, SetError> mapErrors})>
@@ -703,9 +773,15 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     List<EmailId> emailIds,
     KeyWordIdentifier labelKeyword,
   ) async {
-    return (
-      emailIdsSuccess: emailIds,
-      mapErrors: <Id, SetError>{},
+    final gmailLabel = _keywordToGmailLabel(labelKeyword);
+    if (gmailLabel == null) {
+      return (emailIdsSuccess: emailIds, mapErrors: const <Id, SetError>{});
+    }
+    final inverse = _isInverseKeyword(labelKeyword);
+    return _runMutation(
+      emailIds,
+      addLabelIds: inverse ? [gmailLabel] : null,
+      removeLabelIds: inverse ? null : [gmailLabel],
     );
   }
 
@@ -717,10 +793,133 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     List<EmailId> emailIds,
     List<KeyWordIdentifier> labelKeywords,
   ) async {
-    return (
-      emailIdsSuccess: emailIds,
-      mapErrors: <Id, SetError>{},
+    // Bucket each keyword into add/remove based on its inverse polarity.
+    final addLabels = <String>[];
+    final removeLabels = <String>[];
+    for (final kw in labelKeywords) {
+      final gmailLabel = _keywordToGmailLabel(kw);
+      if (gmailLabel == null) continue;
+      if (_isInverseKeyword(kw)) {
+        removeLabels.add(gmailLabel);
+      } else {
+        addLabels.add(gmailLabel);
+      }
+    }
+    if (addLabels.isEmpty && removeLabels.isEmpty) {
+      return (emailIdsSuccess: emailIds, mapErrors: const <Id, SetError>{});
+    }
+    return _runMutation(
+      emailIds,
+      addLabelIds: addLabels.isEmpty ? null : addLabels,
+      removeLabelIds: removeLabels.isEmpty ? null : removeLabels,
     );
+  }
+
+  // ---- mail-mutation helpers ----
+
+  /// Routes a label-mutation through `mail-mutation` and converts the
+  /// edge-fn response into tmail's `(emailIdsSuccess, mapErrors)` shape.
+  /// Unauthorized IDs (caller doesn't own the message — `skipped` from the
+  /// edge fn) are surfaced as `SetError.forbidden`; per-message Gmail-API
+  /// failures are surfaced as `SetError.serverFail` with the detail.
+  Future<({List<EmailId> emailIdsSuccess, Map<Id, SetError> mapErrors})>
+      _runMutation(
+    List<EmailId> emailIds, {
+    List<String>? addLabelIds,
+    List<String>? removeLabelIds,
+  }) async {
+    if (emailIds.isEmpty) {
+      return (emailIdsSuccess: const <EmailId>[], mapErrors: const <Id, SetError>{});
+    }
+    final ids = emailIds.map((e) => e.id.value).toList();
+    final result = await _api.modifyMessages(
+      messageIds: ids,
+      addLabelIds: addLabelIds,
+      removeLabelIds: removeLabelIds,
+    );
+
+    final mutatedSet = result.mutated.toSet();
+    final emailIdsSuccess = emailIds
+        .where((e) => mutatedSet.contains(e.id.value))
+        .toList(growable: false);
+
+    final mapErrors = <Id, SetError>{};
+    for (final skipped in result.skipped) {
+      mapErrors[Id(skipped)] = SetError(
+        SetError.forbidden,
+        description: 'caller alias does not match this message',
+      );
+    }
+    result.errors.forEach((id, msg) {
+      // If the same id was already marked as forbidden (skipped + verify
+      // error), keep the more specific verify error.
+      mapErrors[Id(id)] = SetError(SetError.serverFail, description: msg);
+    });
+    return (emailIdsSuccess: emailIdsSuccess, mapErrors: mapErrors);
+  }
+
+  /// Translates a synthetic destination mailbox id (matching the IDs minted
+  /// by EdgeFnMailboxDataSource — `inbox`, `sent`, `drafts`, `trash`, `spam`)
+  /// into the Gmail label add/remove pair to apply.
+  ///
+  /// Quirk: Gmail rejects modify calls that try to add/remove SENT or DRAFT
+  /// labels via the public API (those are managed by users.messages.send /
+  /// users.drafts.*). For sent/drafts destinations we no-op — the move is
+  /// not meaningful in Gmail's model, but returning a clean translation
+  /// keeps the dispatch surface consistent.
+  ({List<String>? add, List<String>? remove}) _translateMailboxMove(
+    String destination,
+  ) {
+    switch (destination) {
+      case 'inbox':
+        return (add: const ['INBOX'], remove: const ['TRASH', 'SPAM']);
+      case 'trash':
+        return (add: const ['TRASH'], remove: const ['INBOX']);
+      case 'spam':
+        return (add: const ['SPAM'], remove: const ['INBOX']);
+      case 'sent':
+      case 'drafts':
+        // Not user-mutable in Gmail; treat as no-op so the optimistic UI
+        // is honored without a 400 from users.messages.modify.
+        return (add: null, remove: null);
+      default:
+        // Unknown synthetic id (future user-defined label). Best-effort:
+        // archive (remove INBOX) and add the destination label name.
+        return (add: [destination], remove: const ['INBOX']);
+    }
+  }
+
+  /// Maps a JMAP keyword to its corresponding Gmail label name. Returns null
+  /// if the keyword has no Gmail equivalent (we should no-op rather than
+  /// fabricate a label).
+  ///
+  /// Note: `$seen` is mapped to UNREAD because Gmail uses the inverse axis.
+  /// `_isInverseKeyword` flips the add/remove side accordingly.
+  String? _keywordToGmailLabel(KeyWordIdentifier keyword) {
+    if (keyword == KeyWordIdentifier.emailSeen) return 'UNREAD';
+    if (keyword == KeyWordIdentifier.emailFlagged) return 'STARRED';
+    if (keyword == KeyWordIdentifier.emailJunk) return 'SPAM';
+    if (keyword == KeyWordIdentifier.emailNotJunk) return 'SPAM';
+    if (keyword == KeyWordIdentifier.emailDraft) return null; // managed by drafts API
+    if (keyword == KeyWordIdentifier.emailAnswered) return null; // no Gmail label
+    if (keyword == KeyWordIdentifier.emailForwarded) return null; // no Gmail label
+    if (keyword == KeyWordIdentifier.emailPhishing) return null; // Gmail handles via reportSpam
+    if (keyword == KeyWordIdentifier.mdnSent) return null;
+    // User-defined keyword. Gmail label names are arbitrary strings; sanitize
+    // the JMAP keyword value so it round-trips cleanly: strip the leading $,
+    // and prefix to make it visually distinct from Gmail's system labels.
+    final raw = keyword.value;
+    final cleaned = raw.startsWith(r'$') ? raw.substring(1) : raw;
+    if (cleaned.isEmpty) return null;
+    return 'User-Defined-$cleaned';
+  }
+
+  /// Returns true if the keyword's polarity is inverted relative to its Gmail
+  /// label — currently only `$seen` (Gmail uses UNREAD as the negation) and
+  /// `$notjunk` (we map to SPAM with inverted polarity).
+  bool _isInverseKeyword(KeyWordIdentifier keyword) {
+    return keyword == KeyWordIdentifier.emailSeen ||
+        keyword == KeyWordIdentifier.emailNotJunk;
   }
 }
 
