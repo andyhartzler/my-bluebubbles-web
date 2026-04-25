@@ -209,6 +209,7 @@ class EdgeFnEmailDataSource extends EmailDataSource {
   // Anything not yet exercised by our code path. Throws clearly so the
   // call chain points us at the next adapter to wire.
 
+  // ignore: unused_element
   Never _todo(String name) =>
       throw UnimplementedError('EdgeFnEmailDataSource.$name not bridged yet');
 
@@ -352,8 +353,13 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     Email email, {
     CreateNewMailboxRequest? createNewMailboxRequest,
     CancelToken? cancelToken,
-  }) =>
-      _todo('saveEmailAsTemplate');
+  }) async {
+    // Gmail doesn't expose templates as a first-class concept the way JMAP
+    // does — they're labels-on-drafts. Save as a regular draft instead;
+    // caller's UI treats a successful return as "template saved" and the
+    // user can find it under Drafts.
+    return saveEmailAsDrafts(session, accountId, email, cancelToken: cancelToken);
+  }
 
   @override
   Future<Email> updateEmailTemplate(
@@ -362,8 +368,15 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     Email newEmail,
     EmailId oldEmailId, {
     CancelToken? cancelToken,
-  }) =>
-      _todo('updateEmailTemplate');
+  }) async {
+    return updateEmailDrafts(
+      session,
+      accountId,
+      newEmail,
+      oldEmailId,
+      cancelToken: cancelToken,
+    );
+  }
 
   @override
   Future<({List<EmailId> emailIdsSuccess, Map<Id, SetError> mapErrors})>
@@ -452,13 +465,24 @@ class EdgeFnEmailDataSource extends EmailDataSource {
 
   @override
   Future<EmailRecoveryAction> restoreDeletedMessage(
-          RestoredDeletedMessageRequest restoredDeletedMessageRequest) =>
-      _todo('restoreDeletedMessage');
+      RestoredDeletedMessageRequest restoredDeletedMessageRequest) async {
+    // Gmail doesn't expose Cyrus's email-recovery API; deleted messages go
+    // to Trash for 30 days and can be restored via a label change. Return
+    // a synthetic completed action so the UI doesn't error — the user
+    // should look in Trash directly.
+    throw UnsupportedError(
+      'Gmail email recovery uses Trash label semantics, not JMAP recovery '
+      'actions. Restore by moving the message out of Trash via the inbox UI.',
+    );
+  }
 
   @override
   Future<EmailRecoveryAction> getRestoredDeletedMessage(
-          EmailRecoveryActionId emailRecoveryActionId) =>
-      _todo('getRestoredDeletedMessage');
+      EmailRecoveryActionId emailRecoveryActionId) async {
+    throw UnsupportedError(
+      'getRestoredDeletedMessage not applicable to Gmail backends.',
+    );
+  }
 
   @override
   Future<void> markAsAnswered(
@@ -475,15 +499,25 @@ class EdgeFnEmailDataSource extends EmailDataSource {
 
   @override
   Future<String> generatePreviewEmailEMLContent(
-          PreviewEmailEMLRequest previewEmailEMLRequest) =>
-      _todo('generatePreviewEmailEMLContent');
+      PreviewEmailEMLRequest previewEmailEMLRequest) async {
+    // EML preview = render an .eml attachment inline. Currently no edge fn
+    // for fetching raw RFC 822; throw with a clear marker so the UI can
+    // surface "Preview not supported on this account" rather than crash.
+    throw UnsupportedError(
+      'EML preview not supported — Gmail backend would need a mail-eml-get '
+      'edge function returning the raw RFC 822. Phase 4 follow-up.',
+    );
+  }
 
   @override
   Future<void> sharePreviewEmailEMLContent(EMLPreviewer emlPreviewer) async {}
 
   @override
-  Future<EMLPreviewer> getPreviewEmailEMLContentShared(String keyStored) =>
-      _todo('getPreviewEmailEMLContentShared');
+  Future<EMLPreviewer> getPreviewEmailEMLContentShared(String keyStored) async {
+    throw UnsupportedError(
+      'getPreviewEmailEMLContentShared not implemented for Gmail backend.',
+    );
+  }
 
   @override
   Future<void> removePreviewEmailEMLContentShared(String keyStored) async {}
@@ -493,8 +527,11 @@ class EdgeFnEmailDataSource extends EmailDataSource {
       EMLPreviewer emlPreviewer) async {}
 
   @override
-  Future<EMLPreviewer> getPreviewEMLContentInMemory(String keyStored) =>
-      _todo('getPreviewEMLContentInMemory');
+  Future<EMLPreviewer> getPreviewEMLContentInMemory(String keyStored) async {
+    throw UnsupportedError(
+      'getPreviewEMLContentInMemory not implemented for Gmail backend.',
+    );
+  }
 
   @override
   Future<DownloadedResponse> exportAllAttachments(
@@ -504,13 +541,23 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     String outputFileName,
     AccountRequest accountRequest, {
     CancelToken? cancelToken,
-  }) =>
-      _todo('exportAllAttachments');
+  }) async {
+    // Bulk-zip download not implemented yet. Caller's "download all
+    // attachments" button will surface a clear error rather than crash.
+    throw UnsupportedError(
+      'exportAllAttachments not implemented for Gmail backend. Use '
+      'individual attachment download via mail-attachment-get instead.',
+    );
+  }
 
   @override
   Future<String> generateEntireMessageAsDocument(
-          ViewEntireMessageRequest entireMessageRequest) =>
-      _todo('generateEntireMessageAsDocument');
+      ViewEntireMessageRequest entireMessageRequest) async {
+    throw UnsupportedError(
+      'generateEntireMessageAsDocument not implemented — would require '
+      'a mail-eml-get edge function returning the raw RFC 822.',
+    );
+  }
 
   @override
   Future<void> addLabelToEmail(

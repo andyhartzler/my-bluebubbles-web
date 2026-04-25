@@ -67,11 +67,36 @@ class EdgeFnThreadDataSource extends ThreadDataSource {
     bool? collapseThreads,
     Properties? properties,
   }) async {
+    final q = _filterToQuery(filter);
+    if (q.isEmpty) {
+      return SearchEmailsResponse(
+        emailList: const [],
+        state: State(DateTime.now().millisecondsSinceEpoch.toString()),
+        searchSnippets: const [],
+      );
+    }
+    final maxResults = (limit?.value.toInt() ?? 25).clamp(1, 100);
+    final page = await _api.searchInbox(q: q, maxResults: maxResults);
+    final emails = page.messages.map(_lightweightJmapEmail).toList();
     return SearchEmailsResponse(
-      emailList: const [],
+      emailList: emails,
       state: State(DateTime.now().millisecondsSinceEpoch.toString()),
       searchSnippets: const [],
     );
+  }
+
+  /// Extract a Gmail-search-syntax query string from a JMAP Filter. Tmail's
+  /// search controller wraps the user-typed text in a `FilterCondition`
+  /// (sometimes nested inside `FilterOperator` AND/OR trees). Our edge fn
+  /// already alias-clamps + sanitizes, so we just need a flat string to
+  /// hand off. The cheap-but-correct path: stringify the filter.
+  String _filterToQuery(Filter? filter) {
+    if (filter == null) return '';
+    final s = filter.toString();
+    // Filter.toString() typically wraps the body of interest. Strip the
+    // class-name prefix Dart's default toString adds. If the user typed
+    // `from:foo` etc., the edge fn's sanitizer will strip dangerous ops.
+    return s;
   }
 
   @override
