@@ -266,7 +266,7 @@ class EmailRecoveryFormDesktopBuilder extends StatelessWidget {
     );
 
     return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.20),
+      backgroundColor: Colors.black.withOpacity(0.20),
       body: child,
     );
   }

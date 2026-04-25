@@ -97,7 +97,7 @@ enum LabelActionType {
       case LabelActionType.delete:
         return AppColor.redFF3347;
       default:
-        return AppColor.gray424244.withValues(alpha: 0.72);
+        return AppColor.gray424244.withOpacity(0.72);
     }
   }
 
@@ -106,7 +106,7 @@ enum LabelActionType {
       case LabelActionType.delete:
         return AppColor.redFF3347;
       default:
-        return AppColor.gray424244.withValues(alpha: 0.9);
+        return AppColor.gray424244.withOpacity(0.9);
     }
   }
 }

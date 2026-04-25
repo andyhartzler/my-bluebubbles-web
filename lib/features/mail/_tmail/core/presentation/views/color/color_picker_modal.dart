@@ -76,12 +76,12 @@ class _ColorPickerModalState extends State<ColorPickerModal> {
           borderRadius: const BorderRadius.all(Radius.circular(16)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
+              color: Colors.black.withOpacity(0.08),
               blurRadius: 24,
               offset: const Offset(0, 2),
             ),
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
+              color: Colors.black.withOpacity(0.08),
               blurRadius: 2,
             ),
           ],
@@ -210,25 +210,19 @@ class _ColorPickerModalState extends State<ColorPickerModal> {
                                   decoration: InputDecoration(
                                     border: UnderlineInputBorder(
                                       borderSide: BorderSide(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.12,
-                                        ),
+                                        color: Colors.black.withOpacity(0.12),
                                         width: 1,
                                       ),
                                     ),
                                     enabledBorder: UnderlineInputBorder(
                                       borderSide: BorderSide(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.12,
-                                        ),
+                                        color: Colors.black.withOpacity(0.12),
                                         width: 1,
                                       ),
                                     ),
                                     focusedBorder: UnderlineInputBorder(
                                       borderSide: BorderSide(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.12,
-                                        ),
+                                        color: Colors.black.withOpacity(0.12),
                                         width: 1,
                                       ),
                                     ),

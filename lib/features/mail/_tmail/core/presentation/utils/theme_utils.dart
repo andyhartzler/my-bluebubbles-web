@@ -13,7 +13,7 @@ class ThemeUtils {
       fontFamilyFallback: ConstantsUI.fontFamilyFallback,
       appBarTheme: _appBarTheme,
       textTheme: _textTheme,
-      hoverColor: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08),
+      hoverColor: Theme.of(context).colorScheme.outline.withOpacity(0.08),
       textSelectionTheme: _textSelectionTheme,
       dividerTheme: _dividerTheme,
       visualDensity: VisualDensity.adaptivePlatformDensity,
@@ -283,7 +283,7 @@ class ThemeUtils {
     letterSpacing: 0.25,
     fontSize: 14,
     height: 20 / 14,
-    color: AppColor.textSecondary.withValues(alpha: 0.48),
+    color: AppColor.textSecondary.withOpacity(0.48),
   );
 
   static TextStyle textStyleM3BodyLarge = defaultTextStyleInterFont.copyWith(
@@ -315,7 +315,7 @@ class ThemeUtils {
     letterSpacing: 0.0,
     fontSize: 24,
     height: 28.01 / 24,
-    color: AppColor.gray424244.withValues(alpha: 0.9),
+    color: AppColor.gray424244.withOpacity(0.9),
   );
 
   static TextStyle defaultTextStyleInterFont = TextStyle(

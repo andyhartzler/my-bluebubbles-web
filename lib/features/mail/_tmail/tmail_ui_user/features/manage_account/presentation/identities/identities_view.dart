@@ -55,7 +55,7 @@ class IdentitiesView extends GetWidget<IdentitiesController> {
                       child: SettingHeaderWidget(
                         menuItem: AccountMenuItem.profiles,
                         textStyle: ThemeUtils.textStyleInter600().copyWith(
-                          color: Colors.black.withValues(alpha: 0.9),
+                          color: Colors.black.withOpacity(0.9),
                         ),
                         padding: const EdgeInsetsDirectional.only(end: 16),
                       ),
@@ -145,7 +145,7 @@ class IdentitiesView extends GetWidget<IdentitiesController> {
                     padding: isDefaultIdentitySupported
                         ? const EdgeInsets.only(top: 24, bottom: 12)
                         : const EdgeInsets.symmetric(vertical: 24),
-                    child: Divider(color: Colors.black.withValues(alpha: 0.08)),
+                    child: Divider(color: Colors.black.withOpacity(0.08)),
                   ),
                 );
 

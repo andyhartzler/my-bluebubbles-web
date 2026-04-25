@@ -308,10 +308,9 @@ extension AppColor on Color {
   ];
 
   int toInt() {
-    final alpha = (a * 255).toInt();
-    final red = (r * 255).toInt();
-    final green = (g * 255).toInt();
-    final blue = (b * 255).toInt();
+    // Flutter <3.27 Color exposes alpha/red/green/blue as int 0-255.
+    // (Flutter 3.27+ adds 0.0-1.0 component getters a/r/g/b — patched
+    //  for our Flutter 3.24.4 baseline during the tmail fork.)
     return (alpha << 24) | (red << 16) | (green << 8) | blue;
   }
 

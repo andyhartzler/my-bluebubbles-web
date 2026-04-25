@@ -56,7 +56,7 @@ class PopupMenuActionGroupWidget with PopupContextMenuActionMixin {
         if (i < entries.length - 1)
           PopupMenuDivider(
             height: 1,
-            color: AppColor.gray424244.withValues(alpha: dividerOpacity),
+            color: AppColor.gray424244.withOpacity(dividerOpacity),
           ),
       ],
     ];

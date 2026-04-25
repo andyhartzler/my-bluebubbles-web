@@ -52,7 +52,7 @@ class MailboxVisibilityView extends GetWidget<MailboxVisibilityController>
               SettingHeaderWidget(
                 menuItem: AccountMenuItem.mailboxVisibility,
                 textStyle: ThemeUtils.textStyleInter600().copyWith(
-                  color: Colors.black.withValues(alpha: 0.9),
+                  color: Colors.black.withOpacity(0.9),
                 ),
                 padding: EdgeInsets.zero,
               )

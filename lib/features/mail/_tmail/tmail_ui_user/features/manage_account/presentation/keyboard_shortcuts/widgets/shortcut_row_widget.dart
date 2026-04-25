@@ -32,7 +32,7 @@ class ShortcutRow extends StatelessWidget {
           Text(
             item.context.getDisplayName(AppLocalizations.of(context)),
             style: ThemeUtils.textStyleBodyBody3(
-              color: AppColor.gray424244.withValues(alpha: 0.64),
+              color: AppColor.gray424244.withOpacity(0.64),
             ),
           ),
           Row(

@@ -70,7 +70,7 @@ class SettingUserInfoWidget extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: ThemeUtils.textStyleM3BodyMedium.copyWith(
-                        color: AppColor.textSecondary.withValues(alpha: 0.48),
+                        color: AppColor.textSecondary.withOpacity(0.48),
                       ),
                     ),
                   ],

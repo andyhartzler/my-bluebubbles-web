@@ -35,12 +35,12 @@ class IdentityCreatorFormDesktopBuilder extends StatelessWidget {
         borderRadius: const BorderRadius.all(Radius.circular(16)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 24,
             offset: const Offset(0, 2),
           ),
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 2,
           ),
         ],
@@ -102,7 +102,7 @@ class IdentityCreatorFormDesktopBuilder extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.2),
+      backgroundColor: Colors.black.withOpacity(0.2),
       body: PopBackBarrierWidget(
         child: Center(
           child: GestureDetector(

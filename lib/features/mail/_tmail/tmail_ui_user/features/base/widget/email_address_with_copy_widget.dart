@@ -42,7 +42,7 @@ class EmailAddressWithCopyWidget extends StatelessWidget {
             backgroundColor: Colors.transparent,
             iconSize: 20,
             iconColor: copyIconColor ??
-                AppColor.textSecondary.withValues(alpha: 0.48),
+                AppColor.textSecondary.withOpacity(0.48),
             padding: const EdgeInsets.all(5),
             margin: copyIconMargin,
             onTapActionCallback: onCopyButtonAction,

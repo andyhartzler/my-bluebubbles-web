@@ -22,7 +22,7 @@ class ShortcutKeyWidget extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.black.withValues(alpha: 0.88),
+              color: Colors.black.withOpacity(0.88),
             ),
       ),
     );

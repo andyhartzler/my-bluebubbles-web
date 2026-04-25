@@ -42,7 +42,7 @@ mixin PopupContextMenuActionMixin {
         ),
       ),
       backgroundColor: Colors.white,
-      barrierColor: Colors.black.withValues(alpha: 0.2),
+      barrierColor: Colors.black.withOpacity(0.2),
       constraints: BoxConstraints(
         maxHeight: maxHeight ?? double.infinity,
       ),

@@ -24,7 +24,7 @@ class SettingExplanationWidget extends StatelessWidget {
       menuItem.getExplanation(AppLocalizations.of(context)),
       textAlign: textAlign,
       style: ThemeUtils.textStyleM3BodyMedium1
-          .copyWith(color: AppColor.gray424244.withValues(alpha: 0.64)),
+          .copyWith(color: AppColor.gray424244.withOpacity(0.64)),
     );
 
     if (isCenter) {

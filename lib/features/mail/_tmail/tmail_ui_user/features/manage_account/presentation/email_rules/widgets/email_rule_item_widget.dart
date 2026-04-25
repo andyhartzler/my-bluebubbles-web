@@ -64,7 +64,7 @@ class EmailRulesItemWidget extends StatelessWidget {
                   Flexible(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: AppColor.gray49454F.withValues(alpha: 0.08),
+                        color: AppColor.gray49454F.withOpacity(0.08),
                         borderRadius: const BorderRadius.all(
                           Radius.circular(16),
                         ),

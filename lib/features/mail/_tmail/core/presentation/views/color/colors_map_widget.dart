@@ -75,7 +75,7 @@ class _ColorsMapWidgetState extends State<ColorsMapWidget> {
       children: [
         TMailButtonWidget.fromIcon(
           icon: widget.imagePaths.icCloseDialog,
-          iconColor: AppColor.m3SurfaceBackground.withValues(alpha: 0.48),
+          iconColor: AppColor.m3SurfaceBackground.withOpacity(0.48),
           iconSize: 18.46,
           width: 40,
           height: 40,

@@ -66,7 +66,7 @@ class ForwardView extends GetWidget<ForwardController> with AppLoaderMixin {
                     SettingHeaderWidget(
                       menuItem: AccountMenuItem.forward,
                       textStyle: ThemeUtils.textStyleInter600().copyWith(
-                        color: Colors.black.withValues(alpha: 0.9),
+                        color: Colors.black.withOpacity(0.9),
                       ),
                       padding: const EdgeInsets.only(bottom: 16),
                     )

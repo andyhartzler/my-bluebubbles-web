@@ -47,10 +47,10 @@ class ModalListActionButtonWidget extends StatelessWidget {
         label: positiveLabel,
         backgroundColor: isPositiveActionEnabled
             ? AppColor.primaryMain
-            : AppColor.profileMenuDivider.withValues(alpha: 0.12),
+            : AppColor.profileMenuDivider.withOpacity(0.12),
         textColor: isPositiveActionEnabled
             ? Colors.white
-            : AppColor.m3SurfaceBackground.withValues(alpha: 0.38),
+            : AppColor.m3SurfaceBackground.withOpacity(0.38),
         onTapAction: isPositiveActionEnabled ? onPositiveAction : null,
       ),
     );

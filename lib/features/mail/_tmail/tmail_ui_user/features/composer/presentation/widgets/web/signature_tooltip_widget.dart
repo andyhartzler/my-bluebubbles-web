@@ -16,11 +16,11 @@ class SignatureTooltipWidget extends StatelessWidget {
         borderRadius: const BorderRadius.all(Radius.circular(10)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
+            color: Colors.black.withOpacity(0.16),
             blurRadius: 24,
           ),
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 2,
           )
         ]

@@ -165,7 +165,7 @@ class _LabelListItemState extends State<LabelListItem> {
 
   Color _menuButtonBackgroundColor(BuildContext context) {
     if (_isContextMenuVisible) {
-      return Theme.of(context).colorScheme.outline.withValues(alpha: 0.08);
+      return Theme.of(context).colorScheme.outline.withOpacity(0.08);
     }
     return TrailingMailboxItemWidgetStyles.menuIconBackgroundColor;
   }

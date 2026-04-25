@@ -81,7 +81,7 @@ class _KeyboardShortcutsViewState extends State<KeyboardShortcutsView> {
               SettingHeaderWidget(
                 menuItem: AccountMenuItem.keyboardShortcuts,
                 textStyle: ThemeUtils.textStyleInter600().copyWith(
-                  color: Colors.black.withValues(alpha: 0.9),
+                  color: Colors.black.withOpacity(0.9),
                 ),
                 padding: EdgeInsets.zero,
               )
@@ -148,7 +148,7 @@ class _KeyboardShortcutsViewState extends State<KeyboardShortcutsView> {
                               start: 0,
                               end: 0,
                               child: Divider(
-                                color: Colors.black.withValues(alpha: 0.12),
+                                color: Colors.black.withOpacity(0.12),
                               ),
                             ),
                           ],

@@ -27,7 +27,7 @@ class ContextItemLabelTypeAction
   @override
   Color get selectedIconColor => isSelected
       ? AppColor.primaryMain
-      : AppColor.gray424244.withValues(alpha: 0.72);
+      : AppColor.gray424244.withOpacity(0.72);
 
   @override
   bool get isArrangeRTL => false;

@@ -65,7 +65,7 @@ class LabelListContextMenu extends StatelessWidget {
           ),
           Divider(
             height: 1,
-            color: AppColor.gray424244.withValues(alpha: 0.12),
+            color: AppColor.gray424244.withOpacity(0.12),
           ),
           createLabelButton,
         ],
