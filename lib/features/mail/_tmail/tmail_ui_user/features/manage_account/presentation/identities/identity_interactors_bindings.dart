@@ -36,8 +36,15 @@ class IdentityInteractorsBindings extends InteractorsBindings {
 
   @override
   void bindingsDataSource() {
+    // MOYD CRM patch — bypass the JMAP IdentityDataSourceImpl in favor of
+    // the untagged EdgeFnIdentityDataSource registered globally by
+    // registerEdgeFnDataSources(). The original line was:
+    //   () => Get.find<IdentityDataSourceImpl>(tag: composerId)
+    // — which fails since our synthetic Session has no real JMAP endpoint.
+    // Forwarding to the untagged Get.find resolves to our edge-fn-backed
+    // impl, populating the From: dropdown with the caller's alias.
     Get.lazyPut<IdentityDataSource>(
-      () => Get.find<IdentityDataSourceImpl>(tag: composerId),
+      () => Get.find<IdentityDataSource>(),
       tag: composerId,
     );
     Get.lazyPut<IdentityCreatorDataSource>(
