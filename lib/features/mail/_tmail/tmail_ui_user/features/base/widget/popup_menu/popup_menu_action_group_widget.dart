@@ -54,10 +54,9 @@ class PopupMenuActionGroupWidget with PopupContextMenuActionMixin {
               ),
             ),
         if (i < entries.length - 1)
-          PopupMenuDivider(
-            height: 1,
-            color: AppColor.gray424244.withOpacity(dividerOpacity),
-          ),
+          // Flutter 3.27+ adds `color` to PopupMenuDivider; we're on 3.24.
+          // Drop the explicit color — default theme divider is fine.
+          const PopupMenuDivider(height: 1),
       ],
     ];
 

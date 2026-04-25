@@ -118,10 +118,40 @@ class SentryConfig {
   final String? dsn;
   final String? environment;
   final String? release;
-  const SentryConfig({this.dsn, this.environment, this.release});
+  final bool? isAvailable;
+  final double? tracesSampleRate;
+  final double? profilesSampleRate;
+  final double? sessionSampleRate;
+  const SentryConfig({
+    this.dsn,
+    this.environment,
+    this.release,
+    this.isAvailable,
+    this.tracesSampleRate,
+    this.profilesSampleRate,
+    this.sessionSampleRate,
+  });
 }
 
 extension SentryManagerExt on SentryManager {
   Future<void> clearUser() async {}
   Future<void> setUser({String? id, String? email}) async {}
+}
+
+class SentryUser {
+  final String? id;
+  final String? email;
+  final String? username;
+  final String? ipAddress;
+  final String? name;
+  final Map<String, dynamic>? data;
+  SentryUser({this.id, this.email, this.username, this.ipAddress, this.name, this.data});
+}
+
+extension SentryConfigToCache on SentryConfig {
+  dynamic toSentryConfigurationCache() => null;
+}
+
+extension SentryManagerInit on SentryManager {
+  Future<void> initializeWithSentryConfig(SentryConfig config) async {}
 }

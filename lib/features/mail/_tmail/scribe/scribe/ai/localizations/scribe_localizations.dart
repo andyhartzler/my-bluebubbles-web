@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:multiple_localization/multiple_localization.dart';
-import 'package:bluebubbles/features/mail/_tmail/scribe/scribe/ai/l10n/messages_all.dart';
 
 class ScribeLocalizations {
   static const List<String> _supportedLanguageCodes = ['en', 'fr', 'ru', 'vi', 'de', 'it', 'ar'];
@@ -11,15 +10,11 @@ class ScribeLocalizations {
   }
 
   static Future<ScribeLocalizations> load(Locale locale) {
-    final effectiveLocale = _supportedLanguageCodes.contains(locale.languageCode)
-        ? locale
-        : const Locale('en');
-    return MultipleLocalizations.load(
-      initializeMessages,
-      effectiveLocale,
-      (locale) => ScribeLocalizations(),
-      setDefaultLocale: false,
-    );
+    // tmail's intl_generator-driven message loader is dropped (intl_generator
+    // pins analyzer ^5.1.0 which conflicts with bluebubbles' ^6.5.0). Return
+    // the default English instance — Intl.message fallbacks ship the literal
+    // strings, which is fine for the MOYD CRM (English-only).
+    return Future.value(ScribeLocalizations());
   }
 
   static const LocalizationsDelegate<ScribeLocalizations> delegate =

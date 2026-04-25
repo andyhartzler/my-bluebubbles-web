@@ -15,3 +15,15 @@ class SuperDnsClient {
   Future<List<SrvRecord>> lookupSrv(String _) async => const [];
   Future<List<String>> lookupTxt(String _) async => const [];
 }
+
+class TxtRecord {
+  final String text;
+  const TxtRecord(this.text);
+}
+
+// tmail's login/data/network/dns_lookup module uses DnsClient too.
+class DnsClient {
+  DnsClient();
+  Future<List<SrvRecord>> lookupSrv(String _) async => const [];
+  Future<List<String>> lookupTxt(String _) async => const [];
+}

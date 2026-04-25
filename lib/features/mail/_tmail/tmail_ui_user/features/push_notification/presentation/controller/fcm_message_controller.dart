@@ -15,7 +15,6 @@ import 'package:bluebubbles/features/mail/_tmail/model/model.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/caching/config/hive_cache_config.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/caching/entries/sentry_configuration_cache.dart';
-import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/caching/extensions/sentry_cache_extensions.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/caching/manager/sentry_configuration_cache_manager.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/home/domain/extensions/session_extensions.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/home/domain/state/get_session_state.dart';

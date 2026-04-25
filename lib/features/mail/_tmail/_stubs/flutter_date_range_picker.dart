@@ -41,6 +41,11 @@ class MaterialDateRangePickerDialog extends StatelessWidget {
     DateTime? firstDate,
     DateTime? lastDate,
     Function(DateTime? startDate, DateTime? endDate)? onCallbackAction,
+    Function(DateTime? startDate, DateTime? endDate)? selectDateRangeActionCallback,
+    bool? autoClose,
+    bool? barrierDismissible,
+    String? barrierLabel,
+    bool? usePointerInterceptor,
   }) async {}
 }
 

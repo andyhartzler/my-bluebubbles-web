@@ -91,7 +91,6 @@ class _LabelDropdownMenuItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return PointerInterceptor(
       child: Row(
-        spacing: 16,
         children: [
           _CheckboxIcon(
             isSelected: isSelected,
