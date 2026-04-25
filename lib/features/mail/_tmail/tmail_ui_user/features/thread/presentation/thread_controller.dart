@@ -225,7 +225,11 @@ class ThreadController extends BaseController with EmailActionController {
       canLoadMore = true;
     } else if (failure is GetEmailByIdFailure) {
       openingEmail.value = false;
-      popAndPush(AppRoutes.unknownRoutePage);
+      // MOYD CRM patch — popAndPush(AppRoutes.unknownRoutePage) targets a
+      // tmail route we never registered with GetX, which yanks the user
+      // out of MailScreen entirely. Same pattern as commit d48713c3c on
+      // web_auth_redirect_processor_extension.dart.
+      // popAndPush(AppRoutes.unknownRoutePage);
     } else if (failure is GetAllEmailFailure || failure is CleanAndGetAllEmailFailure) {
       mailboxDashBoardController.updateRefreshAllEmailState(Left(RefreshAllEmailFailure()));
     }
@@ -1510,7 +1514,9 @@ class ThreadController extends BaseController with EmailActionController {
       ));
     } else {
       logWarning('ThreadController::_getEmailByIdFromLocationBar: session & accountId is NULL');
-      popAndPush(AppRoutes.unknownRoutePage);
+      // MOYD CRM patch — see GetEmailByIdFailure note above. Don't yank
+      // the user out of MailScreen via popAndPush(AppRoutes.unknownRoutePage).
+      // popAndPush(AppRoutes.unknownRoutePage);
     }
   }
 
