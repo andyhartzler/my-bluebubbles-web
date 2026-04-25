@@ -29,6 +29,81 @@ class AutoInferredAssignmentsService {
     }
   }
 
+  /// Resolves a `profile_pictures` jsonb (or `avatar_url`) into a fully
+  /// qualified public URL. Handles three shapes:
+  ///   1. Already a `https://...` or `http://...` URL → return as-is.
+  ///   2. A bare filename (legacy schema, e.g. `<uuid>-instagram.jpeg`)
+  ///      → resolve through `member-photos` storage bucket public URL.
+  ///   3. A `profile_pictures` value can also be a list of
+  ///      `{path, bucket, primary, ...}` objects (post-Nov-2025 schema)
+  ///      — use the `primary: true` entry's path against its bucket.
+  ///   4. Or a flat map `{instagram: '...', twitter: '...'}` (legacy).
+  /// Returns null if nothing usable found.
+  String? _resolveAvatarUrl(SupabaseClient client, Map<String, dynamic>? mem) {
+    if (mem == null) return null;
+
+    String? toPublicUrl(String value, {String defaultBucket = 'member-photos'}) {
+      final v = value.trim();
+      if (v.isEmpty) return null;
+      if (v.startsWith('http://') || v.startsWith('https://')) return v;
+      try {
+        return client.storage.from(defaultBucket).getPublicUrl(v);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    // 1. avatar_url (user-uploaded headshot)
+    final ax = (mem['avatar_url'] as String?)?.trim();
+    if (ax != null && ax.isNotEmpty) {
+      final resolved = toPublicUrl(ax);
+      if (resolved != null) return resolved;
+    }
+
+    final pics = mem['profile_pictures'];
+
+    // 3. Array form: [{path, bucket, primary, ...}, ...]
+    if (pics is List) {
+      Map<String, dynamic>? primary;
+      for (final entry in pics) {
+        if (entry is! Map) continue;
+        final asMap = Map<String, dynamic>.from(entry);
+        if (asMap['primary'] == true) {
+          primary = asMap;
+          break;
+        }
+        primary ??= asMap;
+      }
+      if (primary != null) {
+        final path = (primary['path'] as String?) ?? (primary['url'] as String?);
+        final bucket = (primary['bucket'] as String?) ?? 'member-photos';
+        if (path != null && path.isNotEmpty) {
+          if (path.startsWith('http://') || path.startsWith('https://')) {
+            return path;
+          }
+          try {
+            return client.storage.from(bucket).getPublicUrl(path);
+          } catch (_) {
+            // fall through
+          }
+        }
+      }
+    }
+
+    // 4. Flat map form: {instagram: '...', twitter: '...'}
+    if (pics is Map) {
+      final asMap = Map<String, dynamic>.from(pics);
+      for (final key in const ['instagram', 'twitter', 'linkedin', 'facebook']) {
+        final v = asMap[key];
+        if (v is String && v.trim().isNotEmpty) {
+          return toPublicUrl(v);
+        }
+      }
+    }
+
+    return null;
+  }
+
   /// Returns merged auto-inferred items for [authUserId] / [memberId].
   /// `isStaff` controls whether staff-only inferences (pending profile
   /// changes, pending event approvals, pending job approvals) appear.
@@ -65,13 +140,16 @@ class AutoInferredAssignmentsService {
           .select('id, full_name, updated_at')
           .eq('moyd_assigned_to', memberId);
       for (final r in (rows as List).whereType<Map>()) {
+        final id = r['id']?.toString() ?? '';
         results.add(AutoInferredAssignment(
-          key: 'candidate:${r['id']}',
+          key: 'candidate:$id',
           source: 'candidate',
           title: 'Candidate: ${r['full_name'] ?? 'Unnamed'}',
           subtitle: 'Assigned to you',
-          entityUrl: '/candidates/${r['id']}',
+          entityUrl: '/candidates/$id',
           at: DateTime.tryParse(r['updated_at']?.toString() ?? ''),
+          entityKind: 'candidate',
+          entityId: id,
         ));
       }
     });
@@ -95,29 +173,19 @@ class AutoInferredAssignmentsService {
             mem = Map<String, dynamic>.from(memberJoin.first as Map);
           }
           final name = (mem?['name'] as String?)?.trim();
-          final avatar = (mem?['avatar_url'] as String?)?.trim();
-          // Fall back to profile_pictures jsonb (instagram > twitter) when avatar_url isn't set.
-          String? fallbackAvatar = avatar;
-          if ((fallbackAvatar == null || fallbackAvatar.isEmpty) && mem?['profile_pictures'] is Map) {
-            final pics = mem!['profile_pictures'] as Map;
-            final ig = pics['instagram'];
-            final tw = pics['twitter'];
-            if (ig is String && ig.isNotEmpty) {
-              fallbackAvatar = ig;
-            } else if (tw is String && tw.isNotEmpty) {
-              fallbackAvatar = tw;
-            }
-          }
-          final memberId = r['member_id']?.toString() ?? '';
+          final resolvedAvatar = _resolveAvatarUrl(client, mem);
+          final memberRowId = r['member_id']?.toString() ?? '';
           results.add(AutoInferredAssignment(
             key: 'profile_change:${r['id']}',
             source: 'profile_change',
             title: 'Profile change pending review',
-            subtitle: (name != null && name.isNotEmpty) ? name : 'Member $memberId',
-            entityUrl: '/members/$memberId?changes=pending',
+            subtitle: (name != null && name.isNotEmpty) ? name : 'Member $memberRowId',
+            entityUrl: '/members/$memberRowId?changes=pending',
             at: DateTime.tryParse(r['created_at']?.toString() ?? ''),
             memberName: (name != null && name.isNotEmpty) ? name : null,
-            memberAvatarUrl: (fallbackAvatar != null && fallbackAvatar.isNotEmpty) ? fallbackAvatar : null,
+            memberAvatarUrl: resolvedAvatar,
+            entityKind: 'member',
+            entityId: memberRowId,
           ));
         }
       });
@@ -133,13 +201,16 @@ class AutoInferredAssignmentsService {
             .order('created_at', ascending: false)
             .limit(20);
         for (final r in (rows as List).whereType<Map>()) {
+          final id = r['id']?.toString() ?? '';
           results.add(AutoInferredAssignment(
-            key: 'event_pending:${r['id']}',
+            key: 'event_pending:$id',
             source: 'event_pending',
             title: 'Event submission: ${r['title'] ?? 'Untitled'}',
             subtitle: 'Awaiting approval',
-            entityUrl: '/events?tab=pending&id=${r['id']}',
+            entityUrl: '/events?tab=pending&id=$id',
             at: DateTime.tryParse(r['created_at']?.toString() ?? ''),
+            entityKind: 'event',
+            entityId: id,
           ));
         }
       });
@@ -149,19 +220,24 @@ class AutoInferredAssignmentsService {
     await safe(() async {
       final rows = await client
           .from('legislation_bill_notes')
-          .select('id, bill_id, body, created_at, mentioned_member_ids')
+          .select('id, bill_id, committee_id, body, created_at, mentioned_member_ids')
           .contains('mentioned_member_ids', [memberId])
           .order('created_at', ascending: false)
           .limit(20);
       for (final r in (rows as List).whereType<Map>()) {
         final body = (r['body'] as String?) ?? '';
+        final billId = r['bill_id']?.toString() ?? '';
+        final committeeId = r['committee_id']?.toString();
         results.add(AutoInferredAssignment(
           key: 'bill_mention:${r['id']}',
           source: 'bill_mention',
           title: 'You were mentioned on a bill',
           subtitle: body.length > 80 ? '${body.substring(0, 80)}…' : body,
-          entityUrl: '/bills/${r['bill_id']}?note=${r['id']}',
+          entityUrl: '/bills/$billId?note=${r['id']}',
           at: DateTime.tryParse(r['created_at']?.toString() ?? ''),
+          entityKind: 'bill',
+          entityId: billId,
+          committeeId: committeeId,
         ));
       }
     });
@@ -176,13 +252,16 @@ class AutoInferredAssignmentsService {
             .order('created_at', ascending: false)
             .limit(20);
         for (final r in (rows as List).whereType<Map>()) {
+          final id = r['id']?.toString() ?? '';
           results.add(AutoInferredAssignment(
-            key: 'job_pending:${r['id']}',
+            key: 'job_pending:$id',
             source: 'job_pending',
             title: 'Job approval pending: ${r['title'] ?? 'Untitled'}',
             subtitle: 'Awaiting approval',
-            entityUrl: '/jobs?tab=pending&id=${r['id']}',
+            entityUrl: '/jobs?tab=pending&id=$id',
             at: DateTime.tryParse(r['created_at']?.toString() ?? ''),
+            entityKind: 'job',
+            entityId: id,
           ));
         }
       });

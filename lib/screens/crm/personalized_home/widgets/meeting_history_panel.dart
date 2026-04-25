@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+import 'package:bluebubbles/screens/crm/meeting_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/services/crm/home_meeting_history_service.dart';
+import 'package:bluebubbles/services/crm/meeting_repository.dart';
 
 import 'branded_panel.dart';
 
@@ -84,12 +87,54 @@ class _MeetingHistoryPanelState extends State<MeetingHistoryPanel>
       body: TabBarView(
         controller: _tabs,
         children: [
-          _list(_upcoming, _loading, isUpcoming: true),
-          _list(_attended, _loading, isUpcoming: false),
-          _list(_hosted, _loading, isUpcoming: false),
+          _list(_upcoming, _loading, isUpcoming: true, kind: 'scheduled'),
+          _list(_attended, _loading, isUpcoming: false, kind: 'past'),
+          _list(_hosted, _loading, isUpcoming: false, kind: 'mixed'),
         ],
       ),
     );
+  }
+
+  /// Open the right detail surface for a meeting row.
+  /// - `past` and the past-hosted half of `mixed` → fetch a `Meeting` by
+  ///   id and push `MeetingDetailScreen`.
+  /// - `scheduled` (and the upcoming-hosted half of `mixed`) → push the
+  ///   global `MeetingsScreen` since there's no scheduled-meeting detail
+  ///   view yet. The user lands on the same data source they just clicked
+  ///   from, with the broader context available.
+  Future<void> _openMeeting(Map<String, dynamic> m, String kind) async {
+    final id = m['id']?.toString();
+    if (id == null || id.isEmpty) return;
+
+    // Detect mixed-tab source so we route past-hosted to detail and
+    // upcoming-hosted to the meetings list.
+    final source = m['_source'] as String?;
+    final isPastForRouting =
+        kind == 'past' || (kind == 'mixed' && source == 'past_hosted');
+
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (isPastForRouting) {
+      try {
+        final meeting = await MeetingRepository().getMeetingById(id);
+        if (!mounted) return;
+        if (meeting == null) {
+          messenger.showSnackBar(const SnackBar(content: Text('Meeting not found')));
+          return;
+        }
+        navigator.push(MaterialPageRoute(
+          builder: (_) => MeetingDetailScreen(initialMeeting: meeting),
+        ));
+      } catch (e) {
+        if (!mounted) return;
+        messenger.showSnackBar(SnackBar(content: Text('Open failed: $e')));
+      }
+      return;
+    }
+
+    // Scheduled / upcoming-hosted: route to the all-meetings screen.
+    navigator.push(MaterialPageRoute(builder: (_) => const MeetingsScreen()));
   }
 
   /// Format a meeting's date+time for display, always in America/Chicago
@@ -126,7 +171,12 @@ class _MeetingHistoryPanelState extends State<MeetingHistoryPanel>
     return '$dayLabel · $timeLabel $tzAbbrev';
   }
 
-  Widget _list(List<Map<String, dynamic>> items, bool loading, {required bool isUpcoming}) {
+  Widget _list(
+    List<Map<String, dynamic>> items,
+    bool loading, {
+    required bool isUpcoming,
+    required String kind,
+  }) {
     if (loading && items.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -134,7 +184,7 @@ class _MeetingHistoryPanelState extends State<MeetingHistoryPanel>
       return Center(
         child: Text(
           isUpcoming ? 'No upcoming meetings' : 'No meetings yet',
-          style: const TextStyle(color: Colors.grey),
+          style: const TextStyle(color: Color(0xFF6B7280)),
         ),
       );
     }
@@ -151,6 +201,7 @@ class _MeetingHistoryPanelState extends State<MeetingHistoryPanel>
         );
         return ListTile(
           dense: true,
+          onTap: () => _openMeeting(m, kind),
           leading: Icon(
             isUpcoming ? Icons.event_available : Icons.event_note,
             size: 20,
@@ -164,6 +215,7 @@ class _MeetingHistoryPanelState extends State<MeetingHistoryPanel>
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          trailing: const Icon(Icons.arrow_forward_ios, size: 14),
         );
       },
     );

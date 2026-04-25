@@ -44,16 +44,44 @@ class BrandedPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final body = bodyHeight != null
-        ? SizedBox(height: bodyHeight, child: this.body)
-        : this.body;
+    // Force the body to render against a light surface theme so default
+    // text widgets land as dark-on-light regardless of the app-wide
+    // dark theme — guarantees AA contrast on the white panel body.
+    final lightTheme = Theme.of(context).copyWith(
+      brightness: Brightness.light,
+      colorScheme: const ColorScheme.light(
+        surface: Colors.white,
+        onSurface: Color(0xFF1F2937), // slate-800
+      ),
+      iconTheme: const IconThemeData(color: Color(0xFF334155)), // slate-700
+      textTheme: Theme.of(context).textTheme.apply(
+            bodyColor: const Color(0xFF1F2937),
+            displayColor: const Color(0xFF111827),
+          ),
+      listTileTheme: const ListTileThemeData(
+        textColor: Color(0xFF1F2937),
+        iconColor: Color(0xFF475569), // slate-600
+        subtitleTextStyle: TextStyle(color: Color(0xFF475569)),
+      ),
+      dividerTheme: const DividerThemeData(color: Color(0xFFE5E7EB)),
+    );
 
+    final themedBody = Theme(data: lightTheme, child: this.body);
+    final sized = bodyHeight != null
+        ? SizedBox(height: bodyHeight, child: themedBody)
+        : themedBody;
+
+    // Always paint a near-white surface for the body so default
+    // `ListTile` dark-on-light text stays readable on BOTH light and
+    // dark themes. We sit on top of `BrandedBackground` (light blue
+    // gradient + image overlay), so a near-opaque white reads as a
+    // clean card, never as a black slab. NEVER use `Theme.cardColor`
+    // here — on dark theme it resolves near-black and kills contrast.
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(16),
+          color: Colors.white.withOpacity(0.96),
           boxShadow: [
             BoxShadow(
               color: BrandColors.unityBlue.withOpacity(0.18),
@@ -102,7 +130,7 @@ class BrandedPanel extends StatelessWidget {
                 ],
               ),
             ),
-            body,
+            sized,
           ],
         ),
       ),

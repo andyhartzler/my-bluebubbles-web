@@ -101,7 +101,9 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
     }
 
     final prefs = _prefs ?? UserHomePreferences.defaultsFor(authId);
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 600;
+    final isWide = width >= 960;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -157,20 +159,51 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (prefs.showAssignments) ...[
-                      AssignmentsPanel(
-                        authUserId: authId,
-                        memberId: member.id,
-                        isStaff: session.isExecutive || session.isCommitteeMember,
+                    // Wide desktop: Assignments + Meetings sit side-by-side
+                    // in a 50/50 row above the full-width tiles area.
+                    if (prefs.showAssignments &&
+                        prefs.showMeetingHistory &&
+                        isWide) ...[
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: AssignmentsPanel(
+                                authUserId: authId,
+                                memberId: member.id,
+                                isStaff: session.isExecutive ||
+                                    session.isCommitteeMember,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: MeetingHistoryPanel(
+                                authUserId: authId,
+                                memberId: member.id,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
-                    ],
-                    if (prefs.showMeetingHistory) ...[
-                      MeetingHistoryPanel(
-                        authUserId: authId,
-                        memberId: member.id,
-                      ),
-                      const SizedBox(height: 16),
+                    ] else ...[
+                      if (prefs.showAssignments) ...[
+                        AssignmentsPanel(
+                          authUserId: authId,
+                          memberId: member.id,
+                          isStaff: session.isExecutive ||
+                              session.isCommitteeMember,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      if (prefs.showMeetingHistory) ...[
+                        MeetingHistoryPanel(
+                          authUserId: authId,
+                          memberId: member.id,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                     ],
                     if (prefs.showOptionalTiles) ...[
                       OptionalTilesSection(

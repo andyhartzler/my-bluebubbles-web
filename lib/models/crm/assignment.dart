@@ -130,10 +130,21 @@ class AutoInferredAssignment {
   final String source;       // 'candidate' | 'profile_change' | 'event_pending' | 'bill_mention' | 'job_pending'
   final String title;
   final String? subtitle;
-  final String entityUrl;    // in-app deep link
+  final String entityUrl;    // legacy in-app deep link (web-style path)
   final DateTime? at;        // when the underlying row was last updated
   final String? memberName;       // optional — name of the related member (e.g. profile-change subject)
-  final String? memberAvatarUrl;  // optional — avatar URL for the related member
+  final String? memberAvatarUrl;  // optional — already-resolved public URL (NOT a bare filename)
+
+  /// Concrete entity reference for click-to-open. The native CRM
+  /// navigates by pushing detail-screen widgets directly (no named
+  /// routes), so we carry the typed ids alongside the legacy URL.
+  ///
+  /// `entityKind` ∈ {'candidate', 'member', 'event', 'job', 'bill'}.
+  final String? entityKind;
+  final String? entityId;
+  /// Required for `entityKind == 'bill'` — `BillDetailScreen` needs both
+  /// `billId` and `committeeId`.
+  final String? committeeId;
 
   const AutoInferredAssignment({
     required this.key,
@@ -144,5 +155,8 @@ class AutoInferredAssignment {
     this.at,
     this.memberName,
     this.memberAvatarUrl,
+    this.entityKind,
+    this.entityId,
+    this.committeeId,
   });
 }

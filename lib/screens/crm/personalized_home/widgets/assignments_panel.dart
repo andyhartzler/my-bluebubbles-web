@@ -2,9 +2,19 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:bluebubbles/features/committees/legislation_tracker/screens/bill_detail_screen.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/forms/screens/jobs/job_detail_screen.dart';
 import 'package:bluebubbles/models/crm/assignment.dart';
+import 'package:bluebubbles/models/crm/event.dart';
+import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/event_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/assignments_service.dart';
 import 'package:bluebubbles/services/crm/auto_inferred_assignments_service.dart';
+import 'package:bluebubbles/services/crm/candidate_repository.dart';
+import 'package:bluebubbles/services/crm/member_repository.dart';
+import 'package:bluebubbles/services/crm/supabase_service.dart';
 
 import 'assignment_create_dialog.dart';
 import 'branded_panel.dart';
@@ -119,7 +129,6 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
     );
     if (created != null) {
       _loadOutgoing();
-      // The realtime stream will pick up incoming-to-me cases automatically.
     }
   }
 
@@ -139,11 +148,122 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
   Future<void> _toggleDone(Assignment a) async {
     final next = a.isDone ? 'pending' : 'done';
     await _service.setStatus(a.id, next);
-    // Optimistic UI: update local lists without waiting for realtime.
     setState(() {
       _toMe = _toMe.map((x) => x.id == a.id ? a.copyWith(status: next) : x).toList();
       _byMe = _byMe.map((x) => x.id == a.id ? a.copyWith(status: next) : x).toList();
     });
+  }
+
+  /// Navigate to the entity an auto-inferred item points at, by pushing
+  /// the existing native detail screen. Falls back to opening the
+  /// member-edit dialog or surfacing a snackbar if a fetch fails.
+  Future<void> _openAuto(AutoInferredAssignment a) async {
+    final kind = a.entityKind;
+    final id = a.entityId;
+    if (kind == null || id == null || id.isEmpty) {
+      _snackbarFallback(a.entityUrl);
+      return;
+    }
+    await _navigateToEntity(kind: kind, id: id, committeeId: a.committeeId);
+  }
+
+  /// Navigate from an explicit assignment to its linked entity, if any.
+  /// If the assignment has no `entityType/entityId`, opens the edit
+  /// dialog (when the user is the assigner) instead.
+  Future<void> _openExplicit(Assignment a, {required bool allowEdit}) async {
+    final kind = a.entityType;
+    final id = a.entityId;
+    if (kind != null && id != null && id.isNotEmpty &&
+        const {'candidate','member','event','job','bill'}.contains(kind)) {
+      await _navigateToEntity(kind: kind, id: id);
+      return;
+    }
+    if (allowEdit) {
+      await _edit(a);
+    }
+  }
+
+  Future<void> _navigateToEntity({
+    required String kind,
+    required String id,
+    String? committeeId,
+  }) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      switch (kind) {
+        case 'candidate':
+          final c = await CandidateRepository().fetchCandidate(id);
+          if (!mounted) return;
+          if (c == null) {
+            messenger.showSnackBar(const SnackBar(content: Text('Candidate not found')));
+            return;
+          }
+          navigator.push(MaterialPageRoute(
+            builder: (_) => CandidateDetailScreen(candidate: c),
+          ));
+          return;
+
+        case 'member':
+          final m = await MemberRepository().getMemberById(id);
+          if (!mounted) return;
+          if (m == null) {
+            messenger.showSnackBar(const SnackBar(content: Text('Member not found')));
+            return;
+          }
+          navigator.push(MaterialPageRoute(
+            builder: (_) => MemberDetailScreen(member: m),
+          ));
+          return;
+
+        case 'event':
+          final client = CRMSupabaseService().client;
+          final row = await client.from('events').select().eq('id', id).maybeSingle();
+          if (!mounted) return;
+          if (row == null) {
+            messenger.showSnackBar(const SnackBar(content: Text('Event not found')));
+            return;
+          }
+          final ev = Event.fromJson(Map<String, dynamic>.from(row));
+          navigator.push(MaterialPageRoute(
+            builder: (_) => EventDetailScreen(initialEvent: ev),
+          ));
+          return;
+
+        case 'job':
+          navigator.push(MaterialPageRoute(
+            builder: (_) => JobDetailScreen(jobId: id),
+          ));
+          return;
+
+        case 'bill':
+          if (committeeId == null || committeeId.isEmpty) {
+            messenger.showSnackBar(const SnackBar(
+              content: Text('Bill committee unknown — open Legislation tab.'),
+            ));
+            return;
+          }
+          navigator.push(MaterialPageRoute(
+            builder: (_) => BillDetailScreen(
+              billId: id,
+              committeeId: committeeId,
+            ),
+          ));
+          return;
+
+        default:
+          messenger.showSnackBar(SnackBar(content: Text('Cannot open: $kind')));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('Open failed: $e')));
+    }
+  }
+
+  void _snackbarFallback(String url) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Link: $url')),
+    );
   }
 
   @override
@@ -183,7 +303,7 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
     }
     if (items.isEmpty) {
       return const Center(
-        child: Text('Nothing here yet', style: TextStyle(color: Colors.grey)),
+        child: Text('Nothing here yet', style: TextStyle(color: Color(0xFF6B7280))),
       );
     }
     return ListView.separated(
@@ -192,6 +312,7 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
       itemBuilder: (context, i) {
         final a = items[i];
         return ListTile(
+          onTap: () => _openExplicit(a, allowEdit: allowEdit),
           leading: Checkbox(
             value: a.isDone,
             onChanged: (_) => _toggleDone(a),
@@ -232,7 +353,7 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
       return const Center(
         child: Text(
           'No auto-detected items',
-          style: TextStyle(color: Colors.grey),
+          style: TextStyle(color: Color(0xFF6B7280)),
         ),
       );
     }
@@ -248,62 +369,76 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
               ? Text(a.subtitle!, maxLines: 2, overflow: TextOverflow.ellipsis)
               : null,
           trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-          // Deep-link routing not yet wired to in-app navigator;
-          // for now copy the URL to clipboard as a placeholder action.
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Link: ${a.entityUrl}')),
-            );
-          },
+          onTap: () => _openAuto(a),
         );
       },
     );
   }
 
+  /// Always render initials (or a source icon) as the `child:` of the
+  /// CircleAvatar, then lay the network image over it via `foregroundImage`.
+  /// On a 404/CORS/empty-URL failure the foreground falls away and the
+  /// child stays visible — so Andrew sees "AH" / "SJ" / icon, never an
+  /// empty grey circle.
   Widget _autoLeading(AutoInferredAssignment a) {
-    if (a.memberAvatarUrl != null && a.memberAvatarUrl!.isNotEmpty) {
-      return CircleAvatar(
-        radius: 18,
-        backgroundImage: NetworkImage(a.memberAvatarUrl!),
-        onBackgroundImageError: (_, __) {},
-        backgroundColor: Colors.grey.shade300,
-      );
-    }
-    if (a.memberName != null && a.memberName!.isNotEmpty) {
-      return CircleAvatar(
-        radius: 18,
-        backgroundColor: Colors.blueGrey.shade100,
-        child: Text(
-          a.memberName!.trim().substring(0, 1).toUpperCase(),
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-      );
-    }
-    return Icon(_iconForSource(a.source), size: 20);
+    final hasName = a.memberName != null && a.memberName!.trim().isNotEmpty;
+    final initials = hasName ? _initialsOf(a.memberName!) : null;
+
+    final fallbackChild = initials != null
+        ? Text(
+            initials,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          )
+        : Icon(_iconForSource(a.source), color: Colors.white, size: 18);
+
+    final hasUrl = a.memberAvatarUrl != null && a.memberAvatarUrl!.isNotEmpty;
+
+    return CircleAvatar(
+      radius: 18,
+      backgroundColor: BrandColors.unityBlue,
+      foregroundImage: hasUrl ? NetworkImage(a.memberAvatarUrl!) : null,
+      onForegroundImageError: hasUrl ? (_, __) {} : null,
+      child: fallbackChild,
+    );
+  }
+
+  static String _initialsOf(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
+    return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
   }
 
   Widget _priorityChip(String p) {
-    Color color;
+    Color bg;
+    Color fg;
     switch (p) {
       case 'high':
-        color = Colors.red;
+        bg = const Color(0xFFFEE2E2); // red-100
+        fg = const Color(0xFF991B1B); // red-800
         break;
       case 'medium':
-        color = Colors.orange;
+        bg = const Color(0xFFFFEDD5); // orange-100
+        fg = const Color(0xFF9A3412); // orange-800
         break;
       default:
-        color = Colors.grey;
+        bg = const Color(0xFFF1F5F9); // slate-100
+        fg = const Color(0xFF334155); // slate-700
     }
     return Container(
       margin: const EdgeInsets.only(right: 4),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: bg,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         p,
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w600),
       ),
     );
   }
