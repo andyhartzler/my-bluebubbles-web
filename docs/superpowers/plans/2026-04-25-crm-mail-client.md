@@ -6,6 +6,97 @@
 
 **Architecture:** Flutter never holds the Google service-account key. All Gmail API traffic goes through Supabase Edge Functions that authenticate via the existing `moyd-ai-agent@backend-everything.iam.gserviceaccount.com` (DWD impersonating `crm@`), inject `q=deliveredto:<caller-alias>` server-side, and post-filter responses by `Delivered-To` header before returning to the client. Send path overwrites `From:` header from `auth.uid()`'s alias — clients cannot send as someone else. One `users.watch` on `crm@` covers all aliases via Pub/Sub fan-out in our reactor. Andrew, Dustin, and Landon already have their own Workspace seats — they're excluded from the shared-mailbox flow.
 
+## Status — 2026-04-25 EOD
+
+**Today shipped ~30+ commits across all five phases plus the full tmail-flutter source fork landing on `master`. The mail client is functionally end-to-end for the 15 provisioned execs, with hardening fallbacks running on cron. A small set of mutation paths and the EML preview are still in flight via parallel agents.**
+
+### Phase status — all SHIPPED to `master`
+
+- ✅ **Phase 0 — Foundation** (live)
+  - DWD scopes added to `moyd-ai-agent@backend-everything.iam.gserviceaccount.com`
+  - gcloud Pub/Sub topic `gmail-crm` + push subscription `gmail-crm-sub` ACTIVE
+  - `gmail-api-push@system.gserviceaccount.com` granted `roles/pubsub.publisher` after Andrew set the project-level `iam.allowedPolicyMemberDomains` org-policy override
+  - Schema migration applied: 4 tables on `public.` (`mail_aliases`, `mail_messages_cache`, `mail_send_log`, `mail_pubsub_state`) with RLS, audit triggers, `current_user_alias()` SECURITY DEFINER scalar
+  - 15 execs provisioned with `firstname@moyoungdemocrats.org` aliases on shared `crm@` Workspace seat (austin, chelsea, chloe, claudia, elena, elmedin, gannon, gavin, heather, james, katlin, lucas, lucy, rogelio, ryan)
+  - Shipping commits: `24fa3a0e6` (schema), `81d71c572` (shared libs)
+
+- ✅ **Phase 1 — Read-only inbox MVP** (live)
+  - Edge fns: `mail-list`, `mail-thread-get`, `mail-message-get`
+  - Trust boundary: alias clamp + RFC 5322 exact-match post-filter (C2/C3/C4 reviewer fixes baked in)
+  - `mail-watch-renew` + `mail-pubsub-receiver` + pg_cron daily renew (jobid 86 at 09:15 UTC)
+  - Flutter inbox UI gated on `mail_aliases.user_id = auth.uid()`
+  - Shipping commits: `4930b790b`, `398a64169`, `34d1b35d3`, `59e28c1f9`
+
+- ✅ **Phase 2 — Send + composer** (live)
+  - `mail-send` edge fn (overwrites `From:` from caller's alias server-side)
+  - `mail-draft-create`, `mail-draft-list`, `mail-draft-update`, `mail-draft-send`
+  - Composer wired through tmail's `ComposerView`
+  - Shipping commits: `1aecf4a85` (mail-send), `8609d6b79` (drafts)
+
+- ✅ **Phase 3 — Multi-exec provisioning** (live)
+  - `provision-mail-alias` + `revoke-mail-alias` edge fns
+  - Superadmin "Enable Mail" / "Revoke" UI button per row on `executives_screen.dart`
+  - Shipping commits: `74fa767cd` (provision), `e5079c77d` (revoke), `bcb82e778` (UI), `90b42f36b` (revoke wire-up)
+
+- ✅ **Phase 4 — Drafts, search, attachments, label optimization** (live)
+  - All 4 mail-draft-* edge fns (above)
+  - `mail-attachment-get` (streams bytes via signed proxy)
+  - `mail-search` with proper Gmail query builder (filter → `q=` translation, not `filter.toString()`)
+  - Shipping commits: `14a1bbff8` (attachments + search), `8e0c9a301` (attachment client wiring), `993696aa4` (proper Gmail query builder)
+
+- ✅ **Phase 5 — Hardening** (live, 4 pg_cron jobs running)
+  - `mail-poll` — 5-min Pub/Sub silent-detection fallback
+  - `mail-watch-health` — Slack alert on stale `users.watch`
+  - `mail-reconcile-nightly` — drift detection between Gmail and `mail_messages_cache`
+  - Shipping commits: `b49991b1f` (poll + watch-health + cron), `792c4e371` (reconcile-nightly cron 89)
+
+### Tmail-flutter source fork — LIVE on `master`
+
+The "fresh widgets" inbox UI Andrew rejected on 2026-04-25 has been replaced by the full tmail-flutter source fork. As of EOD this is on `master` and shipping.
+
+- **2,514 .dart files** copied verbatim from `linagora/tmail-flutter` into `lib/features/mail/_tmail/`, all `package:` imports rewritten to project-local paths
+- **Pubspec resolves** with 95 deps changed, 14 tmail-deps added, 4 dropped (super_dns_client, flutter_date_range_picker, twake_previewer_flutter, sentry_flutter/sentry_dio), 4 path-stub overrides (photo_manager, permission_handler, fast_contacts, flutter_local_notifications), `web: 1.0.0` pin
+- **Flutter 3.27+ API patches** delivered via `tool/patch_pub_cache.sh`, executed from `netlify-build.sh` after `flutter pub get` (commit `bac6a9a53`)
+- **Edge-fn-backed data sources** for `EmailDataSource`, `ThreadDataSource`, `MailboxDataSource`, `IdentityDataSource` replace tmail's JMAP layer (commits `fe1c51780` → `f41b27fa8`)
+- **`MailScreenTmailBindings`** boots the full GetX dep chain so tmail's controllers initialize cleanly inside our Provider-based shell (commit `7e0041742`)
+- **`dashboard_controller_fixups`** validates 7 controllers boot under our env (commit `26a41e9d6`)
+- **`MailScreen`** wraps tmail's `MailboxDashBoardView` with a `BrandColors` theme override (`unityBlue` / `sunriseGold` / `momentumBlue` replace `LinagoraColors`) (commit `a0a41ff00`)
+- Nav button labeled **"Email"** on top-bar + mobile drawer, alias-gated (visible only to execs with a non-revoked, send-as-verified `mail_aliases` row)
+
+### Boot trace + EdgeFn hardening
+
+All three controller boot paths fully traced and hardened so no `UnimplementedError` is hit at mount time:
+
+- `MailboxDashBoardController` — commit `eca50e484`
+- `ComposerController` — commit `c38540de7`
+- `ThreadController` + `SingleEmailController` — commit `267be87da`
+- Tagged identity binding patched to forward to our `EdgeFnIdentityDataSource` (commit `d0dab6169`)
+- Identity pre-population at `MailScreen` boot via `populateDashboardListIdentities` (commit `c8a8c66e3`)
+- Single synthetic `Identity` per caller alias from `EdgeFnIdentityDataSource` (commit `978de23d8`)
+- OIDC redirect chain neutralized — Supabase auth handles auth, tmail's appauth flow is short-circuited (commit `d48713c3c`)
+
+### Real mutations — recently shipped
+
+- `EdgeFnEmailDataSource.saveEmailAsDrafts` → `mail-draft-create` (commit `c3f44ebfe`)
+- `EdgeFnEmailDataSource.updateEmailDrafts` → `mail-draft-update` (commit `c3f44ebfe`)
+- `EdgeFnEmailDataSource.searchEmails` → `mail-search` with proper filter-to-Gmail-query builder (commits `100668129`, `993696aa4`)
+
+### In-flight (parallel agents working as of EOD)
+
+- ⏳ `mail-mutation` edge fn — real propagation for read/star/move/archive/trash/label
+- ⏳ `mail-eml-get` edge fn + EML preview / view-original wiring in tmail's email view
+- ⏳ `mail-unsubscribe` edge fn + List-Unsubscribe header handling
+
+### Not yet done (deferred)
+
+- Live runtime verification by signing in as an exec end-to-end (need exec creds for browser sign-in)
+- `markAsAnswered` / `markAsForwarded` — Gmail API has no clean equivalents; left as no-ops
+- Permanent delete (`mail-delete` edge fn) — currently no-op (tmail trash → Gmail trash works; permanent purge does not)
+- FCM push integration — stubbed (web push via Pub/Sub fan-out is what we use; FCM was tmail's mobile-native path)
+- Vacation responder — `users.settings.vacation` not wired through our edge layer
+
+---
+
 ## Status — 2026-04-25 (live)
 
 **Phase 1 + 2 + 3 edge layer = SHIPPED to `master` and live on moyd.app:**
