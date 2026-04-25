@@ -17,8 +17,10 @@ class ContactDataSourceImpl extends ContactDataSource {
       if (autoCompletePattern.word.isEmpty) {
         return <DeviceContact>[];
       } else {
+        // contacts_service 0.6.x dropped getContactsByEmailOrName.
+        // Use getContacts(query) and rely on its substring matching.
         final suggestedList = await contact_service.ContactsService
-          .getContactsByEmailOrName(autoCompletePattern.word);
+          .getContacts(query: autoCompletePattern.word);
         if (suggestedList.isNotEmpty) {
           return suggestedList.expand((contact) => _toDeviceContact(contact)).toList();
         } else {

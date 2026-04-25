@@ -21,7 +21,7 @@ class NetworkConnectionController extends GetxController {
 
   bool _isEnableShowToastDisconnection = true;
 
-  StreamSubscription<ConnectivityResult>? _subscription;
+  StreamSubscription<List<ConnectivityResult>>? _subscription;
 
   NetworkConnectionController(this._connectivity);
 
@@ -48,7 +48,7 @@ class NetworkConnectionController extends GetxController {
   void _getCurrentNetworkConnectionState() async {
     final connectionResult = await _connectivity.checkConnectivity();
     log('NetworkConnectionController::_getCurrentNetworkConnectionState():connectionResult: $connectionResult');
-    _setNetworkConnectivityState(connectionResult);
+    _setNetworkConnectivityState(connectionResult.first);
     _handleNetworkConnectionState();
   }
 
@@ -56,7 +56,7 @@ class NetworkConnectionController extends GetxController {
     _subscription = _connectivity.onConnectivityChanged.listen(
       (result) {
         log('NetworkConnectionController::_listenNetworkConnectionChanged()::onConnectivityChanged: $result');
-        _setNetworkConnectivityState(result);
+        _setNetworkConnectivityState(result.first);
         _handleNetworkConnectionState();
       },
       onError: (error, stackTrace) {

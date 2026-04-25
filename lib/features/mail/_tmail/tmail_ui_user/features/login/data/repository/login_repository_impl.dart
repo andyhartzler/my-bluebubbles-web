@@ -30,7 +30,7 @@ class LoginRepositoryImpl implements LoginRepository {
   }
 
   @override
-  Future<String> dnsLookupToGetJmapUrl(String emailAddress) {
+  Future<String?> dnsLookupToGetJmapUrl(String emailAddress) {
     return _loginDataSource[DataSourceType.network]!.dnsLookupToGetJmapUrl(emailAddress);
   }
 }

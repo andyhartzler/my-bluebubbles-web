@@ -1,4 +1,6 @@
+import 'package:bluebubbles/features/mail/_tmail/_stubs/sentry_flutter.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/universal_import/html_stub.dart' as html;
+import 'package:bluebubbles/features/mail/_tmail/_stubs/sentry_flutter.dart';
 import 'package:back_button_interceptor/back_button_interceptor.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/core.dart';
 import 'package:dartz/dartz.dart';

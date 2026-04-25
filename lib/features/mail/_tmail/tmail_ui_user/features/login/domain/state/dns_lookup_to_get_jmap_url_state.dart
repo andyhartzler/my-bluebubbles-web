@@ -4,12 +4,12 @@ import 'package:bluebubbles/features/mail/_tmail/core/presentation/state/success
 class DNSLookupToGetJmapUrlLoading extends LoadingState {}
 
 class DNSLookupToGetJmapUrlSuccess extends UIState {
-  final String jmapUrl;
+  final String? jmapUrl;
 
   DNSLookupToGetJmapUrlSuccess(this.jmapUrl);
 
   @override
-  List<Object> get props => [jmapUrl];
+  List<Object?> get props => [jmapUrl];
 }
 
 class DNSLookupToGetJmapUrlFailure extends FeatureFailure {

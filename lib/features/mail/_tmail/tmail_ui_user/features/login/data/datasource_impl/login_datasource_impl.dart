@@ -15,7 +15,7 @@ class LoginDataSourceImpl implements LoginDataSource {
   );
 
   @override
-  Future<String> dnsLookupToGetJmapUrl(String emailAddress) {
+  Future<String?> dnsLookupToGetJmapUrl(String emailAddress) {
     return Future.sync(() async {
       return await _dnsLookupManager.lookupJmapUrl(emailAddress);
     }).catchError(_exceptionThrower.throwException);

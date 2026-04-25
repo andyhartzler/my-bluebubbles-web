@@ -1,4 +1,6 @@
+import 'package:bluebubbles/features/mail/_tmail/_stubs/sentry_flutter.dart';
 import 'dart:async';
+import 'package:bluebubbles/features/mail/_tmail/_stubs/sentry_flutter.dart';
 import 'dart:convert';
 
 import 'package:back_button_interceptor/back_button_interceptor.dart';
@@ -721,15 +723,9 @@ class MailboxDashBoardController extends ReloadableController
             );
           }
           break;
-        case SharedMediaType.mailto:
-          if (EmailUtils.isEmailAddressValid(sharedMediaFile.path)) {
-            openComposer(
-              ComposerArguments.fromEmailAddress(
-                EmailAddress(null, sharedMediaFile.path),
-              ),
-            );
-          }
-          break;
+        // SharedMediaType.mailto removed in receive_sharing_intent 1.4+.
+        // The mailto path is unused outside of native iOS share-extension
+        // anyway; drop the case so the switch compiles.
       }
       return;
     }
@@ -832,7 +828,9 @@ class MailboxDashBoardController extends ReloadableController
   }
 
   void _registerLocalNotificationStreamListener() {
-    _notificationManager.localNotificationStream.listen(_handleClickLocalNotificationOnForeground);
+    _notificationManager.localNotificationStream.listen(
+      (dynamic event) => _handleClickLocalNotificationOnForeground(event as NotificationResponse?),
+    );
   }
 
   void _registerDownloadUIActionListener() {

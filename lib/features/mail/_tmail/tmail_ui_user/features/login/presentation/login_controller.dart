@@ -584,7 +584,7 @@ class LoginController extends ReloadableController {
   }
 
   void _handleDNSLookupToGetJmapUrlSuccess(DNSLookupToGetJmapUrlSuccess success) {
-    onBaseUrlChange(success.jmapUrl);
+    onBaseUrlChange(success.jmapUrl ?? "");
     _checkOIDCIsAvailable();
   }
 

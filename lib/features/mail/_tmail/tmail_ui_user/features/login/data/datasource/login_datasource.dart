@@ -10,5 +10,5 @@ abstract class LoginDataSource {
 
   Future<List<RecentLoginUsername>> getAllRecentLoginUsernamesLatest({int? limit, String? pattern});
 
-  Future<String> dnsLookupToGetJmapUrl(String emailAddress);
+  Future<String?> dnsLookupToGetJmapUrl(String emailAddress);
 }

@@ -1,3 +1,4 @@
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/caching/extensions/sentry_cache_extensions.dart';
 
 import 'dart:async';
 
@@ -147,7 +148,7 @@ class FcmMessageController extends PushBaseController {
       }
 
       final sentryConfig = configCache.toSentryConfig();
-      if (!sentryConfig.isAvailable) {
+      if (sentryConfig.isAvailable != true) {
         logWarning('FcmMessageController::setUpSentryConfiguration: SentryConfiguration is not available');
         return;
       }

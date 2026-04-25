@@ -6,4 +6,6 @@ class DnsLookupManager {
   DnsLookupManager();
   Future<String?> lookupSrvJmap(String _) async => null;
   Future<String?> lookupTxtAutoconfig(String _) async => null;
+  Future<String?> lookupJmapUrl(String _) async => null;
+  Future<String?> lookupSrvJmapUrl(String _) async => null;
 }

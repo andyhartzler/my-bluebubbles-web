@@ -66,7 +66,6 @@ class NetworkIsolateBindings extends Bindings {
     if (BuildUtils.isDebugMode) {
       dio.interceptors.add(LogInterceptor(requestBody: true));
     }
-    SentryDioHelper.addIfAvailable(dio);
   }
 
   void _bindingApi() {

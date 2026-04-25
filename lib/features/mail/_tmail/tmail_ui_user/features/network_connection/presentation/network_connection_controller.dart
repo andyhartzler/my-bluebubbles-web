@@ -20,7 +20,7 @@ class NetworkConnectionController extends GetxController {
     checkInterval: _timeIntervalInternetConnection
   );
 
-  StreamSubscription<ConnectivityResult>? _subscription;
+  StreamSubscription<List<ConnectivityResult>>? _subscription;
   StreamSubscription<InternetConnectionStatus>? _internetSubscription;
 
   NetworkConnectionController(this._connectivity);
@@ -68,7 +68,7 @@ class NetworkConnectionController extends GetxController {
     _subscription = _connectivity.onConnectivityChanged.listen(
       (result) {
         log('NetworkConnectionController::_listenNetworkConnectionChanged()::onConnectivityChanged: $result');
-        _setNetworkConnectivityState(result);
+        _setNetworkConnectivityState(result.first);
       },
       onError: (error, stackTrace) {
         logWarning('NetworkConnectionController::_listenNetworkConnectionChanged()::onConnectivityChanged:error: $error | stackTrace: $stackTrace');

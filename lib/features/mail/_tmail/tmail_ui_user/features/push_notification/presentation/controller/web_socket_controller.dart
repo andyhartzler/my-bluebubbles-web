@@ -39,7 +39,7 @@ class WebSocketController extends PushBaseController {
 
   ConnectWebSocketInteractor? _connectWebSocketInteractor;
   NetworkConnectionController? _networkConnectionController;
-  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   static final List<TypeName> _mailTypePushSupported = [
     TypeName.emailType,

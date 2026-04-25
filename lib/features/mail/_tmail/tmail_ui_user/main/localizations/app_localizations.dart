@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/l10n/messages_all.dart';
 
 class AppLocalizations {
 
@@ -10,13 +9,9 @@ class AppLocalizations {
 
   static Future<AppLocalizations> load(Locale locale) async {
     final name = locale.countryCode == null ? locale.languageCode : locale.toString();
-
     final localeName = Intl.canonicalizedLocale(name);
-
-    return initializeMessages(localeName).then((_) {
-      Intl.defaultLocale = localeName;
-      return AppLocalizations();
-    });
+    Intl.defaultLocale = localeName;
+    return AppLocalizations();
   }
 
   String get initializing_data {

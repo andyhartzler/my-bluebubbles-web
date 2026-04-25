@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/features/mail/_tmail/core/domain/extensions/datetime_extension.dart';
 import 'package:bluebubbles/features/mail/_tmail/core/utils/platform_info.dart';

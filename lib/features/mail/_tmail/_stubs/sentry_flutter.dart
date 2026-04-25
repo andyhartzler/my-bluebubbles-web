@@ -111,10 +111,11 @@ class SentryManager {
   void addBreadcrumb({String? message, String? category}) {}
   Future<void> close() async {}
   Future<void> clearUser() async {}
-  Future<void> setUser({String? id, String? email}) async {}
+  Future<void> setUser([dynamic userOrNull]) async {}
 }
 
 class SentryConfig {
+  static const String sentryConfigKeyChain = 'sentry_config';
   final String? dsn;
   final String? environment;
   final String? release;
@@ -131,6 +132,8 @@ class SentryConfig {
     this.profilesSampleRate,
     this.sessionSampleRate,
   });
+
+  Map<String, dynamic> toJson() => {};
 }
 
 extension SentryManagerExt on SentryManager {
@@ -154,4 +157,17 @@ extension SentryConfigToCache on SentryConfig {
 
 extension SentryManagerInit on SentryManager {
   Future<void> initializeWithSentryConfig(SentryConfig config) async {}
+}
+
+extension SentryUserCacheExt on SentryUser {
+  dynamic toSentryUserCache() => null;
+}
+
+// (sentryConfigKeyChain + toJson moved into SentryConfig class as static / method)
+
+
+
+class SentryDioHelper {
+  static void addSentry(dynamic dio) {}
+  static void configureNetworkTracing(dynamic dio, {bool? captureFailedRequests}) {}
 }
