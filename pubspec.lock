@@ -444,6 +444,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.1.0"
+  contacts_service:
+    dependency: "direct main"
+    description:
+      name: contacts_service
+      sha256: f6d5ea33b31dfcdcd2e65d8abdc836502e04ddb0f66a96aa726fa9891ea9671e
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.6.3"
   convert:
     dependency: transitive
     description:
@@ -1027,6 +1035,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.0"
+  fk_user_agent:
+    dependency: "direct main"
+    description:
+      name: fk_user_agent
+      sha256: fd6c94e120786985a292d12f61422a581f4e851148d5940af38b819357b8ad0d
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.0"
   fl_chart:
     dependency: "direct main"
     description:
@@ -1120,6 +1136,46 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.1"
+  flutter_charset_detector:
+    dependency: "direct main"
+    description:
+      name: flutter_charset_detector
+      sha256: d7c11a82c2c51cb35a010b42c64001afb8a9e4d7be1f57620604d386d3467ad1
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.0.0"
+  flutter_charset_detector_android:
+    dependency: transitive
+    description:
+      name: flutter_charset_detector_android
+      sha256: "617345b0f78ad56c2633ea6132e57c2e374f6970792afbe9743237f683eeae8e"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.1"
+  flutter_charset_detector_darwin:
+    dependency: transitive
+    description:
+      name: flutter_charset_detector_darwin
+      sha256: "8cf51c3e16c2fb4ec4e309f16f6046a0ddf1ff57d1b6b696410d077a9ffbfb15"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.1"
+  flutter_charset_detector_platform_interface:
+    dependency: transitive
+    description:
+      name: flutter_charset_detector_platform_interface
+      sha256: "1c09ed7b314a5a9dde76057b98b7d35458ba881eed03d5e5b6f7f74b4869d18c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
+  flutter_charset_detector_web:
+    dependency: transitive
+    description:
+      name: flutter_charset_detector_web
+      sha256: b547194e97e15d2cca17e957ad7f373b48abf35080e645ac5b6976d129b0265d
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.0"
   flutter_colorpicker:
     dependency: "direct main"
     description:
@@ -1167,6 +1223,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "9.5.0"
+  flutter_hsvcolor_picker:
+    dependency: "direct main"
+    description:
+      name: flutter_hsvcolor_picker
+      sha256: f3480d7beaf4d3a3b76512a0c149a3b698076c8cf721bc515cded30de37ded6a
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.5.1"
   flutter_html:
     dependency: "direct main"
     description:
@@ -1947,6 +2011,14 @@ packages:
       url: "https://github.com/linagora/html-editor-enhanced.git"
     source: git
     version: "3.3.5"
+  html_unescape:
+    dependency: "direct main"
+    description:
+      name: html_unescape
+      sha256: "15362d7a18f19d7b742ef8dcb811f5fd2a2df98db9f80ea393c075189e0b61e3"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.0"
   http:
     dependency: "direct overridden"
     description:
@@ -2297,6 +2369,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.2.0"
+  lottie:
+    dependency: "direct main"
+    description:
+      name: lottie
+      sha256: fa39707f36786707b01eca7626d2c16c32aa603b3f3a146518518458847dc127
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.0"
   lottie_native:
     dependency: "direct main"
     description:
@@ -2482,6 +2562,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.3.2+7"
+  multiple_localization:
+    dependency: "direct main"
+    description:
+      name: multiple_localization
+      sha256: "29c97a3fbf4d067ea5a63df1995465ea81ef28e2c817d9d0871983e50f4fd3f0"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.6.0"
   nested:
     dependency: transitive
     description:
@@ -3025,6 +3113,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.10.1"
+  pull_to_refresh:
+    dependency: "direct main"
+    description:
+      name: pull_to_refresh
+      sha256: bbadd5a931837b57739cf08736bea63167e284e71fb23b218c8c9a6e042aad12
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.0"
   qr:
     dependency: transitive
     description:
@@ -3064,6 +3160,14 @@ packages:
       relative: true
     source: path
     version: "1.0.0"
+  receive_sharing_intent:
+    dependency: "direct main"
+    description:
+      name: receive_sharing_intent
+      sha256: ec76056e4d258ad708e76d85591d933678625318e411564dcb9059048ca3a593
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.8.1"
   record:
     dependency: "direct main"
     description:
@@ -3169,6 +3273,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.2"
+  sanitize_html:
+    dependency: "direct main"
+    description:
+      name: sanitize_html
+      sha256: "12669c4a913688a26555323fb9cec373d8f9fbe091f2d01c40c723b33caa8989"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.0"
   saver_gallery:
     dependency: "direct main"
     description:

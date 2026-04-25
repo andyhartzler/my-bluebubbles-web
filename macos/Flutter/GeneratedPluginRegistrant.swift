@@ -17,6 +17,7 @@ import file_selector_macos
 import firebase_core
 import firebase_messaging
 import flutter_appauth
+import flutter_charset_detector_darwin
 import flutter_image_compress_macos
 import flutter_inappwebview_macos
 import flutter_secure_storage_macos
@@ -60,6 +61,7 @@ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   FLTFirebaseCorePlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseCorePlugin"))
   FLTFirebaseMessagingPlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseMessagingPlugin"))
   FlutterAppauthPlugin.register(with: registry.registrar(forPlugin: "FlutterAppauthPlugin"))
+  FlutterCharsetDetectorPlugin.register(with: registry.registrar(forPlugin: "FlutterCharsetDetectorPlugin"))
   FlutterImageCompressMacosPlugin.register(with: registry.registrar(forPlugin: "FlutterImageCompressMacosPlugin"))
   InAppWebViewFlutterPlugin.register(with: registry.registrar(forPlugin: "InAppWebViewFlutterPlugin"))
   FlutterSecureStoragePlugin.register(with: registry.registrar(forPlugin: "FlutterSecureStoragePlugin"))
