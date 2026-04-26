@@ -42,7 +42,7 @@ import 'package:bluebubbles/screens/crm/dashboard_shell/dashboard_shell_screen.d
 import 'package:bluebubbles/features/campaigns/screens/mautic_embed_screen.dart';
 import 'package:bluebubbles/features/forms/screens/forms_main_screen.dart';
 import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
-import 'package:bluebubbles/features/mail/screens/mail_screen.dart';
+import 'package:bluebubbles/features/mail/screens/mail_screen_lazy.dart';
 import 'package:bluebubbles/features/mail/services/mail_api_client.dart';
 import 'package:bluebubbles/screens/crm/surveys_screen.dart';
 import 'package:bluebubbles/screens/crm/candidates_page.dart';
@@ -1047,9 +1047,18 @@ class _HomeState extends OptimizedState<Home>
                         key: PageStorageKey('slack-management-view'),
                         embed: true,
                       ),
-                      const MailScreen(
-                        key: PageStorageKey('mail-view'),
-                      ),
+                      // Mail uses deferred-loading: the tmail-flutter fork
+                      // (~2,500 .dart files) ships as a separate JS chunk
+                      // that only downloads when this widget mounts. We
+                      // gate the mount on `_mailEnabled`, so non-execs
+                      // (no provisioned alias) never trigger the download.
+                      _mailEnabled
+                          ? const MailScreenLazy(
+                              key: PageStorageKey('mail-view'),
+                            )
+                          : const SizedBox.shrink(
+                              key: PageStorageKey('mail-view-placeholder'),
+                            ),
                       const MauticEmbedScreen(
                         key: PageStorageKey('campaigns-view'),
                       ),
