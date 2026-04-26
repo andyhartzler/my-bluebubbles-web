@@ -1,5 +1,10 @@
 // Resolves the caller's alias_email from their Supabase auth bearer token.
 // Returns 401 if no token, 403 if the user has no provisioned alias.
+//
+// `isSuperadmin` is fetched via a USER-SCOPED client so `auth.uid()` resolves
+// inside the SECURITY DEFINER function. Calling the RPC against the
+// service-role client (as we used to) returns false unconditionally because
+// auth.uid() is null in service-role context.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -46,7 +51,16 @@ export async function resolveCaller(
     });
   }
 
-  const { data: superadminRow } = await supabase.rpc(
+  // User-scoped client so the RPC's auth.uid() resolves to the caller.
+  // SUPABASE_ANON_KEY is the public client key; combined with the bearer
+  // token in the Authorization header, the RPC runs in the user's RLS
+  // context.
+  const userClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } },
+  );
+  const { data: superadminRow } = await userClient.rpc(
     "current_user_is_superadmin",
   );
   const isSuperadmin = superadminRow === true;

@@ -20,14 +20,25 @@ export function extractEmail(
   if (!headerValue) return null;
   const v = headerValue.trim();
   // Prefer angle-bracket form — display names may contain emails too;
-  // only the bracketed one is the actual recipient/sender.
-  const ang = v.match(/<\s*([^<>\s]+@[^<>\s]+)\s*>/);
-  if (ang) return ang[1].toLowerCase();
+  // per RFC 5322 the actual address is in the LAST angle-bracket pair.
+  // (A display name like `"Andrew <chelsea@example.com>"` followed by
+  //  `<real@evil.com>` would otherwise spoof a different alias if we
+  //  picked the FIRST match.)
+  const angMatches = [...v.matchAll(/<\s*([^<>\s]+@[^<>\s]+)\s*>/g)];
+  if (angMatches.length > 0) {
+    return angMatches[angMatches.length - 1][1].toLowerCase();
+  }
   // Bare email — entire value is just an address with no display name.
   if (/^[^\s<>"]+@[^\s<>"]+$/.test(v)) return v.toLowerCase();
-  // Last-resort: scan for the first email-shaped substring.
-  const last = v.match(/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/);
-  return last ? last[1].toLowerCase() : null;
+  // Last-resort: scan for the LAST email-shaped substring (same intent
+  // as the angle-bracket case — the actual address is at the end).
+  const bareMatches = [
+    ...v.matchAll(/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g),
+  ];
+  if (bareMatches.length > 0) {
+    return bareMatches[bareMatches.length - 1][1].toLowerCase();
+  }
+  return null;
 }
 
 /** Like extractEmail but for a comma-separated header (To:, Cc:, Bcc:). */
@@ -45,6 +56,15 @@ export function extractEmailList(
  * Returns true iff `alias` matches one of the addresses in the message
  * headers (Delivered-To, To, Cc, Bcc, From). Case-insensitive, exact-match
  * on the extracted email — NOT substring containment.
+ *
+ * NOTE: callers fetching `Bcc` in their `metadataHeaders=` query enable
+ * the match against Bcc'd recipients. Read paths (mail-list /
+ * mail-thread-get / mail-message-get) intentionally OMIT Bcc so the
+ * recipient list stays confidential — bcc'd recipients won't see the
+ * message in their inbox. Write/delete paths (mail-mutation /
+ * mail-permanent-delete / mail-attachment-get / mail-eml-get /
+ * mail-reconcile-nightly / mail-unsubscribe) include Bcc so a bcc'd
+ * recipient can still operate on a message whose ID they already have.
  */
 export function messageMatchesAlias(
   headers: Record<string, string>,
