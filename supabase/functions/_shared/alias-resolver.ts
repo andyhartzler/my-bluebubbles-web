@@ -1,17 +1,36 @@
-// Resolves the caller's alias_email from their Supabase auth bearer token.
-// Returns 401 if no token, 403 if the user has no provisioned alias.
+// Resolves the caller's alias_email + mailbox_kind from their Supabase auth
+// bearer token. Returns 401 if no token, 403 if the user has no provisioned
+// alias.
 //
 // `isSuperadmin` is fetched via a USER-SCOPED client so `auth.uid()` resolves
 // inside the SECURITY DEFINER function. Calling the RPC against the
 // service-role client (as we used to) returns false unconditionally because
 // auth.uid() is null in service-role context.
+//
+// `mailboxKind` distinguishes:
+//   - 'shared_alias' — exec shares crm@moyoungdemocrats.org. Gmail calls
+//     impersonate crm@; reads need the q-clamp + post-filter; writes pin
+//     From: to the alias.
+//   - 'self_owned' — exec has their own Workspace seat (Andrew/Dustin/Landon).
+//     Gmail calls impersonate their own mailbox; no q-clamp, no post-filter,
+//     and From: is the mailbox itself by definition.
+//
+// `impersonationSubject` is the email to pass to getGoogleAccessToken({subject})
+// so callers don't have to re-derive the branch logic. Always trust this from
+// the DB row — never accept a client-supplied subject.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+
+export const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
+
+export type MailboxKind = "shared_alias" | "self_owned";
 
 export interface ResolvedCaller {
   userId: string;
   aliasEmail: string;
   isSuperadmin: boolean;
+  mailboxKind: MailboxKind;
+  impersonationSubject: string;
 }
 
 export async function resolveCaller(
@@ -41,7 +60,7 @@ export async function resolveCaller(
 
   const { data: row } = await supabase
     .from("mail_aliases")
-    .select("alias_email, revoked_at, gmail_send_as_verified")
+    .select("alias_email, revoked_at, gmail_send_as_verified, mailbox_kind")
     .eq("user_id", userId)
     .maybeSingle();
   if (!row || row.revoked_at || !row.gmail_send_as_verified) {
@@ -65,9 +84,17 @@ export async function resolveCaller(
   );
   const isSuperadmin = superadminRow === true;
 
+  const aliasEmail = (row.alias_email as string).toLowerCase();
+  const mailboxKind = (row.mailbox_kind as MailboxKind) ?? "shared_alias";
+  const impersonationSubject = mailboxKind === "self_owned"
+    ? aliasEmail
+    : SHARED_MAILBOX;
+
   return {
     userId,
-    aliasEmail: (row.alias_email as string).toLowerCase(),
+    aliasEmail,
     isSuperadmin,
+    mailboxKind,
+    impersonationSubject,
   };
 }

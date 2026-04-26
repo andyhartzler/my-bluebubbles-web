@@ -24,7 +24,6 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 
-const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const NETWORK_TIMEOUT_MS = 5000;
 
@@ -152,7 +151,7 @@ Deno.serve(async (req) => {
   let tok: string;
   try {
     tok = await getGoogleAccessToken({
-      subject: SHARED_MAILBOX,
+      subject: caller.impersonationSubject,
       scopes: [
         "https://www.googleapis.com/auth/gmail.modify",
         "https://www.googleapis.com/auth/gmail.send",
@@ -195,10 +194,14 @@ Deno.serve(async (req) => {
     ),
   );
 
-  // TRUST BOUNDARY: caller must be a participant of this message — same
-  // exact-match check used by mail-message-get. Without this an exec could
-  // unsubscribe another exec's mailing-list subscriptions.
-  if (!messageMatchesAlias(headers, caller.aliasEmail)) {
+  // TRUST BOUNDARY: caller must be a participant of this message. Without
+  // this a shared_alias exec could unsubscribe another exec's mailing-list
+  // subscriptions just by knowing a message id. Self_owned skips — caller
+  // owns the mailbox.
+  if (
+    caller.mailboxKind !== "self_owned" &&
+    !messageMatchesAlias(headers, caller.aliasEmail)
+  ) {
     return jsonResponse(403, { error: "not_yours" });
   }
 

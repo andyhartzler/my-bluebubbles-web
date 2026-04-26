@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
   // 1. Look up the active alias.
   const { data: existing, error: lookupErr } = await sb
     .from("mail_aliases")
-    .select("alias_email")
+    .select("alias_email, mailbox_kind")
     .eq("user_id", targetUserId)
     .is("revoked_at", null)
     .maybeSingle();
@@ -108,45 +108,72 @@ Deno.serve(async (req) => {
     });
   }
   const aliasEmail = existing.alias_email as string;
+  const mailboxKind = (existing.mailbox_kind as string) ?? "shared_alias";
 
-  // 2. Delete Gmail send-as on crm@. Idempotent: 404 = already gone.
-  const gmailTok = await getGoogleAccessToken({
-    subject: SHARED_MAILBOX,
-    scopes: ["https://www.googleapis.com/auth/gmail.settings.sharing"],
-  });
-  const sendAsRes = await gapi(
-    `https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs/${
-      encodeURIComponent(aliasEmail)
-    }`,
-    gmailTok,
-    { method: "DELETE" },
-  );
-  if (!sendAsRes.ok && sendAsRes.status !== 404) {
-    const detail = await sendAsRes.text();
-    return new Response(
-      JSON.stringify({ error: "send_as_delete_failed", detail }),
-      { status: 502, headers: { "Content-Type": "application/json" } },
+  if (mailboxKind === "shared_alias") {
+    // 2a. Delete Gmail send-as on crm@. Idempotent: 404 = already gone.
+    const gmailTok = await getGoogleAccessToken({
+      subject: SHARED_MAILBOX,
+      scopes: ["https://www.googleapis.com/auth/gmail.settings.sharing"],
+    });
+    const sendAsRes = await gapi(
+      `https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs/${
+        encodeURIComponent(aliasEmail)
+      }`,
+      gmailTok,
+      { method: "DELETE" },
     );
-  }
+    if (!sendAsRes.ok && sendAsRes.status !== 404) {
+      const detail = await sendAsRes.text();
+      return new Response(
+        JSON.stringify({ error: "send_as_delete_failed", detail }),
+        { status: 502, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
-  // 3. Delete Workspace user-alias on crm@. Idempotent: 404 = already gone.
-  const adminTok = await getGoogleAccessToken({
-    subject: ADMIN_IMPERSONATE,
-    scopes: ["https://www.googleapis.com/auth/admin.directory.user.alias"],
-  });
-  const aliasRes = await gapi(
-    `https://admin.googleapis.com/admin/directory/v1/users/${SHARED_MAILBOX}/aliases/${
-      encodeURIComponent(aliasEmail)
-    }`,
-    adminTok,
-    { method: "DELETE" },
-  );
-  if (!aliasRes.ok && aliasRes.status !== 404) {
-    const detail = await aliasRes.text();
-    return new Response(
-      JSON.stringify({ error: "admin_alias_delete_failed", detail }),
-      { status: 502, headers: { "Content-Type": "application/json" } },
+    // 3a. Delete Workspace user-alias on crm@. Idempotent: 404 = already gone.
+    const adminTok = await getGoogleAccessToken({
+      subject: ADMIN_IMPERSONATE,
+      scopes: ["https://www.googleapis.com/auth/admin.directory.user.alias"],
+    });
+    const aliasRes = await gapi(
+      `https://admin.googleapis.com/admin/directory/v1/users/${SHARED_MAILBOX}/aliases/${
+        encodeURIComponent(aliasEmail)
+      }`,
+      adminTok,
+      { method: "DELETE" },
     );
+    if (!aliasRes.ok && aliasRes.status !== 404) {
+      const detail = await aliasRes.text();
+      return new Response(
+        JSON.stringify({ error: "admin_alias_delete_failed", detail }),
+        { status: 502, headers: { "Content-Type": "application/json" } },
+      );
+    }
+  } else {
+    // self_owned — there's no alias on crm@ and no sendAs to remove.
+    // Stop the Gmail watch on the user's mailbox so we stop receiving
+    // pushes for it, and remove the mail_pubsub_state row.
+    try {
+      const watchTok = await getGoogleAccessToken({
+        subject: aliasEmail,
+        scopes: ["https://www.googleapis.com/auth/gmail.modify"],
+      });
+      await fetch("https://gmail.googleapis.com/gmail/v1/users/me/stop", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${watchTok}` },
+      });
+    } catch (e) {
+      console.warn(
+        `revoke-mail-alias: users.stop failed for ${aliasEmail}: ${
+          String(e)
+        }`,
+      );
+    }
+    await sb
+      .from("mail_pubsub_state")
+      .delete()
+      .eq("mailbox_email", aliasEmail);
   }
 
   // 4. Flip the audit-trail flag (do NOT delete the row).

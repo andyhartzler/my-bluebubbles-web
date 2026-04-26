@@ -13,7 +13,6 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 interface DraftBody {
@@ -190,7 +189,7 @@ Deno.serve(async (req) => {
   let tok: string;
   try {
     tok = await getGoogleAccessToken({
-      subject: SHARED_MAILBOX,
+      subject: caller.impersonationSubject,
       scopes: ["https://www.googleapis.com/auth/gmail.modify"],
     });
   } catch (e) {

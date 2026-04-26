@@ -2,7 +2,6 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 
-const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 interface GmailHeader {
@@ -87,39 +86,43 @@ Deno.serve(async (req) => {
   }
 
   const tok = await getGoogleAccessToken({
-    subject: SHARED_MAILBOX,
+    subject: caller.impersonationSubject,
     scopes: ["https://www.googleapis.com/auth/gmail.modify"],
   });
 
   // TRUST BOUNDARY: pre-fetch metadata + alias check BEFORE downloading bytes.
-  // Without this, an exec could iterate messageIds and pull other execs'
-  // attachments. The Delivered-To header is essential here — Gmail's shared
-  // inbox routes to whichever alias was the actual envelope recipient.
-  const metaParams = new URLSearchParams({ format: "metadata" });
-  for (const h of ["From", "To", "Cc", "Bcc", "Delivered-To"]) {
-    metaParams.append("metadataHeaders", h);
-  }
-  const metaRes = await fetch(
-    `${GMAIL_API}/messages/${messageId}?${metaParams}`,
-    { headers: { Authorization: `Bearer ${tok}` } },
-  );
-  if (!metaRes.ok) {
-    return new Response(
-      JSON.stringify({ error: "meta_fetch_failed" }),
-      { status: metaRes.status, headers: { "Content-Type": "application/json" } },
+  // Without this, a shared_alias exec could iterate messageIds and pull
+  // other execs' attachments. Self_owned skips — caller owns the mailbox.
+  if (caller.mailboxKind !== "self_owned") {
+    const metaParams = new URLSearchParams({ format: "metadata" });
+    for (const h of ["From", "To", "Cc", "Bcc", "Delivered-To"]) {
+      metaParams.append("metadataHeaders", h);
+    }
+    const metaRes = await fetch(
+      `${GMAIL_API}/messages/${messageId}?${metaParams}`,
+      { headers: { Authorization: `Bearer ${tok}` } },
     );
-  }
-  const meta = await metaRes.json();
-  const headers = Object.fromEntries(
-    (meta.payload?.headers ?? []).map(
-      (h: GmailHeader) => [h.name.toLowerCase(), h.value],
-    ),
-  );
-  if (!messageMatchesAlias(headers, caller.aliasEmail)) {
-    return new Response(JSON.stringify({ error: "not_yours" }), {
-      status: 403,
-      headers: { "Content-Type": "application/json" },
-    });
+    if (!metaRes.ok) {
+      return new Response(
+        JSON.stringify({ error: "meta_fetch_failed" }),
+        {
+          status: metaRes.status,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+    const meta = await metaRes.json();
+    const headers = Object.fromEntries(
+      (meta.payload?.headers ?? []).map(
+        (h: GmailHeader) => [h.name.toLowerCase(), h.value],
+      ),
+    );
+    if (!messageMatchesAlias(headers, caller.aliasEmail)) {
+      return new Response(JSON.stringify({ error: "not_yours" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
   }
 
   // Need full payload tree to discover the attachment's mimeType + filename.

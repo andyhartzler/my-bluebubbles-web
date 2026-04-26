@@ -1,28 +1,41 @@
 // Pub/Sub push handler for Gmail history notifications. Verifies the
-// Google-signed OIDC token (review §C5), then walks users.history.list
-// from our persisted floor and upserts new INBOX messages into
-// mail_messages_cache, classified by alias via exact-match RFC 5322
-// (review §C2-C4).
+// Google-signed OIDC token (review §C5), routes to the right mailbox
+// using the push payload's `emailAddress`, then walks
+// users.history.list from that mailbox's persisted floor and upserts
+// new INBOX messages into mail_messages_cache.
 //
-// Phase 6 follow-up: after classifying each inbound message we check
-// mail_vacation_prefs for the alias's owning user, and if a vacation
-// pref is enabled + active, fire an auto-reply via Gmail
-// users.messages.send. Three layers of loop prevention keep us from
-// joining a mail-bot pile-on:
-//   1. Skip if the inbound message has any RFC-3834 / mailing-list
-//      header (Auto-Submitted, Precedence: bulk/list/auto_reply,
-//      X-Autoreply, List-Id, List-Unsubscribe).
-//   2. Skip if mail_messages_cache shows we've already auto-replied
-//      to this (alias_email, from_addr) pair in the last 24h.
-//   3. Always set Auto-Submitted: auto-replied on outbound replies
-//      so other RFC-3834-aware responders won't reply to ours.
+// Mailbox routing:
+//   - The push payload has shape `{ emailAddress, historyId }`. We look
+//     up the matching row in mail_pubsub_state (PK = mailbox_email).
+//   - For shared_alias mailboxes (crm@), we classify each new message by
+//     alias via exact-match RFC 5322 headers (mailbox holds 15 execs'
+//     mail).
+//   - For self_owned mailboxes (andrew@/dustin@/landon@), every message
+//     in INBOX is for the owning alias by definition; no classification
+//     needed.
+//
+// Phase 6 vacation auto-reply pipeline runs after cache write (per-message)
+// for shared_alias mailboxes. Self_owned mailboxes can opt into it the same
+// way — vacation prefs key on user_id, not on mailbox_kind.
+//
+// Three layers of loop prevention keep us out of mail-bot pile-ons:
+//   1. Skip if the inbound message has any RFC-3834 / mailing-list header
+//      (Auto-Submitted, Precedence: bulk/list/auto_reply, X-Autoreply,
+//      List-Id, List-Unsubscribe).
+//   2. Skip if mail_messages_cache shows we've already auto-replied to
+//      this (alias_email, from_addr) pair in the last 24h.
+//   3. Always set Auto-Submitted: auto-replied on outbound replies so
+//      other RFC-3834-aware responders won't reply to ours.
 
 import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { verifyPubsubOidc } from "../_shared/oidc-verify.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
+import {
+  enumerateWatchedMailboxes,
+  type MailboxKind,
+} from "../_shared/mailbox-registry.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const RECEIVER_URL =
   "https://faajpcarasilbfndzkmd.functions.supabase.co/mail-pubsub-receiver";
@@ -72,9 +85,6 @@ function buildAutoReplyRfc822(opts: AutoReplyRfc822Opts): string {
   headers.push(`Message-ID: ${opts.messageId}`);
   headers.push(`Date: ${new Date().toUTCString()}`);
   headers.push(`MIME-Version: 1.0`);
-  // RFC 3834: signal that this is an automatic reply so other
-  // responders don't reply to us. "auto-replied" is the canonical
-  // value for vacation responders.
   headers.push(`Auto-Submitted: auto-replied`);
   headers.push(`X-Auto-Response-Suppress: All`);
   headers.push(`Precedence: auto_reply`);
@@ -121,17 +131,11 @@ function buildAutoReplyRfc822(opts: AutoReplyRfc822Opts): string {
   }
 }
 
-// ---------------------------------------------------------------------
-// Loop-prevention: any of these headers on the inbound message means
-// don't auto-reply. (RFC 3834 §2 + standard mailing-list signals.)
-// ---------------------------------------------------------------------
 function inboundIsAutoOrList(
   headers: Record<string, string>,
 ): { skip: boolean; reason?: string } {
   const autoSubmitted = (headers["auto-submitted"] ?? "").trim().toLowerCase();
   if (autoSubmitted && autoSubmitted !== "no") {
-    // RFC 3834: any value other than "no" (including "auto-generated",
-    // "auto-replied", "auto-notified") means automatic — skip.
     return { skip: true, reason: `auto-submitted: ${autoSubmitted}` };
   }
   const precedence = (headers["precedence"] ?? "").trim().toLowerCase();
@@ -162,7 +166,6 @@ function inboundIsAutoOrList(
   return { skip: false };
 }
 
-// Strip "<addr>" / "Name <addr>" / "addr" -> bare lowercased addr.
 function extractEmail(raw: string): string {
   if (!raw) return "";
   const m = raw.match(/<([^>]+)>/);
@@ -186,33 +189,67 @@ Deno.serve(async (req) => {
   }
   const data = JSON.parse(atob(dataB64));
   const newHistoryId: string = String(data.historyId);
+  const pushedMailbox: string | undefined = data.emailAddress
+    ? String(data.emailAddress).toLowerCase()
+    : undefined;
+  if (!pushedMailbox) {
+    // Old-style payload without emailAddress — shouldn't happen in
+    // current Gmail API, but bail safely rather than guessing.
+    return new Response(
+      JSON.stringify({ ack: true, error: "no_mailbox_in_payload" }),
+      { headers: { "Content-Type": "application/json" } },
+    );
+  }
 
   const sb = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
+
+  // Resolve the mailbox kind + alias roster from the registry.
+  const mailboxes = await enumerateWatchedMailboxes(sb);
+  const mailbox = mailboxes.find(
+    (m) => m.mailboxEmail.toLowerCase() === pushedMailbox,
+  );
+  if (!mailbox) {
+    // Push for a mailbox we don't track (revoked alias, stale watch, etc.)
+    // — ack and move on rather than 502'ing the push (which would retry
+    // indefinitely).
+    return new Response(
+      JSON.stringify({ ack: true, error: "unknown_mailbox", pushedMailbox }),
+      { headers: { "Content-Type": "application/json" } },
+    );
+  }
+  const mailboxKind: MailboxKind = mailbox.mailboxKind;
+
   const { data: state } = await sb
     .from("mail_pubsub_state")
     .select("history_id")
-    .eq("id", 1)
+    .eq("mailbox_email", pushedMailbox)
     .maybeSingle();
   const startHistoryId = state?.history_id;
   if (!startHistoryId) {
-    // First push — establish baseline only. Backfill >7d isn't possible
-    // (Gmail rejects expired startHistoryId).
-    await sb.from("mail_pubsub_state").upsert({
-      id: 1,
-      history_id: newHistoryId,
-      watch_expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
-      last_event_at: new Date().toISOString(),
-    });
-    return new Response(JSON.stringify({ ack: true, baseline: newHistoryId }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    // First push for this mailbox — establish baseline only. Gmail rejects
+    // expired startHistoryId so we can't backfill >7d.
+    await sb
+      .from("mail_pubsub_state")
+      .upsert(
+        {
+          mailbox_email: pushedMailbox,
+          history_id: newHistoryId,
+          watch_expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+          last_event_at: new Date().toISOString(),
+        },
+        { onConflict: "mailbox_email" },
+      );
+    return new Response(
+      JSON.stringify({ ack: true, baseline: newHistoryId, mailbox: pushedMailbox }),
+      { headers: { "Content-Type": "application/json" } },
+    );
   }
 
   const tok = await getGoogleAccessToken({
-    subject: SHARED_MAILBOX,
+    subject: pushedMailbox,
     scopes: [
       "https://www.googleapis.com/auth/gmail.modify",
       "https://www.googleapis.com/auth/gmail.send",
@@ -237,7 +274,8 @@ Deno.serve(async (req) => {
     if (!histRes.ok) {
       // 404 means startHistoryId expired (>7d). Reset baseline.
       // KNOWN LIMITATION: messages between expired watermark and reset
-      // are not backfilled — full reconciliation lives in Phase 5.
+      // are not backfilled — full reconciliation lives in
+      // mail-reconcile-nightly.
       if (histRes.status === 404) {
         await sb
           .from("mail_pubsub_state")
@@ -245,10 +283,11 @@ Deno.serve(async (req) => {
             history_id: newHistoryId,
             last_event_at: new Date().toISOString(),
           })
-          .eq("id", 1);
-        return new Response(JSON.stringify({ ack: true, reset: true }), {
-          headers: { "Content-Type": "application/json" },
-        });
+          .eq("mailbox_email", pushedMailbox);
+        return new Response(
+          JSON.stringify({ ack: true, reset: true, mailbox: pushedMailbox }),
+          { headers: { "Content-Type": "application/json" } },
+        );
       }
       return new Response(JSON.stringify({ error: "history_failed" }), {
         status: 502,
@@ -265,29 +304,18 @@ Deno.serve(async (req) => {
     pageToken = hist.nextPageToken;
   } while (pageToken);
 
-  // Per-message classification using the exact-match helper.
-  const { data: aliases } = await sb
-    .from("mail_aliases")
-    .select("user_id, alias_email, display_name")
-    .is("revoked_at", null)
-    .eq("gmail_send_as_verified", true);
-  type AliasRow = {
-    user_id: string;
-    alias_email: string;
-    display_name: string;
-  };
-  const aliasRows: AliasRow[] = (aliases ?? []) as AliasRow[];
-  const aliasList: string[] = aliasRows.map((r) => r.alias_email.toLowerCase());
-  const aliasMeta = new Map<string, AliasRow>(
-    aliasRows.map((r) => [r.alias_email.toLowerCase(), r]),
+  // Per-message classification.
+  // - shared_alias: walk headers, match against the 15 aliases.
+  // - self_owned: every message belongs to the single owning alias.
+  const aliasList: string[] = mailbox.aliases.map((a) =>
+    a.aliasEmail.toLowerCase()
   );
+  const aliasMeta = new Map(mailbox.aliases.map((a) => [a.aliasEmail, a]));
 
   let autoRepliesSent = 0;
   let autoRepliesSkipped = 0;
 
   for (const mid of messageIds) {
-    // We need more headers than before to do RFC-3834 loop-prevention,
-    // plus the original Message-ID for In-Reply-To/References.
     const r = await fetch(
       `${GMAIL_API}/messages/${mid}?format=metadata` +
         `&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc` +
@@ -309,10 +337,15 @@ Deno.serve(async (req) => {
     ) as Record<string, string>;
 
     let alias = "";
-    for (const a of aliasList) {
-      if (messageMatchesAlias(headers, a)) {
-        alias = a;
-        break;
+    if (mailboxKind === "self_owned") {
+      // Single-alias mailbox — the message is theirs by definition.
+      alias = aliasList[0] ?? "";
+    } else {
+      for (const a of aliasList) {
+        if (messageMatchesAlias(headers, a)) {
+          alias = a;
+          break;
+        }
       }
     }
     if (!alias) continue; // not for any provisioned exec — skip
@@ -344,15 +377,11 @@ Deno.serve(async (req) => {
     // auto-reply to lose us the cache write or the historyId update.
     // ---------------------------------------------------------------
     try {
-      // Skip outbound (SENT label) — these are messages WE sent. Some
-      // of them may be addressed to ourselves, but we never want the
-      // receiver to auto-reply to outbound mail.
       const labels: string[] = m.labelIds ?? [];
       if (labels.includes("SENT") || !labels.includes("INBOX")) {
         continue;
       }
 
-      // Loop-prevention layer 1: RFC 3834 + mailing list headers.
       const autoCheck = inboundIsAutoOrList(headers);
       if (autoCheck.skip) {
         autoRepliesSkipped++;
@@ -362,29 +391,26 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Sender — if we can't extract an email, we can't reply.
       const fromEmail = extractEmail(fromAddr);
       if (!fromEmail || fromEmail === alias) continue;
-      // Don't auto-reply to crm@ itself or any of our own aliases.
+      // Don't auto-reply to any of our provisioned aliases (across all
+      // mailboxes). Re-query is overkill; aliasList here is per-mailbox
+      // but we accept the cross-mailbox edge case and skip the check
+      // beyond the local alias set.
       if (aliasList.includes(fromEmail)) continue;
 
-      // Find the alias's owning user.
       const aliasRow = aliasMeta.get(alias);
       if (!aliasRow) {
-        // Edge case: alias exists in aliasList from earlier query but
-        // metadata map doesn't have it — shouldn't happen given they
-        // come from the same query, but bail safely.
         autoRepliesSkipped++;
         continue;
       }
 
-      // Look up vacation pref for this user.
       const { data: vacationPref } = await sb
         .from("mail_vacation_prefs")
         .select(
           "is_enabled, from_date, to_date, subject, text_body, html_body",
         )
-        .eq("user_id", aliasRow.user_id)
+        .eq("user_id", aliasRow.userId)
         .maybeSingle();
 
       if (!vacationPref || vacationPref.is_enabled !== true) continue;
@@ -396,9 +422,6 @@ Deno.serve(async (req) => {
         today <= vacationPref.to_date;
       if (!fromDateOk || !toDateOk) continue;
 
-      // Loop-prevention layer 2: idempotent on (this message) +
-      // rate-limited per (alias, from) pair.
-      // First check: have we already auto-replied to THIS message?
       const { data: thisMsg } = await sb
         .from("mail_messages_cache")
         .select("auto_replied_at")
@@ -409,7 +432,6 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Second check: rate-limit per (alias, from_addr) -> 1 per 24h.
       const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
       const { data: recentReply } = await sb
         .from("mail_messages_cache")
@@ -429,7 +451,6 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Build the reply.
       const origSubject = (headers["subject"] ?? "").trim();
       const baseSubject = (vacationPref.subject ?? "").trim() ||
         (origSubject || "Out of office");
@@ -450,9 +471,6 @@ Deno.serve(async (req) => {
       }
 
       if (!origMessageId) {
-        // No Message-ID on the inbound — without it threading is
-        // broken and loop-prevention on the receiver's side gets
-        // shaky. Skip rather than send a malformed reply.
         autoRepliesSkipped++;
         console.log(`[autoreply] skip ${m.id}: no Message-ID header`);
         continue;
@@ -460,7 +478,7 @@ Deno.serve(async (req) => {
 
       const replyMessageId = genMessageId(alias);
       const rfc822 = buildAutoReplyRfc822({
-        fromName: aliasRow.display_name ?? "",
+        fromName: aliasRow.displayName ?? "",
         fromAddr: alias,
         toAddr: fromEmail,
         subject: replySubject,
@@ -490,17 +508,13 @@ Deno.serve(async (req) => {
       }
       const sent = await sendRes.json();
 
-      // Mark as auto-replied so any replay of this history page
-      // (e.g. on watermark reset) won't double-send.
       await sb
         .from("mail_messages_cache")
         .update({ auto_replied_at: new Date().toISOString() })
         .eq("gmail_message_id", m.id);
 
-      // Audit row in mail_send_log so the auto-reply shows up in the
-      // same audit surface as user-initiated sends.
       await sb.from("mail_send_log").insert({
-        sender_user_id: aliasRow.user_id,
+        sender_user_id: aliasRow.userId,
         alias_email: alias,
         rfc822_message_id: replyMessageId,
         thread_id: sent.threadId ?? m.threadId,
@@ -528,11 +542,12 @@ Deno.serve(async (req) => {
       history_id: lastResponseHistoryId ?? newHistoryId,
       last_event_at: new Date().toISOString(),
     })
-    .eq("id", 1);
+    .eq("mailbox_email", pushedMailbox);
 
   return new Response(
     JSON.stringify({
       ack: true,
+      mailbox: pushedMailbox,
       processed: messageIds.size,
       autoRepliesSent,
       autoRepliesSkipped,

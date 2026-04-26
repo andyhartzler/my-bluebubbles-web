@@ -16,7 +16,6 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 
-const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const CONCURRENCY = 10;
 
@@ -77,44 +76,50 @@ Deno.serve(async (req) => {
   }
 
   const tok = await getGoogleAccessToken({
-    subject: SHARED_MAILBOX,
+    subject: caller.impersonationSubject,
     scopes: ["https://www.googleapis.com/auth/gmail.modify"],
   });
 
   const errors: Record<string, string> = {};
+  const isSelfOwned = caller.mailboxKind === "self_owned";
 
   // PHASE 1: per-message alias verification.
+  // For shared_alias we fetch metadata and confirm ownership before mutating.
+  // For self_owned the caller IS the mailbox — every message in their inbox
+  // is theirs, so we authorize all requested IDs without a metadata fetch.
   // messages.get?format=metadata = 5 quota units. 10 concurrent ~ 50 u/burst.
-  const verifyResults: VerifyResult[] = await chunkedMap(
-    messageIds,
-    CONCURRENCY,
-    async (id): Promise<VerifyResult> => {
-      const r = await fetch(
-        `${GMAIL_API}/messages/${id}?format=metadata` +
-          `&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc` +
-          `&metadataHeaders=Bcc&metadataHeaders=Delivered-To`,
-        { headers: { Authorization: `Bearer ${tok}` } },
-      );
-      if (!r.ok) {
-        return {
-          id,
-          authorized: false,
-          error: `verify_failed_${r.status}`,
-        };
-      }
-      const m = await r.json();
-      const headers = Object.fromEntries(
-        (m.payload?.headers ?? []).map(
-          (h: { name: string; value: string }) => [
-            h.name.toLowerCase(),
-            h.value,
-          ],
-        ),
-      );
-      const ok = messageMatchesAlias(headers, caller.aliasEmail);
-      return { id, authorized: ok };
-    },
-  );
+  const verifyResults: VerifyResult[] = isSelfOwned
+    ? messageIds.map((id) => ({ id, authorized: true }))
+    : await chunkedMap(
+      messageIds,
+      CONCURRENCY,
+      async (id): Promise<VerifyResult> => {
+        const r = await fetch(
+          `${GMAIL_API}/messages/${id}?format=metadata` +
+            `&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc` +
+            `&metadataHeaders=Bcc&metadataHeaders=Delivered-To`,
+          { headers: { Authorization: `Bearer ${tok}` } },
+        );
+        if (!r.ok) {
+          return {
+            id,
+            authorized: false,
+            error: `verify_failed_${r.status}`,
+          };
+        }
+        const m = await r.json();
+        const headers = Object.fromEntries(
+          (m.payload?.headers ?? []).map(
+            (h: { name: string; value: string }) => [
+              h.name.toLowerCase(),
+              h.value,
+            ],
+          ),
+        );
+        const ok = messageMatchesAlias(headers, caller.aliasEmail);
+        return { id, authorized: ok };
+      },
+    );
 
   const authorizedIds: string[] = [];
   const skippedIds: string[] = [];

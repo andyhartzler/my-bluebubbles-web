@@ -2,7 +2,6 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 
-const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 interface GmailHeader {
@@ -72,15 +71,15 @@ Deno.serve(async (req) => {
   }
 
   const tok = await getGoogleAccessToken({
-    subject: SHARED_MAILBOX,
+    subject: caller.impersonationSubject,
     scopes: ["https://www.googleapis.com/auth/gmail.modify"],
   });
 
   // TRUST BOUNDARY: pre-fetch metadata + alias check BEFORE downloading the
-  // raw message bytes. Without this, an exec could iterate messageIds and
-  // pull other execs' EML bodies. Same trust pattern as mail-attachment-get
-  // and mail-message-get — Delivered-To is essential because the shared
-  // mailbox routes by envelope recipient.
+  // raw message bytes. Without this, a shared_alias exec could iterate
+  // messageIds and pull other execs' EML bodies. Self_owned skips the alias
+  // check (caller owns the mailbox) but we still fetch metadata for Subject
+  // → filename and let Gmail return 404 on bad ids.
   const metaParams = new URLSearchParams({ format: "metadata" });
   for (const h of ["From", "To", "Cc", "Bcc", "Delivered-To", "Subject"]) {
     metaParams.append("metadataHeaders", h);
@@ -101,7 +100,10 @@ Deno.serve(async (req) => {
       (h: GmailHeader) => [h.name.toLowerCase(), h.value],
     ),
   );
-  if (!messageMatchesAlias(headers, caller.aliasEmail)) {
+  if (
+    caller.mailboxKind !== "self_owned" &&
+    !messageMatchesAlias(headers, caller.aliasEmail)
+  ) {
     return new Response(JSON.stringify({ error: "not_yours" }), {
       status: 403,
       headers: { "Content-Type": "application/json" },

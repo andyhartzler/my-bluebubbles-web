@@ -27,7 +27,6 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 
-const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const CONCURRENCY = 10;
 
@@ -74,13 +73,17 @@ Deno.serve(async (req) => {
   }
 
   const tok = await getGoogleAccessToken({
-    subject: SHARED_MAILBOX,
+    subject: caller.impersonationSubject,
     scopes: ["https://www.googleapis.com/auth/gmail.modify"],
   });
 
   const errors: Record<string, string> = {};
+  const isSelfOwned = caller.mailboxKind === "self_owned";
 
-  // PHASE 1: per-message alias verification + trash-gate check.
+  // PHASE 1: per-message verification.
+  // - shared_alias: alias-match + trash-gate (both required).
+  // - self_owned: alias-match skipped (caller owns the mailbox), but the
+  //   trash-gate stays — it's a safety property, not an alias property.
   // messages.get?format=metadata = 5 quota units. 10 concurrent ~ 50 u/burst.
   const verifyResults: VerifyResult[] = await chunkedMap(
     messageIds,
@@ -100,22 +103,24 @@ Deno.serve(async (req) => {
         };
       }
       const m = await r.json();
-      const headers = Object.fromEntries(
-        (m.payload?.headers ?? []).map(
-          (h: { name: string; value: string }) => [
-            h.name.toLowerCase(),
-            h.value,
-          ],
-        ),
-      );
-      const aliasOk = messageMatchesAlias(headers, caller.aliasEmail);
-      if (!aliasOk) {
-        return { id, authorized: false, reason: "alias_mismatch" };
+      if (!isSelfOwned) {
+        const headers = Object.fromEntries(
+          (m.payload?.headers ?? []).map(
+            (h: { name: string; value: string }) => [
+              h.name.toLowerCase(),
+              h.value,
+            ],
+          ),
+        );
+        const aliasOk = messageMatchesAlias(headers, caller.aliasEmail);
+        if (!aliasOk) {
+          return { id, authorized: false, reason: "alias_mismatch" };
+        }
       }
 
       // Safety gate: refuse to permanent-delete unless the message is
-      // currently in TRASH or SPAM. Caller's UI is expected to trash first
-      // (mail-mutation add TRASH) and only then call mail-permanent-delete.
+      // currently in TRASH or SPAM. UI flow: trash first (mail-mutation add
+      // TRASH), then permanent-delete. Same gate for both mailbox kinds.
       const labelIds: string[] = Array.isArray(m.labelIds) ? m.labelIds : [];
       const inTrashOrSpam =
         labelIds.includes("TRASH") || labelIds.includes("SPAM");

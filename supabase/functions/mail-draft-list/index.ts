@@ -10,7 +10,6 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 
-const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const META_CONCURRENCY = 10;
 
@@ -42,9 +41,10 @@ Deno.serve(async (req) => {
   );
 
   const tok = await getGoogleAccessToken({
-    subject: SHARED_MAILBOX,
+    subject: caller.impersonationSubject,
     scopes: ["https://www.googleapis.com/auth/gmail.modify"],
   });
+  const isSelfOwned = caller.mailboxKind === "self_owned";
 
   const params = new URLSearchParams({ maxResults: String(maxResults) });
   if (pageToken) params.set("pageToken", pageToken);
@@ -76,8 +76,11 @@ Deno.serve(async (req) => {
         (h: { name: string; value: string }) => [h.name.toLowerCase(), h.value],
       ),
     );
-    // TRUST BOUNDARY: exact-match alias check on From: header.
-    if (!messageMatchesAlias(headers, caller.aliasEmail)) return null;
+    // TRUST BOUNDARY: shared_alias must match caller's alias on From:.
+    // Self_owned skips — every draft in the mailbox is the caller's.
+    if (!isSelfOwned && !messageMatchesAlias(headers, caller.aliasEmail)) {
+      return null;
+    }
     return {
       id: d.id,
       message: {

@@ -2,7 +2,6 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 
-const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const META_CONCURRENCY = 10;
 
@@ -59,14 +58,22 @@ Deno.serve(async (req) => {
     100,
   );
 
-  // SERVER-INJECTED ALIAS CLAMP — defense layer 1.
-  const aliasClamp =
-    `(deliveredto:${caller.aliasEmail} OR from:${caller.aliasEmail})`;
-  const userQ = sanitizeUserQuery(typeof body.q === "string" ? body.q : "");
-  const q = userQ ? `${aliasClamp} AND (${userQ})` : aliasClamp;
+  // For shared_alias mailboxes, server-inject the alias clamp + sanitize user
+  // query. For self_owned, the caller IS the mailbox owner — no clamp needed.
+  const isSelfOwned = caller.mailboxKind === "self_owned";
+  const rawUserQ = typeof body.q === "string" ? body.q : "";
+  let q: string;
+  if (isSelfOwned) {
+    q = rawUserQ.trim();
+  } else {
+    const aliasClamp =
+      `(deliveredto:${caller.aliasEmail} OR from:${caller.aliasEmail})`;
+    const userQ = sanitizeUserQuery(rawUserQ);
+    q = userQ ? `${aliasClamp} AND (${userQ})` : aliasClamp;
+  }
 
   const tok = await getGoogleAccessToken({
-    subject: SHARED_MAILBOX,
+    subject: caller.impersonationSubject,
     scopes: ["https://www.googleapis.com/auth/gmail.modify"],
   });
 
@@ -99,9 +106,15 @@ Deno.serve(async (req) => {
       ),
     );
     // TRUST BOUNDARY layer 2: exact-match alias check (review §C2-C4).
-    // Never skip this — Gmail's q-side operator could in principle return
-    // a message that no longer matches by the time metadata renders.
-    if (!messageMatchesAlias(headers, caller.aliasEmail)) return null;
+    // Never skip this for shared_alias — Gmail's q-side operator could in
+    // principle return a message that no longer matches by the time metadata
+    // renders. Self_owned mailboxes skip — caller is the mailbox owner.
+    if (
+      !isSelfOwned &&
+      !messageMatchesAlias(headers, caller.aliasEmail)
+    ) {
+      return null;
+    }
     return {
       id: m.id,
       threadId: m.threadId,

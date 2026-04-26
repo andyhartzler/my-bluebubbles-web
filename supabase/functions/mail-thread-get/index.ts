@@ -2,7 +2,6 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 
-const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 Deno.serve(async (req) => {
@@ -20,7 +19,7 @@ Deno.serve(async (req) => {
   }
 
   const tok = await getGoogleAccessToken({
-    subject: SHARED_MAILBOX,
+    subject: caller.impersonationSubject,
     scopes: ["https://www.googleapis.com/auth/gmail.modify"],
   });
   const r = await fetch(`${GMAIL_API}/threads/${threadId}?format=full`, {
@@ -35,14 +34,22 @@ Deno.serve(async (req) => {
   const thread = await r.json();
 
   // TRUST BOUNDARY: exact-match alias against parsed addresses (review §C2-C4).
-  const messages = (thread.messages ?? []).filter(
-    (m: { payload?: { headers?: { name: string; value: string }[] } }) => {
-      const headers = Object.fromEntries(
-        (m.payload?.headers ?? []).map((h) => [h.name.toLowerCase(), h.value]),
-      );
-      return messageMatchesAlias(headers, caller.aliasEmail);
-    },
-  );
+  // Self_owned mailboxes skip — every message in their mailbox is theirs.
+  const isSelfOwned = caller.mailboxKind === "self_owned";
+  const allMessages = thread.messages ?? [];
+  const messages = isSelfOwned
+    ? allMessages
+    : allMessages.filter(
+      (m: { payload?: { headers?: { name: string; value: string }[] } }) => {
+        const headers = Object.fromEntries(
+          (m.payload?.headers ?? []).map((h) => [
+            h.name.toLowerCase(),
+            h.value,
+          ]),
+        );
+        return messageMatchesAlias(headers, caller.aliasEmail);
+      },
+    );
 
   if (messages.length === 0) {
     return new Response(JSON.stringify({ error: "thread_not_yours" }), {

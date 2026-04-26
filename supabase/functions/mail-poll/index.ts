@@ -1,63 +1,68 @@
 // Pub/Sub silent-detection fallback for the Gmail history pipeline.
-// Cron fires every 5 min. If the receiver hasn't been pinged recently
-// (last_event_at within the last 5 minutes), we no-op. Otherwise we
-// run the same users.history.list walk that mail-pubsub-receiver runs
-// on a real push, catching up any messages we missed because Pub/Sub
-// is having an outage or the watch lapsed.
+// Cron fires every 5 min. For each mailbox we track in mail_pubsub_state,
+// if the receiver hasn't been pinged recently (last_event_at within the
+// last 5 min) we no-op. Otherwise we run the same users.history.list walk
+// the receiver runs on a real push, catching up any messages we missed
+// because Pub/Sub had an outage or the watch lapsed.
 //
-// Deployed with --no-verify-jwt because pg_cron hits us URL-only with
-// no caller-controlled inputs.
+// Per-mailbox: shared_alias (crm@) is one entry; each self_owned mailbox
+// is its own entry. Each mailbox has its own history watermark.
+//
+// Deployed --no-verify-jwt because pg_cron hits us URL-only with no
+// caller-controlled inputs.
 
 import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
+import {
+  enumerateWatchedMailboxes,
+  type WatchedMailbox,
+} from "../_shared/mailbox-registry.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
-const FRESH_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const FRESH_WINDOW_MS = 5 * 60 * 1000;
 
-Deno.serve(async (_req) => {
-  const sb = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
+interface MailboxResult {
+  mailbox: string;
+  status:
+    | "fresh"
+    | "no_baseline"
+    | "reset"
+    | "ok"
+    | "history_failed"
+    | "no_state";
+  processed?: number;
+  detail?: string;
+}
 
+async function pollOne(
+  sb: ReturnType<typeof createClient>,
+  m: WatchedMailbox,
+): Promise<MailboxResult> {
   const { data: state } = await sb
     .from("mail_pubsub_state")
     .select("history_id, last_event_at")
-    .eq("id", 1)
+    .eq("mailbox_email", m.mailboxEmail)
     .maybeSingle();
 
-  // No baseline at all — nothing to walk from. The first real push
-  // (or watch-renew) will establish it.
   if (!state?.history_id) {
-    return new Response(
-      JSON.stringify({ ok: true, fresh: false, reason: "no_baseline" }),
-      { headers: { "Content-Type": "application/json" } },
-    );
+    // No baseline yet — first push (or watch-renew) will establish it.
+    return { mailbox: m.mailboxEmail, status: "no_baseline" };
   }
 
-  // Fast-path: receiver was just pinged, no need to poll.
   if (state.last_event_at) {
     const ageMs = Date.now() - new Date(state.last_event_at).getTime();
     if (ageMs < FRESH_WINDOW_MS) {
-      return new Response(JSON.stringify({ ok: true, fresh: true }), {
-        headers: { "Content-Type": "application/json" },
-      });
+      return { mailbox: m.mailboxEmail, status: "fresh" };
     }
   }
 
-  const startHistoryId: string = String(state.history_id);
-
+  const startHistoryId = String(state.history_id);
   const tok = await getGoogleAccessToken({
-    subject: SHARED_MAILBOX,
+    subject: m.mailboxEmail,
     scopes: ["https://www.googleapis.com/auth/gmail.modify"],
   });
 
-  // Same pagination pattern as the receiver. Persist the historyId
-  // returned by Gmail (floor of pages processed), NOT a synthetic
-  // now-id — otherwise we'd persist ahead of what we actually
-  // processed and silently drop messages on the next walk.
   const messageIds = new Set<string>();
   let pageToken: string | undefined;
   let lastResponseHistoryId: string | undefined;
@@ -73,11 +78,10 @@ Deno.serve(async (_req) => {
     });
 
     if (!histRes.ok) {
-      // 404 = startHistoryId expired (>7d). Reset baseline to current
-      // Gmail historyId via users.messages.list (same recovery path
-      // as the receiver, but discovered via list instead of the push
-      // envelope's newHistoryId).
       if (histRes.status === 404) {
+        // startHistoryId expired (>7d). Reset baseline to current Gmail
+        // historyId via users.messages.list — same recovery path the
+        // receiver uses on a 404.
         const listRes = await fetch(
           `${GMAIL_API}/messages?maxResults=1`,
           { headers: { Authorization: `Bearer ${tok}` } },
@@ -85,8 +89,6 @@ Deno.serve(async (_req) => {
         let resetHistoryId: string | undefined;
         if (listRes.ok) {
           const lj = await listRes.json();
-          // /messages.list doesn't return a top-level historyId, so
-          // fetch the first message's historyId to use as the new floor.
           const firstId = lj.messages?.[0]?.id;
           if (firstId) {
             const mr = await fetch(
@@ -105,20 +107,18 @@ Deno.serve(async (_req) => {
             ...(resetHistoryId ? { history_id: resetHistoryId } : {}),
             last_event_at: new Date().toISOString(),
           })
-          .eq("id", 1);
+          .eq("mailbox_email", m.mailboxEmail);
         console.log(
-          "mail-poll: history reset (404 expired)",
+          `mail-poll[${m.mailboxEmail}]: history reset (404 expired)`,
           { from: startHistoryId, to: resetHistoryId ?? "unchanged" },
         );
-        return new Response(
-          JSON.stringify({ ok: true, reset: true, processed: 0 }),
-          { headers: { "Content-Type": "application/json" } },
-        );
+        return { mailbox: m.mailboxEmail, status: "reset" };
       }
-      return new Response(
-        JSON.stringify({ error: "history_failed", status: histRes.status }),
-        { status: 502, headers: { "Content-Type": "application/json" } },
-      );
+      return {
+        mailbox: m.mailboxEmail,
+        status: "history_failed",
+        detail: `${histRes.status}`,
+      };
     }
 
     const hist = await histRes.json();
@@ -131,15 +131,9 @@ Deno.serve(async (_req) => {
     pageToken = hist.nextPageToken;
   } while (pageToken);
 
-  // Per-message classification using the exact-match alias helper.
-  const { data: aliases } = await sb
-    .from("mail_aliases")
-    .select("alias_email")
-    .is("revoked_at", null)
-    .eq("gmail_send_as_verified", true);
-  const aliasList: string[] = (aliases ?? []).map(
-    (r: { alias_email: string }) => r.alias_email.toLowerCase(),
-  );
+  // Per-message classification.
+  const aliasList: string[] = m.aliases.map((a) => a.aliasEmail.toLowerCase());
+  const isSelfOwned = m.mailboxKind === "self_owned";
 
   for (const mid of messageIds) {
     const r = await fetch(
@@ -147,25 +141,29 @@ Deno.serve(async (_req) => {
       { headers: { Authorization: `Bearer ${tok}` } },
     );
     if (!r.ok) continue;
-    const m = await r.json();
+    const msg = await r.json();
     const headers = Object.fromEntries(
-      (m.payload?.headers ?? []).map(
+      (msg.payload?.headers ?? []).map(
         (h: { name: string; value: string }) => [h.name.toLowerCase(), h.value],
       ),
     );
 
     let alias = "";
-    for (const a of aliasList) {
-      if (messageMatchesAlias(headers, a)) {
-        alias = a;
-        break;
+    if (isSelfOwned) {
+      alias = aliasList[0] ?? "";
+    } else {
+      for (const a of aliasList) {
+        if (messageMatchesAlias(headers, a)) {
+          alias = a;
+          break;
+        }
       }
     }
-    if (!alias) continue; // not for any provisioned exec — skip
+    if (!alias) continue;
 
     await sb.from("mail_messages_cache").upsert({
-      gmail_message_id: m.id,
-      thread_id: m.threadId,
+      gmail_message_id: msg.id,
+      thread_id: msg.threadId,
       alias_email: alias,
       from_addr: headers["from"] ?? "",
       to_addrs: (headers["to"] ?? "")
@@ -177,9 +175,9 @@ Deno.serve(async (_req) => {
         .map((s: string) => s.trim())
         .filter(Boolean),
       subject: headers["subject"] ?? "",
-      snippet: m.snippet ?? "",
-      internal_date: new Date(Number(m.internalDate)).toISOString(),
-      labels: m.labelIds ?? [],
+      snippet: msg.snippet ?? "",
+      internal_date: new Date(Number(msg.internalDate)).toISOString(),
+      labels: msg.labelIds ?? [],
       delivered_to: headers["delivered-to"] ?? null,
     });
   }
@@ -187,16 +185,49 @@ Deno.serve(async (_req) => {
   await sb
     .from("mail_pubsub_state")
     .update({
-      // Persist what Gmail returned, not now() — same invariant as the
-      // receiver. If Gmail returned no historyId (empty walk), keep
-      // the current floor.
       ...(lastResponseHistoryId ? { history_id: lastResponseHistoryId } : {}),
       last_event_at: new Date().toISOString(),
     })
-    .eq("id", 1);
+    .eq("mailbox_email", m.mailboxEmail);
+
+  return {
+    mailbox: m.mailboxEmail,
+    status: "ok",
+    processed: messageIds.size,
+  };
+}
+
+Deno.serve(async (_req) => {
+  const sb = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  let mailboxes: WatchedMailbox[];
+  try {
+    mailboxes = await enumerateWatchedMailboxes(sb);
+  } catch (e) {
+    return new Response(
+      JSON.stringify({ error: "enumerate_failed", detail: String(e) }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  const results: MailboxResult[] = [];
+  for (const m of mailboxes) {
+    try {
+      results.push(await pollOne(sb, m));
+    } catch (e) {
+      results.push({
+        mailbox: m.mailboxEmail,
+        status: "history_failed",
+        detail: String(e),
+      });
+    }
+  }
 
   return new Response(
-    JSON.stringify({ ok: true, processed: messageIds.size }),
+    JSON.stringify({ ok: true, results }),
     { headers: { "Content-Type": "application/json" } },
   );
 });

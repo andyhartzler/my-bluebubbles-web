@@ -12,7 +12,6 @@ import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 interface UpdateBody {
@@ -141,7 +140,7 @@ Deno.serve(async (req) => {
   const bodyHtml = body.bodyHtml?.toString();
 
   const tok = await getGoogleAccessToken({
-    subject: SHARED_MAILBOX,
+    subject: caller.impersonationSubject,
     scopes: ["https://www.googleapis.com/auth/gmail.modify"],
   });
 
@@ -162,8 +161,13 @@ Deno.serve(async (req) => {
       (h: { name: string; value: string }) => [h.name.toLowerCase(), h.value],
     ),
   );
-  // TRUST BOUNDARY: only the caller who created the draft can update it.
-  if (!messageMatchesAlias(existingHeaders, caller.aliasEmail)) {
+  // TRUST BOUNDARY: shared_alias drafts must match the caller's alias on
+  // From: — only the creator can update. Self_owned drafts are all the
+  // caller's by definition (their own mailbox).
+  if (
+    caller.mailboxKind !== "self_owned" &&
+    !messageMatchesAlias(existingHeaders, caller.aliasEmail)
+  ) {
     return new Response(JSON.stringify({ error: "not_yours" }), {
       status: 403,
       headers: { "Content-Type": "application/json" },

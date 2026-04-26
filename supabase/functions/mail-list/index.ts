@@ -2,7 +2,6 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 
-const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const META_CONCURRENCY = 10;
 
@@ -58,14 +57,24 @@ Deno.serve(async (req) => {
     Math.max(body.maxResults ?? 25, 1),
     100,
   );
-  // SERVER-INJECTED ALIAS CLAMP — defense layer 1.
-  const aliasClamp =
-    `(deliveredto:${caller.aliasEmail} OR from:${caller.aliasEmail})`;
-  const userQ = sanitizeUserQuery(typeof body.q === "string" ? body.q : "");
-  const q = userQ ? `${aliasClamp} AND (${userQ})` : aliasClamp;
+  // For shared_alias mailboxes, server-inject the alias clamp + sanitize user
+  // query (defense layer 1). For self_owned, the caller IS the mailbox owner
+  // — every message is theirs by definition, so we pass the user query
+  // through untouched (Gmail's full search syntax is fine; nothing to clamp).
+  const isSelfOwned = caller.mailboxKind === "self_owned";
+  const rawUserQ = typeof body.q === "string" ? body.q : "";
+  let q: string;
+  if (isSelfOwned) {
+    q = rawUserQ.trim();
+  } else {
+    const aliasClamp =
+      `(deliveredto:${caller.aliasEmail} OR from:${caller.aliasEmail})`;
+    const userQ = sanitizeUserQuery(rawUserQ);
+    q = userQ ? `${aliasClamp} AND (${userQ})` : aliasClamp;
+  }
 
   const tok = await getGoogleAccessToken({
-    subject: SHARED_MAILBOX,
+    subject: caller.impersonationSubject,
     scopes: ["https://www.googleapis.com/auth/gmail.modify"],
   });
 
@@ -98,7 +107,15 @@ Deno.serve(async (req) => {
       ),
     );
     // TRUST BOUNDARY layer 2: exact-match alias check (review §C2-C4).
-    if (!messageMatchesAlias(headers, caller.aliasEmail)) return null;
+    // Self_owned mailboxes skip this — every message in their Gmail
+    // inbox is theirs by definition, including mail delivered to other
+    // Workspace aliases that route to this mailbox (founder@, etc.).
+    if (
+      !isSelfOwned &&
+      !messageMatchesAlias(headers, caller.aliasEmail)
+    ) {
+      return null;
+    }
     return {
       id: m.id,
       threadId: m.threadId,
