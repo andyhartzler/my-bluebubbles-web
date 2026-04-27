@@ -483,11 +483,23 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+          // When the parent gave us a bounded height (e.g. compactMode in
+          // the split-screen candidates page passes height: double.infinity
+          // inside an Expanded), expand to fill it. Otherwise the map's
+          // SizedBox(height: double.infinity) would collapse to zero
+          // because the Column wouldn't take the available vertical space.
+          mainAxisSize: widget.height.isInfinite
+              ? MainAxisSize.max
+              : MainAxisSize.min,
           children: [
             if (!widget.compactMode) _buildTitle(),
             if (!widget.compactMode) _buildDistrictTypeToggle(),
-            _buildMap(),
+            // When height is infinite, let the map flex to fill the column.
+            // When height is finite, use the explicit value.
+            if (widget.height.isInfinite)
+              Expanded(child: _buildMap())
+            else
+              _buildMap(),
             if (widget.showLegend && !widget.compactMode) _buildLegendBar(),
           ],
         ),
@@ -616,8 +628,12 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
     final isLoading = !_loadedTypes.contains(_activeType);
 
     if (isLoading) {
+      // When wrapped in Expanded (height==infinity) the parent already
+      // bounds us; SizedBox.expand() picks up that bound. When given an
+      // explicit finite height, keep the original behaviour.
       return SizedBox(
-        height: widget.height,
+        height: widget.height.isInfinite ? null : widget.height,
+        width: widget.height.isInfinite ? double.infinity : null,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -806,7 +822,11 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
     }
 
     return SizedBox(
-      height: widget.height,
+      // Same pattern as the loading branch — when wrapped in Expanded
+      // the parent's bound takes effect; when given a finite height
+      // use it directly.
+      height: widget.height.isInfinite ? null : widget.height,
+      width: widget.height.isInfinite ? double.infinity : null,
       child: ClipRRect(
         borderRadius: widget.compactMode
             ? BorderRadius.circular(12)
