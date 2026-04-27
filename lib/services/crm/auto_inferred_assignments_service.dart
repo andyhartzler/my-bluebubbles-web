@@ -137,14 +137,14 @@ class AutoInferredAssignmentsService {
     await safe(() async {
       final rows = await client
           .from('candidates')
-          .select('id, full_name, updated_at')
+          .select('id, name, updated_at')
           .eq('moyd_assigned_to', memberId);
       for (final r in (rows as List).whereType<Map>()) {
         final id = r['id']?.toString() ?? '';
         results.add(AutoInferredAssignment(
           key: 'candidate:$id',
           source: 'candidate',
-          title: 'Candidate: ${r['full_name'] ?? 'Unnamed'}',
+          title: 'Candidate: ${r['name'] ?? 'Unnamed'}',
           subtitle: 'Assigned to you',
           entityUrl: '/candidates/$id',
           at: DateTime.tryParse(r['updated_at']?.toString() ?? ''),

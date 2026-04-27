@@ -1478,7 +1478,13 @@ class _MecResearchTabState extends State<MecResearchTab> {
   // ===========================================================================
 
   Widget _buildEnrichmentSections() {
-    final enr = _enrichmentData ?? (_unifiedProfile?['donor'] as Map<String, dynamic>?);
+    // get_donor_unified_profile returns the donor_enrichment row under the
+    // top-level 'enrichment' key (see jmap RPC body). Reading
+    // _unifiedProfile['donor'] returned null and silently hid the entire
+    // enrichment section. The async _enrichmentData fetch path is correct.
+    final unifiedEnr =
+        _unifiedProfile?['enrichment'] as Map<String, dynamic>?;
+    final enr = _enrichmentData ?? unifiedEnr;
     final donorRow = _profileDonorRow;
     if (enr == null && donorRow == null) return const SizedBox.shrink();
 

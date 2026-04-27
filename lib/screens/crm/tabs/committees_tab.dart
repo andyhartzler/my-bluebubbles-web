@@ -1080,18 +1080,40 @@ class CommitteesTabState extends State<CommitteesTab> {
             final donor = _donors[index];
             final firstName = (donor['first_name'] as String? ?? '').trim();
             final lastName = (donor['last_name'] as String? ?? '').trim();
-            // Companies and committees don't have a per-individual MEC profile
-            // page — only individuals do. Skip the nav silently for those
-            // (no toast — the row simply isn't tappable for them).
-            if (firstName.isEmpty && lastName.isEmpty) return;
-            Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => MECDonorScreen(
-                firstName: firstName,
-                lastName: lastName,
-                city: donor['city'] as String?,
-                state: donor['state'] as String?,
-              ),
-            ));
+            final donorMecId =
+                (donor['donor_mec_id'] as String? ?? '').trim();
+            final donorName = (donor['donor_name'] as String? ?? '').trim();
+
+            // Three donor row types:
+            //   1. Individual (first+last set) → push MECDonorScreen.
+            //   2. Committee (donor_mec_id set — looked up by RPC from
+            //      contributor_committee against mec_committees.mec_id) →
+            //      drill into that committee's detail in this same tab.
+            //   3. Pure company (no individual name, no mec_id match) →
+            //      no profile page exists, no-op.
+            if (firstName.isNotEmpty || lastName.isNotEmpty) {
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => MECDonorScreen(
+                  firstName: firstName,
+                  lastName: lastName,
+                  city: donor['city'] as String?,
+                  state: donor['state'] as String?,
+                ),
+              ));
+              return;
+            }
+            if (donorMecId.isNotEmpty) {
+              _openCommitteeDetail({
+                'mec_id': donorMecId,
+                'committee_id': donorMecId,
+                'committee_name': donorName.isNotEmpty
+                    ? donorName
+                    : 'Committee',
+                'source': 'mec',
+              });
+              return;
+            }
+            // Pure company donor — silently no-op.
           },
         ),
         if (_hasMoreDonors && !_loadingMoreDonors)
