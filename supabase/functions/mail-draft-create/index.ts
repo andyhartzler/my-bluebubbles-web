@@ -11,6 +11,7 @@
 
 import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
+import { resolveSendAsForSelfOwned } from "../_shared/email-utils.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -27,6 +28,8 @@ interface DraftBody {
   references?: string[];
   relatedEntityType?: string;
   relatedEntityId?: string;
+  /** Self_owned-only: verified sendAs address. Ignored for shared_alias. */
+  fromAddr?: string;
 }
 
 function b64url(bytes: Uint8Array): string {
@@ -145,12 +148,56 @@ Deno.serve(async (req) => {
     .select("display_name")
     .eq("alias_email", caller.aliasEmail)
     .maybeSingle();
-  const fromName = aliasRow?.display_name ?? "";
+  const aliasDisplayName = (aliasRow?.display_name as string | undefined) ??
+    "";
 
-  const messageId = genMessageId(caller.aliasEmail);
+  // Mint Google token early so we can validate the requested fromAddr
+  // (self_owned only) before logging the audit row.
+  let tok: string;
+  try {
+    tok = await getGoogleAccessToken({
+      subject: caller.impersonationSubject,
+      scopes: [
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/gmail.settings.basic",
+      ],
+    });
+  } catch (e) {
+    return new Response(
+      JSON.stringify({ error: "token_failed", detail: String(e) }),
+      { status: 502, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // Resolve the From: identity. shared_alias always pins to the alias.
+  // self_owned can request any verified sendAs identity on their seat.
+  let fromAddr = caller.aliasEmail;
+  let fromName = aliasDisplayName;
+  if (caller.mailboxKind === "self_owned" && body.fromAddr) {
+    const resolved = await resolveSendAsForSelfOwned(
+      tok,
+      caller.impersonationSubject,
+      body.fromAddr,
+      aliasDisplayName,
+    );
+    if (!resolved) {
+      return new Response(
+        JSON.stringify({
+          error: "from_addr_not_authorized",
+          detail:
+            "Requested From: address is not a verified sendAs identity on this mailbox.",
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    fromAddr = resolved.email;
+    fromName = resolved.displayName;
+  }
+
+  const messageId = genMessageId(fromAddr);
   const rfc822 = buildRfc822({
     fromName,
-    fromAddr: caller.aliasEmail,
+    fromAddr,
     to,
     cc,
     bcc,
@@ -164,11 +211,12 @@ Deno.serve(async (req) => {
   const raw = b64url(new TextEncoder().encode(rfc822));
 
   // Insert audit row with status 'queued' — drafts are pre-send intent.
+  // alias_email records the actual From: used.
   const { data: logRow, error: logErr } = await sb
     .from("mail_send_log")
     .insert({
       sender_user_id: caller.userId,
-      alias_email: caller.aliasEmail,
+      alias_email: fromAddr,
       rfc822_message_id: messageId,
       thread_id: body.threadId ?? null,
       recipients: { to, cc, bcc },
@@ -184,23 +232,6 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: "log_failed", detail: logErr.message }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
-  }
-
-  let tok: string;
-  try {
-    tok = await getGoogleAccessToken({
-      subject: caller.impersonationSubject,
-      scopes: ["https://www.googleapis.com/auth/gmail.modify"],
-    });
-  } catch (e) {
-    await sb
-      .from("mail_send_log")
-      .update({ status: "failed", error_detail: `token: ${String(e)}` })
-      .eq("id", logRow!.id);
-    return new Response(JSON.stringify({ error: "token_failed" }), {
-      status: 502,
-      headers: { "Content-Type": "application/json" },
-    });
   }
 
   const draftRes = await fetch(`${GMAIL_API}/drafts`, {

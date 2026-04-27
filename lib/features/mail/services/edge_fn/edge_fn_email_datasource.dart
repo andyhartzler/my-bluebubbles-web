@@ -74,10 +74,11 @@ class EdgeFnEmailDataSource extends EmailDataSource {
     CreateNewMailboxRequest? mailboxRequest,
     CancelToken? cancelToken,
   }) async {
-    // Map tmail's EmailRequest → mail-send body. EmailRequest carries
-    // a built Email (subject, from, to, htmlBody, textBody, threadId
-    // ref via inReplyTo). The edge fn server-side overwrites From: with
-    // the caller's alias, so the EmailRequest.email.from set is ignored.
+    // Map tmail's EmailRequest → mail-send body. The composer's
+    // identity picker writes the user-chosen identity into Email.from;
+    // we forward that as `fromAddr`. The edge fn validates it against
+    // users.settings.sendAs for self_owned mailboxes (and ignores it
+    // for shared_alias — those stay pinned to the caller's alias).
     final parsed = _parseEmail(emailRequest.email);
     await _api.sendMessage(
       to: parsed.to,
@@ -89,6 +90,7 @@ class EdgeFnEmailDataSource extends EmailDataSource {
       threadId: parsed.threadId,
       inReplyTo: parsed.inReplyTo,
       references: parsed.references,
+      fromAddr: parsed.fromAddr,
     );
   }
 
@@ -119,6 +121,19 @@ class EdgeFnEmailDataSource extends EmailDataSource {
         : null;
     final references = email.references?.ids.toList();
 
+    // The composer's identity picker writes the user's choice into
+    // Email.from. Take the first entry's email portion (display-name
+    // is irrelevant — the server resolves the display name from the
+    // matching sendAs entry).
+    String? fromAddr;
+    final fromSet = email.from;
+    if (fromSet != null && fromSet.isNotEmpty) {
+      final first = fromSet.first.email;
+      if (first != null && first.isNotEmpty) {
+        fromAddr = first.toLowerCase();
+      }
+    }
+
     return _ParsedEmail(
       to: to,
       cc: cc,
@@ -129,6 +144,7 @@ class EdgeFnEmailDataSource extends EmailDataSource {
       threadId: email.threadId?.id.value,
       inReplyTo: inReplyTo,
       references: references,
+      fromAddr: fromAddr,
     );
   }
 
@@ -329,6 +345,7 @@ class EdgeFnEmailDataSource extends EmailDataSource {
       threadId: parsed.threadId,
       inReplyTo: parsed.inReplyTo,
       references: parsed.references,
+      fromAddr: parsed.fromAddr,
     );
     // Use Gmail's draft id as the canonical Email.id — the composer's
     // "discard" / "update" paths key off the id we hand back here, and
@@ -369,6 +386,7 @@ class EdgeFnEmailDataSource extends EmailDataSource {
       threadId: parsed.threadId,
       inReplyTo: parsed.inReplyTo,
       references: parsed.references,
+      fromAddr: parsed.fromAddr,
     );
     return _emailWithIds(newEmail,
         id: result.draftId, threadId: result.threadId);
@@ -986,6 +1004,7 @@ class _ParsedEmail {
   final String? threadId;
   final String? inReplyTo;
   final List<String>? references;
+  final String? fromAddr;
 
   const _ParsedEmail({
     required this.to,
@@ -997,5 +1016,6 @@ class _ParsedEmail {
     required this.threadId,
     required this.inReplyTo,
     required this.references,
+    required this.fromAddr,
   });
 }

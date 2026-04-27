@@ -9,7 +9,10 @@
 
 import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
-import { messageMatchesAlias } from "../_shared/email-utils.ts";
+import {
+  messageMatchesAlias,
+  resolveSendAsForSelfOwned,
+} from "../_shared/email-utils.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -25,6 +28,8 @@ interface UpdateBody {
   threadId?: string;
   inReplyTo?: string;
   references?: string[];
+  /** Self_owned-only: verified sendAs address. Ignored for shared_alias. */
+  fromAddr?: string;
 }
 
 function b64url(bytes: Uint8Array): string {
@@ -141,7 +146,10 @@ Deno.serve(async (req) => {
 
   const tok = await getGoogleAccessToken({
     subject: caller.impersonationSubject,
-    scopes: ["https://www.googleapis.com/auth/gmail.modify"],
+    scopes: [
+      "https://www.googleapis.com/auth/gmail.modify",
+      "https://www.googleapis.com/auth/gmail.settings.basic",
+    ],
   });
 
   // 1. Fetch the existing draft, full format, to verify ownership and grab
@@ -186,12 +194,38 @@ Deno.serve(async (req) => {
     .select("display_name")
     .eq("alias_email", caller.aliasEmail)
     .maybeSingle();
-  const fromName = aliasRow?.display_name ?? "";
+  const aliasDisplayName = (aliasRow?.display_name as string | undefined) ??
+    "";
 
-  const messageId = genMessageId(caller.aliasEmail);
+  // Resolve From: identity. shared_alias always pins to the alias.
+  // self_owned can request any verified sendAs identity on their seat.
+  let fromAddr = caller.aliasEmail;
+  let fromName = aliasDisplayName;
+  if (caller.mailboxKind === "self_owned" && body.fromAddr) {
+    const resolved = await resolveSendAsForSelfOwned(
+      tok,
+      caller.impersonationSubject,
+      body.fromAddr,
+      aliasDisplayName,
+    );
+    if (!resolved) {
+      return new Response(
+        JSON.stringify({
+          error: "from_addr_not_authorized",
+          detail:
+            "Requested From: address is not a verified sendAs identity on this mailbox.",
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    fromAddr = resolved.email;
+    fromName = resolved.displayName;
+  }
+
+  const messageId = genMessageId(fromAddr);
   const rfc822 = buildRfc822({
     fromName,
-    fromAddr: caller.aliasEmail,
+    fromAddr,
     to,
     cc,
     bcc,

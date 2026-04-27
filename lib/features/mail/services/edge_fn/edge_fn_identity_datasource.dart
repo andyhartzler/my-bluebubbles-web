@@ -1,21 +1,29 @@
 // Edge-function-backed implementation of tmail's IdentityDataSource.
 //
-// MOYD CRM provisions exactly one mail alias per exec via the
-// `mail_aliases` table (alias_email + display_name). We expose that
-// row to tmail as a single synthetic JMAP Identity so the dashboard's
-// _getAllIdentitiesInteractor and the composer's "From:" picker can
-// resolve cleanly.
+// Returns the caller's verified Gmail send-as identities so tmail's
+// composer "From:" picker can show all of them.
 //
-// Phase 1 constraints:
-//   - No multi-identity per user (each exec has exactly one alias).
-//   - No identity mutation (create/edit/delete) — From: is pinned
-//     server-side by the mail-send edge function, so client-side
-//     CRUD would be cosmetic at best and confusing at worst.
-//   - No signature customization. textSignature/htmlSignature are
-//     null; transformHtmlSignature is a passthrough.
+//   - shared_alias mailboxes (15 execs sharing crm@): exactly one
+//     identity is returned — the caller's own alias_email. The shared
+//     mailbox holds N sendAs entries server-side, but the trust
+//     boundary keeps each exec pinned to their own.
+//
+//   - self_owned mailboxes (Andrew/Dustin/Landon): every verified
+//     sendAs identity on their seat (primary + every alias with
+//     verificationStatus=accepted in users.settings.sendAs.list).
+//
+// The actual list is fetched once per session via the
+// `mail-identities-get` edge fn and cached in-process.
+//
+// We deliberately do NOT support createNewIdentity / editIdentity /
+// deleteIdentity — sendAs identities live in Google Workspace, not
+// in Supabase, and managing them from inside the CRM would require
+// re-implementing Gmail's settings.sendAs flow (not in scope here).
+// transformHtmlSignature is a passthrough; signatures aren't stored.
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:jmap_dart_client/jmap/account_id.dart';
 import 'package:jmap_dart_client/jmap/core/id.dart';
 import 'package:jmap_dart_client/jmap/core/properties/properties.dart';
@@ -28,70 +36,72 @@ import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_a
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/model/edit_identity_request.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/model/identities_response.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/model/identity_signature.dart';
-import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/features/mail/services/mail_api_client.dart';
 
 class EdgeFnIdentityDataSource extends IdentityDataSource {
-  EdgeFnIdentityDataSource({CRMSupabaseService? supabase})
-      : _supabase = supabase ?? CRMSupabaseService();
+  EdgeFnIdentityDataSource({MailApiClient? api})
+      : _api = api ?? MailApiClient();
 
-  final CRMSupabaseService _supabase;
+  final MailApiClient _api;
 
-  // Cache the synthetic Identity for the duration of the session — the
-  // alias row doesn't change mid-session and tmail calls getAllIdentities
-  // a few times during dashboard boot. State is also cached so the
+  // Cached for the duration of the session — sendAs lists rarely change
+  // mid-session and tmail's controller calls getAllIdentities a few times
+  // during dashboard boot. State is also cached so the
   // IdentitiesResponse.hasData() check (which requires a non-null state)
   // succeeds.
-  Identity? _cached;
+  List<Identity>? _cached;
   final State _state = State('1');
 
-  /// Slugify alias_email into a valid JMAP `Id` value.
-  /// `Id` requires a-zA-Z0-9_- only; the @ and . in an email break it.
-  static String _slugForAlias(String aliasEmail) {
-    final sanitized = aliasEmail
+  /// Slugify an email into a valid JMAP `Id` (a-zA-Z0-9_-).
+  static String _slugForEmail(String email) {
+    final sanitized = email
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
         .replaceAll(RegExp(r'^-+|-+$'), '');
     return sanitized.isEmpty ? 'caller' : sanitized;
   }
 
-  /// Read the caller's `mail_aliases` row and build a synthetic Identity.
-  /// Returns null when the user has no provisioned alias (e.g. members
-  /// who somehow reach the mail screen — the nav gate should prevent
-  /// this, but we degrade gracefully rather than throw).
-  Future<Identity?> _loadIdentityForCaller() async {
-    if (_cached != null) return _cached;
-    if (!_supabase.isInitialized) return null;
-    final userId = _supabase.client.auth.currentUser?.id;
-    if (userId == null) return null;
+  Future<List<Identity>> _loadIdentities() async {
+    final cached = _cached;
+    if (cached != null) return cached;
 
-    final row = await _supabase.client
-        .from('mail_aliases')
-        .select('alias_email, display_name, revoked_at')
-        .eq('user_id', userId)
-        .maybeSingle();
-    if (row == null) return null;
-    if (row['revoked_at'] != null) return null;
+    try {
+      final resp = await _api.getIdentities();
+      // Sort: primary first, then default (if different), then verified
+      // alphabetical. Keeps the From: picker stable + predictable.
+      final sorted = [...resp.identities];
+      sorted.sort((a, b) {
+        if (a.email == resp.primary) return -1;
+        if (b.email == resp.primary) return 1;
+        if (a.isDefault != b.isDefault) return a.isDefault ? -1 : 1;
+        return a.email.compareTo(b.email);
+      });
 
-    final aliasEmail = row['alias_email'] as String?;
-    if (aliasEmail == null || aliasEmail.isEmpty) return null;
-    final displayName = (row['display_name'] as String?) ?? aliasEmail;
-
-    _cached = Identity(
-      id: IdentityId(Id('moyd-${_slugForAlias(aliasEmail)}')),
-      name: displayName,
-      email: aliasEmail,
-      // No bcc / replyTo / signatures in Phase 1 — the mail-send edge
-      // function pins From: server-side, so client overrides are moot.
-      bcc: null,
-      replyTo: null,
-      textSignature: null,
-      htmlSignature: null,
-      // mayDelete=false signals to tmail's UI that the delete affordance
-      // should be hidden; combined with deleteIdentity throwing, this
-      // prevents accidental destructive flows.
-      mayDelete: false,
-    );
-    return _cached;
+      final identities = sorted
+          .map((i) => Identity(
+                id: IdentityId(Id('moyd-${_slugForEmail(i.email)}')),
+                name: i.displayName.isNotEmpty ? i.displayName : i.email,
+                email: i.email,
+                bcc: null,
+                replyTo: null,
+                textSignature: null,
+                htmlSignature: null,
+                // Server controls the verified set; client must not
+                // delete identities — tmail's UI hides the affordance
+                // when mayDelete=false.
+                mayDelete: false,
+              ))
+          .toList(growable: false);
+      _cached = identities;
+      return identities;
+    } catch (e, st) {
+      debugPrint('[EdgeFnIdentityDataSource] getIdentities failed: $e');
+      debugPrint('${st.toString().split('\n').take(5).join('\n')}');
+      // Fail closed — composer falls back to empty list, which the
+      // controller treats as "no identities" rather than crashing.
+      _cached = const <Identity>[];
+      return const <Identity>[];
+    }
   }
 
   @override
@@ -100,13 +110,8 @@ class EdgeFnIdentityDataSource extends IdentityDataSource {
     AccountId accountId, {
     Properties? properties,
   }) async {
-    final identity = await _loadIdentityForCaller();
-    if (identity == null) {
-      // No alias: return an empty list with a state so hasData() returns
-      // false and the controller skips the "select default" path.
-      return IdentitiesResponse(identities: const <Identity>[], state: _state);
-    }
-    return IdentitiesResponse(identities: [identity], state: _state);
+    final identities = await _loadIdentities();
+    return IdentitiesResponse(identities: identities, state: _state);
   }
 
   @override
@@ -115,11 +120,11 @@ class EdgeFnIdentityDataSource extends IdentityDataSource {
     AccountId accountId,
     CreateNewIdentityRequest identityRequest,
   ) async {
-    // Phase 1: not supported. The composer's "From:" is pinned server-
-    // side; allowing arbitrary identities would let users construct
-    // From-headers that the mail-send edge function would just discard.
+    // Identities live in Google Workspace, not in Supabase. Surfacing
+    // a creation flow here would need Gmail settings.sendAs.create
+    // wiring — out of scope for the CRM mail UI.
     throw UnsupportedError(
-      'EdgeFnIdentityDataSource: createNewIdentity is not supported in Phase 1',
+      'EdgeFnIdentityDataSource: createNewIdentity is not supported',
     );
   }
 
@@ -130,7 +135,7 @@ class EdgeFnIdentityDataSource extends IdentityDataSource {
     IdentityId identityId,
   ) async {
     throw UnsupportedError(
-      'EdgeFnIdentityDataSource: deleteIdentity is not supported in Phase 1',
+      'EdgeFnIdentityDataSource: deleteIdentity is not supported',
     );
   }
 
@@ -141,7 +146,7 @@ class EdgeFnIdentityDataSource extends IdentityDataSource {
     EditIdentityRequest editIdentityRequest,
   ) async {
     throw UnsupportedError(
-      'EdgeFnIdentityDataSource: editIdentity is not supported in Phase 1',
+      'EdgeFnIdentityDataSource: editIdentity is not supported',
     );
   }
 
@@ -149,9 +154,6 @@ class EdgeFnIdentityDataSource extends IdentityDataSource {
   Future<IdentitySignature> transformHtmlSignature(
     IdentitySignature identitySignature,
   ) async {
-    // No html→html transform pipeline; we don't store or render
-    // signatures in Phase 1. Return the input unchanged so callers
-    // that pipe through this never crash.
     return identitySignature;
   }
 }

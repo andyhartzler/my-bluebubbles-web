@@ -1,4 +1,5 @@
-// RFC 5322 address extraction + exact-match alias check.
+// RFC 5322 address extraction + exact-match alias check + send-as
+// authorization helper for the mail-send / mail-draft-* edge fns.
 //
 // THIS IS A TRUST BOUNDARY. The mail-list, mail-thread-get, mail-message-get,
 // and mail-pubsub-receiver functions all use messageMatchesAlias() to confirm
@@ -77,4 +78,61 @@ export function messageMatchesAlias(
     if (v) candidates.push(...extractEmailList(v));
   }
   return candidates.includes(target);
+}
+
+/**
+ * Resolves and authorizes the From: address for a self_owned mailbox's
+ * outbound message. Returns the address Gmail should treat as the
+ * sender, or `null` if the requested address isn't on the caller's
+ * verified sendAs list.
+ *
+ *   - If `requested` is null/empty/equal to the caller's primary
+ *     mailbox, return the primary — no API call needed.
+ *   - Otherwise hit Gmail's `users.settings.sendAs` and confirm the
+ *     address has `verificationStatus === "accepted"`. If it does,
+ *     return it; if not, return null.
+ *
+ * Display name is the matching sendAs entry's displayName, falling
+ * back to the address itself.
+ *
+ * THIS IS A TRUST BOUNDARY. mail-send and mail-draft-* MUST refuse
+ * to use a client-supplied From: that this helper rejects — otherwise
+ * a self_owned exec could spoof any address by typing it in the
+ * composer.
+ */
+export interface ResolvedSendAs {
+  email: string;
+  displayName: string;
+}
+
+export async function resolveSendAsForSelfOwned(
+  accessToken: string,
+  primaryEmail: string,
+  requested: string | undefined | null,
+  primaryDisplayName: string,
+): Promise<ResolvedSendAs | null> {
+  const want = (requested ?? "").trim().toLowerCase();
+  if (!want || want === primaryEmail.toLowerCase()) {
+    return { email: primaryEmail.toLowerCase(), displayName: primaryDisplayName };
+  }
+
+  const r = await fetch(
+    "https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs",
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!r.ok) return null;
+  const body = await r.json();
+  const entries = Array.isArray(body.sendAs) ? body.sendAs : [];
+  for (const e of entries) {
+    const sendAs = (e.sendAsEmail as string | undefined)?.toLowerCase();
+    if (sendAs !== want) continue;
+    const isPrimary = e.isPrimary === true ||
+      sendAs === primaryEmail.toLowerCase();
+    if (!isPrimary && e.verificationStatus !== "accepted") return null;
+    return {
+      email: sendAs,
+      displayName: (e.displayName as string | undefined)?.trim() || sendAs,
+    };
+  }
+  return null;
 }

@@ -13,6 +13,31 @@ class MailListPage {
   const MailListPage({required this.messages, this.nextPageToken});
 }
 
+/// Single verified send-as identity returned by `mail-identities-get`.
+class MailSendAsIdentity {
+  final String email;
+  final String displayName;
+  final bool isDefault;
+  final bool verified;
+  const MailSendAsIdentity({
+    required this.email,
+    required this.displayName,
+    required this.isDefault,
+    required this.verified,
+  });
+}
+
+/// Wrapper for the `mail-identities-get` response — list of identities the
+/// caller is authorized to send as, plus the primary (default) email.
+class MailIdentitiesResponse {
+  final List<MailSendAsIdentity> identities;
+  final String primary;
+  const MailIdentitiesResponse({
+    required this.identities,
+    required this.primary,
+  });
+}
+
 class MailApiClient {
   MailApiClient({CRMSupabaseService? supabase})
     : _supabase = supabase ?? CRMSupabaseService();
@@ -109,10 +134,15 @@ class MailApiClient {
     return Map<String, dynamic>.from(resp.data as Map);
   }
 
-  /// Sends a message via the mail-send edge function. From: header is
-  /// pinned server-side to caller's alias (the resolveCaller layer
-  /// ignores any client-supplied From). Returns the new gmailMessageId
-  /// + threadId.
+  /// Sends a message via the mail-send edge function.
+  ///
+  /// shared_alias mailboxes: From: is pinned server-side to the caller's
+  /// alias_email regardless of [fromAddr] (server ignores it).
+  ///
+  /// self_owned mailboxes: pass [fromAddr] to send AS one of the user's
+  /// verified Gmail sendAs identities (founder@, fundraising@, etc).
+  /// Server validates against users.settings.sendAs and 403s if not on
+  /// the verified list.
   Future<({String gmailMessageId, String threadId, String rfc822MessageId})>
       sendMessage({
     required List<String> to,
@@ -126,6 +156,7 @@ class MailApiClient {
     List<String>? references,
     String? relatedEntityType,
     String? relatedEntityId,
+    String? fromAddr,
   }) async {
     final resp = await _supabase.client.functions.invoke(
       'mail-send',
@@ -142,6 +173,7 @@ class MailApiClient {
           'references': references,
         if (relatedEntityType != null) 'relatedEntityType': relatedEntityType,
         if (relatedEntityId != null) 'relatedEntityId': relatedEntityId,
+        if (fromAddr != null && fromAddr.isNotEmpty) 'fromAddr': fromAddr,
       },
     );
     final data = Map<String, dynamic>.from(resp.data as Map);
@@ -152,10 +184,9 @@ class MailApiClient {
     );
   }
 
-  /// Creates a Gmail draft via the mail-draft-create edge function. From: header
-  /// is pinned server-side to caller's alias (the resolveCaller layer ignores
-  /// any client-supplied From). Returns the draftId + the draft's underlying
-  /// gmailMessageId / threadId / rfc822MessageId.
+  /// Creates a Gmail draft via the mail-draft-create edge function.
+  /// shared_alias: From: pinned to caller's alias regardless of [fromAddr].
+  /// self_owned: pass [fromAddr] to draft AS a verified sendAs identity.
   Future<({String draftId, String gmailMessageId, String threadId, String rfc822MessageId})>
       createDraft({
     required List<String> to,
@@ -169,6 +200,7 @@ class MailApiClient {
     List<String>? references,
     String? relatedEntityType,
     String? relatedEntityId,
+    String? fromAddr,
   }) async {
     final resp = await _supabase.client.functions.invoke(
       'mail-draft-create',
@@ -185,6 +217,7 @@ class MailApiClient {
           'references': references,
         if (relatedEntityType != null) 'relatedEntityType': relatedEntityType,
         if (relatedEntityId != null) 'relatedEntityId': relatedEntityId,
+        if (fromAddr != null && fromAddr.isNotEmpty) 'fromAddr': fromAddr,
       },
     );
     final data = Map<String, dynamic>.from(resp.data as Map);
@@ -222,10 +255,11 @@ class MailApiClient {
     );
   }
 
-  /// Updates an existing Gmail draft via the mail-draft-update edge fn. The
-  /// edge fn verifies caller owns the draft (From: header == caller's alias)
-  /// before rewriting it. Returns the (possibly-changed) draftId / message
-  /// metadata after the update.
+  /// Updates an existing Gmail draft via the mail-draft-update edge fn.
+  /// shared_alias: server verifies the draft's From: matches caller's alias.
+  /// self_owned: server skips that check (caller owns the whole mailbox);
+  /// pass [fromAddr] to switch the draft's From: to a different verified
+  /// sendAs identity.
   Future<({String draftId, String gmailMessageId, String threadId})>
       updateDraft({
     required String draftId,
@@ -238,6 +272,7 @@ class MailApiClient {
     String? threadId,
     String? inReplyTo,
     List<String>? references,
+    String? fromAddr,
   }) async {
     final resp = await _supabase.client.functions.invoke(
       'mail-draft-update',
@@ -253,6 +288,7 @@ class MailApiClient {
         if (inReplyTo != null) 'inReplyTo': inReplyTo,
         if (references != null && references.isNotEmpty)
           'references': references,
+        if (fromAddr != null && fromAddr.isNotEmpty) 'fromAddr': fromAddr,
       },
     );
     final data = Map<String, dynamic>.from(resp.data as Map);
@@ -563,6 +599,34 @@ class MailApiClient {
         phone: m['phone'] as String?,
       );
     }).toList();
+  }
+
+  /// Returns the caller's verified Gmail sendAs identities, used to populate
+  /// the composer's From: picker.
+  ///
+  /// shared_alias: returns a single entry for the caller's alias_email. The
+  /// shared crm@ mailbox has many sendAs entries (one per provisioned exec)
+  /// but the trust boundary keeps each exec pinned to their own alias.
+  ///
+  /// self_owned: returns every verified sendAs identity on the user's own
+  /// Gmail seat. The mailbox owner can compose AS any of them.
+  Future<MailIdentitiesResponse> getIdentities() async {
+    final resp = await _supabase.client.functions.invoke('mail-identities-get');
+    final data = (resp.data as Map?)?.cast<String, dynamic>() ?? {};
+    final identities = ((data['identities'] as List?) ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .map((m) => MailSendAsIdentity(
+              email: (m['email'] as String? ?? '').toLowerCase(),
+              displayName: (m['displayName'] as String?) ?? '',
+              isDefault: m['isDefault'] == true,
+              verified: m['verified'] == true,
+            ))
+        .where((i) => i.email.isNotEmpty)
+        .toList(growable: false);
+    return MailIdentitiesResponse(
+      identities: identities,
+      primary: (data['primary'] as String? ?? '').toLowerCase(),
+    );
   }
 
   /// Returns true iff the current user has an active mail alias provisioned.

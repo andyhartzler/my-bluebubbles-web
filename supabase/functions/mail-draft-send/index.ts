@@ -143,9 +143,19 @@ Deno.serve(async (req) => {
       })
       .eq("id", existingLog.id);
   } else {
+    // alias_email records the actual From: identity used in the draft.
+    // For self_owned mailboxes that may differ from caller.aliasEmail
+    // (e.g. Andrew sending as fundraising@). Fallback to caller.aliasEmail
+    // if the draft somehow has no From: header.
+    const fromHeaderEmail = (() => {
+      const ang = fromHeader.match(/<\s*([^<>\s]+@[^<>\s]+)\s*>/);
+      if (ang) return ang[1].toLowerCase();
+      const bare = fromHeader.match(/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+)/);
+      return bare ? bare[1].toLowerCase() : caller.aliasEmail;
+    })();
     await sb.from("mail_send_log").insert({
       sender_user_id: caller.userId,
-      alias_email: caller.aliasEmail,
+      alias_email: fromHeaderEmail,
       gmail_message_id: sent.id,
       rfc822_message_id: rfc822MessageId,
       thread_id: sent.threadId,
@@ -155,13 +165,19 @@ Deno.serve(async (req) => {
     });
   }
 
-  // 4. Eager-upsert into messages cache so the SENT message appears in the
-  //    UI before the Pub/Sub receiver catches up.
+  // 4. Eager-upsert into messages cache so the SENT message appears in
+  //    the UI before the Pub/Sub receiver catches up. Cache rows are
+  //    keyed by alias_email = inbox owner. shared_alias = caller's alias;
+  //    self_owned = primary mailbox (regardless of which sendAs From: was
+  //    used).
+  const cacheAliasEmail = caller.mailboxKind === "self_owned"
+    ? caller.impersonationSubject.toLowerCase()
+    : caller.aliasEmail;
   const snippet = (existing.message?.snippet ?? "").toString().slice(0, 200);
   await sb.from("mail_messages_cache").upsert({
     gmail_message_id: sent.id,
     thread_id: sent.threadId,
-    alias_email: caller.aliasEmail,
+    alias_email: cacheAliasEmail,
     from_addr: fromHeader || caller.aliasEmail,
     to_addrs: toAddrs,
     cc_addrs: ccAddrs,
