@@ -162,7 +162,8 @@ import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/spam_report_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/state/get_all_identities_state.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/usecases/get_all_identities_interactor.dart';
-import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/network_connection/presentation/network_connection_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/network_connection/presentation/network_connection_controller.dart'
+    if (dart.library.html) 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/network_connection/presentation/web_network_connection_controller.dart';
 
 import 'package:bluebubbles/features/mail/services/edge_fn/tmail_runtime_bindings.dart';
 
