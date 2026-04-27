@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
-import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/mailbox_dashboard_view.dart';
+// MOYD CRM is web-only — mount the web variant of the dashboard, which:
+//   - renders ComposerOverlayView (without it, compose/reply/forward
+//     fire composerManager.addComposer() but nothing visually opens)
+//   - uses the desktop split-pane layout instead of the mobile stub
+//   - registers the desktop click handlers for delete/star/etc on the
+//     thread + email-detail toolbars
+// The non-web `mailbox_dashboard_view.dart` is a 67-line mobile stub.
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/mailbox_dashboard_view_web.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/dashboard_controller_fixups.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/mail_screen_tmail_bindings.dart';
 
