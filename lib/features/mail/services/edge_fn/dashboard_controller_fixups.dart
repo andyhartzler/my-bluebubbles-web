@@ -156,6 +156,7 @@ import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/composer
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/download/presentation/controllers/download_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/presentation/label_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/app_grid_dashboard_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox/presentation/mailbox_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/mailbox_dashboard_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/model/dashboard_routes.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/search_controller.dart'
@@ -202,6 +203,30 @@ void bootDashboardFromSyntheticSession() {
   // thread layout. _handleArguments would normally do this on a real
   // session arrival.
   controller.dispatchRoute(DashboardRoutes.thread);
+
+  // Belt-and-suspenders: directly call getAllMailbox on the
+  // MailboxController. The `ever(accountId, ...)` worker registered in
+  // MailboxController.onInit normally handles this, but its trigger
+  // depends on accountId TRANSITIONING from null to non-null. If the
+  // controller is constructed AFTER we set accountId (e.g. on a
+  // subsequent mount), the worker registers against an already-non-null
+  // value and never fires. Calling getAllMailbox explicitly here is
+  // idempotent: if the worker already fired, this is a duplicate fetch;
+  // BaseController's consumeState handles concurrent emissions cleanly.
+  // Wrapped in try/catch because MailboxController might not yet be
+  // registered on a cold mount path (Get.find throws); on the next
+  // frame the binding will have run and we'll catch the path via the
+  // ever() worker firing on accountId set above.
+  try {
+    final mailboxController = Get.find<MailboxController>();
+    mailboxController.getAllMailbox(
+      TmailRuntimeContext.session,
+      TmailRuntimeContext.accountId,
+    );
+  } catch (_) {
+    // MailboxController not yet bound — accountId.value above will
+    // trigger its onInit-registered ever() worker once it does bind.
+  }
 }
 
 /// Asserts that all seven dashboard collaborators registered by

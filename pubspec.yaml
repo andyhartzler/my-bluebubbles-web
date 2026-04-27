@@ -469,6 +469,15 @@ flutter:
     - assets/badges/badge-8.ico
     - assets/badges/badge-9.ico
     - assets/badges/badge-10.ico
+    # tmail-flutter source fork's icon + image assets. Mounted under
+    # `assets/tmail/` to avoid colliding with bluebubbles' own
+    # `assets/images/` (different file set). The path constants in
+    # `lib/features/mail/_tmail/core/presentation/resources/assets_paths.dart`
+    # point here. Without these declarations every SvgPicture.asset() in
+    # tmail's UI throws "Invalid SVG data" because the bytes can't load.
+    - assets/tmail/images/
+    - assets/tmail/icons/
+    - assets/tmail/animations/
   # .env is intentionally NOT an asset — Flutter web builds bundle assets
   # into the shipped build directory, so any secrets inside .env (especially
   # SUPABASE_SERVICE_ROLE_KEY) would be downloadable by any browser.
