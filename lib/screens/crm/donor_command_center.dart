@@ -260,48 +260,58 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
         maxChildSize: 0.95,
         expand: false,
         builder: (_, scrollCtrl) => StatefulBuilder(
-          builder: (bCtx, setSheetState) => Column(
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[400],
-                  borderRadius: BorderRadius.circular(2),
+          builder: (bCtx, setSheetState) => Theme(
+            data: _lightFilterTheme(bCtx),
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[400],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Filters',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        _clearFilters();
-                        Navigator.pop(bCtx);
-                      },
-                      child: const Text('Clear All'),
-                    ),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Filters',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1F36),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          _clearFilters();
+                          Navigator.pop(bCtx);
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: BrandColors.momentumBlue,
+                        ),
+                        child: const Text('Clear All'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Expanded(
-                child: _buildFilterContent(
-                  scrollController: scrollCtrl,
-                  onChanged: () {
-                    setSheetState(() {});
-                    setState(() {});
-                    _currentPage = 0;
-                    _search();
-                  },
+                Expanded(
+                  child: _buildFilterContent(
+                    scrollController: scrollCtrl,
+                    onChanged: () {
+                      setSheetState(() {});
+                      setState(() {});
+                      _currentPage = 0;
+                      _search();
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -331,27 +341,30 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 900;
 
-        return Column(
-          children: [
-            _buildHeroMetrics(),
-            const SizedBox(height: 8),
-            Expanded(
-              child: isWide
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 280,
-                          child: _buildFilterSidebar(),
-                        ),
-                        const VerticalDivider(width: 1),
-                        Expanded(child: _buildMainContent(constraints.maxWidth - 281)),
-                      ],
-                    )
-                  : _buildMainContent(constraints.maxWidth),
-            ),
-            _buildBulkActionBar(),
-          ],
+        return Container(
+          color: const Color(0xFFF6F8FB),
+          child: Column(
+            children: [
+              _buildHeroMetrics(),
+              const SizedBox(height: 8),
+              Expanded(
+                child: isWide
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 280,
+                            child: _buildFilterSidebar(),
+                          ),
+                          const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
+                          Expanded(child: _buildMainContent(constraints.maxWidth - 281)),
+                        ],
+                      )
+                    : _buildMainContent(constraints.maxWidth),
+              ),
+              _buildBulkActionBar(),
+            ],
+          ),
         );
       },
     );
@@ -426,7 +439,16 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
           ),
         ],
       ),
-      body: BrandedBackground(child: tabView),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: BrandColors.tileGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: tabView,
+      ),
     );
   }
 
@@ -542,7 +564,17 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
             const SizedBox(height: 2),
             Text(
               m.label,
-              style: BrandTextStyles.caption,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                shadows: [
+                  Shadow(
+                    color: Color(0x66000000),
+                    offset: Offset(0, 1),
+                    blurRadius: 2,
+                  ),
+                ],
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -566,51 +598,66 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
     return InputDecoration(
       labelText: label,
       isDense: true,
-      labelStyle: const TextStyle(color: Colors.white70),
+      labelStyle: const TextStyle(color: Color(0xFF374151)),
+      filled: true,
+      fillColor: Colors.white,
       enabledBorder: OutlineInputBorder(
-        borderSide: BorderSide(color: Colors.white.withOpacity(0.24)),
+        borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+        borderRadius: BorderRadius.circular(8),
       ),
-      focusedBorder: const OutlineInputBorder(
-        borderSide: BorderSide(color: BrandColors.sunriseGold),
+      focusedBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: BrandColors.momentumBlue),
+        borderRadius: BorderRadius.circular(8),
       ),
+      border: OutlineInputBorder(
+        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+  }
+
+  /// Light theme used by the filter sidebar AND the mobile filter sheet so
+  /// chips/expansions render with navy text on a white surface.
+  ThemeData _lightFilterTheme(BuildContext context) {
+    return Theme.of(context).copyWith(
+      dividerColor: const Color(0xFFE5E7EB),
+      iconTheme: const IconThemeData(color: Color(0xFF6B7280)),
+      textTheme: Theme.of(context).textTheme.apply(
+            bodyColor: const Color(0xFF1A1F36),
+            displayColor: const Color(0xFF1A1F36),
+          ),
+      listTileTheme: const ListTileThemeData(
+        iconColor: Color(0xFF6B7280),
+        textColor: Color(0xFF1A1F36),
+      ),
+      expansionTileTheme: const ExpansionTileThemeData(
+        iconColor: Color(0xFF6B7280),
+        collapsedIconColor: Color(0xFF6B7280),
+        textColor: Color(0xFF1A1F36),
+        collapsedTextColor: Color(0xFF1A1F36),
+      ),
+    );
+  }
+
+  /// Filter chip label styling — switches to navy when selected, soft slate
+  /// when unselected, against the new light filter surface.
+  TextStyle _chipLabelStyle(bool selected) {
+    return TextStyle(
+      color: selected ? const Color(0xFF1A1F36) : const Color(0xFF4B5563),
+      fontSize: 13,
     );
   }
 
   Widget _buildFilterSidebar() {
     return Container(
-      // Dark navy-blue sidebar that matches the rest of the CRM theme.
-      // Previously had a stark white background that looked disconnected
-      // from the navy app chrome.
-      decoration: BoxDecoration(
-        color: BrandColors.unityBlue.withOpacity(0.55),
+      decoration: const BoxDecoration(
+        color: Colors.white,
         border: Border(
-          right: BorderSide(color: Colors.white.withOpacity(0.12)),
+          right: BorderSide(color: Color(0xFFE5E7EB)),
         ),
       ),
       child: Theme(
-        // Override only the style bits we need (text/icon colors, expansion
-        // tile + list tile colors, divider). Avoid `brightness: dark` or
-        // `colorScheme.copyWith` — those combinations crash ExpansionTile
-        // rendering in this codebase's Theme chain ("An unexpected error
-        // occurred when rendering" appeared as a result).
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.white.withOpacity(0.12),
-          iconTheme: const IconThemeData(color: Colors.white70),
-          textTheme: Theme.of(context).textTheme.apply(
-                bodyColor: Colors.white,
-                displayColor: Colors.white,
-              ),
-          listTileTheme: const ListTileThemeData(
-            iconColor: Colors.white70,
-            textColor: Colors.white,
-          ),
-          expansionTileTheme: const ExpansionTileThemeData(
-            iconColor: Colors.white70,
-            collapsedIconColor: Colors.white70,
-            textColor: Colors.white,
-            collapsedTextColor: Colors.white,
-          ),
-        ),
+        data: _lightFilterTheme(context),
         child: Column(
           children: [
             Padding(
@@ -620,14 +667,14 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.tune, color: Colors.white, size: 20),
+                      Icon(Icons.tune, color: Color(0xFF6B7280), size: 20),
                       SizedBox(width: 8),
                       Text(
                         'Filters',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: Color(0xFF1A1F36),
                         ),
                       ),
                     ],
@@ -635,7 +682,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                   TextButton(
                     onPressed: _clearFilters,
                     style: TextButton.styleFrom(
-                      foregroundColor: BrandColors.sunriseGold,
+                      foregroundColor: BrandColors.momentumBlue,
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     ),
                     child: const Text(
@@ -646,7 +693,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                 ],
               ),
             ),
-            Divider(height: 1, color: Colors.white.withOpacity(0.12)),
+            const Divider(height: 1, color: Color(0xFFE5E7EB)),
             Expanded(
               child: _buildFilterContent(
                 onChanged: () {
@@ -684,9 +731,13 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                   children: [
                     for (final tier in ['major', 'mid', 'small', 'prospect', 'lapsed'])
                       FilterChip(
-                        label: Text(tier[0].toUpperCase() + tier.substring(1)),
+                        label: Text(
+                          tier[0].toUpperCase() + tier.substring(1),
+                          style: _chipLabelStyle(_selectedTier == tier),
+                        ),
                         selected: _selectedTier == tier,
-                        selectedColor: BrandColors.momentumBlue.withOpacity(0.25),
+                        backgroundColor: const Color(0xFFF3F4F6),
+                        selectedColor: BrandColors.momentumBlue.withOpacity(0.18),
                         onSelected: (sel) {
                           _selectedTier = sel ? tier : null;
                           onChanged();
@@ -709,9 +760,9 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                     DropdownButtonFormField<String>(
                       value: _selectedCounty,
                       decoration: _filterDropdownDecoration('County'),
-                      style: const TextStyle(color: Colors.white, fontSize: 13),
-                      iconEnabledColor: Colors.white70,
-                      dropdownColor: BrandColors.unityBlue,
+                      style: const TextStyle(color: Color(0xFF1A1F36), fontSize: 13),
+                      iconEnabledColor: const Color(0xFF6B7280),
+                      dropdownColor: Colors.white,
                       items: [
                         const DropdownMenuItem(value: null, child: Text('All Counties')),
                         ..._buildCountyItems(),
@@ -725,9 +776,9 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                     DropdownButtonFormField<String>(
                       value: _selectedCD,
                       decoration: _filterDropdownDecoration('Congressional District'),
-                      style: const TextStyle(color: Colors.white, fontSize: 13),
-                      iconEnabledColor: Colors.white70,
-                      dropdownColor: BrandColors.unityBlue,
+                      style: const TextStyle(color: Color(0xFF1A1F36), fontSize: 13),
+                      iconEnabledColor: const Color(0xFF6B7280),
+                      dropdownColor: Colors.white,
                       items: [
                         const DropdownMenuItem(value: null, child: Text('All CDs')),
                         ..._buildCDItems(),
@@ -761,13 +812,17 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                       'Strong R',
                     ])
                       FilterChip(
-                        label: Text(lean),
+                        label: Text(
+                          lean,
+                          style: _chipLabelStyle(_selectedPartyLean == lean),
+                        ),
                         selected: _selectedPartyLean == lean,
+                        backgroundColor: const Color(0xFFF3F4F6),
                         selectedColor: lean.contains('D')
-                            ? BrandColors.democratBlue.withOpacity(0.25)
+                            ? BrandColors.democratBlue.withOpacity(0.15)
                             : lean.contains('R')
-                                ? BrandColors.republicanRed.withOpacity(0.25)
-                                : BrandColors.sunriseGold.withOpacity(0.25),
+                                ? BrandColors.republicanRed.withOpacity(0.15)
+                                : BrandColors.sunriseGold.withOpacity(0.15),
                         onSelected: (sel) {
                           _selectedPartyLean = sel ? lean : null;
                           onChanged();
@@ -790,13 +845,13 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                   children: [
                     Text(
                       'Wealth Score: ${(_minWealthScore ?? 0).round()} - ${(_maxWealthScore ?? 100).round()}',
-                      style: const TextStyle(fontSize: 13),
+                      style: const TextStyle(color: Color(0xFF374151), fontSize: 13),
                     ),
                     // RangeSlider's value-indicator defaults to white-on-white
                     // on the dark sidebar — make the pill navy with white text.
                     SliderTheme(
                       data: SliderTheme.of(context).copyWith(
-                        inactiveTrackColor: Colors.white.withOpacity(0.18),
+                        inactiveTrackColor: const Color(0xFFE5E7EB),
                         valueIndicatorColor: BrandColors.momentumBlue,
                         valueIndicatorTextStyle: const TextStyle(color: Colors.white),
                         showValueIndicator: ShowValueIndicator.always,
@@ -825,7 +880,10 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                     ),
                     const SizedBox(height: 8),
                     SwitchListTile(
-                      title: const Text('Homeowner', style: TextStyle(fontSize: 14)),
+                      title: const Text(
+                        'Homeowner',
+                        style: TextStyle(color: Color(0xFF1A1F36), fontSize: 14),
+                      ),
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       value: _isHomeowner ?? false,
@@ -852,9 +910,13 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                   runSpacing: 4,
                   children: [
                     FilterChip(
-                      label: const Text('Enrichment'),
+                      label: Text(
+                        'Enrichment',
+                        style: _chipLabelStyle(_hasEnrichment == true),
+                      ),
                       selected: _hasEnrichment == true,
-                      selectedColor: BrandColors.success.withOpacity(0.25),
+                      backgroundColor: const Color(0xFFF3F4F6),
+                      selectedColor: BrandColors.success.withOpacity(0.18),
                       onSelected: (sel) {
                         _hasEnrichment = sel ? true : null;
                         onChanged();
@@ -863,9 +925,13 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                     Tooltip(
                       message: 'VAN voter file record attached',
                       child: FilterChip(
-                        label: const Text('VAN'),
+                        label: Text(
+                          'VAN',
+                          style: _chipLabelStyle(_hasVan == true),
+                        ),
                         selected: _hasVan == true,
-                        selectedColor: BrandColors.success.withOpacity(0.25),
+                        backgroundColor: const Color(0xFFF3F4F6),
+                        selectedColor: BrandColors.success.withOpacity(0.18),
                         onSelected: (sel) {
                           _hasVan = sel ? true : null;
                           onChanged();
@@ -873,9 +939,13 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                       ),
                     ),
                     FilterChip(
-                      label: const Text('Property'),
+                      label: Text(
+                        'Property',
+                        style: _chipLabelStyle(_hasPropertyRecords == true),
+                      ),
                       selected: _hasPropertyRecords == true,
-                      selectedColor: BrandColors.success.withOpacity(0.25),
+                      backgroundColor: const Color(0xFFF3F4F6),
+                      selectedColor: BrandColors.success.withOpacity(0.18),
                       onSelected: (sel) {
                         _hasPropertyRecords = sel ? true : null;
                         onChanged();
@@ -900,9 +970,15 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                     children: [
                       for (final tag in _availableTags)
                         FilterChip(
-                          label: Text(tag),
+                          label: Text(
+                            tag,
+                            style: _chipLabelStyle(
+                              _selectedTags?.contains(tag) ?? false,
+                            ),
+                          ),
                           selected: _selectedTags?.contains(tag) ?? false,
-                          selectedColor: BrandColors.sunriseGold.withOpacity(0.25),
+                          backgroundColor: const Color(0xFFF3F4F6),
+                          selectedColor: BrandColors.sunriseGold.withOpacity(0.18),
                           onSelected: (sel) {
                             final tags = List<String>.from(_selectedTags ?? []);
                             if (sel) {
@@ -953,19 +1029,19 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
   Widget _buildMainContent(double availableWidth) {
     return Column(
       children: [
-        // Search bar — dark Slack-style input against the navy background.
+        // Search bar — light pill matching the rest of the MOYD CRM surfaces.
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
           child: TextField(
             controller: _searchController,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: Color(0xFF1A1F36)),
             decoration: InputDecoration(
               hintText: 'Search donors by name, email, city...',
-              hintStyle: TextStyle(color: Colors.white.withOpacity(0.55)),
-              prefixIcon: const Icon(Icons.search, color: Colors.white70),
+              hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+              prefixIcon: const Icon(Icons.search, color: Color(0xFF6B7280)),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, color: Colors.white70),
+                      icon: const Icon(Icons.clear, color: Color(0xFF6B7280)),
                       onPressed: () {
                         _searchController.clear();
                         _onSearchChanged('');
@@ -973,10 +1049,18 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                     )
                   : null,
               filled: true,
-              fillColor: BrandColors.unityBlue.withOpacity(0.6),
+              fillColor: Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: BrandColors.momentumBlue, width: 2),
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
@@ -993,7 +1077,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                 '$_totalCount result${_totalCount == 1 ? '' : 's'}',
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: Color(0xFF1A1F36),
                 ),
               ),
               const Spacer(),
@@ -1021,17 +1105,19 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _sortBy,
-          dropdownColor: BrandColors.unityBlue,
-          style: const TextStyle(color: Colors.white, fontSize: 13),
+          dropdownColor: Colors.white,
+          style: const TextStyle(color: Color(0xFF1A1F36), fontSize: 13),
+          iconEnabledColor: const Color(0xFF6B7280),
           icon: Icon(
             _ascending ? Icons.arrow_upward : Icons.arrow_downward,
-            color: Colors.white70,
+            color: const Color(0xFF6B7280),
             size: 16,
           ),
           items: options.entries
@@ -1065,7 +1151,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
             const SizedBox(height: 12),
             Text(
               _error!,
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(color: Color(0xFF1A1F36)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
@@ -1088,20 +1174,20 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.person_search, size: 64, color: Colors.white.withOpacity(0.7)),
+            const Icon(Icons.person_search, size: 64, color: Color(0xFF9CA3AF)),
             const SizedBox(height: 16),
             const Text(
               'No donors found',
               style: TextStyle(
-                color: Colors.white,
+                color: Color(0xFF1A1F36),
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 6),
-            Text(
+            const Text(
               'Try adjusting your search or filters',
-              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+              style: TextStyle(color: Color(0xFF6B7280)),
             ),
           ],
         ),
@@ -1127,24 +1213,19 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
-          headingRowColor: WidgetStateProperty.all(
-            BrandColors.unityBlue.withOpacity(0.6),
-          ),
+          headingRowColor: WidgetStateProperty.all(const Color(0xFFF3F4F6)),
           dataRowColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
-              return BrandColors.momentumBlue.withOpacity(0.28);
+              return BrandColors.momentumBlue.withOpacity(0.08);
             }
-            // White@0.07 put the city/party text at ~2.8:1 contrast against
-            // the page background — below WCAG AA. A deeper navy keeps the
-            // theme and pushes row text past 10:1.
-            return BrandColors.unityBlue.withOpacity(0.35);
+            return Colors.white;
           }),
           headingTextStyle: const TextStyle(
-            color: Colors.white,
+            color: Color(0xFF1A1F36),
             fontWeight: FontWeight.bold,
             fontSize: 13,
           ),
-          dataTextStyle: const TextStyle(color: Colors.white, fontSize: 13),
+          dataTextStyle: const TextStyle(color: Color(0xFF1A1F36), fontSize: 13),
           columns: [
             DataColumn(
               label: Checkbox(
@@ -1162,8 +1243,12 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                     }
                   });
                 },
-                fillColor: WidgetStateProperty.all(Colors.white24),
-                checkColor: BrandColors.sunriseGold,
+                fillColor: WidgetStateProperty.resolveWith((s) =>
+                    s.contains(WidgetState.selected)
+                        ? BrandColors.momentumBlue
+                        : Colors.transparent),
+                side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
+                checkColor: Colors.white,
               ),
             ),
             DataColumn(
@@ -1211,8 +1296,12 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                         }
                       });
                     },
-                    fillColor: WidgetStateProperty.all(Colors.white24),
-                    checkColor: BrandColors.sunriseGold,
+                    fillColor: WidgetStateProperty.resolveWith((s) =>
+                        s.contains(WidgetState.selected)
+                            ? BrandColors.momentumBlue
+                            : Colors.transparent),
+                    side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
+                    checkColor: Colors.white,
                   ),
                 ),
                 DataCell(
@@ -1292,27 +1381,92 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
           if (initials.length >= 2) break;
         }
 
-        return BrandedActivityFeedItem(
-          primaryText: r.fullName,
-          secondaryText: city,
-          tertiaryText: '$totalText  ·  $lastGift',
-          avatarInitials: initials.isNotEmpty ? initials : null,
-          leadingIcon: initials.isEmpty ? Icons.person : null,
-          onTap: () => _navigateToProfile(r.id),
-          trailingChips: chips.isEmpty ? null : chips,
-          trailing: Checkbox(
-            value: selected,
-            onChanged: (v) {
-              setState(() {
-                if (v == true && r.id != null) {
-                  _selectedIds.add(r.id!);
-                } else if (r.id != null) {
-                  _selectedIds.remove(r.id);
-                }
-              });
-            },
-            fillColor: WidgetStateProperty.all(Colors.white24),
-            checkColor: BrandColors.sunriseGold,
+        return Material(
+          color: Colors.white,
+          child: InkWell(
+            onTap: () => _navigateToProfile(r.id),
+            child: Container(
+              decoration: const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: Color(0xFFE5E7EB)),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: BrandColors.unityBlue,
+                    child: initials.isEmpty
+                        ? const Icon(Icons.person, color: Colors.white, size: 20)
+                        : Text(
+                            initials,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          r.fullName,
+                          style: const TextStyle(
+                            color: Color(0xFF1A1F36),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        Text(
+                          city,
+                          style: const TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          '$totalText  ·  $lastGift',
+                          style: const TextStyle(
+                            color: Color(0xFF9CA3AF),
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (chips.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: chips,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Checkbox(
+                    value: selected,
+                    onChanged: (v) {
+                      setState(() {
+                        if (v == true && r.id != null) {
+                          _selectedIds.add(r.id!);
+                        } else if (r.id != null) {
+                          _selectedIds.remove(r.id);
+                        }
+                      });
+                    },
+                    fillColor: WidgetStateProperty.resolveWith((s) =>
+                        s.contains(WidgetState.selected)
+                            ? BrandColors.momentumBlue
+                            : Colors.transparent),
+                    side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
+                    checkColor: Colors.white,
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },
@@ -1328,27 +1482,30 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
     if (totalPages <= 1) return const SizedBox.shrink();
 
     return Container(
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           IconButton(
-            icon: const Icon(Icons.chevron_left, color: Colors.white),
+            icon: const Icon(Icons.chevron_left, color: Color(0xFF1A1F36)),
             onPressed: _currentPage > 0
                 ? () => _onPageChanged(_currentPage - 1)
                 : null,
-            disabledColor: Colors.white24,
+            disabledColor: const Color(0xFFD1D5DB),
           ),
           Text(
             'Page ${_currentPage + 1} of $totalPages',
-            style: const TextStyle(color: Colors.white, fontSize: 14),
+            style: const TextStyle(color: Color(0xFF374151), fontSize: 14),
           ),
           IconButton(
-            icon: const Icon(Icons.chevron_right, color: Colors.white),
+            icon: const Icon(Icons.chevron_right, color: Color(0xFF1A1F36)),
             onPressed: _currentPage < totalPages - 1
                 ? () => _onPageChanged(_currentPage + 1)
                 : null,
-            disabledColor: Colors.white24,
+            disabledColor: const Color(0xFFD1D5DB),
           ),
         ],
       ),
@@ -1370,8 +1527,9 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
       // decoration when the bar is collapsed.
       decoration: hasSelection
           ? const BoxDecoration(
-              color: BrandColors.unityBlue,
-              boxShadow: [BoxShadow(blurRadius: 8, color: Colors.black26)],
+              color: Colors.white,
+              boxShadow: [BoxShadow(blurRadius: 8, color: Color(0x1A000000))],
+              border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
             )
           : null,
       child: _selectedIds.isNotEmpty
@@ -1382,7 +1540,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                   Text(
                     '${_selectedIds.length} selected',
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: Color(0xFF1A1F36),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1390,7 +1548,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                   ActionChip(
                     avatar: const Icon(Icons.label, size: 16, color: Colors.white),
                     label: const Text('Tag Selected'),
-                    backgroundColor: BrandColors.momentumBlue,
+                    backgroundColor: BrandColors.unityBlue,
                     labelStyle: const TextStyle(color: Colors.white, fontSize: 12),
                     onPressed: () => _showComingSoon('Tag Selected'),
                   ),
@@ -1398,7 +1556,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                   ActionChip(
                     avatar: const Icon(Icons.download, size: 16, color: Colors.white),
                     label: const Text('Export Selected'),
-                    backgroundColor: BrandColors.momentumBlue,
+                    backgroundColor: BrandColors.unityBlue,
                     labelStyle: const TextStyle(color: Colors.white, fontSize: 12),
                     onPressed: () => _showComingSoon('Export Selected'),
                   ),
@@ -1406,13 +1564,13 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
                   ActionChip(
                     avatar: const Icon(Icons.phone, size: 16, color: Colors.white),
                     label: const Text('Add to Call Time'),
-                    backgroundColor: BrandColors.momentumBlue,
+                    backgroundColor: BrandColors.unityBlue,
                     labelStyle: const TextStyle(color: Colors.white, fontSize: 12),
                     onPressed: () => _showComingSoon('Add to Call Time'),
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white70),
+                    icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
                     tooltip: 'Deselect all',
                     onPressed: () => setState(() => _selectedIds.clear()),
                   ),
@@ -1441,35 +1599,37 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
     if (tier == null || tier.isEmpty) return const SizedBox.shrink();
 
     Color bg;
+    Color fg = const Color(0xFF1A1F36);
     switch (tier.toLowerCase()) {
       case 'major':
-        bg = BrandColors.sunriseGold;
+        bg = const Color(0xFFFEF3C7);
         break;
       case 'mid':
-        bg = BrandColors.momentumBlue;
+        bg = const Color(0xFFDBEAFE);
         break;
       case 'small':
-        bg = BrandColors.steelBlue;
+        bg = const Color(0xFFE0E7FF);
         break;
       case 'prospect':
-        bg = BrandColors.success;
+        bg = const Color(0xFFD1FAE5);
         break;
       case 'lapsed':
-        bg = BrandColors.warning;
+        bg = const Color(0xFFFEE2E2);
         break;
       default:
-        bg = BrandColors.slateBlue;
+        bg = const Color(0xFFF3F4F6);
+        fg = const Color(0xFF4B5563);
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: bg.withOpacity(0.85),
+        color: bg,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         tier[0].toUpperCase() + tier.substring(1),
-        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -1478,23 +1638,25 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
     if (partyLean == null || partyLean.isEmpty) return const SizedBox.shrink();
 
     Color bg;
+    Color fg = const Color(0xFF1A1F36);
     if (partyLean.contains('D')) {
-      bg = BrandColors.democratBlue;
+      bg = const Color(0xFFDBEAFE);
     } else if (partyLean.contains('R')) {
-      bg = BrandColors.republicanRed;
+      bg = const Color(0xFFFEE2E2);
     } else {
-      bg = BrandColors.slateBlue;
+      bg = const Color(0xFFF3F4F6);
+      fg = const Color(0xFF4B5563);
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: bg.withOpacity(0.85),
+        color: bg,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
         partyLean,
-        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -1540,7 +1702,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
           width: 50,
           child: LinearProgressIndicator(
             value: value / 100,
-            backgroundColor: Colors.white24,
+            backgroundColor: const Color(0xFFE5E7EB),
             valueColor: AlwaysStoppedAnimation(
               // Red reads as "error" — a low wealth score is just low, not
               // broken. Step through the brand palette instead.
@@ -1557,7 +1719,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
         const SizedBox(width: 6),
         Text(
           '$value',
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
+          style: const TextStyle(color: Color(0xFF374151), fontSize: 12),
         ),
       ],
     );
