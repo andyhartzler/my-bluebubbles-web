@@ -91,6 +91,7 @@ import 'package:jmap_dart_client/jmap/core/user_name.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/core/core_bindings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/credential/credential_bindings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/local/local_bindings.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/local/local_isolate_bindings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/network/network_bindings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/network/network_isolate_binding.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/network_connection/network_connection_bindings.dart';
@@ -149,6 +150,16 @@ class MailScreenTmailBindings {
     //    IOSSharingManager).
     // ------------------------------------------------------------------
     LocalBindings().dependencies();
+
+    // ------------------------------------------------------------------
+    // 4b. LocalIsolateBindings — registers the isolate-tagged variants of
+    //     TokenOidcCacheClient/Manager, AccountCacheClient/Manager, and
+    //     EncryptionKeyCacheClient/Manager. NetworkIsolateBindings (5b)
+    //     calls Get.find<TokenOidcCacheManager>(tag: isolateTag) inside
+    //     its AuthorizationInterceptors + IOSSharingManager constructors,
+    //     so we have to seed those isolate-tagged registrations first.
+    // ------------------------------------------------------------------
+    LocalIsolateBindings().dependencies();
 
     // ------------------------------------------------------------------
     // 5. NetworkBindings — Dio + every JMAP API class. Configured with
