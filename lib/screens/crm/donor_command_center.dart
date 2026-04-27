@@ -720,6 +720,15 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
         children: [
           // Tier
           ExpansionTile(
+            // Unique PageStorageKey so each ExpansionTile gets its own slot
+            // in the parent PageStorageBucket. Without an explicit key,
+            // ExpansionTile reads `PageStorage.readState(context) as bool?`
+            // off the auto-generated identity. If a sibling widget
+            // (TabBarView/KeepAlive/etc.) has stored a non-bool at that same
+            // auto-generated identity, the cast throws 'type int is not a
+            // subtype of bool?' on every rebuild. The key's value type is
+            // String — what matters is uniqueness, not the type.
+            key: const PageStorageKey<String>('donor-filter-tier'),
             title: const Text('Tier'),
             initiallyExpanded: true,
             children: [
@@ -751,6 +760,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
 
           // Geography
           ExpansionTile(
+            key: const PageStorageKey<String>('donor-filter-geography'),
             title: const Text('Geography'),
             children: [
               Padding(
@@ -796,6 +806,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
 
           // Political
           ExpansionTile(
+            key: const PageStorageKey<String>('donor-filter-political'),
             title: const Text('Political'),
             children: [
               Padding(
@@ -836,6 +847,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
 
           // Financial
           ExpansionTile(
+            key: const PageStorageKey<String>('donor-filter-financial'),
             title: const Text('Financial'),
             children: [
               Padding(
@@ -901,6 +913,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
 
           // Data sources
           ExpansionTile(
+            key: const PageStorageKey<String>('donor-filter-data'),
             title: const Text('Data'),
             children: [
               Padding(
@@ -960,6 +973,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
           // Tags
           if (_availableTags.isNotEmpty)
             ExpansionTile(
+              key: const PageStorageKey<String>('donor-filter-tags'),
               title: const Text('Tags'),
               children: [
                 Padding(
