@@ -3,9 +3,9 @@
 //
 // Reads `public.candidate_score_components` (10 rows per candidate, one
 // per category). Each row carries `is_auto` flag + optional manual
-// override. Auto categories show a lock icon + tooltip explaining their
-// inputs from `source_data` jsonb. Manual categories surface a stepper
-// for executives to dial 0–10.
+// override. Auto categories show an "AUTO" chip + inline description
+// explaining their inputs from `source_data` jsonb. Manual categories
+// surface a stepper for executives to dial 0–10.
 //
 // Total /100 displayed at top — equals the cached
 // `candidates.young_dem_score` int (which the recompute_candidate_score
@@ -13,11 +13,30 @@
 //
 // Permission: stepper enabled iff the current user is on the exec
 // committee (`members.executive_committee = true`).
+//
+// Visual: light card-on-card on the candidate Profile gradient backdrop.
+// Pure white surface, navy text, branded score chips. Designed to read
+// cleanly against the teal/navy gradient that lives on the Profile tab.
 
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+
+// ===================== design tokens =====================
+//
+// Centralized so the per-row + header styling stays in lock-step. These
+// match the donor_command_center light-filter-panel + mail_screen
+// light-surface palette that just shipped.
+const Color _kSurface = Colors.white;
+const Color _kRowSurface = Color(0xFFF6F8FB);
+const Color _kBorder = Color(0xFFE5E7EB);
+const Color _kNavy = Color(0xFF1A1F36);
+const Color _kSlate600 = Color(0xFF475569);
+const Color _kSlate500 = Color(0xFF64748B);
+const Color _kSlate400 = Color(0xFF94A3B8);
+const Color _kLowBg = Color(0xFFFEE2E2);
+const Color _kZeroBg = Color(0xFFF3F4F6);
 
 /// Display-friendly category metadata. The `key` matches the
 /// `candidate_score_components.category` value written by
@@ -158,6 +177,16 @@ class _CandidateRubricCardState extends State<CandidateRubricCard> {
     );
   }
 
+  /// Color band for the total /100 chip (and the progress bar).
+  /// Spec: democratBlue ≥70, sunriseGold ≥40, momentumBlue otherwise —
+  /// never red. Red on a candidate scoring rubric reads as "broken".
+  Color get _totalColor {
+    final t = _total;
+    if (t >= 70) return BrandColors.democratBlue;
+    if (t >= 40) return BrandColors.sunriseGold;
+    return BrandColors.momentumBlue;
+  }
+
   Future<void> _override(String category, int newScore) async {
     if (!_isExec) return;
     final userId = _supabase.client.auth.currentUser?.id;
@@ -183,30 +212,101 @@ class _CandidateRubricCardState extends State<CandidateRubricCard> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(
-          child: CircularProgressIndicator(
-            color: BrandColors.sunriseGold, strokeWidth: 2,
-          ),
-        ),
-      );
-    }
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: _kSurface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: _kBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 20,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: _loading ? _buildLoading() : _buildContent(),
+    );
+  }
+
+  Widget _buildLoading() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 32),
+      child: Center(
+        child: CircularProgressIndicator(
+          color: BrandColors.momentumBlue,
+          strokeWidth: 2.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    if (_byCategory.isEmpty) {
+      return _buildEmpty();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTotalHeader(),
+        const SizedBox(height: 14),
+        _buildProgressBar(),
+        const SizedBox(height: 18),
+        ..._categories.map(_buildRow),
+      ],
+    );
+  }
+
+  Widget _buildEmpty() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _kRowSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Row(
         children: [
-          _buildTotalHeader(),
-          const SizedBox(height: 16),
-          ..._categories.map(_buildRow),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: BrandColors.sunriseGold.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.info_outline,
+              color: BrandColors.sunriseGold,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Score not yet computed',
+                  style: TextStyle(
+                    color: _kNavy,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Run recompute_candidate_score(candidate_id) to '
+                  'populate the rubric.',
+                  style: TextStyle(
+                    color: _kSlate500,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -214,26 +314,77 @@ class _CandidateRubricCardState extends State<CandidateRubricCard> {
 
   Widget _buildTotalHeader() {
     final t = _total;
-    final color = t >= 70
-        ? BrandColors.democratBlue
-        : t >= 40
-            ? BrandColors.sunriseGold
-            : Colors.redAccent;
+    final color = _totalColor;
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const Icon(Icons.bar_chart, color: BrandColors.sunriseGold, size: 22),
-        const SizedBox(width: 10),
-        const Text('Candidate Rubric',
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(Icons.bar_chart, color: color, size: 20),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Text(
+            'Candidate Rubric',
             style: TextStyle(
-              color: Colors.white,
+              color: _kNavy,
               fontSize: 16,
               fontWeight: FontWeight.w800,
-            )),
-        const Spacer(),
-        Text('$t', style: TextStyle(color: color, fontSize: 28, fontWeight: FontWeight.w900, fontFeatures: const [FontFeature.tabularFigures()])),
-        const SizedBox(width: 4),
-        Text('/100', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14)),
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Text(
+            '$t',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              fontFeatures: [FontFeature.tabularFigures()],
+              height: 1.1,
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        const Text(
+          '/100',
+          style: TextStyle(
+            color: _kSlate600,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildProgressBar() {
+    final progress = (_total / 100).clamp(0.0, 1.0);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: LinearProgressIndicator(
+        value: progress,
+        backgroundColor: _kZeroBg,
+        valueColor: AlwaysStoppedAnimation<Color>(_totalColor),
+        minHeight: 8,
+      ),
     );
   }
 
@@ -241,46 +392,95 @@ class _CandidateRubricCardState extends State<CandidateRubricCard> {
     final row = _byCategory[cat.key];
     final score = (row?['score'] as num?)?.toInt() ?? 0;
     final isAuto = row?['is_auto'] == true;
-    final scoreColor = score >= 8
-        ? BrandColors.democratBlue
-        : score >= 5
-            ? BrandColors.sunriseGold
-            : Colors.white.withOpacity(0.4);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: _kRowSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder),
+      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(cat.icon, size: 16, color: Colors.white.withOpacity(0.6)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Tooltip(
-              message: cat.description,
-              child: Text(
-                cat.label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+          // Branded leading icon tile.
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: BrandColors.momentumBlue.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              cat.icon,
+              size: 20,
+              color: BrandColors.momentumBlue,
             ),
           ),
-          if (isAuto)
-            Tooltip(
-              message: 'Auto-computed. Click the score to override.',
-              child: Icon(Icons.auto_awesome,
-                  size: 12, color: Colors.white.withOpacity(0.35)),
+          const SizedBox(width: 12),
+          // Two-line label + description (description is what was the
+          // hover-only Tooltip in the legacy layout).
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  cat.label,
+                  style: const TextStyle(
+                    color: _kNavy,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  cat.description,
+                  style: const TextStyle(
+                    color: _kSlate500,
+                    fontSize: 12,
+                    height: 1.3,
+                  ),
+                ),
+              ],
             ),
-          const SizedBox(width: 8),
-          if (_isExec)
-            _StepperBadge(
-              score: score,
-              color: scoreColor,
-              onTap: () => _showStepperSheet(cat, score),
-            )
-          else
-            _ReadonlyBadge(score: score, color: scoreColor),
+          ),
+          const SizedBox(width: 10),
+          // Score circle + optional AUTO chip stacked underneath.
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ScoreCircle(
+                score: score,
+                onTap: _isExec ? () => _showStepperSheet(cat, score) : null,
+              ),
+              if (isAuto) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _kZeroBg,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'AUTO',
+                    style: TextStyle(
+                      color: _kSlate500,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ],
       ),
     );
@@ -289,7 +489,7 @@ class _CandidateRubricCardState extends State<CandidateRubricCard> {
   Future<void> _showStepperSheet(_RubricCategory cat, int currentScore) async {
     final newScore = await showModalBottomSheet<int>(
       context: context,
-      backgroundColor: const Color(0xFF0B1E37),
+      backgroundColor: _kSurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -297,44 +497,81 @@ class _CandidateRubricCardState extends State<CandidateRubricCard> {
         var local = currentScore;
         return StatefulBuilder(builder: (ctx, setSheetState) {
           return Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(cat.label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    )),
+                // Drag handle.
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: _kBorder,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  cat.label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: _kNavy,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                Text(cat.description,
-                    style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12)),
-                const SizedBox(height: 24),
+                Text(
+                  cat.description,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: _kSlate600,
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 28),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    IconButton.filled(
-                      onPressed: local > 0
-                          ? () => setSheetState(() => local--)
-                          : null,
-                      icon: const Icon(Icons.remove),
+                    _StepperButton(
+                      icon: Icons.remove,
+                      onPressed:
+                          local > 0 ? () => setSheetState(() => local--) : null,
                     ),
-                    const SizedBox(width: 24),
-                    Text('$local',
+                    const SizedBox(width: 28),
+                    SizedBox(
+                      width: 96,
+                      child: Text(
+                        '$local',
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
-                          color: BrandColors.sunriseGold,
+                          color: _kNavy,
                           fontSize: 56,
                           fontWeight: FontWeight.w900,
-                        )),
-                    const SizedBox(width: 24),
-                    IconButton.filled(
+                          fontFeatures: [FontFeature.tabularFigures()],
+                          height: 1.0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 28),
+                    _StepperButton(
+                      icon: Icons.add,
                       onPressed: local < 10
                           ? () => setSheetState(() => local++)
                           : null,
-                      icon: const Icon(Icons.add),
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'out of 10',
+                  style: TextStyle(
+                    color: _kSlate500,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Row(
@@ -342,18 +579,38 @@ class _CandidateRubricCardState extends State<CandidateRubricCard> {
                     Expanded(
                       child: TextButton(
                         onPressed: () => Navigator.of(ctx).pop(null),
-                        child: const Text('Cancel',
-                            style: TextStyle(color: Colors.white70)),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: _kSlate500,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: FilledButton(
                         style: FilledButton.styleFrom(
                           backgroundColor: BrandColors.sunriseGold,
-                          foregroundColor: BrandColors.unityBlue,
+                          foregroundColor: _kNavy,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                         onPressed: () => Navigator.of(ctx).pop(local),
-                        child: const Text('Save'),
+                        child: const Text(
+                          'Save',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -370,57 +627,104 @@ class _CandidateRubricCardState extends State<CandidateRubricCard> {
   }
 }
 
-class _StepperBadge extends StatelessWidget {
+/// 44x44 round score chip. Tap-able when `onTap != null` (exec users).
+class _ScoreCircle extends StatelessWidget {
   final int score;
-  final Color color;
-  final VoidCallback onTap;
-  const _StepperBadge({
-    required this.score,
-    required this.color,
-    required this.onTap,
-  });
+  final VoidCallback? onTap;
+  const _ScoreCircle({required this.score, this.onTap});
+
+  /// Branded score-band styling. 0 reads as muted neutral; 1-4 is a soft
+  /// red wash with navy text (warning, not error); 5-7 is sunrise gold;
+  /// 8-10 is success green. Never raw red — that reads "broken".
+  ({Color bg, Color fg}) get _bandColors {
+    if (score >= 8) {
+      return (bg: BrandColors.success, fg: Colors.white);
+    }
+    if (score >= 5) {
+      return (bg: BrandColors.sunriseGold, fg: _kNavy);
+    }
+    if (score >= 1) {
+      return (bg: _kLowBg, fg: _kNavy);
+    }
+    return (bg: _kZeroBg, fg: _kSlate400);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.18),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.4)),
+    final colors = _bandColors;
+    final circle = Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: colors.bg,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.black.withOpacity(0.06),
         ),
-        child: Text('$score',
-            style: TextStyle(
-              color: color,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            )),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        '$score',
+        style: TextStyle(
+          color: colors.fg,
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          fontFeatures: const [FontFeature.tabularFigures()],
+          height: 1.0,
+        ),
+      ),
+    );
+    if (onTap == null) return circle;
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: circle,
       ),
     );
   }
 }
 
-class _ReadonlyBadge extends StatelessWidget {
-  final int score;
-  final Color color;
-  const _ReadonlyBadge({required this.score, required this.color});
+/// Stepper +/- button used inside the bottom-sheet editor.
+class _StepperButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onPressed;
+  const _StepperButton({required this.icon, required this.onPressed});
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(8),
+    final enabled = onPressed != null;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: _kSurface,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: enabled
+                  ? BrandColors.momentumBlue
+                  : _kBorder,
+              width: 1.5,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            icon,
+            size: 22,
+            color: enabled
+                ? BrandColors.momentumBlue
+                : _kSlate400,
+          ),
+        ),
       ),
-      child: Text('$score',
-          style: TextStyle(
-            color: color,
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-          )),
     );
   }
 }
