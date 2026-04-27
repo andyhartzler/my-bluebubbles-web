@@ -742,11 +742,13 @@ class _HomeState extends OptimizedState<Home>
           error: error.exception,
           trace: error.stack,
         );
-        // Surface the exception + first 8 stack frames inline so we can
-        // diagnose render-time failures without requiring DevTools console
-        // access. CustomErrorWidget showed only a generic message which
-        // hid the actual cause (e.g. tmail GetX bindings, missing deps).
+        // Surface exception + library + context + first 12 stack frames
+        // inline. `library` and `context` are what tell us which widget
+        // chain threw — without them the minified js stack is useless on
+        // the deployed build.
         final exception = error.exception.toString();
+        final library = error.library ?? '(no library)';
+        final ctx = error.context?.toDescription() ?? '(no context)';
         final stack = error.stack
             ?.toString()
             .split('\n')
@@ -776,6 +778,16 @@ class _HomeState extends OptimizedState<Home>
                     fontSize: 12,
                     color: Color(0xFF7F1D1D),
                     fontFamily: 'monospace',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SelectableText(
+                  'library: $library\ncontext: $ctx',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF991B1B),
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 8),
