@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/app_localizations_delegate.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/localizations/localization_service.dart';
+
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:bluebubbles/app/components/custom/custom_error_box.dart';
@@ -424,6 +427,17 @@ class Main extends StatelessWidget {
             ),
           ],
           home: SupabaseAuthGate(child: const AuthenticatedApp()),
+          // Register tmail's AppLocalizationsDelegate alongside the
+          // Flutter defaults. The mail screen does
+          // `AppLocalizations.of(context).<key>` from inside many of
+          // its widgets (e.g. EmailViewBackButton, ToolbarWidgetState);
+          // without the delegate, that returns null and rendering throws.
+          // shouldReload returns false, so the delegate just adds the
+          // string lookup without affecting the rest of the app.
+          localizationsDelegates: const [
+            AppLocalizationsDelegate(),
+          ],
+          supportedLocales: LocalizationService.supportedLocales,
           shortcuts: {
             LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.comma):
                 const OpenSettingsIntent(),
