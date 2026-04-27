@@ -24,6 +24,7 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const NETWORK_TIMEOUT_MS = 5000;
 
@@ -96,7 +97,7 @@ async function fetchWithTimeout(
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { ...corsHeaders(), "Content-Type": "application/json" },
   });
 }
 
@@ -133,6 +134,8 @@ function buildUnsubscribeRfc822(
 }
 
 Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   if (req.method !== "POST") return new Response("Use POST", { status: 405 });
 
   const caller = await resolveCaller(req);

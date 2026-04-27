@@ -24,6 +24,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -45,6 +46,8 @@ function escapeLikePattern(raw: string): string {
 }
 
 Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

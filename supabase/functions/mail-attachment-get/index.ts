@@ -2,6 +2,7 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 interface GmailHeader {
@@ -70,6 +71,8 @@ function dispositionFilename(name: string): string {
 }
 
 Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   if (req.method !== "POST") return new Response("Use POST", { status: 405 });
 
   const caller = await resolveCaller(req);
@@ -81,7 +84,7 @@ Deno.serve(async (req) => {
   if (!messageId || !attachmentId) {
     return new Response(
       JSON.stringify({ error: "missing_messageId_or_attachmentId" }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
+      { status: 400, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -107,7 +110,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "meta_fetch_failed" }),
         {
           status: metaRes.status,
-          headers: { "Content-Type": "application/json" },
+          headers: { ...corsHeaders(), "Content-Type": "application/json" },
         },
       );
     }
@@ -120,7 +123,7 @@ Deno.serve(async (req) => {
     if (!messageMatchesAlias(headers, caller.aliasEmail)) {
       return new Response(JSON.stringify({ error: "not_yours" }), {
         status: 403,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
       });
     }
   }
@@ -135,7 +138,7 @@ Deno.serve(async (req) => {
   if (!fullRes.ok) {
     return new Response(
       JSON.stringify({ error: "full_fetch_failed" }),
-      { status: fullRes.status, headers: { "Content-Type": "application/json" } },
+      { status: fullRes.status, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
   const full = await fullRes.json();
@@ -143,7 +146,7 @@ Deno.serve(async (req) => {
   if (!part) {
     return new Response(
       JSON.stringify({ error: "attachment_not_found" }),
-      { status: 404, headers: { "Content-Type": "application/json" } },
+      { status: 404, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -154,14 +157,14 @@ Deno.serve(async (req) => {
   if (!attRes.ok) {
     return new Response(
       JSON.stringify({ error: "attachment_fetch_failed" }),
-      { status: attRes.status, headers: { "Content-Type": "application/json" } },
+      { status: attRes.status, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
   const att = await attRes.json();
   if (typeof att.data !== "string") {
     return new Response(
       JSON.stringify({ error: "attachment_no_data" }),
-      { status: 502, headers: { "Content-Type": "application/json" } },
+      { status: 502, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 

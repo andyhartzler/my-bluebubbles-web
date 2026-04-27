@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { google } from "npm:googleapis@130";
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 // --- Supabase Client ---
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -202,6 +203,8 @@ async function sendSingleEmail({ gmail, to, cc, bcc, subject, htmlBody, textBody
 }
 // --- Main handler ---
 Deno.serve(async (req)=>{
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, {

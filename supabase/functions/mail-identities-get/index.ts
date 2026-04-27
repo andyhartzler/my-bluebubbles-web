@@ -14,6 +14,7 @@
 
 import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -37,6 +38,8 @@ interface GmailSendAsEntry {
 }
 
 Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   if (req.method !== "POST") return new Response("Use POST", { status: 405 });
 
   const caller = await resolveCaller(req);
@@ -65,7 +68,7 @@ Deno.serve(async (req) => {
     ];
     return new Response(
       JSON.stringify({ identities, primary: caller.aliasEmail }),
-      { headers: { "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -81,7 +84,7 @@ Deno.serve(async (req) => {
     const detail = (await r.text()).slice(0, 500);
     return new Response(
       JSON.stringify({ error: "sendas_list_failed", detail }),
-      { status: 502, headers: { "Content-Type": "application/json" } },
+      { status: 502, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
   const body = await r.json();
@@ -123,6 +126,6 @@ Deno.serve(async (req) => {
 
   return new Response(
     JSON.stringify({ identities, primary: primaryEmail }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
   );
 });

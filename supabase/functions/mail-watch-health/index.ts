@@ -12,13 +12,16 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 interface StaleEntry {
   mailbox: string;
   expiresIn: string;
   lastUpdate: string;
 }
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   const sb = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -31,13 +34,13 @@ Deno.serve(async (_req) => {
   if (error) {
     return new Response(
       JSON.stringify({ ok: true, alerted: false, reason: "state_read_error" }),
-      { headers: { "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
   if (!states || states.length === 0) {
     return new Response(
       JSON.stringify({ ok: true, alerted: false, reason: "no_watches" }),
-      { headers: { "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -65,7 +68,7 @@ Deno.serve(async (_req) => {
         alerted: false,
         watches: states.length,
       }),
-      { headers: { "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -86,7 +89,7 @@ Deno.serve(async (_req) => {
         reason: "no_webhook",
         stale,
       }),
-      { headers: { "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -110,6 +113,6 @@ Deno.serve(async (_req) => {
 
   return new Response(
     JSON.stringify({ ok: true, alerted: true, stale }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
   );
 });

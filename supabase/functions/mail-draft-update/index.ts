@@ -9,6 +9,7 @@
 
 import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 import {
   messageMatchesAlias,
   resolveSendAsForSelfOwned,
@@ -123,6 +124,8 @@ function buildRfc822(opts: {
 }
 
 Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   if (req.method !== "POST") {
     return new Response("Use POST", { status: 405 });
   }
@@ -134,7 +137,7 @@ Deno.serve(async (req) => {
   if (!draftId) {
     return new Response(JSON.stringify({ error: "missing_draftId" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
   const to = sanitizeAddrList(body.to);
@@ -160,7 +163,7 @@ Deno.serve(async (req) => {
   if (!getRes.ok) {
     return new Response(
       JSON.stringify({ error: "draft_not_found", detail: await getRes.text() }),
-      { status: getRes.status, headers: { "Content-Type": "application/json" } },
+      { status: getRes.status, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
   const existing = await getRes.json();
@@ -178,7 +181,7 @@ Deno.serve(async (req) => {
   ) {
     return new Response(JSON.stringify({ error: "not_yours" }), {
       status: 403,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
   const existingThreadId = existing.message?.threadId as string | undefined;
@@ -215,7 +218,7 @@ Deno.serve(async (req) => {
           detail:
             "Requested From: address is not a verified sendAs identity on this mailbox.",
         }),
-        { status: 403, headers: { "Content-Type": "application/json" } },
+        { status: 403, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
       );
     }
     fromAddr = resolved.email;
@@ -256,7 +259,7 @@ Deno.serve(async (req) => {
         error: "draft_update_failed",
         detail: await updateRes.text(),
       }),
-      { status: 502, headers: { "Content-Type": "application/json" } },
+      { status: 502, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
   const updated = await updateRes.json();
@@ -269,6 +272,6 @@ Deno.serve(async (req) => {
       threadId: updated.message?.threadId,
       rfc822MessageId: messageId,
     }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
   );
 });

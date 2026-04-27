@@ -13,6 +13,7 @@
 
 import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 import {
   enumerateWatchedMailboxes,
   type WatchedMailbox,
@@ -197,7 +198,9 @@ async function pollOne(
   };
 }
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   const sb = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -209,7 +212,7 @@ Deno.serve(async (_req) => {
   } catch (e) {
     return new Response(
       JSON.stringify({ error: "enumerate_failed", detail: String(e) }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      { status: 500, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -228,6 +231,6 @@ Deno.serve(async (_req) => {
 
   return new Response(
     JSON.stringify({ ok: true, results }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
   );
 });

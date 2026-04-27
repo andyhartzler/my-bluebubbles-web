@@ -19,6 +19,7 @@
 
 import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 import {
   enumerateWatchedMailboxes,
   type WatchedMailbox,
@@ -276,7 +277,9 @@ async function reconcileSelfOwned(
   }
 }
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   const startedAt = Date.now();
 
   const sb = createClient(
@@ -290,7 +293,7 @@ Deno.serve(async (_req) => {
   } catch (e) {
     return new Response(
       JSON.stringify({ ok: false, error: String(e) }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      { status: 500, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -316,6 +319,6 @@ Deno.serve(async (_req) => {
   console.log("mail-reconcile-nightly:", result);
 
   return new Response(JSON.stringify(result), {
-    headers: { "Content-Type": "application/json" },
+    headers: { ...corsHeaders(), "Content-Type": "application/json" },
   });
 });

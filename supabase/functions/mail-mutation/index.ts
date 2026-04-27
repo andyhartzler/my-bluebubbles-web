@@ -16,6 +16,7 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const CONCURRENCY = 10;
 
@@ -40,6 +41,8 @@ interface VerifyResult {
 }
 
 Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   if (req.method !== "POST") return new Response("Use POST", { status: 405 });
 
   const caller = await resolveCaller(req);
@@ -65,13 +68,13 @@ Deno.serve(async (req) => {
   if (messageIds.length === 0) {
     return new Response(
       JSON.stringify({ error: "missing_messageIds" }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
+      { status: 400, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
   if (addLabelIds.length === 0 && removeLabelIds.length === 0) {
     return new Response(
       JSON.stringify({ error: "missing_label_changes" }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
+      { status: 400, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -164,6 +167,6 @@ Deno.serve(async (req) => {
       skipped: skippedIds,
       errors,
     }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
   );
 });

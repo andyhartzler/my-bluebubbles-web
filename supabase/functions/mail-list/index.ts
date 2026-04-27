@@ -2,6 +2,7 @@ import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
 
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const META_CONCURRENCY = 10;
 
@@ -46,6 +47,8 @@ async function chunkedMap<T, U>(
 }
 
 Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   if (req.method !== "POST") return new Response("Use POST", { status: 405 });
 
   const caller = await resolveCaller(req);
@@ -86,7 +89,7 @@ Deno.serve(async (req) => {
   if (!listRes.ok) {
     return new Response(
       JSON.stringify({ error: "list_failed", detail: await listRes.text() }),
-      { status: 502, headers: { "Content-Type": "application/json" } },
+      { status: 502, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
   const list = await listRes.json();
@@ -138,6 +141,6 @@ Deno.serve(async (req) => {
       messages: messages.filter(Boolean),
       nextPageToken: list.nextPageToken ?? null,
     }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
   );
 });

@@ -26,6 +26,7 @@
 // the API calls if alias / send-as already exist.
 
 import { getGoogleAccessToken } from "../_shared/google-auth.ts";
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SHARED_MAILBOX = "crm@moyoungdemocrats.org";
@@ -71,6 +72,8 @@ async function gapi(
 }
 
 Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   if (req.method !== "POST") {
     return new Response("Use POST", { status: 405 });
   }
@@ -79,7 +82,7 @@ Deno.serve(async (req) => {
   if (!auth?.startsWith("Bearer ")) {
     return new Response(JSON.stringify({ error: "missing_auth" }), {
       status: 401,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 
@@ -99,14 +102,14 @@ Deno.serve(async (req) => {
   if (userErr || !userResp?.user) {
     return new Response(JSON.stringify({ error: "invalid_token" }), {
       status: 401,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
   const { data: isSuper } = await sbAuth.rpc("current_user_is_superadmin");
   if (isSuper !== true) {
     return new Response(JSON.stringify({ error: "not_superadmin" }), {
       status: 403,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 
@@ -119,7 +122,7 @@ Deno.serve(async (req) => {
   if (!targetUserId) {
     return new Response(JSON.stringify({ error: "missing_userId" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 
@@ -132,13 +135,13 @@ Deno.serve(async (req) => {
     if (!explicit) {
       return new Response(
         JSON.stringify({ error: "missing_aliasEmail_for_self_owned" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
+        { status: 400, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
       );
     }
     if (!ALIAS_REGEX.test(explicit)) {
       return new Response(JSON.stringify({ error: "alias_invalid" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
       });
     }
     aliasEmail = explicit;
@@ -147,21 +150,21 @@ Deno.serve(async (req) => {
     if (!firstNameRaw) {
       return new Response(
         JSON.stringify({ error: "missing_firstName" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
+        { status: 400, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
       );
     }
     const localPart = slug(firstNameRaw);
     if (!localPart) {
       return new Response(JSON.stringify({ error: "invalid_first_name" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
       });
     }
     aliasEmail = `${localPart}@${DOMAIN}`;
     if (!ALIAS_REGEX.test(aliasEmail)) {
       return new Response(JSON.stringify({ error: "alias_invalid" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
       });
     }
   }
@@ -171,7 +174,7 @@ Deno.serve(async (req) => {
   if (!targetAuth?.user) {
     return new Response(JSON.stringify({ error: "target_user_not_found" }), {
       status: 404,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 
@@ -197,7 +200,7 @@ Deno.serve(async (req) => {
           error: "workspace_user_not_found",
           detail,
         }),
-        { status: 404, headers: { "Content-Type": "application/json" } },
+        { status: 404, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
       );
     }
 
@@ -220,7 +223,7 @@ Deno.serve(async (req) => {
     if (dbErr) {
       return new Response(
         JSON.stringify({ error: "db_failed", detail: dbErr.message }),
-        { status: 500, headers: { "Content-Type": "application/json" } },
+        { status: 500, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
       );
     }
 
@@ -275,7 +278,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ ok: true, alias: row, watch: watchResult }),
-      { headers: { "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -299,7 +302,7 @@ Deno.serve(async (req) => {
     ) {
       return new Response(
         JSON.stringify({ error: "alias_insert_failed", detail }),
-        { status: 502, headers: { "Content-Type": "application/json" } },
+        { status: 502, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
       );
     }
   }
@@ -346,7 +349,7 @@ Deno.serve(async (req) => {
   if (!sendAsOk) {
     return new Response(
       JSON.stringify({ error: "send_as_failed", detail: lastDetail }),
-      { status: 502, headers: { "Content-Type": "application/json" } },
+      { status: 502, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -369,12 +372,12 @@ Deno.serve(async (req) => {
   if (dbErr) {
     return new Response(
       JSON.stringify({ error: "db_failed", detail: dbErr.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      { status: 500, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
   return new Response(
     JSON.stringify({ ok: true, alias: row }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
   );
 });

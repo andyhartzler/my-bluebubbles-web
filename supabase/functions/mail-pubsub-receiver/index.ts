@@ -30,6 +30,7 @@
 import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { verifyPubsubOidc } from "../_shared/oidc-verify.ts";
 import { messageMatchesAlias } from "../_shared/email-utils.ts";
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 import {
   enumerateWatchedMailboxes,
   type MailboxKind,
@@ -174,6 +175,8 @@ function extractEmail(raw: string): string {
 }
 
 Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   const failed = await verifyPubsubOidc(req, {
     expectedAudience: RECEIVER_URL,
     expectedEmail: PUSH_SA_EMAIL,
@@ -184,7 +187,7 @@ Deno.serve(async (req) => {
   const dataB64 = env?.message?.data;
   if (!dataB64) {
     return new Response(JSON.stringify({ ack: true }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
   const data = JSON.parse(atob(dataB64));
@@ -197,7 +200,7 @@ Deno.serve(async (req) => {
     // current Gmail API, but bail safely rather than guessing.
     return new Response(
       JSON.stringify({ ack: true, error: "no_mailbox_in_payload" }),
-      { headers: { "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -217,7 +220,7 @@ Deno.serve(async (req) => {
     // indefinitely).
     return new Response(
       JSON.stringify({ ack: true, error: "unknown_mailbox", pushedMailbox }),
-      { headers: { "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
   const mailboxKind: MailboxKind = mailbox.mailboxKind;
@@ -244,7 +247,7 @@ Deno.serve(async (req) => {
       );
     return new Response(
       JSON.stringify({ ack: true, baseline: newHistoryId, mailbox: pushedMailbox }),
-      { headers: { "Content-Type": "application/json" } },
+      { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -286,12 +289,12 @@ Deno.serve(async (req) => {
           .eq("mailbox_email", pushedMailbox);
         return new Response(
           JSON.stringify({ ack: true, reset: true, mailbox: pushedMailbox }),
-          { headers: { "Content-Type": "application/json" } },
+          { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
         );
       }
       return new Response(JSON.stringify({ error: "history_failed" }), {
         status: 502,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
       });
     }
     const hist = await histRes.json();
@@ -552,6 +555,6 @@ Deno.serve(async (req) => {
       autoRepliesSent,
       autoRepliesSkipped,
     }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
   );
 });

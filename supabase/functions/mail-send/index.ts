@@ -14,6 +14,7 @@
 import { getGoogleAccessToken } from "../_shared/google-auth.ts";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 import { resolveSendAsForSelfOwned } from "../_shared/email-utils.ts";
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -126,6 +127,8 @@ function buildRfc822(opts: {
 }
 
 Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   if (req.method !== "POST") {
     return new Response("Use POST", { status: 405 });
   }
@@ -137,7 +140,7 @@ Deno.serve(async (req) => {
   if (to.length === 0) {
     return new Response(JSON.stringify({ error: "missing_to" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
   const cc = sanitizeAddrList(body.cc);
@@ -148,7 +151,7 @@ Deno.serve(async (req) => {
   if (!bodyText && !bodyHtml) {
     return new Response(JSON.stringify({ error: "missing_body" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 
@@ -181,7 +184,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     return new Response(
       JSON.stringify({ error: "token_failed", detail: String(e) }),
-      { status: 502, headers: { "Content-Type": "application/json" } },
+      { status: 502, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -203,7 +206,7 @@ Deno.serve(async (req) => {
           detail:
             "Requested From: address is not a verified sendAs identity on this mailbox.",
         }),
-        { status: 403, headers: { "Content-Type": "application/json" } },
+        { status: 403, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
       );
     }
     fromAddr = resolved.email;
@@ -247,7 +250,7 @@ Deno.serve(async (req) => {
   if (logErr) {
     return new Response(
       JSON.stringify({ error: "log_failed", detail: logErr.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      { status: 500, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -271,7 +274,7 @@ Deno.serve(async (req) => {
       .eq("id", logRow!.id);
     return new Response(
       JSON.stringify({ error: "send_failed", detail }),
-      { status: 502, headers: { "Content-Type": "application/json" } },
+      { status: 502, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
   const sent = await sendRes.json();
@@ -315,6 +318,6 @@ Deno.serve(async (req) => {
       threadId: sent.threadId,
       rfc822MessageId: messageId,
     }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
   );
 });

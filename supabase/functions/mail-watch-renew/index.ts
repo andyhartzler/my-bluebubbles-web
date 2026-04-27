@@ -13,6 +13,7 @@
 // halt the rest.
 
 import { getGoogleAccessToken } from "../_shared/google-auth.ts";
+import { handleCors, corsHeaders } from "../_shared/cors.ts";
 import {
   enumerateWatchedMailboxes,
   type WatchedMailbox,
@@ -85,7 +86,9 @@ async function renewOne(
   }
 }
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   const sb = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -97,7 +100,7 @@ Deno.serve(async (_req) => {
   } catch (e) {
     return new Response(
       JSON.stringify({ error: "enumerate_failed", detail: String(e) }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      { status: 500, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );
   }
 
@@ -113,7 +116,7 @@ Deno.serve(async (_req) => {
     JSON.stringify({ ok: allOk, results }),
     {
       status: allOk ? 200 : 207,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     },
   );
 });
