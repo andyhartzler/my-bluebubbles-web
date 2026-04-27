@@ -10,6 +10,7 @@ import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/models/crm/voter_file_record.dart';
+import 'package:bluebubbles/widgets/crm/candidate_rubric_card.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_painters.dart';
 import 'package:bluebubbles/screens/crm/voter_file/voter_file_card.dart';
 import 'package:bluebubbles/screens/crm/widgets/candidate_questionnaire_panel.dart';
@@ -1442,14 +1443,11 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           const SizedBox(height: 16),
         ],
 
-        // ── Score Radar ──
-        if (c.isYoungDem) ...[
-          _buildYoungDemScore(),
-          const SizedBox(height: 16),
-        ],
-
-        // ── Score Radar Chart ──
-        _buildScoreRadar(),
+        // ── Candidate Rubric (replaces _buildYoungDemScore + _buildScoreRadar)
+        // 10-category 0-10 rubric driven by candidate_score_components.
+        // Auto categories computed by recompute_candidate_score(); exec
+        // committee can override individual scores via the stepper.
+        CandidateRubricCard(candidateId: c.id),
         const SizedBox(height: 16),
 
         // ── Social Links ──
