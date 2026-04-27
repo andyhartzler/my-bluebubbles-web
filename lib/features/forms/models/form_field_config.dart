@@ -120,6 +120,19 @@ class FormFieldConfig {
   final String? suffixText;
   final String? hintText;
 
+  // Smart-form: prefilled-confirm metadata. Only meaningful when
+  // `type == 'prefilled_confirm'`. See migration
+  // 20260507_01_prefill_endorsement_for_candidate.sql for the contract
+  // and form_field_types.dart for the allowed prefillSource values.
+  // `prefillSource` names the key the moydforms renderer looks up in
+  // the bag returned by `prefill_endorsement_for_candidate(<uuid>)`.
+  // `fallbackQuestionType` is the editable widget the renderer mounts
+  // when the candidate picks Edit (e.g. 'short_answer', 'number').
+  // `prefillFormat` is an optional display hint ('currency'|'text'|'csv'|'date').
+  final String? prefillSource;
+  final String? prefillFormat;
+  final String? fallbackQuestionType;
+
   const FormFieldConfig({
     required this.id,
     required this.type,
@@ -185,6 +198,9 @@ class FormFieldConfig {
     this.prefixText,
     this.suffixText,
     this.hintText,
+    this.prefillSource,
+    this.prefillFormat,
+    this.fallbackQuestionType,
   });
 
   factory FormFieldConfig.fromJson(Map<String, dynamic> json) {
@@ -333,6 +349,9 @@ class FormFieldConfig {
       prefixText: json['prefixText'] as String? ?? json['prefix_text'] as String?,
       suffixText: json['suffixText'] as String? ?? json['suffix_text'] as String?,
       hintText: json['hintText'] as String? ?? json['hint_text'] as String?,
+      prefillSource: json['prefill_source'] as String? ?? json['prefillSource'] as String?,
+      prefillFormat: json['prefill_format'] as String? ?? json['prefillFormat'] as String?,
+      fallbackQuestionType: json['fallback_question_type'] as String? ?? json['fallbackQuestionType'] as String?,
     );
   }
 
@@ -401,6 +420,12 @@ class FormFieldConfig {
     if (prefixText != null) 'prefixText': prefixText,
     if (suffixText != null) 'suffixText': suffixText,
     if (hintText != null) 'hintText': hintText,
+    // Smart-form fields — emit snake_case so the moydforms renderer (which
+    // reads the questions[] schema) sees the same keys it expects from
+    // the migration's seed updates.
+    if (prefillSource != null) 'prefill_source': prefillSource,
+    if (prefillFormat != null) 'prefill_format': prefillFormat,
+    if (fallbackQuestionType != null) 'fallback_question_type': fallbackQuestionType,
   };
 
   FormFieldConfig copyWith({
@@ -468,6 +493,9 @@ class FormFieldConfig {
     String? prefixText,
     String? suffixText,
     String? hintText,
+    String? prefillSource,
+    String? prefillFormat,
+    String? fallbackQuestionType,
   }) {
     return FormFieldConfig(
       id: id ?? this.id,
@@ -534,6 +562,9 @@ class FormFieldConfig {
       prefixText: prefixText ?? this.prefixText,
       suffixText: suffixText ?? this.suffixText,
       hintText: hintText ?? this.hintText,
+      prefillSource: prefillSource ?? this.prefillSource,
+      prefillFormat: prefillFormat ?? this.prefillFormat,
+      fallbackQuestionType: fallbackQuestionType ?? this.fallbackQuestionType,
     );
   }
 

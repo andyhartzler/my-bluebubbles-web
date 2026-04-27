@@ -3,6 +3,15 @@ class FormFieldTypes {
   // Layout / Display elements (not actual inputs)
   static const String sectionHeader = 'section_header';
 
+  // Smart-form: prefilled-confirm widget. The renderer (moydforms) reads
+  // a `prefill_source` key off the field, looks it up in the bag returned
+  // by the Supabase RPC `prefill_endorsement_for_candidate(<uuid>)`, and
+  // shows the candidate a "Confirm correct / Edit" card instead of an
+  // empty input. Only meaningful for forms that pass `?candidate_id=` in
+  // the URL — most forms should ignore this category. See migration
+  // 20260507_01_prefill_endorsement_for_candidate.sql for the contract.
+  static const String prefilledConfirm = 'prefilled_confirm';
+
   // Basic text input fields
   static const String text = 'text';
   static const String shortAnswer = 'short_answer'; // Alias for text
@@ -93,6 +102,13 @@ class FormFieldTypes {
           FieldTypeInfo(fileUpload, 'File Upload', 'Upload files to cloud storage'),
           FieldTypeInfo(imagePicker, 'Image Picker', 'Select or capture images/photos'),
         ],
+        'Smart Forms': [
+          FieldTypeInfo(
+            prefilledConfirm,
+            'Prefilled Confirm',
+            'Show known data with a Confirm correct / Edit toggle (requires ?candidate_id in URL)',
+          ),
+        ],
         'iOS (Cupertino)': [
           FieldTypeInfo(cupertinoTextField, 'Text Field (iOS)', 'iOS-styled text input'),
           FieldTypeInfo(cupertinoCheckbox, 'Checkbox (iOS)', 'iOS-styled checkbox'),
@@ -171,6 +187,30 @@ class FormFieldTypes {
       sectionHeader,
     ].contains(type);
   }
+
+  /// Smart-form prefilled-confirm field — renderer needs a `prefill_source`
+  /// key and a `fallback_question_type` so the editor UI can surface the
+  /// extra config. See migration 20260507_01_prefill_endorsement_for_candidate.sql.
+  static bool isPrefilledConfirm(String type) {
+    return type == prefilledConfirm;
+  }
+
+  /// Allowed `prefill_source` values — kept in sync with the v1 keys
+  /// returned by `prefill_endorsement_for_candidate(uuid)`. Surfacing this
+  /// list in the form-builder UI lets the author pick from a dropdown
+  /// instead of typing free-form strings (and risking a typo that silently
+  /// disables the prefill on the rendered form).
+  static const List<String> prefillSources = [
+    'mec_committee_name',
+    'mec_committee_id',
+    'mec_total_raised',
+    'mec_contribution_count',
+    'incumbent_yn',
+    'prior_office',
+    'voter_primary_participation',
+    'filing_status',
+    'campaign_committee_name',
+  ];
 }
 
 /// Information about a field type

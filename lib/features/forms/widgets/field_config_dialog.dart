@@ -55,6 +55,14 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
   List<String> _selectedValidators = [];
   Map<String, dynamic> _validatorConfigs = {};
 
+  // Smart-form prefilled-confirm metadata. Only surfaced when the author
+  // picks `prefilled_confirm` from the field-type dropdown — and only sent
+  // back through onSave when meaningful. See migration
+  // 20260507_01_prefill_endorsement_for_candidate.sql for the contract.
+  String? _prefillSource;
+  String? _prefillFormat;
+  String _fallbackQuestionType = FormFieldTypes.text;
+
   @override
   void initState() {
     super.initState();
@@ -86,6 +94,11 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
       _options = List.from(field.options ?? []);
       _selectedValidators = List.from(field.validatorTypes ?? []);
       _validatorConfigs = Map.from(field.validation ?? {});
+
+      // Smart-form metadata
+      _prefillSource = field.prefillSource;
+      _prefillFormat = field.prefillFormat;
+      _fallbackQuestionType = field.fallbackQuestionType ?? FormFieldTypes.text;
     }
   }
 
@@ -413,7 +426,9 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
           SizedBox(height: isMobile ? 12 : 16),
 
           // Show different properties based on field type
-          if (FormFieldTypes.requiresOptions(_fieldType)) ...[
+          if (FormFieldTypes.isPrefilledConfirm(_fieldType)) ...[
+            _buildPrefilledConfirmProperties(isMobile: isMobile),
+          ] else if (FormFieldTypes.requiresOptions(_fieldType)) ...[
             _buildOptionsEditor(isMobile: isMobile),
           ] else if (FormFieldTypes.isNumeric(_fieldType)) ...[
             _buildNumericProperties(isMobile: isMobile),
@@ -439,6 +454,116 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
           ],
         ],
       ),
+    );
+  }
+
+  /// Smart-form prefilled-confirm property panel.
+  ///
+  /// Renders two dropdowns:
+  ///  1. `prefill_source` — which key in the bag returned by
+  ///     `prefill_endorsement_for_candidate(<uuid>)` should populate this
+  ///     field. Picking from a dropdown (instead of free-form text) prevents
+  ///     typos that would silently disable the prefill.
+  ///  2. `fallback_question_type` — the editable widget the moydforms
+  ///     renderer mounts when the candidate picks Edit (or when the RPC
+  ///     returned no value for this source).
+  Widget _buildPrefilledConfirmProperties({bool isMobile = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.blue.withOpacity(0.2)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.auto_awesome, color: Colors.blue, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Smart Form: Prefilled Confirm. The candidate sees the value '
+                  'we already have and confirms or edits it. Only fires when '
+                  'the form URL has ?candidate_id=<uuid>.',
+                  style: TextStyle(fontSize: isMobile ? 12 : 13),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: isMobile ? 12 : 16),
+        Text(
+          'Prefill Source',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 13 : 14),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          value: _prefillSource,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            hintText: 'Pick the data source',
+          ),
+          items: FormFieldTypes.prefillSources
+              .map((src) => DropdownMenuItem(value: src, child: Text(src)))
+              .toList(),
+          onChanged: (v) => setState(() => _prefillSource = v),
+        ),
+        SizedBox(height: isMobile ? 12 : 16),
+        Text(
+          'Fallback Question Type',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 13 : 14),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Widget rendered when the candidate picks Edit (or when no prefill data is available).',
+          style: TextStyle(fontSize: isMobile ? 11 : 12, color: Colors.grey[700]),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          value: _fallbackQuestionType,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          items: const [
+            DropdownMenuItem(value: 'short_answer', child: Text('Short answer')),
+            DropdownMenuItem(value: 'long_answer', child: Text('Long answer')),
+            DropdownMenuItem(value: 'number', child: Text('Number')),
+            DropdownMenuItem(value: 'radio', child: Text('Radio (yes/no)')),
+            DropdownMenuItem(value: 'date_picker', child: Text('Date picker')),
+          ],
+          onChanged: (v) => setState(() => _fallbackQuestionType = v ?? FormFieldTypes.text),
+        ),
+        SizedBox(height: isMobile ? 12 : 16),
+        Text(
+          'Display Format (optional)',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 13 : 14),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String?>(
+          value: _prefillFormat,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            hintText: 'Auto',
+          ),
+          items: const [
+            DropdownMenuItem(value: null, child: Text('Auto')),
+            DropdownMenuItem(value: 'currency', child: Text('Currency ($1,234.56)')),
+            DropdownMenuItem(value: 'date', child: Text('Date')),
+            DropdownMenuItem(value: 'csv', child: Text('Comma-separated list')),
+            DropdownMenuItem(value: 'text', child: Text('Plain text')),
+          ],
+          onChanged: (v) => setState(() => _prefillFormat = v),
+        ),
+      ],
     );
   }
 
@@ -963,8 +1088,21 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
       return;
     }
 
-    // Validate field-specific requirements
-    if (FormFieldTypes.requiresOptions(_fieldType) && _options.isEmpty) {
+    // Validate field-specific requirements. Smart-form prefilled_confirm
+    // requires a prefill_source (so the renderer knows which RPC key to
+    // map this field to), but the radio fallback doesn't need options
+    // configured here — the renderer hard-codes yes/no for the
+    // incumbent_yn case and treats other fallbacks as plain text/number.
+    if (_fieldType == FormFieldTypes.prefilledConfirm) {
+      if (_prefillSource == null || _prefillSource!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pick a Prefill Source for this prefilled-confirm field'),
+          ),
+        );
+        return;
+      }
+    } else if (FormFieldTypes.requiresOptions(_fieldType) && _options.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please add at least one option for this field type'),
@@ -1004,6 +1142,13 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
       divisions: divisions,
       firstDate: _firstDate,
       lastDate: _lastDate,
+      // Smart-form metadata — only emit when the field is actually a
+      // prefilled_confirm so other field types stay clean in JSON.
+      prefillSource: _fieldType == FormFieldTypes.prefilledConfirm ? _prefillSource : null,
+      prefillFormat: _fieldType == FormFieldTypes.prefilledConfirm ? _prefillFormat : null,
+      fallbackQuestionType: _fieldType == FormFieldTypes.prefilledConfirm
+          ? _fallbackQuestionType
+          : null,
     );
 
     widget.onSave(field);
