@@ -489,6 +489,60 @@ class CandidateRepository {
   // by name. The Intel tab caches this once per detail screen so the
   // bottom-sheet picker opens instantly.
 
+  /// Find likely MOYD member matches for an unlinked candidate.
+  ///
+  /// Strategy: prefer email-exact, fall back to name-exact (first+last).
+  /// Returns at most 5 candidates so the picker stays compact. Used by
+  /// the Intel tab's "Possible matches" panel.
+  Future<List<Map<String, dynamic>>> findPossibleMemberMatches({
+    String? firstName,
+    String? lastName,
+    String? email,
+  }) async {
+    if (!isReady) return [];
+    final results = <Map<String, dynamic>>[];
+    try {
+      if (email != null && email.isNotEmpty) {
+        final byEmail = await _client
+            .from('members')
+            .select('id,name,email,profile_pictures,executive_title,date_joined')
+            .ilike('email', email)
+            .limit(5);
+        results.addAll(
+          (byEmail as List).whereType<Map>().map(
+                (m) => m.map((k, v) => MapEntry(k.toString(), v)),
+              ),
+        );
+      }
+      if (results.length < 5 &&
+          firstName != null && firstName.isNotEmpty &&
+          lastName != null && lastName.isNotEmpty) {
+        final byName = await _client
+            .from('members')
+            .select('id,name,email,profile_pictures,executive_title,date_joined')
+            .ilike('first_name', firstName)
+            .ilike('last_name', lastName)
+            .limit(5);
+        for (final m in (byName as List).whereType<Map>()) {
+          final mapped = m.map((k, v) => MapEntry(k.toString(), v));
+          if (!results.any((e) => e['id'] == mapped['id'])) {
+            results.add(mapped);
+          }
+        }
+      }
+      return results.take(5).toList();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.findPossibleMemberMatches error: $e');
+      return [];
+    }
+  }
+
+  /// Link a candidate row to a MOYD member uuid (sets candidates.member_id).
+  /// Used by the Intel tab "Link" CTA on possible-match tiles.
+  Future<void> linkCandidateToMember(String candidateId, String memberId) async {
+    await updateCandidate(candidateId, {'member_id': memberId});
+  }
+
   Future<List<Map<String, dynamic>>> getExecCommitteeMembers() async {
     if (!isReady) return [];
     try {
