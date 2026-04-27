@@ -48,6 +48,39 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
     super.dispose();
   }
 
+  /// Switch to the Committees tab, then open the requested committee detail.
+  ///
+  /// The naive postFrameCallback approach fails on the first navigation
+  /// because the CommitteesTab widget isn't materialised until the
+  /// TabBarView animates to its index — addPostFrameCallback fires AFTER
+  /// the frame that started the animation, but BEFORE tmail's lazy build
+  /// of the tab 3 child. _committeesKey.currentState is null on the first
+  /// frame, so the open silently no-ops and the user sees only the empty
+  /// committees-tab list view.
+  ///
+  /// We poll the GlobalKey across animation frames (max 30 = ~500ms at
+  /// 60fps) and call openCommitteeById as soon as the state attaches.
+  void _navigateToCommittee(
+    String committeeId,
+    String committeeName,
+    String source,
+  ) {
+    _tabController.animateTo(3);
+    int attempts = 0;
+    void tryOpen() {
+      final state = _committeesKey.currentState;
+      if (state != null) {
+        state.openCommitteeById(committeeId, committeeName, source);
+        return;
+      }
+      attempts++;
+      if (attempts < 30 && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => tryOpen());
+      }
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => tryOpen());
+  }
+
   @override
   Widget build(BuildContext context) {
     final tabView = TabBarView(
@@ -57,16 +90,7 @@ class _DonorCommandCenterState extends State<DonorCommandCenter>
       children: [
         const FundraisingTab(),
         MecResearchTab(
-          onNavigateToCommittee: (committeeId, committeeName, source) {
-            _tabController.animateTo(3);
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _committeesKey.currentState?.openCommitteeById(
-                committeeId,
-                committeeName,
-                source,
-              );
-            });
-          },
+          onNavigateToCommittee: _navigateToCommittee,
         ),
         const CallTimeTab(),
         CommitteesTab(key: _committeesKey),

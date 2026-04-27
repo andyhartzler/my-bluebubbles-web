@@ -1,0 +1,4 @@
+-- get_donor_unified_profile now joins to mec_committees for real names
+-- (previously trusted mec_contributions.committee_name which was 'No' or
+-- empty for ~36k rows / 1316 committees).
+-- See migration record applied via supabase MCP for the full body.
