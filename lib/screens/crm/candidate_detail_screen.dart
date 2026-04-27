@@ -365,10 +365,17 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         _districtDemographics = results[2] as DistrictDemographics?;
         _adjacentDistricts = results[3] as Map<String, List<Candidate>>;
 
-        // Load historical candidates for this district (non-blocking)
-        _repo.getDistrictHistoricalCandidates(c.district!).then((hc) {
-          if (mounted) setState(() => _historicalCandidates = hc);
-        });
+        // Load historical candidates for this (district, office) pair
+        // (non-blocking). Office is required after migration 20260427_02 —
+        // without it District 81 of State Rep collided with District 81
+        // of State Senator.
+        if (c.office.isNotEmpty) {
+          _repo
+              .getDistrictHistoricalCandidates(c.district!, c.office)
+              .then((hc) {
+            if (mounted) setState(() => _historicalCandidates = hc);
+          });
+        }
       }
     } catch (e) {
       debugPrint('❌ Error loading race data: $e');
@@ -5220,6 +5227,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         children: [
           const SizedBox(height: 8),
           ..._historicalCandidates.take(20).map((hc) {
+            final id = hc['id'] as String?;
             final name = hc['name'] as String? ?? '';
             final party = hc['party'] as String? ?? '';
             final photo = hc['photo_url'] as String?;
@@ -5233,13 +5241,18 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             else partyColor = Colors.grey;
 
             return GestureDetector(
-              onTap: () => Navigator.of(context).push(
-                ThemeSwitcher.buildPageRoute(
-                  builder: (_) => TitleBarWrapper(
-                    child: HistoricalCandidateScreen(candidateName: name),
-                  ),
-                ),
-              ),
+              onTap: id == null
+                  ? null
+                  : () => Navigator.of(context).push(
+                        ThemeSwitcher.buildPageRoute(
+                          builder: (_) => TitleBarWrapper(
+                            child: HistoricalCandidateScreen(
+                              historicalId: id,
+                              candidateName: name,
+                            ),
+                          ),
+                        ),
+                      ),
               child: Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(10),

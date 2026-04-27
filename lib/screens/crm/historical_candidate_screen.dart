@@ -7,10 +7,23 @@ import 'package:url_launcher/url_launcher.dart';
 
 /// Detail screen for historical candidates — shows their full race
 /// history, campaign finance, bio, and social links.
+///
+/// Lookup is keyed on `historicalId` (uuid) rather than name. Name-based
+/// lookup was unsafe: scraper-bleed left rows with `name='Libertarian'`
+/// (or 'Republican', 'Submit photo', etc.), and clicking those tiles
+/// fanned out across every same-named row statewide. Migration
+/// 20260427_02 cleaned the data and added a uuid-keyed RPC; the screen
+/// uses that path. `candidateName` is retained for the header label
+/// while the profile loads.
 class HistoricalCandidateScreen extends StatefulWidget {
+  final String historicalId;
   final String candidateName;
 
-  const HistoricalCandidateScreen({super.key, required this.candidateName});
+  const HistoricalCandidateScreen({
+    super.key,
+    required this.historicalId,
+    required this.candidateName,
+  });
 
   @override
   State<HistoricalCandidateScreen> createState() => _HistoricalCandidateScreenState();
@@ -29,7 +42,7 @@ class _HistoricalCandidateScreenState extends State<HistoricalCandidateScreen> {
 
   Future<void> _loadProfile() async {
     try {
-      final response = await _repo.getHistoricalCandidateProfile(widget.candidateName);
+      final response = await _repo.getHistoricalCandidateProfile(widget.historicalId);
       if (mounted) setState(() { _profile = response; _loading = false; });
     } catch (e) {
       if (mounted) setState(() => _loading = false);

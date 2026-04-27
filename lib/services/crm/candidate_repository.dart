@@ -1292,12 +1292,21 @@ class CandidateRepository {
     }
   }
 
-  Future<Map<String, dynamic>?> getHistoricalCandidateProfile(String name) async {
+  /// Fetch a historical candidate's full profile by their stable id.
+  ///
+  /// Migration 20260427_02 introduced
+  /// `get_historical_candidate_profile_by_id(p_id uuid)` — name-keyed
+  /// lookup is unsafe because scraper-bleed left rows whose `name` was
+  /// just "Libertarian"/"Republican"/etc, and clicking those collapsed
+  /// every party-named row across the state. We now key on the row's
+  /// uuid, which is unique and survives any future merge.
+  Future<Map<String, dynamic>?> getHistoricalCandidateProfile(String id) async {
     if (!isReady) return null;
     try {
-      final response = await _client.rpc('get_historical_candidate_profile', params: {
-        'p_name': name,
-      });
+      final response = await _client.rpc(
+        'get_historical_candidate_profile_by_id',
+        params: {'p_id': id},
+      );
       return response is Map<String, dynamic> ? response : null;
     } catch (e) {
       debugPrint('❌ CandidateRepository.getHistoricalCandidateProfile error: $e');
@@ -1305,11 +1314,19 @@ class CandidateRepository {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getDistrictHistoricalCandidates(String district) async {
+  /// Past candidates for a (district, office) pair. Office is required
+  /// — the prior single-arg signature collided "District 81 State Rep"
+  /// with "District 81 State Senator" and dumped both into the same
+  /// panel.
+  Future<List<Map<String, dynamic>>> getDistrictHistoricalCandidates(
+    String district,
+    String office,
+  ) async {
     if (!isReady) return [];
     try {
       final response = await _client.rpc('get_district_historical_candidates', params: {
         'p_district': district,
+        'p_office': office,
       });
       if (response == null) return [];
       return (response as List<dynamic>).cast<Map<String, dynamic>>();
