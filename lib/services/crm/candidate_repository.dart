@@ -543,6 +543,30 @@ class CandidateRepository {
     await updateCandidate(candidateId, {'member_id': memberId});
   }
 
+  /// Fetch a single member row by id. Used by the Intel tab MOYD Member
+  /// Status tile when the candidate's linked_member embed didn't populate
+  /// (PostgREST's FK embed occasionally falls back to the bare select).
+  Future<Map<String, dynamic>?> fetchMemberById(String memberId) async {
+    if (!isReady) return null;
+    try {
+      final row = await _client
+          .from('members')
+          .select(
+            'id,name,email,profile_pictures,executive_committee,'
+            'executive_title,executive_role,date_joined',
+          )
+          .eq('id', memberId)
+          .maybeSingle();
+      if (row == null) return null;
+      if (row is Map<String, dynamic>) return row;
+      final asMap = row as Map;
+      return asMap.map((k, v) => MapEntry(k.toString(), v));
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.fetchMemberById error: $e');
+      return null;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getExecCommitteeMembers() async {
     if (!isReady) return [];
     try {

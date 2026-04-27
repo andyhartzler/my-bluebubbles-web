@@ -4114,13 +4114,17 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                       final id = m['id'] as String;
                       final name = (m['name'] as String?) ?? '(no name)';
                       final title = (m['executive_title'] as String?) ?? '';
-                      final pics = m['profile_pictures'];
-                      String? pic;
-                      if (pics is List && pics.isNotEmpty && pics.first is Map) {
-                        pic = (pics.first as Map)['url'] as String?;
-                      }
+                      // members.profile_pictures is either:
+                      //   • List of {path, bucket, primary, ...} (newer
+                      //     uploads — array form)
+                      //   • Map of {instagram: 'rel-path'} (legacy social
+                      //     scrape — object form)
+                      // Build a public storage URL from whichever shape we got
+                      // so the avatar actually renders.
+                      final pic = _extractMemberPhotoUrl(m['profile_pictures']);
                       return ListTile(
                         leading: CircleAvatar(
+                          radius: 22,
                           backgroundColor: BrandColors.steelBlue.withOpacity(0.3),
                           backgroundImage:
                               pic != null ? NetworkImage(pic) : null,
@@ -4174,6 +4178,74 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       final updated = await _repo.fetchCandidate(c.id);
       if (updated != null && mounted) setState(() => _candidate = updated);
     }
+  }
+
+  /// Extract a public-storage URL from `members.profile_pictures`.
+  /// Handles both shapes seen in production:
+  ///   • List of {path, bucket, primary, ...} objects (newer uploads)
+  ///   • Map of {instagram: 'rel-path', ...} (legacy social scrape)
+  /// Returns null when nothing usable is present.
+  String? _extractMemberPhotoUrl(dynamic pictures) {
+    if (pictures == null) return null;
+    final base = CRMConfig.supabaseUrl.endsWith('/')
+        ? CRMConfig.supabaseUrl.substring(0, CRMConfig.supabaseUrl.length - 1)
+        : CRMConfig.supabaseUrl;
+    if (base.isEmpty) return null;
+
+    String? buildUrl(dynamic path, [dynamic bucket]) {
+      if (path is! String || path.isEmpty) return null;
+      if (path.startsWith('http://') || path.startsWith('https://')) return path;
+      // Some legacy entries already include the storage path prefix.
+      if (path.startsWith('storage/')) {
+        return '$base/$path';
+      }
+      final b = (bucket is String && bucket.isNotEmpty)
+          ? bucket
+          : 'member-photos';
+      return '$base/storage/v1/object/public/$b/$path';
+    }
+
+    if (pictures is List) {
+      // Prefer the entry flagged primary; fall back to the first one.
+      Map? primary;
+      for (final entry in pictures) {
+        if (entry is Map && entry['primary'] == true) {
+          primary = entry;
+          break;
+        }
+      }
+      primary ??= (pictures.isNotEmpty && pictures.first is Map)
+          ? pictures.first as Map
+          : null;
+      if (primary == null) return null;
+      final direct = primary['url'] ?? primary['public_url'] ?? primary['publicUrl'];
+      if (direct is String && direct.isNotEmpty) {
+        return direct.startsWith('http') ? direct : buildUrl(direct);
+      }
+      return buildUrl(primary['path'], primary['bucket']);
+    }
+    if (pictures is Map) {
+      // Try standard URL keys first, then fall through to legacy
+      // `instagram: <relative path>` style entries.
+      final direct = pictures['url'] ?? pictures['public_url'] ?? pictures['publicUrl'];
+      if (direct is String && direct.isNotEmpty) {
+        return direct.startsWith('http') ? direct : buildUrl(direct);
+      }
+      final pathFromBucket = pictures['path'];
+      if (pathFromBucket != null) {
+        return buildUrl(pathFromBucket, pictures['bucket']);
+      }
+      // Legacy social-scrape shape: any string-valued key is a relative path.
+      for (final entry in pictures.entries) {
+        if (entry.value is String && (entry.value as String).isNotEmpty) {
+          return buildUrl(entry.value);
+        }
+      }
+    }
+    if (pictures is String && pictures.isNotEmpty) {
+      return buildUrl(pictures);
+    }
+    return null;
   }
 
   Widget _buildFollowUpReminder() {
@@ -4652,6 +4724,42 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
   Widget _buildMoydMemberLink() {
     final linked = c.linkedMember;
+    // If the candidate row has member_id set but the embedded fetch
+    // didn't populate linked_member (e.g. the PostgREST FK embed fell
+    // back to the bare select on transient errors), fetch the member
+    // directly so the tile reflects truth instead of showing "no match".
+    if (linked == null && (c.memberId ?? '').isNotEmpty) {
+      return _card(
+        'MOYD Member Status',
+        Icons.card_membership,
+        BrandColors.momentumBlue,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: FutureBuilder<Map<String, dynamic>?>(
+            future: _repo.fetchMemberById(c.memberId!),
+            builder: (ctx, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: Center(
+                    child: SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: BrandColors.momentumBlue,
+                      ),
+                    ),
+                  ),
+                );
+              }
+              final m = snap.data;
+              if (m != null) return _linkedMemberPanel(m);
+              return _possibleMatchPanel();
+            },
+          ),
+        ),
+      );
+    }
     return _card(
       'MOYD Member Status',
       Icons.card_membership,
@@ -4669,11 +4777,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     final name = (m['name'] as String?) ?? '';
     final title = (m['executive_title'] as String?) ?? '';
     final dateJoined = m['date_joined'] as String?;
-    final pics = m['profile_pictures'];
-    String? pic;
-    if (pics is List && pics.isNotEmpty && pics.first is Map) {
-      pic = (pics.first as Map)['url'] as String?;
-    }
+    final pic = _extractMemberPhotoUrl(m['profile_pictures']);
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       // Existing _openMemberProfile() reads c.memberId — which IS this

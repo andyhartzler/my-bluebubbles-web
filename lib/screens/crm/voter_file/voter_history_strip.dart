@@ -67,61 +67,76 @@ class VoterHistoryStrip extends StatelessWidget {
     // Aggregate counts (eligibility approximated from the year-span).
     final agg = _computeAggregates(sorted);
 
+    // Aggregate pills shown both in collapsed header and as the expanded
+    // footer. Keeping them visible while collapsed is the load-bearing
+    // affordance — at-a-glance "primary 4 of 6, general 7 of 7" is what
+    // users want most of the time.
+    final aggWrap = Wrap(
+      spacing: 16,
+      runSpacing: 6,
+      children: [
+        _AggPill(
+          label: 'Primary',
+          voted: agg.primaryVoted,
+          total: agg.primaryTotal,
+          color: BrandColors.sunriseGold,
+        ),
+        _AggPill(
+          label: 'General',
+          voted: agg.generalVoted,
+          total: agg.generalTotal,
+          color: BrandColors.democratBlue,
+        ),
+        if (agg.otherVoted > 0)
+          _AggPill(
+            label: 'Special / Municipal',
+            voted: agg.otherVoted,
+            total: agg.otherVoted,
+            color: BrandColors.momentumBlue,
+          ),
+      ],
+    );
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withOpacity(0.06)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var i = 0; i < years.length; i++)
-            _YearGroup(
-              year: years[i],
-              entries: byYear[years[i]]!,
-              isLast: i == years.length - 1,
-            ),
-          // ── Aggregate footer ──
-          Container(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            decoration: BoxDecoration(
-              color: BrandColors.unityBlue.withOpacity(0.5),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(11),
-                bottomRight: Radius.circular(11),
+      child: Theme(
+        // ExpansionTile reads dividerColor from the theme; default would
+        // draw a hairline that fights the existing border above.
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+          unselectedWidgetColor: Colors.white70,
+          colorScheme: Theme.of(context).colorScheme.copyWith(
+                primary: BrandColors.sunriseGold,
               ),
-              border: Border(
-                top: BorderSide(color: Colors.white.withOpacity(0.08)),
-              ),
-            ),
-            child: Wrap(
-              spacing: 16,
-              runSpacing: 6,
-              children: [
-                _AggPill(
-                  label: 'Primary',
-                  voted: agg.primaryVoted,
-                  total: agg.primaryTotal,
-                  color: BrandColors.sunriseGold,
-                ),
-                _AggPill(
-                  label: 'General',
-                  voted: agg.generalVoted,
-                  total: agg.generalTotal,
-                  color: BrandColors.democratBlue,
-                ),
-                if (agg.otherVoted > 0)
-                  _AggPill(
-                    label: 'Special / Municipal',
-                    voted: agg.otherVoted,
-                    total: agg.otherVoted,
-                    color: BrandColors.momentumBlue,
-                  ),
-              ],
-            ),
+        ),
+        child: ExpansionTile(
+          // PageStorageKey<String> so the open/closed state has its own
+          // bucket slot. Without an explicit key the auto-generated bucket
+          // identifier can collide with sibling widgets and the
+          // `as bool?` cast inside _ExpansionTileState.initState throws.
+          key: const PageStorageKey<String>('voter-history-strip'),
+          initiallyExpanded: false,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          childrenPadding: EdgeInsets.zero,
+          iconColor: Colors.white70,
+          collapsedIconColor: Colors.white70,
+          title: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: aggWrap,
           ),
-        ],
+          children: [
+            for (var i = 0; i < years.length; i++)
+              _YearGroup(
+                year: years[i],
+                entries: byYear[years[i]]!,
+                isLast: i == years.length - 1,
+              ),
+          ],
+        ),
       ),
     );
   }
