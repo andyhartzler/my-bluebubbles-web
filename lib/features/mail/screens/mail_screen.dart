@@ -44,12 +44,20 @@ class _MailScreenState extends State<MailScreen> {
   Future<void> _boot() async {
     await MailScreenTmailBindings.initialize();
     registerDashboardControllerFixups();
-    // Tmail normally calls _getAllIdentities() from _setUpComponentsFromSession,
-    // which is gated on receiving a Session via Get.arguments. We mount the
-    // dashboard view directly (no Get.to navigation), so that path never runs
-    // and the composer's From: dropdown has nothing to show. Pre-populate
-    // listIdentities here, after MailboxDashBoardController + interactors are
-    // registered.
+    // Tmail normally calls `_setUpComponentsFromSession(session)` in
+    // response to a Session arriving via `Get.arguments`. We mount the
+    // dashboard view directly (no Get.to navigation), so that path never
+    // fires — leaving `accountId` null forever, which means
+    // MailboxController never calls getAllMailbox(), no mailbox is
+    // selected, and ThreadController never calls getAllEmailAction().
+    // bootDashboardFromSyntheticSession() reproduces the load-bearing
+    // assignments (sessionCurrent + accountId.value) so the entire
+    // mailbox tree → selected mailbox → email list chain wakes up.
+    bootDashboardFromSyntheticSession();
+    // Identities are also populated by _setUpComponentsFromSession, but
+    // we keep the dedicated helper because it routes the result through
+    // controller.consumeState — the same path tmail itself uses, with
+    // diagnostic logging on success/failure.
     populateDashboardListIdentities();
   }
 

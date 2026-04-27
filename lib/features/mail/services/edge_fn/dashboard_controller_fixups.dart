@@ -157,6 +157,7 @@ import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/download
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/labels/presentation/label_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/app_grid_dashboard_controller.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/mailbox_dashboard_controller.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/model/dashboard_routes.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/search_controller.dart'
     as search;
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/controller/spam_report_controller.dart';
@@ -166,6 +167,42 @@ import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/network_
     if (dart.library.html) 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/network_connection/presentation/web_network_connection_controller.dart';
 
 import 'package:bluebubbles/features/mail/services/edge_fn/tmail_runtime_bindings.dart';
+
+/// Wakes the MailboxDashBoardController by reproducing the load-bearing
+/// lines of `_setUpComponentsFromSession` that our boot path skips.
+///
+/// Background: tmail's controller normally waits for `Get.arguments` to
+/// carry a `Session`. Receiving one calls `_setUpComponentsFromSession`,
+/// which writes `sessionCurrent = session` and `accountId.value = session.accountId`.
+/// Setting `accountId` is the load-bearing assignment — `MailboxController`
+/// has an `ever(accountId, ...)` worker that only fires `getAllMailbox()`
+/// when `accountId` becomes non-null. Without it: no mailbox tree, no
+/// selected mailbox, no `ThreadController.ever(selectedMailbox, ...)` →
+/// no `getAllEmailAction()` → no `mail-list` request → inbox sits "loading
+/// forever" because no fetch was ever issued.
+///
+/// We mount `MailboxDashBoardView` directly inside the CRM (no
+/// `Get.to(arguments: session)` navigation), so that path is dead. This
+/// helper wakes it: assign the synthetic Session + AccountId from
+/// TmailRuntimeContext, then dispatch `DashboardRoutes.thread` so the
+/// view picks the correct route (its default is `waiting`).
+///
+/// Idempotent: re-running just re-assigns the same values; the
+/// `ever()` workers do not re-fire on identity-equal writes.
+void bootDashboardFromSyntheticSession() {
+  final controller = Get.find<MailboxDashBoardController>();
+
+  // Order matters: sessionCurrent first (so anything that listens on
+  // accountId and reads sessionCurrent has both available), then
+  // accountId.value (which is the trigger for MailboxController).
+  controller.sessionCurrent = TmailRuntimeContext.session;
+  controller.accountId.value = TmailRuntimeContext.accountId;
+
+  // Move the dashboard route off `waiting` so the view renders the
+  // thread layout. _handleArguments would normally do this on a real
+  // session arrival.
+  controller.dispatchRoute(DashboardRoutes.thread);
+}
 
 /// Asserts that all seven dashboard collaborators registered by
 /// `MailboxDashBoardBindings` are present in the GetX registry. Throws a
