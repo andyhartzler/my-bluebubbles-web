@@ -50,7 +50,14 @@ class EdgeFnThreadDataSource extends ThreadDataSource {
     Properties? properties,
   }) async {
     final maxResults = (limit?.value.toInt() ?? 25).clamp(1, 100);
-    final page = await _api.listInbox(maxResults: maxResults);
+    // Convert tmail's filter (inMailbox, before, search terms) into a Gmail
+    // query string. Without this, every folder + pagination cursor was
+    // ignored — Inbox/Sent/Drafts/Trash all rendered the same INBOX list.
+    final q = _filterToQuery(filter).trim();
+    final page = await _api.listInbox(
+      maxResults: maxResults,
+      q: q.isNotEmpty ? q : null,
+    );
     final emails = page.messages.map(_lightweightJmapEmail).toList();
     return EmailsResponse(
       emailList: emails,
@@ -133,13 +140,50 @@ class EdgeFnThreadDataSource extends ThreadDataSource {
   }
 
   /// Maps each populated field on an [EmailFilterCondition] to a Gmail
-  /// search operator. Fields tmail uses but Gmail can't express (mailbox
-  /// IDs, JMAP keyword IDs other than $seen, before/after as UTC objects)
-  /// are dropped — the alias-clamp on the server already constrains the
-  /// mailbox, and unread/has-attachment are the keyword cases that matter
-  /// in practice.
+  /// search operator. Fields tmail uses but Gmail can't express (JMAP
+  /// keyword IDs other than $seen) are dropped.
+  ///
+  /// Mailbox filtering: tmail passes the synthetic mailbox id
+  /// (inbox/sent/drafts/trash/spam) as `inMailbox`. We map to Gmail's
+  /// `in:` operator. Without this every folder showed the same INBOX list.
+  ///
+  /// Pagination cursor: tmail's load-more sends `before: lastEmail.receivedAt`
+  /// (a UTCDate) on subsequent fetches. Gmail accepts `before:YYYY/MM/DD`
+  /// (or unix epoch). We emit the latter for sub-day precision.
   List<String> _conditionToTokens(EmailFilterCondition c) {
     final tokens = <String>[];
+
+    // Folder. The synthetic mailbox id is one of our 5 well-known values
+    // (see EdgeFnMailboxDataSource._syntheticMailboxes). Map to Gmail `in:`.
+    final mbId = c.inMailbox?.id.value;
+    if (mbId != null) {
+      switch (mbId) {
+        case 'inbox':
+          tokens.add('in:inbox');
+          break;
+        case 'sent':
+          tokens.add('in:sent');
+          break;
+        case 'drafts':
+          tokens.add('in:drafts');
+          break;
+        case 'trash':
+          tokens.add('in:trash');
+          break;
+        case 'spam':
+          tokens.add('in:spam');
+          break;
+      }
+    }
+
+    // Pagination cursor. tmail emits `before` as receivedAt of the last
+    // email rendered. Gmail accepts unix-seconds for sub-day precision.
+    final before = c.before?.value;
+    if (before != null) {
+      final epochSecs = before.millisecondsSinceEpoch ~/ 1000;
+      tokens.add('before:$epochSecs');
+    }
+
     final text = c.text?.trim();
     if (text != null && text.isNotEmpty) tokens.add(text);
     final body = c.body?.trim();
