@@ -728,8 +728,54 @@ class _HomeState extends OptimizedState<Home>
           error: error.exception,
           trace: error.stack,
         );
-        return CustomErrorWidget(
-          "An unexpected error occurred when rendering.",
+        // Surface the exception + first 8 stack frames inline so we can
+        // diagnose render-time failures without requiring DevTools console
+        // access. CustomErrorWidget showed only a generic message which
+        // hid the actual cause (e.g. tmail GetX bindings, missing deps).
+        final exception = error.exception.toString();
+        final stack = error.stack
+            ?.toString()
+            .split('\n')
+            .take(12)
+            .join('\n') ??
+            '(no stack)';
+        return Material(
+          color: const Color(0xFFFFF5F5),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Render error',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF991B1B),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SelectableText(
+                  exception,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF7F1D1D),
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SelectableText(
+                  stack,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF7F1D1D),
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       };
       /* ----- SERVER VERSION CHECK ----- */
