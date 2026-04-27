@@ -192,7 +192,11 @@ class JmapEmailBuilder {
     final pad = '=' * ((4 - s.length % 4) % 4);
     final b64 = (s + pad).replaceAll('-', '+').replaceAll('_', '/');
     try {
-      return utf8.decode(base64.decode(b64));
+      // allowMalformed: true so emails sent in Windows-1252 / iso-8859-*
+      // (smart quotes, non-breaking space, etc.) don't fail-and-return-empty
+      // when their bytes are interpreted as UTF-8. Replacement char (U+FFFD)
+      // is fine; rendering empty string instead would lose the entire email.
+      return const Utf8Decoder(allowMalformed: true).convert(base64.decode(b64));
     } catch (_) {
       return '';
     }
