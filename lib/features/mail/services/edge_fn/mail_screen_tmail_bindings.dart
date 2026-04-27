@@ -92,6 +92,7 @@ import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/cor
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/credential/credential_bindings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/local/local_bindings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/network/network_bindings.dart';
+import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/network/network_isolate_binding.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/network_connection/network_connection_bindings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/main/bindings/session/session_bindings.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/mailbox_dashboard/presentation/bindings/mailbox_dashboard_bindings.dart';
@@ -155,6 +156,19 @@ class MailScreenTmailBindings {
     //    EdgeFn DataSources bypass the API layer.
     // ------------------------------------------------------------------
     NetworkBindings().dependencies();
+
+    // ------------------------------------------------------------------
+    // 5b. NetworkIsolateBindings — registers HtmlAnalyzer, FileUploader,
+    //     ThreadIsolateWorker, MailboxIsolateWorker, plus the isolate-tag
+    //     variants of Dio/DioClient/HttpClient/EmailAPI/ThreadAPI used
+    //     by the upload + composer paths. The composer's Get.find<HtmlAnalyzer>
+    //     comes from here — without this, MailboxDashBoardBindings explodes
+    //     with "minified:jDb not found" (jDb = HtmlAnalyzer's runtime type).
+    //     On web (PlatformInfo.isMobile == false) the IsolateWorker constructors
+    //     resolve their ThreadAPI/EmailAPI from the untagged registrations
+    //     NetworkBindings already made.
+    // ------------------------------------------------------------------
+    NetworkIsolateBindings().dependencies();
 
     // ------------------------------------------------------------------
     // 6. CredentialBindings — credential/account/auth interactors. The
