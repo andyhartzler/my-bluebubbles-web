@@ -89,7 +89,11 @@ extension AppColor on Color {
   static const counterMailboxColor = BrandColors.unityBlue;
   static const backgroundCounterMailboxColor = Color(0xFFE3E1FD);
   static const backgroundCounterMailboxSelectedColor = Color(0x17313131);
-  static const bgMailboxListMail = Color(0xFFFBFBFF);
+  // Was Color(0xFFFBFBFF) (cool off-white tinted toward indigo). The inbox
+  // list pane background. Re-tinted toward navy by the same small amount as
+  // colorBgDesktop so the whole mail surface reads as one cohesive cool-off-
+  // white sheet instead of an indigo-tinted slab.
+  static const bgMailboxListMail = Color(0xFFF6F8FB);
   static const bgMessenger = Color(0xFFF2F2F5);
   // Was Color(0xFF182952). Default text-button color -> navy.
   static const textButtonColor = BrandColors.unityBlue;
@@ -164,7 +168,13 @@ extension AppColor on Color {
   static const colorTextSettingDescriptions = colorTextButtonHeaderThread;
   static const colorButtonHeaderThread = Color(0x99EBEDF0);
   static const colorBorderBodyThread = Color(0x5CB8C1CC);
-  static const colorBgDesktop = Color(0xFFF3F6F9);
+  // Was Color(0xFFF3F6F9) (flat cool grey). The dashboard's outer chrome
+  // surface — sits between the inbox list pane and the open-email pane.
+  // Tinted slightly toward unityBlue (very faint navy wash) so the mail
+  // surface no longer reads as a foreign white app bolted onto the navy
+  // CRM frame. Still light enough that all on-surface dark text passes
+  // contrast (>15:1).
+  static const colorBgDesktop = Color(0xFFEEF2F7);
   static const colorItemEmailSelectedDesktop = Color(0xFFDFEEFF);
   // Was Color(0xFFDE5E5E) (Linagora coral red). Default avatar background
   // when no per-recipient color is computed -> navy. The avatarTextColor is
@@ -385,17 +395,24 @@ extension AppColor on Color {
   // MOYD accent instead of off-brand purple.
   static const aiActionTag = BrandColors.sunriseGold;
 
+  // Was a 10-gradient rainbow palette (cyan→purple, lime→green, pink→peach,
+  // yellow→cyan, etc) producing red/blue/yellow/pink avatar circles in the
+  // inbox — visually loud and totally off-brand against MOYD's navy + gold
+  // CRM chrome. Remapped to a monochrome MOYD palette: every avatar is now a
+  // navy/momentumBlue/sunriseGold gradient so per-recipient hash distribution
+  // still yields visually distinct circles, but every one reads as part of the
+  // MOYD brand. Hash distribution (sum-of-codeUnits % 10) is preserved.
   static const mapGradientColor = [
-    [Color(0xFF21D4FD), Color(0xFFB721FF)],
-    [Color(0xFF38F9D7), Color(0xFF43E97B)],
-    [Color(0xFF11E6F0), Color(0xFF4FACFE)],
-    [Color(0xFFE88395), Color(0xFFEF9C8F)],
-    [Color(0xFF8DDAD5), Color(0xFF00CDAC)],
-    [Color(0xFFE4ABF0), Color(0xFFD96EED)],
-    [Color(0xFFF0FF00), Color(0xFF58CFFB)],
-    [Color(0xFFEFC0D7), Color(0xFF1AD5E4)],
-    [Color(0xFFFFD26F), Color(0xFF3677FF)],
-    [Color(0xFF87A6F8), Color(0xFF645FF6)],
+    [BrandColors.unityBlue, BrandColors.momentumBlue],     // navy → light blue (default unity)
+    [Color(0xFF1F2A44), BrandColors.unityBlue],            // deep navy → navy
+    [BrandColors.momentumBlue, BrandColors.unityBlue],     // light blue → navy (reversed)
+    [BrandColors.federalBlue, BrandColors.democratBlue],   // federal → democrat blue
+    [BrandColors.democratBlue, BrandColors.momentumBlue],  // dem blue → momentum
+    [BrandColors.unityBlue, BrandColors.federalBlue],      // navy → federal
+    [BrandColors.sunriseGold, Color(0xFFE49612)],          // gold (warm accent)
+    [Color(0xFF3D4D77), BrandColors.unityBlue],            // slate-navy → navy
+    [BrandColors.royalBlue, BrandColors.democratBlue],     // royal → democrat
+    [BrandColors.steelBlue, BrandColors.momentumBlue],     // steel → momentum
   ];
 
   int toInt() {

@@ -127,7 +127,24 @@ class _MailScreenState extends State<MailScreen> {
               ),
             );
           }
-          return MailboxDashBoardView();
+          // Wrap the dashboard in a subtle unityBlue → momentumBlue gradient
+          // backdrop. The dashboard's own Scaffold paints its background
+          // (tinted-off-white, set in this theme below) over most of the
+          // surface, but any gap — rounded edges, drawer transitions,
+          // safe-area insets — shows MOYD navy instead of bare white. This
+          // bridges the navy nav chrome above with the cool-off-white mail
+          // surface inside without clipping the dashboard (which would
+          // break its drawer slide-in animation on tabletLarge).
+          return Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [BrandColors.unityBlue, BrandColors.momentumBlue],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: MailboxDashBoardView(),
+          );
         },
       ),
     );
@@ -149,7 +166,10 @@ ThemeData _moydTmailTheme(BuildContext context) {
       onSurface: const Color(0xFF1A1F36),
       surfaceTint: BrandColors.momentumBlue,
     ),
-    scaffoldBackgroundColor: Colors.white,
+    // Tinted off-white: bridges the navy frame outside with the cool-off-
+    // white mail surface inside. Stays light enough that all body text on
+    // it passes contrast (>15:1 vs #1A1F36).
+    scaffoldBackgroundColor: const Color(0xFFF6F8FB),
     appBarTheme: AppBarTheme(
       backgroundColor: BrandColors.unityBlue,
       foregroundColor: Colors.white,
@@ -180,6 +200,45 @@ ThemeData _moydTmailTheme(BuildContext context) {
     listTileTheme: const ListTileThemeData(
       iconColor: BrandColors.unityBlue,
       textColor: Color(0xFF1A1F36),
+      titleTextStyle: TextStyle(
+        color: Color(0xFF1A1F36),
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.1,
+      ),
+      subtitleTextStyle: TextStyle(
+        color: Color(0xFF55687D),
+        fontSize: 13,
+        fontWeight: FontWeight.w400,
+      ),
+    ),
+    // Push tighter, more deliberate body text sizing across the dashboard
+    // so the inbox list rows + open-email subject line feel like the rest
+    // of the CRM (which uses w600 14-15 titles + w500 13 secondary text).
+    textTheme: base.textTheme.copyWith(
+      titleMedium: const TextStyle(
+        color: Color(0xFF1A1F36),
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.1,
+      ),
+      titleLarge: const TextStyle(
+        color: BrandColors.unityBlue,
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.2,
+      ),
+      bodyMedium: const TextStyle(
+        color: Color(0xFF1A1F36),
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        height: 1.45,
+      ),
+      bodySmall: const TextStyle(
+        color: Color(0xFF55687D),
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+      ),
     ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: BrandColors.momentumBlue,
