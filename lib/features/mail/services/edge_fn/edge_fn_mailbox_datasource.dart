@@ -197,7 +197,18 @@ class EdgeFnMailboxDataSource extends MailboxDataSource {
     AccountId accountId,
     Map<Id, Role> mapRoles,
   ) async {
-    return (_syntheticMailboxes(), <Id, SetError>{});
+    // tmail's MailboxController calls this when default roles (outbox,
+    // templates) are missing from the result of getAllMailbox. We don't
+    // support those roles, but we MUST return an empty list — returning
+    // _syntheticMailboxes() here causes each caller to APPEND the existing
+    // 5 mailboxes onto allMailboxes via _handleCreateDefaultFolderIfMissingSuccess
+    // (mailbox_controller.dart:771). The boot path calls getAllMailbox up
+    // to 3 times (ever-worker + explicit boot call + re-fires from create),
+    // so the sidebar ends up with 3× every system folder. Returning empty
+    // here makes the success handler short-circuit at the "isEmpty" guard
+    // (mailbox_controller.dart:755) and just rebuild the tree from the
+    // existing collection — exactly what we want.
+    return (const <Mailbox>[], <Id, SetError>{});
   }
 
   @override

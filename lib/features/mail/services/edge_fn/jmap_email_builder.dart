@@ -54,8 +54,6 @@ class JmapEmailBuilder {
     // both are present" produces the right result.
     final htmlParts = <_BodyCandidate>[];
     final textParts = <_BodyCandidate>[];
-    int partCounter = 0;
-    PartId nextPartId() => PartId('p${partCounter++}');
 
     void walk(Map part) {
       final mime = (part['mimeType'] as String?)?.toLowerCase();
@@ -80,22 +78,36 @@ class JmapEmailBuilder {
     final payload = raw['payload'];
     if (payload is Map) walk(payload);
 
-    // Prefer html. Only fall back to text/plain when no html part exists.
-    final selected = htmlParts.isNotEmpty ? htmlParts : textParts;
+    // Pick exactly ONE body part to render:
+    //   - Prefer the LARGEST text/html part. Some emails (forwarded
+    //     newsletters, marketing notifications) include multiple text/html
+    //     siblings — typically a brief plain-style summary and the styled
+    //     full version. If we emit both, tmail's `emailContentList` joins
+    //     them with `</br>` and the user sees the email rendered twice.
+    //   - If no html part, fall back to the largest text/plain part.
+    //   - If neither, emit nothing — the viewer renders an empty body.
+    _BodyCandidate? selected;
+    if (htmlParts.isNotEmpty) {
+      htmlParts.sort((a, b) => b.value.length.compareTo(a.value.length));
+      selected = htmlParts.first;
+    } else if (textParts.isNotEmpty) {
+      textParts.sort((a, b) => b.value.length.compareTo(a.value.length));
+      selected = textParts.first;
+    }
 
     final bodyValues = <PartId, EmailBodyValue>{};
     final htmlBodyParts = <EmailBodyPart>{};
     final textBodyParts = <EmailBodyPart>{};
-    for (final candidate in selected) {
-      final pid = nextPartId();
+    if (selected != null) {
+      final pid = PartId('p0');
       bodyValues[pid] = EmailBodyValue(
-        value: candidate.value,
+        value: selected.value,
         isEncodingProblem: false,
         isTruncated: false,
       );
-      final mediaType = _parseMediaType(candidate.mime);
+      final mediaType = _parseMediaType(selected.mime);
       final emailPart = EmailBodyPart(partId: pid, type: mediaType);
-      if (candidate.mime == 'text/html') {
+      if (selected.mime == 'text/html') {
         htmlBodyParts.add(emailPart);
       } else {
         textBodyParts.add(emailPart);
