@@ -43,6 +43,7 @@ class _MECPayeeScreenState extends State<MECPayeeScreen> {
   final CandidateRepository _candidateRepo = CandidateRepository();
   Map<String, dynamic>? _profile;
   bool _loading = true;
+  String? _loadError;
 
   bool get _isCompany => (widget.company ?? '').trim().isNotEmpty;
 
@@ -80,7 +81,12 @@ class _MECPayeeScreenState extends State<MECPayeeScreen> {
       }
     } catch (e) {
       debugPrint('MECPayeeScreen load error: $e');
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = e.toString();
+        });
+      }
     }
   }
 
@@ -163,9 +169,15 @@ class _MECPayeeScreenState extends State<MECPayeeScreen> {
                                 SizedBox(
                                   height: MediaQuery.of(context).size.height * 0.6,
                                   child: CandidateUI.emptyState(
-                                    Icons.storefront_outlined,
-                                    'Not Found',
-                                    'No expenditure records found for this payee.',
+                                    _loadError != null
+                                        ? Icons.error_outline
+                                        : Icons.storefront_outlined,
+                                    _loadError != null
+                                        ? 'Failed to load payee'
+                                        : 'Not Found',
+                                    _loadError != null
+                                        ? 'RPC error: $_loadError'
+                                        : 'No expenditure records found for $_displayName.',
                                   ),
                                 ),
                               ],

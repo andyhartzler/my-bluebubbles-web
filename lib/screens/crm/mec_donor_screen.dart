@@ -50,6 +50,7 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
   VoterFileRecord? _voterRecord;
   DonorEnrichmentRecord? _enrichmentRecord;
   bool _loading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -105,7 +106,12 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
       }
     } catch (e) {
       debugPrint('❌ MECDonorScreen load error: $e');
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = e.toString();
+        });
+      }
     }
   }
 
@@ -193,9 +199,16 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
                                 SizedBox(
                                   height: MediaQuery.of(context).size.height * 0.6,
                                   child: CandidateUI.emptyState(
-                                    Icons.person_off,
-                                    'Not Found',
-                                    'No donor data found.',
+                                    _loadError != null
+                                        ? Icons.error_outline
+                                        : Icons.person_off,
+                                    _loadError != null
+                                        ? 'Failed to load donor'
+                                        : 'Not Found',
+                                    _loadError != null
+                                        ? 'RPC error: $_loadError'
+                                        : 'No donor data for ${widget.firstName} ${widget.lastName}'
+                                            '${(widget.city?.isNotEmpty ?? false) ? " from ${widget.city}, ${widget.state ?? ""}" : ""}.',
                                   ),
                                 ),
                               ],
