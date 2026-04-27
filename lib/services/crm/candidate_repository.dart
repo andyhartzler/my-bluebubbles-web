@@ -141,14 +141,32 @@ class CandidateRepository {
 
   // ─── Fetch single candidate ────────────────────────────────────
 
+  /// Embedded select string used by [fetchCandidate] to bring along the
+  /// joined legislator headshot, the team member assigned to this candidate,
+  /// and the candidate's linked MOYD member. PostgREST resolves the FK
+  /// embeds via the FK names — for the two members joins we have to
+  /// disambiguate because both go to the same target table.
+  static const _candidateDetailSelect =
+      '*,'
+      'legislator:legislation_legislators!candidates_legislator_id_fkey('
+      '  id,name,first_name,last_name,photo_url,chamber,district,party'
+      '),'
+      'assigned_member:members!candidates_moyd_assigned_to_fkey('
+      '  id,name,email,profile_pictures,executive_committee,'
+      '  executive_title,executive_role,date_joined'
+      '),'
+      'linked_member:members!candidates_member_id_fkey('
+      '  id,name,email,profile_pictures,executive_committee,'
+      '  executive_title,executive_role,date_joined'
+      ')';
+
   Future<Candidate?> fetchCandidate(String id) async {
     if (!isReady) return null;
 
     try {
       final response = await _client
-          
           .from('candidates')
-          .select()
+          .select(_candidateDetailSelect)
           .eq('id', id)
           .maybeSingle();
 
@@ -156,7 +174,19 @@ class CandidateRepository {
       return Candidate.fromJson(response);
     } catch (e) {
       debugPrint('❌ CandidateRepository.fetchCandidate error: $e');
-      return null;
+      // If the embedded select hits a missing FK relationship name on a
+      // staging DB, fall back to the bare select so the screen still loads.
+      try {
+        final fallback = await _client
+            .from('candidates')
+            .select()
+            .eq('id', id)
+            .maybeSingle();
+        if (fallback == null) return null;
+        return Candidate.fromJson(fallback);
+      } catch (_) {
+        return null;
+      }
     }
   }
 
@@ -443,9 +473,123 @@ class CandidateRepository {
   }
 
   // ─── Assign team member ────────────────────────────────────────
+  //
+  // candidates.moyd_assigned_to is uuid REFERENCES members(id). The historical
+  // `assignTeamMember(id, memberName)` signature was a footgun — name strings
+  // never passed type validation and silently failed. The current contract
+  // takes a member UUID (or null to unassign).
 
-  Future<void> assignTeamMember(String id, String? memberName) async {
-    await updateCandidate(id, {'moyd_assigned_to': memberName});
+  Future<void> assignTeamMember(String candidateId, String? memberId) async {
+    await updateCandidate(candidateId, {'moyd_assigned_to': memberId});
+  }
+
+  // ─── Exec committee roster (for the Assigned-To picker) ────────
+  //
+  // Returns the executive_committee=true subset of public.members ordered
+  // by name. The Intel tab caches this once per detail screen so the
+  // bottom-sheet picker opens instantly.
+
+  Future<List<Map<String, dynamic>>> getExecCommitteeMembers() async {
+    if (!isReady) return [];
+    try {
+      final rows = await _client
+          .from('members')
+          .select('id,name,email,profile_pictures,executive_title,'
+              'executive_role,date_joined')
+          .eq('executive_committee', true)
+          .order('name', ascending: true);
+      return (rows as List)
+          .whereType<Map>()
+          .map((m) => m.map((k, v) => MapEntry(k.toString(), v)))
+          .toList();
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getExecCommitteeMembers error: $e');
+      return [];
+    }
+  }
+
+  // ─── Find a likely member match for an unlinked candidate ──────
+  //
+  // Used by the Intel tab → MOYD Member Status card. Tries email first
+  // (cheapest, highest confidence), then a (first_name, last_name) match.
+  // Returns null if nothing plausible came back.
+
+  Future<Map<String, dynamic>?> findMemberByEmailOrName({
+    String? email,
+    String? firstName,
+    String? lastName,
+  }) async {
+    if (!isReady) return null;
+    final cleanedEmail = email?.trim().toLowerCase();
+    try {
+      if (cleanedEmail != null && cleanedEmail.isNotEmpty) {
+        // Try primary email then school_email as a fallback. We avoid `or()`
+        // because email values can legitimately contain `+`/`,` which the
+        // PostgREST or-filter doesn't escape cleanly.
+        final byPrimary = await _client
+            .from('members')
+            .select('id,name,email,profile_pictures,executive_title,'
+                'executive_role,date_joined')
+            .eq('email', cleanedEmail)
+            .limit(1)
+            .maybeSingle();
+        if (byPrimary != null) {
+          return (byPrimary).map((k, v) => MapEntry(k.toString(), v));
+        }
+        final bySchool = await _client
+            .from('members')
+            .select('id,name,email,profile_pictures,executive_title,'
+                'executive_role,date_joined')
+            .eq('school_email', cleanedEmail)
+            .limit(1)
+            .maybeSingle();
+        if (bySchool != null) {
+          return (bySchool).map((k, v) => MapEntry(k.toString(), v));
+        }
+      }
+      final fn = firstName?.trim();
+      final ln = lastName?.trim();
+      if (fn == null || ln == null || fn.isEmpty || ln.isEmpty) return null;
+      // ILIKE name pattern — keeps it simple and avoids tsvector tokenizer
+      // surprises on hyphenated names.
+      final byName = await _client
+          .from('members')
+          .select('id,name,email,profile_pictures,executive_title,'
+              'executive_role,date_joined')
+          .ilike('name', '$fn $ln')
+          .limit(1)
+          .maybeSingle();
+      if (byName == null) return null;
+      return (byName).map((k, v) => MapEntry(k.toString(), v));
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.findMemberByEmailOrName error: $e');
+      return null;
+    }
+  }
+
+  // ─── Latest membership card for a member (status + expiration) ──
+
+  Future<Map<String, dynamic>?> fetchLatestMembershipCard(String memberId) async {
+    if (!isReady) return null;
+    try {
+      final row = await _client
+          .from('membership_cards')
+          .select('card_status,activation_date,expiration_date,updated_at')
+          .eq('member_id', memberId)
+          .order('updated_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      if (row == null) return null;
+      return (row as Map).map((k, v) => MapEntry(k.toString(), v));
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.fetchLatestMembershipCard error: $e');
+      return null;
+    }
+  }
+
+  // ─── Link this candidate to a MOYD member ──────────────────────
+  Future<void> linkToMember(String candidateId, String? memberId) async {
+    await updateCandidate(candidateId, {'member_id': memberId});
   }
 
   // ─── Create new candidate ──────────────────────────────────────

@@ -61,7 +61,30 @@ BEGIN
 END
 $$;
 
--- ── 2. membership_cards: allow staff read ───────────────────────────────────
+-- ── 2. Ensure FK from candidates.member_id → members(id) exists ─────────────
+-- The column existed without a constraint, which prevented PostgREST embeds
+-- (`linked_member:members!candidates_member_id_fkey(...)`) from resolving in
+-- the candidate detail screen. Adding the constraint also enforces
+-- referential integrity for any future imports.
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+      FROM pg_constraint
+     WHERE conname = 'candidates_member_id_fkey'
+       AND conrelid = 'public.candidates'::regclass
+  ) THEN
+    ALTER TABLE public.candidates
+      ADD CONSTRAINT candidates_member_id_fkey
+      FOREIGN KEY (member_id)
+      REFERENCES public.members(id)
+      ON DELETE SET NULL;
+  END IF;
+END
+$$;
+
+-- ── 3. membership_cards: allow staff read ───────────────────────────────────
 -- Required by candidate_detail_screen → MOYD Member Status card so we can
 -- show the linked member's card_status / expiration_date alongside their
 -- profile. Staff-only — does not loosen self-read or service_role policies.

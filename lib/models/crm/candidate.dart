@@ -74,6 +74,14 @@ class Candidate {
   final int scoreVan;
   final int scoreEndorsements;
 
+  // ── Embedded join data (populated via fetchCandidate's PostgREST embed) ──
+  // These are NOT persisted on `public.candidates`. They carry the joined
+  // legislator + member rows so the UI can render avatars, member status, and
+  // assignee photos without firing a second round-trip.
+  final String? legislatorPhotoUrl;
+  final Map<String, dynamic>? assignedMember; // members row when moyd_assigned_to is set
+  final Map<String, dynamic>? linkedMember;   // members row when member_id is set
+
   const Candidate({
     required this.id,
     required this.name,
@@ -133,6 +141,9 @@ class Candidate {
     this.scoreContributions = 0,
     this.scoreVan = 0,
     this.scoreEndorsements = 0,
+    this.legislatorPhotoUrl,
+    this.assignedMember,
+    this.linkedMember,
   });
 
   factory Candidate.fromJson(Map<String, dynamic> json) {
@@ -211,7 +222,35 @@ class Candidate {
       scoreContributions: (json['score_contributions'] as num?)?.toInt() ?? 0,
       scoreVan: (json['score_van'] as num?)?.toInt() ?? 0,
       scoreEndorsements: (json['score_endorsements'] as num?)?.toInt() ?? 0,
+      legislatorPhotoUrl: _embeddedString(json['legislator'], 'photo_url'),
+      assignedMember: _embeddedMap(json['assigned_member']),
+      linkedMember: _embeddedMap(json['linked_member']),
     );
+  }
+
+  /// Pulls a nested PostgREST-embedded scalar (e.g. legislator.photo_url).
+  /// PostgREST returns either a Map (one-to-one) or a List (one-to-many);
+  /// candidates ↔ legislators is a 1:1 FK so we expect a Map, but tolerate
+  /// the list form for defensive parsing.
+  static String? _embeddedString(dynamic node, String field) {
+    if (node is Map && node[field] is String && (node[field] as String).isNotEmpty) {
+      return node[field] as String;
+    }
+    if (node is List && node.isNotEmpty && node.first is Map) {
+      final value = (node.first as Map)[field];
+      if (value is String && value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
+  static Map<String, dynamic>? _embeddedMap(dynamic node) {
+    if (node is Map<String, dynamic>) return node;
+    if (node is Map) return node.map((k, v) => MapEntry(k.toString(), v));
+    if (node is List && node.isNotEmpty && node.first is Map) {
+      final m = node.first as Map;
+      return m.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() => {
@@ -332,6 +371,81 @@ class Candidate {
   String get lastName {
     final parts = name.split(' ').where((p) => p.isNotEmpty).toList();
     return parts.length >= 2 ? parts.last : '';
+  }
+
+  /// Best-available photo for this candidate, in priority order:
+  ///   1. Uploaded `photoUrl` (candidates.photo_url)
+  ///   2. Incumbent legislator headshot (legislation_legislators.photo_url)
+  ///   3. Linked MOYD member's primary profile picture
+  /// Returns null when nothing usable is available — UI should fall back
+  /// to initials.
+  String? get effectivePhotoUrl {
+    if (photoUrl != null && photoUrl!.isNotEmpty) return photoUrl;
+    if (legislatorPhotoUrl != null && legislatorPhotoUrl!.isNotEmpty) {
+      return legislatorPhotoUrl;
+    }
+    final memberUrl = _primaryProfilePictureUrl(linkedMember);
+    if (memberUrl != null && memberUrl.isNotEmpty) return memberUrl;
+    return null;
+  }
+
+  /// Convenience accessor for the avatar URL of the team member assigned
+  /// to this candidate (Intel tab → Assigned To card).
+  String? get assignedMemberPhotoUrl => _primaryProfilePictureUrl(assignedMember);
+
+  /// Resolves a public URL for the primary photo inside a `members` row
+  /// returned by PostgREST. Mirrors the logic in MemberProfilePhoto.parseList:
+  /// prefers entries flagged `primary: true`, falls back to the first entry,
+  /// and tolerates both list-form and {key: filename} legacy shapes.
+  static String? _primaryProfilePictureUrl(Map<String, dynamic>? member) {
+    if (member == null) return null;
+    final pics = member['profile_pictures'];
+    if (pics == null) return null;
+
+    String? buildUrl(String? bucket, String? path) {
+      if (path == null || path.isEmpty) return null;
+      final b = (bucket == null || bucket.isEmpty) ? 'member-photos' : bucket;
+      // If the path already contains a full URL (e.g. legacy avatar_url
+      // pasted into profile_pictures), return as-is.
+      if (path.startsWith('http')) return path;
+      // Strip any accidentally-prefixed `storage/v1/object/public/<bucket>/`.
+      var clean = path;
+      final marker = 'storage/v1/object/public/$b/';
+      if (clean.startsWith(marker)) {
+        clean = clean.substring(marker.length);
+      }
+      return 'https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/$b/$clean';
+    }
+
+    if (pics is List) {
+      Map? primary;
+      for (final entry in pics) {
+        if (entry is Map && entry['primary'] == true) {
+          primary = entry;
+          break;
+        }
+      }
+      primary ??= pics.firstWhere(
+        (e) => e is Map,
+        orElse: () => null,
+      ) as Map?;
+      if (primary == null) return null;
+      return buildUrl(
+        primary['bucket']?.toString(),
+        primary['path']?.toString(),
+      );
+    }
+
+    if (pics is Map) {
+      // Legacy {twitter|instagram: filename} shape — pick instagram first.
+      for (final key in const ['instagram', 'twitter', 'facebook']) {
+        final value = pics[key];
+        if (value is String && value.isNotEmpty) {
+          return buildUrl('member-photos', value);
+        }
+      }
+    }
+    return null;
   }
 
   /// Whether this candidate has any social media links
@@ -458,6 +572,9 @@ class Candidate {
     int? scoreContributions,
     int? scoreVan,
     int? scoreEndorsements,
+    String? legislatorPhotoUrl,
+    Map<String, dynamic>? assignedMember,
+    Map<String, dynamic>? linkedMember,
   }) {
     return Candidate(
       id: id ?? this.id,
@@ -511,6 +628,9 @@ class Candidate {
       scoreContributions: scoreContributions ?? this.scoreContributions,
       scoreVan: scoreVan ?? this.scoreVan,
       scoreEndorsements: scoreEndorsements ?? this.scoreEndorsements,
+      legislatorPhotoUrl: legislatorPhotoUrl ?? this.legislatorPhotoUrl,
+      assignedMember: assignedMember ?? this.assignedMember,
+      linkedMember: linkedMember ?? this.linkedMember,
     );
   }
 
