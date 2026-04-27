@@ -6,6 +6,7 @@
 
 import 'dart:convert';
 
+import 'package:http_parser/http_parser.dart';
 import 'package:jmap_dart_client/jmap/core/id.dart';
 import 'package:jmap_dart_client/jmap/core/utc_date.dart';
 import 'package:jmap_dart_client/jmap/mail/email/email.dart';
@@ -34,17 +35,27 @@ class JmapEmailBuilder {
       if (labels.contains('STARRED')) KeyWordIdentifier.emailFlagged: true,
     };
 
-    // Walk payload tree; capture text/html and text/plain bodies as
-    // EmailBodyPart entries with a synthetic PartId per body. tmail's
-    // viewer reads bodyValues[partId].value to render the body.
-    final bodyValues = <PartId, EmailBodyValue>{};
-    final htmlBodyParts = <EmailBodyPart>{};
-    final textBodyParts = <EmailBodyPart>{};
+    // Walk payload tree; capture text/html and text/plain bodies into
+    // separate buckets. Then emit ONLY the preferred bucket into
+    // bodyValues — html if present, otherwise text.
+    //
+    // Why: tmail's `Email.emailContentList` (in email_extension.dart)
+    // iterates *all* bodyValues entries when assembling the renderable
+    // content, joins them with '</br>', and renders the result. If we
+    // emit both the html and the text/plain alternative for the same
+    // logical message, the email viewer renders BOTH stacked — the
+    // styled html on top and the plain-text duplicate below it.
+    //
+    // For multipart/alternative messages, RFC 2046 says the receiver
+    // should pick the LAST/best part (typically text/html). For
+    // multipart/mixed, only the first text body counts as the message
+    // body — the rest are usually attachments (which we capture
+    // elsewhere via Email.attachments). Either way, "prefer html when
+    // both are present" produces the right result.
+    final htmlParts = <_BodyCandidate>[];
+    final textParts = <_BodyCandidate>[];
     int partCounter = 0;
-    PartId nextPartId() {
-      final pid = PartId('p${partCounter++}');
-      return pid;
-    }
+    PartId nextPartId() => PartId('p${partCounter++}');
 
     void walk(Map part) {
       final mime = (part['mimeType'] as String?)?.toLowerCase();
@@ -52,20 +63,10 @@ class JmapEmailBuilder {
       final data = body is Map ? body['data'] as String? : null;
       if (data != null && data.isNotEmpty) {
         final decoded = _b64urlDecode(data);
-        final pid = nextPartId();
-        bodyValues[pid] = EmailBodyValue(
-          value: decoded,
-          isEncodingProblem: false,
-          isTruncated: false,
-        );
-        final part0 = EmailBodyPart(
-          partId: pid,
-          type: _toMediaType(mime),
-        );
         if (mime == 'text/html') {
-          htmlBodyParts.add(part0);
+          htmlParts.add(_BodyCandidate(mime: mime!, value: decoded));
         } else if (mime == 'text/plain') {
-          textBodyParts.add(part0);
+          textParts.add(_BodyCandidate(mime: mime!, value: decoded));
         }
       }
       final parts = part['parts'];
@@ -78,6 +79,28 @@ class JmapEmailBuilder {
 
     final payload = raw['payload'];
     if (payload is Map) walk(payload);
+
+    // Prefer html. Only fall back to text/plain when no html part exists.
+    final selected = htmlParts.isNotEmpty ? htmlParts : textParts;
+
+    final bodyValues = <PartId, EmailBodyValue>{};
+    final htmlBodyParts = <EmailBodyPart>{};
+    final textBodyParts = <EmailBodyPart>{};
+    for (final candidate in selected) {
+      final pid = nextPartId();
+      bodyValues[pid] = EmailBodyValue(
+        value: candidate.value,
+        isEncodingProblem: false,
+        isTruncated: false,
+      );
+      final mediaType = _parseMediaType(candidate.mime);
+      final emailPart = EmailBodyPart(partId: pid, type: mediaType);
+      if (candidate.mime == 'text/html') {
+        htmlBodyParts.add(emailPart);
+      } else {
+        textBodyParts.add(emailPart);
+      }
+    }
 
     return Email(
       id: emailId,
@@ -163,11 +186,20 @@ class JmapEmailBuilder {
     }
   }
 
-  static dynamic _toMediaType(String? mime) {
-    // tmail's EmailBodyPart.type is MediaType from http_parser. Since
-    // we don't strictly need the type (tmail's viewer uses partId →
-    // bodyValues[partId].value), pass null and let tmail's defaults
-    // handle it. The reflection layer accepts dynamic.
-    return null;
+  static MediaType? _parseMediaType(String? mime) {
+    if (mime == null || mime.isEmpty) return null;
+    final slash = mime.indexOf('/');
+    if (slash <= 0 || slash == mime.length - 1) return null;
+    try {
+      return MediaType(mime.substring(0, slash), mime.substring(slash + 1));
+    } catch (_) {
+      return null;
+    }
   }
+}
+
+class _BodyCandidate {
+  final String mime;
+  final String value;
+  _BodyCandidate({required this.mime, required this.value});
 }
