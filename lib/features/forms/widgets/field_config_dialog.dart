@@ -556,7 +556,7 @@ class _FieldConfigDialogState extends State<FieldConfigDialog> with SingleTicker
           ),
           items: const [
             DropdownMenuItem(value: null, child: Text('Auto')),
-            DropdownMenuItem(value: 'currency', child: Text('Currency ($1,234.56)')),
+            DropdownMenuItem(value: 'currency', child: Text(r'Currency ($1,234.56)')),
             DropdownMenuItem(value: 'date', child: Text('Date')),
             DropdownMenuItem(value: 'csv', child: Text('Comma-separated list')),
             DropdownMenuItem(value: 'text', child: Text('Plain text')),
