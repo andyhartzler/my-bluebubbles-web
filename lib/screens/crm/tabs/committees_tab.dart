@@ -5,6 +5,7 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/services/crm/mec_repository.dart';
 import 'package:bluebubbles/models/crm/mec_committee.dart';
 import 'package:bluebubbles/models/crm/mec_contribution.dart';
+import 'package:bluebubbles/screens/crm/mec_donor_screen.dart';
 
 /// Committees tab — browse, search, and view detailed committee profiles
 /// including fundraising totals, contributions by year, donors with pagination,
@@ -996,6 +997,11 @@ class CommitteesTabState extends State<CommitteesTab> {
   Widget _buildDonorSection(NumberFormat currencyFormat) {
     // Build ranked items from _donors state; progressFraction normalized to the
     // top donor's total so the #1 row always fills the bar.
+    //
+    // RPC keys (from get_committee_donors_paginated): donor_name, total, cnt,
+    // first_name, last_name, company, city, state. Earlier this widget read
+    // 'name'/'count' which were never in the response — every row showed
+    // empty name + "0 contributions".
     final double maxTotal = _donors.isEmpty
         ? 0
         : _donors
@@ -1003,9 +1009,13 @@ class CommitteesTabState extends State<CommitteesTab> {
             .fold<double>(0, (a, b) => a > b ? a : b);
 
     final rankedItems = _donors.map((donor) {
-      final name = donor['name'] as String? ?? '';
+      final builtName = (donor['donor_name'] as String? ?? '').trim();
+      final company = (donor['company'] as String? ?? '').trim();
+      final name = builtName.isNotEmpty
+          ? builtName
+          : (company.isNotEmpty ? company : 'Anonymous');
       final total = (donor['total'] as num?)?.toDouble() ?? 0;
-      final count = (donor['count'] as num?)?.toInt() ?? 0;
+      final count = (donor['cnt'] as num?)?.toInt() ?? 0;
       final city = donor['city'] as String? ?? '';
       final state = donor['state'] as String? ?? '';
 
@@ -1068,13 +1078,20 @@ class CommitteesTabState extends State<CommitteesTab> {
           emptyLabel: _loadingMoreDonors ? 'Loading...' : 'No donor data available',
           onItemTap: (index) {
             final donor = _donors[index];
-            final name = donor['name'] as String? ?? '';
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Opening donor profile for $name...'),
-                duration: const Duration(seconds: 2),
+            final firstName = (donor['first_name'] as String? ?? '').trim();
+            final lastName = (donor['last_name'] as String? ?? '').trim();
+            // Companies and committees don't have a per-individual MEC profile
+            // page — only individuals do. Skip the nav silently for those
+            // (no toast — the row simply isn't tappable for them).
+            if (firstName.isEmpty && lastName.isEmpty) return;
+            Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => MECDonorScreen(
+                firstName: firstName,
+                lastName: lastName,
+                city: donor['city'] as String?,
+                state: donor['state'] as String?,
               ),
-            );
+            ));
           },
         ),
         if (_hasMoreDonors && !_loadingMoreDonors)
@@ -1136,120 +1153,6 @@ class CommitteesTabState extends State<CommitteesTab> {
     );
   }
 
-  // ignore: unused_element
-  Widget _buildDonorRow(Map<String, dynamic> donor, NumberFormat fmt, int index) {
-    final name = donor['name'] as String? ?? '';
-    final total = (donor['total'] as num?)?.toDouble() ?? 0;
-    final count = (donor['count'] as num?)?.toInt() ?? 0;
-    final city = donor['city'] as String? ?? '';
-    final state = donor['state'] as String? ?? '';
-    final employer = donor['employer'] as String? ?? '';
-    final hasFec = donor['has_fec'] as bool? ?? false;
-
-    // Build the subtitle line
-    final subtitleParts = <String>[];
-    if (city.isNotEmpty) {
-      subtitleParts.add(state.isNotEmpty ? '$city, $state' : city);
-    } else if (state.isNotEmpty) {
-      subtitleParts.add(state);
-    }
-    if (employer.isNotEmpty) {
-      subtitleParts.add(employer);
-    }
-    final subtitle = subtitleParts.join(' \u00B7 '); // middle dot separator
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 2),
-      decoration: BoxDecoration(
-        color: index.isEven
-            ? BrandColors.unityBlue.withOpacity(0.5)
-            : BrandColors.unityBlue.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: InkWell(
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Opening donor profile for $name...'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(6),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          name,
-                          style: BrandTextStyles.body.copyWith(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (hasFec) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: BrandColors.success.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'FEC',
-                            style: TextStyle(
-                              color: BrandColors.success,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (subtitle.isNotEmpty)
-                    Text(
-                      subtitle,
-                      style: BrandTextStyles.caption,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  fmt.format(total),
-                  style: BrandTextStyles.body.copyWith(
-                    color: BrandColors.sunriseGold,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-                Text('$count contribution${count == 1 ? '' : 's'}', style: BrandTextStyles.caption),
-              ],
-            ),
-          ],
-        ),
-        ),
-      ),
-    );
-  }
 
   // ============================================================
   // Shared Widgets
