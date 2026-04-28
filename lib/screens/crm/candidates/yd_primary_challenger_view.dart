@@ -37,9 +37,24 @@ class YdPrimaryChallengerView extends StatelessWidget {
     this.onOpen,
   });
 
-  List<PrimaryChallengePair> get _pairs {
+  List<PrimaryChallengePair> get _ydPairs {
     if (rpcPairs.isNotEmpty) return rpcPairs;
     return CandidatePrimaryDetector.detect(allCandidates);
+  }
+
+  /// Pairs for non-YD Democratic challengers vs Democratic incumbents.
+  /// Computed by subtracting the YD-pair set (matched on
+  /// challengerId+incumbentId) from the full Dem-vs-Dem-incumbent set.
+  List<PrimaryChallengePair> _otherDemPairs(
+    List<PrimaryChallengePair> ydPairs,
+  ) {
+    final allDem = CandidatePrimaryDetector.detectAllDemPrimaries(allCandidates);
+    final ydKeys = ydPairs
+        .map((p) => '${p.challengerId}|${p.incumbentId}')
+        .toSet();
+    return allDem
+        .where((p) => !ydKeys.contains('${p.challengerId}|${p.incumbentId}'))
+        .toList();
   }
 
   Candidate? _find(String id) {
@@ -51,24 +66,27 @@ class YdPrimaryChallengerView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pairs = _pairs;
+    final ydPairs = _ydPairs;
+    final otherPairs = _otherDemPairs(ydPairs);
+    final totalPairs = ydPairs.length + otherPairs.length;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 80),
       children: [
+        // YD challenger hero section — these are the priority cases.
         _sectionHeader(
           icon: Icons.flash_on,
-          title: 'Primary challenges',
-          subtitle: pairs.isEmpty
+          title: 'Young-Dem primary challenges',
+          subtitle: ydPairs.isEmpty
               ? 'No Young Dems are primarying Democratic incumbents right now.'
-              : '${pairs.length} Young Dem ${pairs.length == 1 ? 'challenger' : 'challengers'} running against sitting Democrat ${pairs.length == 1 ? 'incumbent' : 'incumbents'}',
+              : '${ydPairs.length} Young Dem ${ydPairs.length == 1 ? 'challenger' : 'challengers'} running against sitting Democrat ${ydPairs.length == 1 ? 'incumbent' : 'incumbents'}',
           color: BrandColors.sunriseGold,
         ),
         const SizedBox(height: 8),
-        if (pairs.isEmpty)
+        if (ydPairs.isEmpty)
           _emptyPairState()
         else
-          ...pairs.map((p) => Padding(
+          ...ydPairs.map((p) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _PrimaryPairCard(
                   pair: p,
@@ -77,14 +95,46 @@ class YdPrimaryChallengerView extends StatelessWidget {
                   selectedCandidateId: selectedCandidateId,
                   onSelect: onSelect,
                   onOpen: onOpen,
+                  challengerSubtitle: 'Young Democrat',
+                  challengerAccent: BrandColors.sunriseGold,
                 ),
               )),
+
+        // Other Dem-vs-Dem primaries — non-YD challengers facing Dem
+        // incumbents. Andrew explicitly asked to see these so he can
+        // size up other contested primaries even when no YD is involved.
+        if (otherPairs.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _sectionHeader(
+            icon: Icons.compare_arrows,
+            title: 'Other Democratic primaries',
+            subtitle:
+                '${otherPairs.length} non-YD ${otherPairs.length == 1 ? 'challenger' : 'challengers'} running against sitting Democrat ${otherPairs.length == 1 ? 'incumbent' : 'incumbents'}',
+            color: BrandColors.democratBlue,
+          ),
+          const SizedBox(height: 8),
+          ...otherPairs.map((p) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _PrimaryPairCard(
+                  pair: p,
+                  challenger: _find(p.challengerId),
+                  incumbent: _find(p.incumbentId),
+                  selectedCandidateId: selectedCandidateId,
+                  onSelect: onSelect,
+                  onOpen: onOpen,
+                  challengerSubtitle: 'Democrat',
+                  challengerAccent: BrandColors.democratBlue,
+                ),
+              )),
+        ],
+
+        // The full YD list stays at the bottom for context.
         const SizedBox(height: 16),
         _sectionHeader(
           icon: Icons.star,
           title: 'All Young Democrats',
           subtitle:
-              '${allYoungDems.length} flagged candidates across the state',
+              '${allYoungDems.length} flagged candidates across the state · $totalPairs total Dem primaries detected',
           color: BrandColors.sunriseGold,
         ),
         const SizedBox(height: 8),
@@ -168,6 +218,8 @@ class _PrimaryPairCard extends StatelessWidget {
   final String? selectedCandidateId;
   final CandidateTap onSelect;
   final CandidateTap? onOpen;
+  final String challengerSubtitle;
+  final Color challengerAccent;
 
   const _PrimaryPairCard({
     required this.pair,
@@ -176,6 +228,8 @@ class _PrimaryPairCard extends StatelessWidget {
     required this.selectedCandidateId,
     required this.onSelect,
     required this.onOpen,
+    this.challengerSubtitle = 'Young Democrat',
+    this.challengerAccent = BrandColors.sunriseGold,
   });
 
   @override
@@ -244,8 +298,8 @@ class _PrimaryPairCard extends StatelessWidget {
               final challengerSide = _Side(
                 title: 'Challenger',
                 name: pair.challengerName,
-                subtitle: 'Young Democrat',
-                accent: BrandColors.sunriseGold,
+                subtitle: challengerSubtitle,
+                accent: challengerAccent,
                 candidate: challenger,
                 selected: challenger?.id == selectedCandidateId,
                 fullWidth: isMobile,

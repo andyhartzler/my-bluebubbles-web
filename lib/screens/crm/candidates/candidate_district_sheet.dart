@@ -63,15 +63,27 @@ class _CandidateDistrictSheetState extends State<_CandidateDistrictSheet> {
   @override
   void initState() {
     super.initState();
-    // Zoom the sheet's embedded map to the candidate's district after the
-    // first frame (the widget needs to be mounted to attach the controller).
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final c = widget.candidate;
-      if (c.district == null || c.district!.isEmpty) return;
-      await _mapController.zoomToDistrict(
+    // Zoom the sheet's embedded map to the candidate's district. On mobile
+    // this raced previously — addPostFrameCallback fired before either the
+    // map widget had attached its state to the controller or the GeoJSON
+    // had finished parsing, and the controller silently no-op'd. Retry at
+    // 1 frame, 250ms, and 1s — covers map mount + tiny/medium/large
+    // GeoJSON parse times — without spamming the loader.
+    final c = widget.candidate;
+    if (c.district == null || c.district!.isEmpty) return;
+
+    void zoom() {
+      if (!mounted) return;
+      _mapController.zoomToDistrict(
         office: c.office,
         districtNum: c.district,
       );
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      zoom();
+      Future.delayed(const Duration(milliseconds: 250), zoom);
+      Future.delayed(const Duration(seconds: 1), zoom);
     });
   }
 
