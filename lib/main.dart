@@ -1525,19 +1525,42 @@ class _HomeState extends OptimizedState<Home>
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
                 children: [
-                  // FIX: Removed FocusableActionDetector + FocusTraversalGroup that
-                  // consumed the first tap on iOS Safari PWA. The detector's focus
-                  // management intercepted pointer-down before IconButton.onPressed
-                  // could fire, causing the hamburger to be unresponsive on first load.
-                  // IconButton handles touch natively; keyboard a11y is not needed
-                  // on a touch-first mobile PWA.
-                  Semantics(
-                    label: 'Open navigation menu',
-                    button: true,
-                    child: IconButton(
-                      icon: const Icon(Icons.menu),
-                      tooltip: 'Open navigation menu',
-                      onPressed: () => _showMobileMenu(context, crmReady),
+                  // iOS PWA hamburger fix v6 (2026-04-28).
+                  //
+                  // Symptom recap: hamburger fires on first cold launch, but
+                  // after the user force-closes the home-screen PWA and
+                  // relaunches, the tap registers nothing. The profile-circle
+                  // (`_CurrentUserBadge`) on the same top-bar continues to
+                  // work in the same broken session — same surface, same
+                  // context, opposite result.
+                  //
+                  // Diff between the two: the profile-circle uses
+                  // PopupMenuButton's `child:` slot (renders an InkWell
+                  // directly), while every prior hamburger attempt routed
+                  // through IconButton — either standalone or via
+                  // PopupMenuButton's `icon:` slot which internally creates
+                  // an IconButton. IconButton's M3 implementation wraps an
+                  // _IconButton state that includes its own
+                  // FocusableActionDetector. Earlier rounds removed
+                  // FocusableActionDetector that we put AROUND the
+                  // hamburger, but never the one INSIDE IconButton — that
+                  // was always there.
+                  //
+                  // Fix: replicate the profile-circle's exact gesture path
+                  // — Material → InkWell → Padding → Icon. No IconButton,
+                  // no Tooltip-wrapped Material descendant, no internal
+                  // FocusableActionDetector. The hamburger's tap handling
+                  // now exactly mirrors the surface that already works on
+                  // iOS PWA after force-close-relaunch for this user.
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(24),
+                      onTap: () => _showMobileMenu(context, crmReady),
+                      child: const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Icon(Icons.menu),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
