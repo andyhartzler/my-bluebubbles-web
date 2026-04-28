@@ -236,6 +236,34 @@
       }
     }
 
+    // iOS PWA bfcache restore guard.
+    // When the user closes the home-screen PWA and reopens it, iOS often
+    // serves the page from back-forward cache: the DOM is restored intact
+    // but the Flutter pointer-router listeners installed during the
+    // previous JS context are orphaned. Symptom: hamburger menu (and
+    // every other tap target) renders normally but produces no events.
+    // Multiple prior fixes (removed FocusableActionDetector / Focus
+    // autofocus / SelectionArea on mobile / user-scalable=no) addressed
+    // first-load issues but didn't cover the bfcache resume case.
+    //
+    // The standard fix: detect `event.persisted === true` on `pageshow`
+    // and force a fresh navigation. ~500ms reload flash on resume is
+    // worth it vs. a frozen-tap UI. Safari's top-level page handles
+    // this differently — only PWAs in standalone mode hit the broken
+    // path, hence the standalone gate so we don't regress regular
+    // Safari behavior.
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted === true) {
+        const isStandalonePWA =
+          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+          window.navigator.standalone === true;
+        if (isStandalonePWA) {
+          // Hard reload: forces Flutter main() + service worker fresh fetch.
+          window.location.reload();
+        }
+      }
+    });
+
     window.addEventListener('load', function () {
       const loader = window._flutter?.loader;
       if (!loader) {
