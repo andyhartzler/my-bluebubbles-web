@@ -80,6 +80,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:tray_manager/tray_manager.dart';
 import 'package:universal_html/html.dart' as html;
+import 'package:universal_html/js.dart' as js;
 import 'package:universal_io/io.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -1509,37 +1510,55 @@ class _HomeState extends OptimizedState<Home>
     );
   }
 
-  // DIAGNOSTIC INSTRUMENTATION (temporary) — DIAG-PWA-TOPBAR.
-  // Pushes a pointer-event marker into the JS-side __pwaTapDiag pipe so
-  // we can compare what the JS document-level listener saw vs what
-  // Flutter actually got. Removed once the dead-tap root cause is found.
+  // ROOT-CAUSE: Across 8 broken-state sessions in pwa_debug_log the
+  // flutter_events count was 0 — not because Flutter never received the
+  // event, but because the prior `_pwaDiagPush` only wrote to
+  // localStorage and console.debug. It NEVER called
+  // `window.__pwaTapDiag.record(...)`, so its rows were never enqueued
+  // for the Supabase edge-function flush. That made it impossible to
+  // compare "JS saw the click" (we have those rows) against "Flutter
+  // Listener fired its callback" (we don't). Six widget-swap fixes were
+  // attempted on a half-blind diagnostic. This routes the Flutter-side
+  // event through the same JS pipe so the next test session produces
+  // real flutter-layer rows in pwa_debug_log; that data — not more
+  // widget-tree guessing — is what will distinguish "iOS WebKit drops
+  // the click" from "Flutter pointer-router drops it" from
+  // "InkWell.onTap doesn't fire" from "_showMobileMenu future never
+  // resolves." NOT a new diagnostic layer; the layer exists, the bridge
+  // was broken.
   void _pwaDiagPush(String type, {double? x, double? y, String? extra}) {
     if (!kIsWeb) return;
     try {
       final w = html.window;
-      // Use JSON.stringify-friendly object via JS interop. universal_html
-      // exposes window.callMethod which forwards to the JS function with
-      // a JSON-encoded payload.
-      final payload = <String, dynamic>{
-        'event_type': type,
-        if (x != null) 'x': x,
-        if (y != null) 'y': y,
-        'metadata': {
+      // Reach the JS-side window.__pwaTapDiag.record() via universal_html's
+      // JsObject interop. We pass a synthetic event-like map (record()
+      // reads clientX/clientY/target off it) plus an `extra` blob the
+      // edge-fn copies into the metadata jsonb column.
+      final js.JsObject? diag =
+          js.context.hasProperty('__pwaTapDiag')
+              ? js.context['__pwaTapDiag'] as js.JsObject?
+              : null;
+      if (diag != null) {
+        final synthetic = js.JsObject.jsify(<String, dynamic>{
+          'clientX': x ?? 0,
+          'clientY': y ?? 0,
+        });
+        final meta = js.JsObject.jsify(<String, dynamic>{
           'from': 'flutter_listener',
           'topbar': 'mobile',
           if (extra != null) 'extra': extra,
-        },
-      };
-      // Cheapest cross-bridge: stash the JSON on a known global that the
-      // diag JS can read. We use eval through window.console since
-      // universal_html doesn't expose a clean callMethod helper for nested
-      // objects on every browser.
-      final encoded = jsonEncode(payload);
+        });
+        diag.callMethod('record', <dynamic>['flutter', type, synthetic, meta]);
+      }
+      // Mirror to console for Safari Web Inspector.
       // ignore: undefined_prefixed_name
-      w.console.debug('[PWA-DIAG-FLUTTER] $type $encoded');
-      // Also write to localStorage so the same rolling buffer captures it.
+      w.console.debug('[PWA-DIAG-FLUTTER] $type x=$x y=$y');
+    } catch (_) {
+      // Last-resort fallback: keep the localStorage rolling buffer alive
+      // so a manual DevTools poke still shows Flutter-side activity even
+      // if the JS bridge call fails.
       try {
-        final raw = w.localStorage['pwa_tap_diag_v1'] ?? '[]';
+        final raw = html.window.localStorage['pwa_tap_diag_v1'] ?? '[]';
         final decoded = jsonDecode(raw);
         final arr = decoded is List ? decoded : <dynamic>[];
         arr.add({
@@ -1549,15 +1568,14 @@ class _HomeState extends OptimizedState<Home>
           'x': x,
           'y': y,
           'target_path': 'flutter:_buildMobileTopBar',
-          'session_id': w.sessionStorage['pwa_tap_diag_session'] ?? 'flt',
-          'metadata': payload['metadata'],
+          'metadata': {'from': 'flutter_listener_fallback'},
         });
         while (arr.length > 80) {
           arr.removeAt(0);
         }
-        w.localStorage['pwa_tap_diag_v1'] = jsonEncode(arr);
+        html.window.localStorage['pwa_tap_diag_v1'] = jsonEncode(arr);
       } catch (_) {}
-    } catch (_) {}
+    }
   }
 
   Widget _buildMobileTopBar(
@@ -1650,7 +1668,18 @@ class _HomeState extends OptimizedState<Home>
                     message: 'Open navigation menu',
                     child: InkWell(
                       borderRadius: BorderRadius.circular(24),
-                      onTap: () => _showMobileMenu(context, crmReady),
+                      onTap: () {
+                        // ROOT-CAUSE diag: confirm InkWell.onTap actually
+                        // fires on iOS PWA cold-relaunch. If this row
+                        // appears in pwa_debug_log but the menu doesn't
+                        // open, the bug is downstream (showDialog /
+                        // Navigator.of). If it doesn't appear, InkWell
+                        // is being skipped despite the click landing on
+                        // flutter-view.
+                        _pwaDiagPush('flutter_inkwell_ontap',
+                            extra: 'hamburger');
+                        _showMobileMenu(context, crmReady);
+                      },
                       child: const Padding(
                         padding: EdgeInsets.all(12),
                         child: Icon(Icons.menu),
@@ -1675,7 +1704,12 @@ class _HomeState extends OptimizedState<Home>
                     child: InkWell(
                       borderRadius: BorderRadius.circular(24),
                       onTap: crmReady
-                          ? () => _openGlobalSearch(context)
+                          ? () {
+                              // ROOT-CAUSE diag: see hamburger note above.
+                              _pwaDiagPush('flutter_inkwell_ontap',
+                                  extra: 'search');
+                              _openGlobalSearch(context);
+                            }
                           : null,
                       child: Padding(
                         padding: const EdgeInsets.all(12),
