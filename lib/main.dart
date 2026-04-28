@@ -1525,33 +1525,19 @@ class _HomeState extends OptimizedState<Home>
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
                 children: [
-                  // The hamburger menu now uses PopupMenuButton — same pattern as
-                  // the profile circle (`_CurrentUserBadge`) which Andrew verified
-                  // works reliably on iOS PWA across cold launches. The previous
-                  // `IconButton + showDialog<void>(...)` path pushed a
-                  // MaterialPageRoute holding a nested Scaffold, which iOS PWA's
-                  // pointer-router struggled with after bfcache restore. Multiple
-                  // prior fixes (FocusableActionDetector removal, autofocus
-                  // removal, SelectionArea removal, user-scalable=no removal,
-                  // pageshow bfcache reload) addressed first-load + same-session
-                  // resume cases but didn't cover this. PopupMenuButton renders
-                  // its menu through an OverlayEntry-based PopupRoute that
-                  // sidesteps the broken pointer path entirely — same surface,
-                  // same context, but the touch event reliably reaches its
-                  // onSelected handler.
-                  _MobileNavMenuButton(
-                    crmReady: crmReady,
-                    mailEnabled: _mailEnabled,
-                    isSuperadmin: context
-                        .watch<UserSessionProvider>()
-                        .isSuperadmin,
-                    onSelectSection: _setSection,
-                    onOpenSearch: () => _openGlobalSearch(context),
-                    onOpenNewMessage: () => _openNewMessage(context),
-                    onOpenNewEmail: () => _openNewEmail(context),
-                    onOpenSettings: () => Actions.invoke(
-                      context,
-                      const OpenSettingsIntent(),
+                  // FIX: Removed FocusableActionDetector + FocusTraversalGroup that
+                  // consumed the first tap on iOS Safari PWA. The detector's focus
+                  // management intercepted pointer-down before IconButton.onPressed
+                  // could fire, causing the hamburger to be unresponsive on first load.
+                  // IconButton handles touch natively; keyboard a11y is not needed
+                  // on a touch-first mobile PWA.
+                  Semantics(
+                    label: 'Open navigation menu',
+                    button: true,
+                    child: IconButton(
+                      icon: const Icon(Icons.menu),
+                      tooltip: 'Open navigation menu',
+                      onPressed: () => _showMobileMenu(context, crmReady),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1595,6 +1581,323 @@ class _HomeState extends OptimizedState<Home>
 
 
 
+  Future<void> _showMobileMenu(BuildContext context, bool crmReady) async {
+    final BuildContext parentContext = context;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      useSafeArea: true,
+      builder: (dialogContext) {
+        Widget buildItem({
+          required double order,
+          IconData? icon,
+          Widget? iconWidget,
+          required String label,
+          String? subtitle,
+          bool enabled = true,
+          VoidCallback? onActivate,
+        }) {
+          void handleActivate() {
+            Navigator.of(dialogContext).pop();
+            if (onActivate != null) {
+              Future.microtask(onActivate);
+            }
+          }
+
+          return FocusTraversalOrder(
+            order: NumericFocusOrder(order),
+            child: FocusableActionDetector(
+              enabled: enabled,
+              shortcuts: <ShortcutActivator, Intent>{
+                LogicalKeySet(LogicalKeyboardKey.enter): const ActivateIntent(),
+                LogicalKeySet(LogicalKeyboardKey.space): const ActivateIntent(),
+              },
+              actions: <Type, Action<Intent>>{
+                ActivateIntent: CallbackAction<ActivateIntent>(
+                  onInvoke: (intent) {
+                    if (enabled) {
+                      handleActivate();
+                    }
+                    return null;
+                  },
+                ),
+              },
+              child: Semantics(
+                button: true,
+                enabled: enabled,
+                label: label,
+                child: ListTile(
+                  leading: iconWidget ?? (icon != null ? Icon(icon) : null),
+                  title: Text(label),
+                  subtitle: subtitle != null ? Text(subtitle) : null,
+                  enabled: enabled,
+                  onTap: enabled && onActivate != null ? handleActivate : null,
+                ),
+              ),
+            ),
+          );
+        }
+
+        final disabledMessage = crmReady
+            ? null
+            : 'Available when CRM is connected';
+        final theme = Theme.of(parentContext);
+
+        return Scaffold(
+          backgroundColor: theme.colorScheme.surface,
+          appBar: AppBar(
+            title: const Text('Menu'),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              tooltip: 'Close menu',
+            ),
+            elevation: 0,
+          ),
+          body: SafeArea(
+            child: FocusTraversalGroup(
+              policy: OrderedTraversalPolicy(),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  buildItem(
+                    order: 0,
+                    icon: Icons.home_outlined,
+                    label: 'Home',
+                    onActivate: () => _setSection(_HomeSection.home),
+                  ),
+                  buildItem(
+                    order: 0.5,
+                    icon: Icons.dashboard_outlined,
+                    label: 'Dashboard',
+                    onActivate: () => _setSection(_HomeSection.dashboard),
+                  ),
+                  buildItem(
+                    order: 1,
+                    icon: Icons.groups_outlined,
+                    label: 'Members',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.members)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 2,
+                    icon: Icons.volunteer_activism_outlined,
+                    label: 'Donors',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.donors)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 3,
+                    icon: Icons.mark_email_unread_outlined,
+                    label: 'Subscribers',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.subscribers)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 4,
+                    icon: Icons.account_tree_outlined,
+                    label: 'Chapters',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.chapters)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 5,
+                    icon: Icons.groups_3_outlined,
+                    label: 'Committees',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.committees)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 6,
+                    icon: Icons.video_camera_front_outlined,
+                    label: 'Meetings',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.meetings)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 7,
+                    icon: Icons.event_available_outlined,
+                    label: 'Events',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.events)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 8,
+                    icon: Icons.admin_panel_settings_outlined,
+                    label: 'Member Portal',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.memberPortal)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 9,
+                    icon: Icons.notifications_active_outlined,
+                    label: 'Wallet Notifications',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.walletNotifications)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 10,
+                    iconWidget: SvgPicture.asset(
+                      'assets/icon/slack-icon.svg',
+                      width: 24,
+                      height: 24,
+                      colorFilter: ColorFilter.mode(
+                        crmReady
+                            ? theme.iconTheme.color ?? Colors.white
+                            : theme.disabledColor,
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                    label: 'Slack',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.slackManagement)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 11,
+                    icon: Icons.campaign_outlined,
+                    label: 'Campaigns',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.campaigns)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 12,
+                    icon: Icons.dynamic_form_outlined,
+                    label: 'Forms',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.forms)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 13,
+                    icon: Icons.poll_outlined,
+                    label: 'Surveys',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.surveys)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 14,
+                    icon: Icons.account_balance,
+                    label: 'Finances',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.finances)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 15,
+                    icon: Icons.how_to_vote,
+                    label: 'Candidates',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _setSection(_HomeSection.candidates)
+                        : null,
+                  ),
+                  if (_mailEnabled)
+                    buildItem(
+                      order: 12,
+                      icon: Icons.mail_outline,
+                      label: 'Email',
+                      onActivate: () => _setSection(_HomeSection.mail),
+                    ),
+                  buildItem(
+                    order: 16,
+                    icon: Icons.chat_bubble_outline,
+                    label: 'Conversations',
+                    onActivate: () => _setSection(_HomeSection.conversations),
+                  ),
+                  if (parentContext
+                      .read<UserSessionProvider>()
+                      .isSuperadmin)
+                    buildItem(
+                      order: 16.5,
+                      icon: Icons.history,
+                      label: 'Activity',
+                      enabled: crmReady,
+                      subtitle: disabledMessage,
+                      onActivate: crmReady
+                          ? () => _setSection(_HomeSection.activity)
+                          : null,
+                    ),
+                  const Divider(),
+                  buildItem(
+                    order: 17,
+                    icon: Icons.search,
+                    label: 'Search CRM',
+                    enabled: crmReady,
+                    subtitle: disabledMessage,
+                    onActivate: crmReady
+                        ? () => _openGlobalSearch(parentContext)
+                        : null,
+                  ),
+                  buildItem(
+                    order: 18,
+                    icon: Icons.add_comment,
+                    label: 'New Message',
+                    onActivate: () => _openNewMessage(parentContext),
+                  ),
+                  buildItem(
+                    order: 19,
+                    icon: Icons.email_outlined,
+                    label: 'New Email',
+                    onActivate: () => _openNewEmail(parentContext),
+                  ),
+                  buildItem(
+                    order: 20,
+                    icon: Icons.settings_outlined,
+                    label: 'Settings',
+                    onActivate: () => Actions.invoke(
+                      parentContext,
+                      const OpenSettingsIntent(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildBranding(ThemeData theme, {bool mobile = false}) {
     // Responsive logo sizing based on screen width
@@ -2329,319 +2632,6 @@ class _CurrentUserBadge extends StatelessWidget {
                 ],
               ),
             ),
-    );
-  }
-}
-
-/// Mobile top-bar hamburger menu — PopupMenuButton-based.
-///
-/// Uses the same OverlayEntry-based PopupRoute as the profile-circle
-/// `_CurrentUserBadge` (PopupMenuButton<String>). This path works
-/// reliably on iOS PWA across cold launches; the previous
-/// `showDialog<void>(... return Scaffold(...))` approach did not —
-/// after a bfcache restore the showDialog route's pointer-handling
-/// stayed wedged.
-class _MobileNavMenuButton extends StatelessWidget {
-  const _MobileNavMenuButton({
-    required this.crmReady,
-    required this.mailEnabled,
-    required this.isSuperadmin,
-    required this.onSelectSection,
-    required this.onOpenSearch,
-    required this.onOpenNewMessage,
-    required this.onOpenNewEmail,
-    required this.onOpenSettings,
-  });
-
-  final bool crmReady;
-  final bool mailEnabled;
-  final bool isSuperadmin;
-  final void Function(_HomeSection) onSelectSection;
-  final VoidCallback onOpenSearch;
-  final VoidCallback onOpenNewMessage;
-  final VoidCallback onOpenNewEmail;
-  final VoidCallback onOpenSettings;
-
-  // Stable string keys for menu actions. PopupMenuButton<String> is the
-  // exact pattern used by _CurrentUserBadge.
-  static const _kHome = 'home';
-  static const _kDashboard = 'dashboard';
-  static const _kMembers = 'members';
-  static const _kDonors = 'donors';
-  static const _kSubscribers = 'subscribers';
-  static const _kChapters = 'chapters';
-  static const _kCommittees = 'committees';
-  static const _kMeetings = 'meetings';
-  static const _kEvents = 'events';
-  static const _kMemberPortal = 'memberPortal';
-  static const _kWalletNotifications = 'walletNotifications';
-  static const _kSlackManagement = 'slackManagement';
-  static const _kCampaigns = 'campaigns';
-  static const _kForms = 'forms';
-  static const _kSurveys = 'surveys';
-  static const _kFinances = 'finances';
-  static const _kCandidates = 'candidates';
-  static const _kMail = 'mail';
-  static const _kConversations = 'conversations';
-  static const _kActivity = 'activity';
-  static const _kSearch = 'searchCrm';
-  static const _kNewMessage = 'newMessage';
-  static const _kNewEmail = 'newEmail';
-  static const _kSettings = 'settings';
-
-  PopupMenuItem<String> _row({
-    required String value,
-    required IconData icon,
-    required String label,
-    bool enabled = true,
-    String? subtitle,
-  }) {
-    return PopupMenuItem<String>(
-      value: value,
-      enabled: enabled,
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(label),
-        subtitle: subtitle != null ? Text(subtitle) : null,
-        contentPadding: EdgeInsets.zero,
-        enabled: enabled,
-        dense: true,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final disabledMessage =
-        crmReady ? null : 'Available when CRM is connected';
-
-    return PopupMenuButton<String>(
-      tooltip: 'Open navigation menu',
-      offset: const Offset(0, 44),
-      icon: const Icon(Icons.menu),
-      onSelected: (value) {
-        switch (value) {
-          case _kHome:
-            onSelectSection(_HomeSection.home);
-            break;
-          case _kDashboard:
-            onSelectSection(_HomeSection.dashboard);
-            break;
-          case _kMembers:
-            onSelectSection(_HomeSection.members);
-            break;
-          case _kDonors:
-            onSelectSection(_HomeSection.donors);
-            break;
-          case _kSubscribers:
-            onSelectSection(_HomeSection.subscribers);
-            break;
-          case _kChapters:
-            onSelectSection(_HomeSection.chapters);
-            break;
-          case _kCommittees:
-            onSelectSection(_HomeSection.committees);
-            break;
-          case _kMeetings:
-            onSelectSection(_HomeSection.meetings);
-            break;
-          case _kEvents:
-            onSelectSection(_HomeSection.events);
-            break;
-          case _kMemberPortal:
-            onSelectSection(_HomeSection.memberPortal);
-            break;
-          case _kWalletNotifications:
-            onSelectSection(_HomeSection.walletNotifications);
-            break;
-          case _kSlackManagement:
-            onSelectSection(_HomeSection.slackManagement);
-            break;
-          case _kCampaigns:
-            onSelectSection(_HomeSection.campaigns);
-            break;
-          case _kForms:
-            onSelectSection(_HomeSection.forms);
-            break;
-          case _kSurveys:
-            onSelectSection(_HomeSection.surveys);
-            break;
-          case _kFinances:
-            onSelectSection(_HomeSection.finances);
-            break;
-          case _kCandidates:
-            onSelectSection(_HomeSection.candidates);
-            break;
-          case _kMail:
-            onSelectSection(_HomeSection.mail);
-            break;
-          case _kConversations:
-            onSelectSection(_HomeSection.conversations);
-            break;
-          case _kActivity:
-            onSelectSection(_HomeSection.activity);
-            break;
-          case _kSearch:
-            onOpenSearch();
-            break;
-          case _kNewMessage:
-            onOpenNewMessage();
-            break;
-          case _kNewEmail:
-            onOpenNewEmail();
-            break;
-          case _kSettings:
-            onOpenSettings();
-            break;
-        }
-      },
-      itemBuilder: (_) => <PopupMenuEntry<String>>[
-        _row(value: _kHome, icon: Icons.home_outlined, label: 'Home'),
-        _row(
-          value: _kDashboard,
-          icon: Icons.dashboard_outlined,
-          label: 'Dashboard',
-        ),
-        _row(
-          value: _kMembers,
-          icon: Icons.groups_outlined,
-          label: 'Members',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kDonors,
-          icon: Icons.volunteer_activism_outlined,
-          label: 'Donors',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kSubscribers,
-          icon: Icons.mark_email_unread_outlined,
-          label: 'Subscribers',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kChapters,
-          icon: Icons.account_tree_outlined,
-          label: 'Chapters',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kCommittees,
-          icon: Icons.groups_3_outlined,
-          label: 'Committees',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kMeetings,
-          icon: Icons.video_camera_front_outlined,
-          label: 'Meetings',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kEvents,
-          icon: Icons.event_available_outlined,
-          label: 'Events',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kMemberPortal,
-          icon: Icons.admin_panel_settings_outlined,
-          label: 'Member Portal',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kWalletNotifications,
-          icon: Icons.notifications_active_outlined,
-          label: 'Wallet Notifications',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kSlackManagement,
-          icon: Icons.tag,
-          label: 'Slack',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kCampaigns,
-          icon: Icons.campaign_outlined,
-          label: 'Campaigns',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kForms,
-          icon: Icons.dynamic_form_outlined,
-          label: 'Forms',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kSurveys,
-          icon: Icons.poll_outlined,
-          label: 'Surveys',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kFinances,
-          icon: Icons.account_balance,
-          label: 'Finances',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kCandidates,
-          icon: Icons.how_to_vote,
-          label: 'Candidates',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        if (mailEnabled)
-          _row(value: _kMail, icon: Icons.mail_outline, label: 'Email'),
-        _row(
-          value: _kConversations,
-          icon: Icons.chat_bubble_outline,
-          label: 'Conversations',
-        ),
-        if (isSuperadmin)
-          _row(
-            value: _kActivity,
-            icon: Icons.history,
-            label: 'Activity',
-            enabled: crmReady,
-            subtitle: disabledMessage,
-          ),
-        const PopupMenuDivider(),
-        _row(
-          value: _kSearch,
-          icon: Icons.search,
-          label: 'Search CRM',
-          enabled: crmReady,
-          subtitle: disabledMessage,
-        ),
-        _row(
-          value: _kNewMessage,
-          icon: Icons.add_comment,
-          label: 'New Message',
-        ),
-        _row(value: _kNewEmail, icon: Icons.email_outlined, label: 'New Email'),
-        _row(
-          value: _kSettings,
-          icon: Icons.settings_outlined,
-          label: 'Settings',
-        ),
-      ],
     );
   }
 }
