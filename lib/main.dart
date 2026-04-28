@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'dart:ui';
 
@@ -1508,6 +1509,57 @@ class _HomeState extends OptimizedState<Home>
     );
   }
 
+  // DIAGNOSTIC INSTRUMENTATION (temporary) — DIAG-PWA-TOPBAR.
+  // Pushes a pointer-event marker into the JS-side __pwaTapDiag pipe so
+  // we can compare what the JS document-level listener saw vs what
+  // Flutter actually got. Removed once the dead-tap root cause is found.
+  void _pwaDiagPush(String type, {double? x, double? y, String? extra}) {
+    if (!kIsWeb) return;
+    try {
+      final w = html.window;
+      // Use JSON.stringify-friendly object via JS interop. universal_html
+      // exposes window.callMethod which forwards to the JS function with
+      // a JSON-encoded payload.
+      final payload = <String, dynamic>{
+        'event_type': type,
+        if (x != null) 'x': x,
+        if (y != null) 'y': y,
+        'metadata': {
+          'from': 'flutter_listener',
+          'topbar': 'mobile',
+          if (extra != null) 'extra': extra,
+        },
+      };
+      // Cheapest cross-bridge: stash the JSON on a known global that the
+      // diag JS can read. We use eval through window.console since
+      // universal_html doesn't expose a clean callMethod helper for nested
+      // objects on every browser.
+      final encoded = jsonEncode(payload);
+      // ignore: undefined_prefixed_name
+      w.console.debug('[PWA-DIAG-FLUTTER] $type $encoded');
+      // Also write to localStorage so the same rolling buffer captures it.
+      try {
+        final raw = w.localStorage['pwa_tap_diag_v1'] ?? '[]';
+        final decoded = jsonDecode(raw);
+        final arr = decoded is List ? decoded : <dynamic>[];
+        arr.add({
+          'ts_client': DateTime.now().toUtc().toIso8601String(),
+          'layer': 'flutter',
+          'event_type': type,
+          'x': x,
+          'y': y,
+          'target_path': 'flutter:_buildMobileTopBar',
+          'session_id': w.sessionStorage['pwa_tap_diag_session'] ?? 'flt',
+          'metadata': payload['metadata'],
+        });
+        while (arr.length > 80) {
+          arr.removeAt(0);
+        }
+        w.localStorage['pwa_tap_diag_v1'] = jsonEncode(arr);
+      } catch (_) {}
+    } catch (_) {}
+  }
+
   Widget _buildMobileTopBar(
     BuildContext context,
     ThemeData theme,
@@ -1523,7 +1575,29 @@ class _HomeState extends OptimizedState<Home>
             height: kToolbarHeight,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
+              // DIAGNOSTIC INSTRUMENTATION (temporary) — DIAG-PWA-TOPBAR.
+              // Wraps the top-bar row in a Listener so we can see whether
+              // pointer events even reach Flutter's pointer router during
+              // the broken iOS-PWA-after-force-close-relaunch session.
+              // Compare with the document-level capture in web/index.html.
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (e) => _pwaDiagPush(
+                  'flutter_pointerdown',
+                  x: e.position.dx,
+                  y: e.position.dy,
+                ),
+                onPointerUp: (e) => _pwaDiagPush(
+                  'flutter_pointerup',
+                  x: e.position.dx,
+                  y: e.position.dy,
+                ),
+                onPointerCancel: (e) => _pwaDiagPush(
+                  'flutter_pointercancel',
+                  x: e.position.dx,
+                  y: e.position.dy,
+                ),
+                child: Row(
                 children: [
                   // iOS PWA hamburger fix v6 (2026-04-28).
                   //
@@ -1623,6 +1697,7 @@ class _HomeState extends OptimizedState<Home>
                   ),
                 ],
               ),
+              ), // Listener (DIAG-PWA-TOPBAR)
             ),
         ),
       ),
