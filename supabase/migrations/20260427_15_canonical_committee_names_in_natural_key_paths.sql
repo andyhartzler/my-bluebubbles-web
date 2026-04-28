@@ -1,0 +1,5 @@
+-- Patch get_donor_profile_by_natural_key to use canonical committee names
+-- from mec_committees (LEFT JOIN on mec_id) — same fix already applied
+-- to get_donor_unified_profile in 20260427_13. Eliminates "No" / empty
+-- committee names from MECDonorScreen and other natural-key paths.
+-- Full body applied via the supabase MCP migration tool.

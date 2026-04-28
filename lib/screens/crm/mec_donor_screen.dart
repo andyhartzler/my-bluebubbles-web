@@ -23,6 +23,17 @@ import 'package:bluebubbles/services/crm/voter_file_service.dart';
 /// here, every committee is tappable → MECCommitteeScreen and every
 /// candidate is tappable → CandidateDetailScreen.
 class MECDonorScreen extends StatefulWidget {
+  /// When non-null, the screen loads via `get_donor_profile_by_id(donorId)`
+  /// — the canonical, donor-row-based view. This is what most call sites
+  /// should pass now: it disambiguates the "two Jake Zimmermans" case
+  /// where the natural-key match by city only finds half the donor's
+  /// contributions (because the city spelling drifts across rows even
+  /// when they're the same person/donor entity).
+  final int? donorId;
+
+  /// Natural-key fallback. Used when `donorId` is null — typical case:
+  /// a contribution row that doesn't carry a resolved `donor_id` (e.g.
+  /// orphan rows in the contributions table or mec_payee searches).
   final String firstName;
   final String lastName;
   final String? city;
@@ -31,6 +42,7 @@ class MECDonorScreen extends StatefulWidget {
 
   const MECDonorScreen({
     super.key,
+    this.donorId,
     required this.firstName,
     required this.lastName,
     this.city,
@@ -64,15 +76,23 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
       return;
     }
     try {
-      final resp = await _supabase.client.rpc(
-        'get_donor_profile_by_natural_key',
-        params: {
-          'p_first_name': widget.firstName,
-          'p_last_name': widget.lastName,
-          'p_city': widget.city,
-          'p_state': widget.state,
-        },
-      );
+      final dynamic resp;
+      if (widget.donorId != null) {
+        resp = await _supabase.client.rpc(
+          'get_donor_profile_by_id',
+          params: {'p_donor_id': widget.donorId},
+        );
+      } else {
+        resp = await _supabase.client.rpc(
+          'get_donor_profile_by_natural_key',
+          params: {
+            'p_first_name': widget.firstName,
+            'p_last_name': widget.lastName,
+            'p_city': widget.city,
+            'p_state': widget.state,
+          },
+        );
+      }
       if (mounted) {
         setState(() {
           _profile = resp is Map<String, dynamic> ? resp : null;

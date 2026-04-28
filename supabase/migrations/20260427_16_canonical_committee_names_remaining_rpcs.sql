@@ -1,0 +1,3 @@
+-- Patch get_donor_mec_contributions and get_donor_profile_full to use
+-- canonical mec_committees.committee_name. Final two RPCs that were
+-- still leaking 'No' / empty committee names. Body applied via MCP.

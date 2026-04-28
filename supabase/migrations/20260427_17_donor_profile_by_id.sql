@@ -1,0 +1,7 @@
+-- get_donor_profile_by_id(p_donor_id integer) — canonical donor-id-based
+-- profile fetch. Same return shape as get_donor_profile_by_natural_key.
+-- Used by MECDonorScreen when called from a click context that has the
+-- donor_id (committees-tab donor list, donor-research result row), so
+-- duplicate-natural-key donors don't produce inconsistent totals
+-- depending on which contribution row was clicked.
+-- Full body applied via the supabase MCP migration tool.

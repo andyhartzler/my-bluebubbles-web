@@ -1083,9 +1083,15 @@ class CommitteesTabState extends State<CommitteesTab> {
             final donorMecId =
                 (donor['donor_mec_id'] as String? ?? '').trim();
             final donorName = (donor['donor_name'] as String? ?? '').trim();
+            final donorIdNum = (donor['donor_id'] as num?)?.toInt();
 
             // Three donor row types:
             //   1. Individual (first+last set) → push MECDonorScreen.
+            //      Pass donorId so the canonical id-based RPC loads
+            //      ALL their contributions regardless of city spelling
+            //      drift (Andrew's "two Jake Zimmermans" case — same
+            //      person, three city spellings, natural-key match by
+            //      city showed only the slice matching the clicked row).
             //   2. Committee (donor_mec_id set — looked up by RPC from
             //      contributor_committee against mec_committees.mec_id) →
             //      drill into that committee's detail in this same tab.
@@ -1094,6 +1100,7 @@ class CommitteesTabState extends State<CommitteesTab> {
             if (firstName.isNotEmpty || lastName.isNotEmpty) {
               Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => MECDonorScreen(
+                  donorId: donorIdNum,
                   firstName: firstName,
                   lastName: lastName,
                   city: donor['city'] as String?,
