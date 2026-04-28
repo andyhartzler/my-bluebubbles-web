@@ -253,14 +253,36 @@
     // path, hence the standalone gate so we don't regress regular
     // Safari behavior.
     window.addEventListener('pageshow', function (event) {
+      const isStandalonePWA =
+        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+        window.navigator.standalone === true;
+      if (!isStandalonePWA) return;
+
       if (event.persisted === true) {
-        const isStandalonePWA =
-          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
-          window.navigator.standalone === true;
-        if (isStandalonePWA) {
-          // Hard reload: forces Flutter main() + service worker fresh fetch.
-          window.location.reload();
-        }
+        // True bfcache restore — DOM is alive but Flutter listeners are
+        // orphaned. Hardest case; full reload.
+        window.location.reload();
+        return;
+      }
+
+      // Even on cold relaunch (the force-close-relaunch case Andrew
+      // hits), iOS WebKit's gesture arena can hold a phantom pointer
+      // that prevents the Flutter pointer router from dispatching new
+      // taps to non-button semantic nodes. The fix is to drain the
+      // arena synthetically: dispatch a `pointercancel` and trigger
+      // a passive `touchstart` listener attach so Safari's
+      // SafariPointerEventWorkaround re-arms its synthesized
+      // pointer-event chain (see flutter/flutter#70858, #149001).
+      try {
+        document.addEventListener('touchstart', function () {}, {
+          passive: true,
+          once: true,
+        });
+        document.dispatchEvent(
+          new PointerEvent('pointercancel', { bubbles: true, pointerId: 1 })
+        );
+      } catch (_) {
+        // PointerEvent constructor missing on very old WebKit — ignore.
       }
     });
 

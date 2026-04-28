@@ -1552,14 +1552,42 @@ class _HomeState extends OptimizedState<Home>
                   // FocusableActionDetector. The hamburger's tap handling
                   // now exactly mirrors the surface that already works on
                   // iOS PWA after force-close-relaunch for this user.
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(24),
-                      onTap: () => _showMobileMenu(context, crmReady),
-                      child: const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: Icon(Icons.menu),
+                  // iOS PWA hamburger fix v7 (2026-04-28).
+                  //
+                  // Real root cause finally surfaced via research into Flutter
+                  // web's engine-side declarative pointer hit-testing for the
+                  // <flt-semantics> overlay plane (flutter#149001 + PR 176974,
+                  // see also #160560 / #175465). When iOS PWA relaunches the
+                  // WebView after force-close, the semantics overlay
+                  // re-attaches but the hit-test policy treats non-button
+                  // semantic nodes as TRANSPARENT — the event reaches them
+                  // and gets swallowed instead of dispatched downward.
+                  // PopupMenuButton(child:) carries internal
+                  // Semantics(button: true) which marks its node tier-2
+                  // opaque, so clicks reliably hit. IconButton without
+                  // tooltip, or a bare Material+InkWell, falls into tier-3
+                  // transparent and gets eaten by the overlay after relaunch.
+                  // The profile-circle worked all along because of that
+                  // built-in button role.
+                  //
+                  // Fix: explicit Semantics(button: true, container: true)
+                  // wrapping the InkWell. `container: true` forces an
+                  // isolated semantic node so Flutter doesn't merge it with
+                  // an ancestor that has tier-3 default behavior.
+                  Semantics(
+                    label: 'Open navigation menu',
+                    button: true,
+                    container: true,
+                    enabled: true,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(24),
+                        onTap: () => _showMobileMenu(context, crmReady),
+                        child: const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Icon(Icons.menu),
+                        ),
                       ),
                     ),
                   ),
@@ -1571,20 +1599,30 @@ class _HomeState extends OptimizedState<Home>
                     ),
                   ),
                   const SizedBox(width: 4),
+                  // Search icon — same fix as the hamburger above. IconButton
+                  // alone without container:true semantics gets swallowed by
+                  // the iOS PWA <flt-semantics> overlay after force-close-
+                  // relaunch. Wrapping in Semantics(container:true, button:true)
+                  // forces an isolated tier-2 opaque node.
                   Semantics(
                     label: crmReady
                         ? 'Open CRM search'
                         : 'CRM search unavailable',
                     button: true,
+                    container: true,
                     enabled: crmReady,
-                    child: IconButton(
-                      tooltip: crmReady
-                          ? 'Search CRM'
-                          : 'Search available when CRM is connected',
-                      icon: const Icon(Icons.search),
-                      onPressed: crmReady
-                          ? () => _openGlobalSearch(context)
-                          : null,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(24),
+                        onTap: crmReady
+                            ? () => _openGlobalSearch(context)
+                            : null,
+                        child: const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Icon(Icons.search),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 4),
