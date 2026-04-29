@@ -375,6 +375,16 @@ dependency_overrides:
   # depend on a removed/changed API in pointycastle 4. Force 4 to unblock
   # objectbox upgrade; flutter_appauth_web compiles fine against 4.x.
   pointycastle: ^4.0.0
+  # enough_platform_widgets 1.1.2 (latest on pub) is broken against newer
+  # Flutter — passes nullable bool? autofocus to a non-null bool param.
+  # Vendored a patched copy in packages/.
+  enough_platform_widgets:
+    path: packages/enough_platform_widgets_patched
+  # form_builder_cupertino_fields up to 0.5.x has wrong errorBuilder
+  # signature for newer Flutter (Widget?(String) vs Widget(BuildContext,
+  # String)). Vendored patched copy fixes the signature.
+  form_builder_cupertino_fields:
+    path: packages/form_builder_cupertino_fields_patched
   # tmail-flutter source fork overrides — tmail's linagora_design_flutter
   # and other deps want the real native packages; bluebubbles ships
   # path-stubs for web build. Force the path-stubs to win.

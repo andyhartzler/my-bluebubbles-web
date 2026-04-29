@@ -9,10 +9,11 @@ import '../utils/mapkit_token_manager.dart';
 
 // Shim: re-introduce an `allowInterop`-style helper that works on the new
 // SDK. Returns a JSFunction; legacy `dart:js` callMethod still accepts it.
-// Use a precise function type so toJS is happy under dart2js.
+// Use a precise function type so toJS is happy under dart2js. dart2js
+// rejects `dynamic` in toJS signatures, so use JSAny? for incoming params.
 JSFunction _ai0(void Function() f) => f.toJS;
-JSFunction _ai1(void Function(dynamic) f) => f.toJS;
-JSFunction _ai2(void Function(dynamic, dynamic) f) => f.toJS;
+JSFunction _ai1(void Function(JSAny?) f) => f.toJS;
+JSFunction _ai2(void Function(JSAny?, JSAny?) f) => f.toJS;
 
 class EventMapWidget extends StatefulWidget {
   final String location;
@@ -231,7 +232,8 @@ class _EventMapWidgetState extends State<EventMapWidget> with AutomaticKeepAlive
 
       geocoder.callMethod('lookup', [
         addressToGeocode,
-        _ai2((error, data) {
+        _ai2((error, dataAny) {
+          final data = dataAny as dynamic;
           if (error != null) {
             print('[EventMap] Geocoding error: $error');
             if (mounted) {
