@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
 FLUTTER_ROOT="${FLUTTER_ROOT:-/opt/buildhome/.flutter}"
-FLUTTER_VERSION="${FLUTTER_VERSION:-3.24.4}"
+FLUTTER_VERSION="${FLUTTER_VERSION:-3.41.8}"
 
 # Download with retry logic
 function download_with_retry() {
