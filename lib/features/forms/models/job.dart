@@ -60,7 +60,7 @@ enum CustomQuestionType {
 
 /// A custom question for job applications
 @freezed
-class CustomQuestion with _$CustomQuestion {
+abstract class CustomQuestion with _$CustomQuestion {
   const factory CustomQuestion({
     required String id,
     required String question,
@@ -75,7 +75,7 @@ class CustomQuestion with _$CustomQuestion {
 }
 
 @freezed
-class Job with _$Job {
+abstract class Job with _$Job {
   const factory Job({
     required String id,
     @JsonKey(name: 'created_at') required DateTime createdAt,

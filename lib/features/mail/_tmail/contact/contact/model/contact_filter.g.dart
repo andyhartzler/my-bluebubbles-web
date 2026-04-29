@@ -7,11 +7,7 @@ part of 'contact_filter.dart';
 // **************************************************************************
 
 ContactFilter _$ContactFilterFromJson(Map<String, dynamic> json) =>
-    ContactFilter(
-      json['text'] as String,
-    );
+    ContactFilter(json['text'] as String);
 
 Map<String, dynamic> _$ContactFilterToJson(ContactFilter instance) =>
-    <String, dynamic>{
-      'text': instance.text,
-    };
+    <String, dynamic>{'text': instance.text};

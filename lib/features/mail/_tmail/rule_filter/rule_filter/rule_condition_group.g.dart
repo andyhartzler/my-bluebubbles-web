@@ -8,19 +8,21 @@ part of 'rule_condition_group.dart';
 
 RuleConditionGroup _$RuleConditionGroupFromJson(Map<String, dynamic> json) =>
     RuleConditionGroup(
-      conditionCombiner:
-          $enumDecode(_$ConditionCombinerEnumMap, json['conditionCombiner']),
+      conditionCombiner: $enumDecode(
+        _$ConditionCombinerEnumMap,
+        json['conditionCombiner'],
+      ),
       conditions: (json['conditions'] as List<dynamic>)
           .map((e) => RuleCondition.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
 
-Map<String, dynamic> _$RuleConditionGroupToJson(RuleConditionGroup instance) =>
-    <String, dynamic>{
-      'conditionCombiner':
-          _$ConditionCombinerEnumMap[instance.conditionCombiner]!,
-      'conditions': instance.conditions,
-    };
+Map<String, dynamic> _$RuleConditionGroupToJson(
+  RuleConditionGroup instance,
+) => <String, dynamic>{
+  'conditionCombiner': _$ConditionCombinerEnumMap[instance.conditionCombiner]!,
+  'conditions': instance.conditions,
+};
 
 const _$ConditionCombinerEnumMap = {
   ConditionCombiner.AND: 'AND',

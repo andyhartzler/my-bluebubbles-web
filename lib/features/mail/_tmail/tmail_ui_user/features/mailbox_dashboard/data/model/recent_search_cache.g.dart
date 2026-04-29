@@ -16,10 +16,7 @@ class RecentSearchCacheAdapter extends TypeAdapter<RecentSearchCache> {
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return RecentSearchCache(
-      fields[0] as String,
-      fields[1] as DateTime,
-    );
+    return RecentSearchCache(fields[0] as String, fields[1] as DateTime);
   }
 
   @override

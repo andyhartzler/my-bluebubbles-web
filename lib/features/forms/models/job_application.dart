@@ -4,7 +4,7 @@ part 'job_application.freezed.dart';
 part 'job_application.g.dart';
 
 @freezed
-class JobApplication with _$JobApplication {
+abstract class JobApplication with _$JobApplication {
   const factory JobApplication({
     required String id,
     @JsonKey(name: 'created_at') required DateTime createdAt,

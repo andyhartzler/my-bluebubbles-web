@@ -7,13 +7,11 @@ part of 'text_formatting_menu_config.dart';
 // **************************************************************************
 
 TextFormattingMenuConfig _$TextFormattingMenuConfigFromJson(
-        Map<String, dynamic> json) =>
-    TextFormattingMenuConfig(
-      isDisplayed: json['isDisplayed'] as bool? ?? false,
-    );
+  Map<String, dynamic> json,
+) => TextFormattingMenuConfig(
+  isDisplayed: json['isDisplayed'] as bool? ?? false,
+);
 
 Map<String, dynamic> _$TextFormattingMenuConfigToJson(
-        TextFormattingMenuConfig instance) =>
-    <String, dynamic>{
-      'isDisplayed': instance.isDisplayed,
-    };
+  TextFormattingMenuConfig instance,
+) => <String, dynamic>{'isDisplayed': instance.isDisplayed};

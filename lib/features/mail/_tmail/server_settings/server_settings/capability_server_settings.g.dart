@@ -14,6 +14,4 @@ SettingsCapability _$SettingsCapabilityFromJson(Map<String, dynamic> json) =>
     );
 
 Map<String, dynamic> _$SettingsCapabilityToJson(SettingsCapability instance) =>
-    <String, dynamic>{
-      'readOnlyProperties': instance.readOnlyProperties,
-    };
+    <String, dynamic>{'readOnlyProperties': instance.readOnlyProperties};

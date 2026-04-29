@@ -10,7 +10,8 @@ _TaskClassification _$TaskClassificationFromJson(Map<String, dynamic> json) =>
     _TaskClassification(
       type: json['type'] as String,
       scope: json['scope'] as String,
-      dataNeeds: (json['dataNeeds'] as List<dynamic>?)
+      dataNeeds:
+          (json['dataNeeds'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           const [],
@@ -26,11 +27,11 @@ Map<String, dynamic> _$TaskClassificationToJson(_TaskClassification instance) =>
     };
 
 _UsageInfo _$UsageInfoFromJson(Map<String, dynamic> json) => _UsageInfo(
-      inputTokens: (json['input_tokens'] as num?)?.toInt() ?? 0,
-      outputTokens: (json['output_tokens'] as num?)?.toInt() ?? 0,
-      model: json['model'] as String?,
-      processingTimeMs: (json['processing_time_ms'] as num?)?.toInt() ?? 0,
-    );
+  inputTokens: (json['input_tokens'] as num?)?.toInt() ?? 0,
+  outputTokens: (json['output_tokens'] as num?)?.toInt() ?? 0,
+  model: json['model'] as String?,
+  processingTimeMs: (json['processing_time_ms'] as num?)?.toInt() ?? 0,
+);
 
 Map<String, dynamic> _$UsageInfoToJson(_UsageInfo instance) =>
     <String, dynamic>{

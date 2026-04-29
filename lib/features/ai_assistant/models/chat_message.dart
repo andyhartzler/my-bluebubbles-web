@@ -8,7 +8,7 @@ part 'chat_message.g.dart';
 enum FeedbackState { none, positive, negative }
 
 @freezed
-class ChatMessage with _$ChatMessage {
+abstract class ChatMessage with _$ChatMessage {
   const factory ChatMessage({
     required String id,
     @JsonKey(name: 'created_at') required DateTime createdAt,

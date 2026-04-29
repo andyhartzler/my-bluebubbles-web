@@ -7,10 +7,10 @@ part of 'eml_previewer.dart';
 // **************************************************************************
 
 EMLPreviewer _$EMLPreviewerFromJson(Map<String, dynamic> json) => EMLPreviewer(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      content: json['content'] as String,
-    );
+  id: json['id'] as String,
+  title: json['title'] as String,
+  content: json['content'] as String,
+);
 
 Map<String, dynamic> _$EMLPreviewerToJson(EMLPreviewer instance) =>
     <String, dynamic>{

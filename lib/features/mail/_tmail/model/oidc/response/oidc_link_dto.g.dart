@@ -7,9 +7,9 @@ part of 'oidc_link_dto.dart';
 // **************************************************************************
 
 OIDCLinkDto _$OIDCLinkDtoFromJson(Map<String, dynamic> json) => OIDCLinkDto(
-      const UriConverter().fromJson(json['rel'] as String),
-      const UriConverter().fromJson(json['href'] as String),
-    );
+  const UriConverter().fromJson(json['rel'] as String),
+  const UriConverter().fromJson(json['href'] as String),
+);
 
 Map<String, dynamic> _$OIDCLinkDtoToJson(OIDCLinkDto instance) =>
     <String, dynamic>{

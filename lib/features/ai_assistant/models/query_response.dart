@@ -5,7 +5,7 @@ part 'query_response.g.dart';
 
 /// Task classification from Knowledge Chat V2
 @freezed
-class TaskClassification with _$TaskClassification {
+abstract class TaskClassification with _$TaskClassification {
   const factory TaskClassification({
     /// One of: simple_lookup, entity_search, explanation, comprehensive_research, content_generation
     required String type,
@@ -23,7 +23,7 @@ class TaskClassification with _$TaskClassification {
 
 /// Usage information from AI response
 @freezed
-class UsageInfo with _$UsageInfo {
+abstract class UsageInfo with _$UsageInfo {
   const factory UsageInfo({
     @JsonKey(name: 'input_tokens') @Default(0) int inputTokens,
     @JsonKey(name: 'output_tokens') @Default(0) int outputTokens,

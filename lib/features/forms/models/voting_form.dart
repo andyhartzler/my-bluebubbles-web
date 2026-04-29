@@ -47,7 +47,7 @@ class SafeBoolTrueConverter implements JsonConverter<bool, dynamic> {
 // VotingForm is actually stored in form_schemas table with form_type='vote'
 // This is a convenience wrapper around the schema
 @freezed
-class VotingForm with _$VotingForm {
+abstract class VotingForm with _$VotingForm {
   const factory VotingForm({
     required String id,
     @JsonKey(name: 'created_at') required DateTime createdAt,
@@ -112,7 +112,7 @@ class VotingForm with _$VotingForm {
 
 // Voting option model for convenience in building vote forms
 @freezed
-class VotingOption with _$VotingOption {
+abstract class VotingOption with _$VotingOption {
   const factory VotingOption({
     required String id,
     required String label,
@@ -126,7 +126,7 @@ class VotingOption with _$VotingOption {
 
 // Vote submission model
 @freezed
-class Vote with _$Vote {
+abstract class Vote with _$Vote {
   const factory Vote({
     required String id,
     @JsonKey(name: 'created_at') required DateTime createdAt,

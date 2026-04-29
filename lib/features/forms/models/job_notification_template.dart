@@ -4,7 +4,7 @@ part 'job_notification_template.freezed.dart';
 part 'job_notification_template.g.dart';
 
 @freezed
-class JobNotificationTemplate with _$JobNotificationTemplate {
+abstract class JobNotificationTemplate with _$JobNotificationTemplate {
   const factory JobNotificationTemplate({
     required String id,
     @JsonKey(name: 'trigger_type') required String triggerType,

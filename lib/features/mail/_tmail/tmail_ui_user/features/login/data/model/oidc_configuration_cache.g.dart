@@ -17,10 +17,7 @@ class OidcConfigurationCacheAdapter
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return OidcConfigurationCache(
-      fields[0] as String,
-      fields[1] as bool,
-    );
+    return OidcConfigurationCache(fields[0] as String, fields[1] as bool);
   }
 
   @override

@@ -7,11 +7,7 @@ part of 'ai_scribe_config.dart';
 // **************************************************************************
 
 AIScribeConfig _$AIScribeConfigFromJson(Map<String, dynamic> json) =>
-    AIScribeConfig(
-      isEnabled: json['isEnabled'] as bool? ?? true,
-    );
+    AIScribeConfig(isEnabled: json['isEnabled'] as bool? ?? true);
 
 Map<String, dynamic> _$AIScribeConfigToJson(AIScribeConfig instance) =>
-    <String, dynamic>{
-      'isEnabled': instance.isEnabled,
-    };
+    <String, dynamic>{'isEnabled': instance.isEnabled};

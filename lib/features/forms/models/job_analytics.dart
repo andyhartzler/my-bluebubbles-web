@@ -5,7 +5,7 @@ part 'job_analytics.g.dart';
 
 /// Individual analytics event for a job (view, apply click, etc.)
 @freezed
-class JobAnalyticsEvent with _$JobAnalyticsEvent {
+abstract class JobAnalyticsEvent with _$JobAnalyticsEvent {
   const factory JobAnalyticsEvent({
     required int id,
     @JsonKey(name: 'created_at') required DateTime createdAt,
@@ -138,7 +138,7 @@ class JobAnalyticsEvent with _$JobAnalyticsEvent {
 
 /// Summarized member interaction with a job
 @freezed
-class JobMemberInteraction with _$JobMemberInteraction {
+abstract class JobMemberInteraction with _$JobMemberInteraction {
   const factory JobMemberInteraction({
     required String id,
     @JsonKey(name: 'created_at') DateTime? createdAt,

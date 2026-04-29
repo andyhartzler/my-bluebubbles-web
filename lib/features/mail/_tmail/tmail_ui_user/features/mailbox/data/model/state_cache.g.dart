@@ -16,10 +16,7 @@ class StateCacheAdapter extends TypeAdapter<StateCache> {
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return StateCache(
-      fields[0] as StateType,
-      fields[1] as String,
-    );
+    return StateCache(fields[0] as StateType, fields[1] as String);
   }
 
   @override

@@ -21,7 +21,7 @@ _JobApplication _$JobApplicationFromJson(Map<String, dynamic> json) =>
       applicationData: json['application_data'] as Map<String, dynamic>?,
       customQuestionResponses:
           json['custom_question_responses'] as Map<String, dynamic>? ??
-              const {},
+          const {},
       status: json['status'] as String? ?? 'submitted',
       memberId: json['member_id'] as String?,
     );

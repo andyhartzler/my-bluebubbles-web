@@ -4,7 +4,7 @@ part 'knowledge_stats.freezed.dart';
 part 'knowledge_stats.g.dart';
 
 @freezed
-class KnowledgeStats with _$KnowledgeStats {
+abstract class KnowledgeStats with _$KnowledgeStats {
   const KnowledgeStats._();
 
   const factory KnowledgeStats({
@@ -28,7 +28,7 @@ class KnowledgeStats with _$KnowledgeStats {
 }
 
 @freezed
-class TableConfig with _$TableConfig {
+abstract class TableConfig with _$TableConfig {
   const factory TableConfig({
     @JsonKey(name: 'table_name') required String tableName,
     @JsonKey(name: 'is_enabled') @Default(false) bool isEnabled,

@@ -16,9 +16,7 @@ class SessionHiveObjAdapter extends TypeAdapter<SessionHiveObj> {
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return SessionHiveObj(
-      value: fields[0] as String,
-    );
+    return SessionHiveObj(value: fields[0] as String);
   }
 
   @override

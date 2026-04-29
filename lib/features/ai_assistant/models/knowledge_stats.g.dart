@@ -13,17 +13,19 @@ _KnowledgeStats _$KnowledgeStatsFromJson(Map<String, dynamic> json) =>
       failedEmbeddings: (json['failedEmbeddings'] as num?)?.toInt() ?? 0,
       documentsByTable:
           (json['documentsByTable'] as Map<String, dynamic>?)?.map(
-                (k, e) => MapEntry(k, (e as num).toInt()),
-              ) ??
-              const {},
-      documentsByType: (json['documentsByType'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(k, (e as num).toInt()),
+          ) ??
+          const {},
+      documentsByType:
+          (json['documentsByType'] as Map<String, dynamic>?)?.map(
             (k, e) => MapEntry(k, (e as num).toInt()),
           ) ??
           const {},
       monthlyUsageDollars:
           (json['monthlyUsageDollars'] as num?)?.toDouble() ?? 0.0,
       totalQueries: (json['totalQueries'] as num?)?.toInt() ?? 0,
-      tableConfigs: (json['tableConfigs'] as List<dynamic>?)
+      tableConfigs:
+          (json['tableConfigs'] as List<dynamic>?)
               ?.map((e) => TableConfig.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
@@ -42,15 +44,15 @@ Map<String, dynamic> _$KnowledgeStatsToJson(_KnowledgeStats instance) =>
     };
 
 _TableConfig _$TableConfigFromJson(Map<String, dynamic> json) => _TableConfig(
-      tableName: json['table_name'] as String,
-      isEnabled: json['is_enabled'] as bool? ?? false,
-      isDiscovered: json['is_discovered'] as bool? ?? false,
-      triggerInstalled: json['trigger_installed'] as bool? ?? false,
-      lastSyncAt: json['last_full_sync_at'] == null
-          ? null
-          : DateTime.parse(json['last_full_sync_at'] as String),
-      rowCount: (json['row_count'] as num?)?.toInt(),
-    );
+  tableName: json['table_name'] as String,
+  isEnabled: json['is_enabled'] as bool? ?? false,
+  isDiscovered: json['is_discovered'] as bool? ?? false,
+  triggerInstalled: json['trigger_installed'] as bool? ?? false,
+  lastSyncAt: json['last_full_sync_at'] == null
+      ? null
+      : DateTime.parse(json['last_full_sync_at'] as String),
+  rowCount: (json['row_count'] as num?)?.toInt(),
+);
 
 Map<String, dynamic> _$TableConfigToJson(_TableConfig instance) =>
     <String, dynamic>{

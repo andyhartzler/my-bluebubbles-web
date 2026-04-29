@@ -17,10 +17,7 @@ class RecentLoginUsernameCacheAdapter
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return RecentLoginUsernameCache(
-      fields[0] as String,
-      fields[1] as DateTime,
-    );
+    return RecentLoginUsernameCache(fields[0] as String, fields[1] as DateTime);
   }
 
   @override

@@ -30,8 +30,10 @@ class MailboxCacheAdapter extends TypeAdapter<MailboxCache> {
       isSubscribed: fields[10] as bool?,
       lastOpened: fields[11] as DateTime?,
       namespace: fields[12] as String?,
-      rights: (fields[13] as Map?)?.map((dynamic k, dynamic v) =>
-          MapEntry(k as String, (v as List?)?.cast<String>())),
+      rights: (fields[13] as Map?)?.map(
+        (dynamic k, dynamic v) =>
+            MapEntry(k as String, (v as List?)?.cast<String>()),
+      ),
     );
   }
 

@@ -4,7 +4,7 @@ part 'source_document.freezed.dart';
 part 'source_document.g.dart';
 
 @freezed
-class SourceDocument with _$SourceDocument {
+abstract class SourceDocument with _$SourceDocument {
   const factory SourceDocument({
     required String id,
     @JsonKey(name: 'source_type') required String sourceType,

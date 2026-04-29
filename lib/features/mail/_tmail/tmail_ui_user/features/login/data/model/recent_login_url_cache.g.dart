@@ -16,10 +16,7 @@ class RecentLoginUrlCacheAdapter extends TypeAdapter<RecentLoginUrlCache> {
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return RecentLoginUrlCache(
-      fields[0] as String,
-      fields[1] as DateTime,
-    );
+    return RecentLoginUrlCache(fields[0] as String, fields[1] as DateTime);
   }
 
   @override

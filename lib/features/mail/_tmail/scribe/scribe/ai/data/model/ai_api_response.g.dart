@@ -14,22 +14,18 @@ AIApiResponse _$AIApiResponseFromJson(Map<String, dynamic> json) =>
     );
 
 Map<String, dynamic> _$AIApiResponseToJson(AIApiResponse instance) =>
-    <String, dynamic>{
-      'choices': instance.choices,
-    };
+    <String, dynamic>{'choices': instance.choices};
 
-Choice _$ChoiceFromJson(Map<String, dynamic> json) => Choice(
-      message: Message.fromJson(json['message'] as Map<String, dynamic>),
-    );
+Choice _$ChoiceFromJson(Map<String, dynamic> json) =>
+    Choice(message: Message.fromJson(json['message'] as Map<String, dynamic>));
 
 Map<String, dynamic> _$ChoiceToJson(Choice instance) => <String, dynamic>{
-      'message': instance.message,
-    };
+  'message': instance.message,
+};
 
-Message _$MessageFromJson(Map<String, dynamic> json) => Message(
-      content: json['content'] as String,
-    );
+Message _$MessageFromJson(Map<String, dynamic> json) =>
+    Message(content: json['content'] as String);
 
 Map<String, dynamic> _$MessageToJson(Message instance) => <String, dynamic>{
-      'content': instance.content,
-    };
+  'content': instance.content,
+};

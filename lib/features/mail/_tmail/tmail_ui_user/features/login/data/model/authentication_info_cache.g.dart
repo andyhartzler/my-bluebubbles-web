@@ -17,10 +17,7 @@ class AuthenticationInfoCacheAdapter
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return AuthenticationInfoCache(
-      fields[0] as String,
-      fields[1] as String,
-    );
+    return AuthenticationInfoCache(fields[0] as String, fields[1] as String);
   }
 
   @override
