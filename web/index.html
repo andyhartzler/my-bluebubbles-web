@@ -395,12 +395,50 @@
         ua: (navigator.userAgent || '').slice(0, 256),
       });
 
+      // Flutter-originated event: bypasses record()'s DOM-event extraction
+      // and writes a properly-shaped row through the same pending/flush
+      // pipeline. Without this, Flutter Listener probes were silently
+      // accumulating in localStorage but never POSTing to Supabase, which
+      // is why pwa_debug_log had 900+ js rows and 0 flutter rows.
+      function recordFromFlutter(type, x, y, extraJson) {
+        try {
+          var extra = null;
+          if (extraJson) {
+            try { extra = JSON.parse(extraJson); } catch (_) {}
+          }
+          var entry = {
+            ts_client: new Date().toISOString(),
+            layer: 'flutter',
+            event_type: type,
+            x: x || 0,
+            y: y || 0,
+            target_path: 'flutter:_buildMobileTopBar',
+            user_agent: (navigator.userAgent || '').slice(0, 256),
+            display_mode: displayMode(),
+            standalone: isStandalone(),
+            session_id: SESSION_ID,
+            metadata: extra,
+          };
+          events.push(entry);
+          if (events.length > 50) events.splice(0, events.length - 50);
+          saveLocal(events);
+          pending.push(entry);
+          scheduleFlush();
+          ensureHud();
+          paintHud();
+          if (window.console && console.debug) {
+            console.debug('[PWA-DIAG-FLT]', type, x, y);
+          }
+        } catch (_) {}
+      }
+
       // Public hooks for Flutter to push its own events through the same pipe,
       // and for manual inspection in DevTools.
       window.__pwaTapDiag = {
         events: events,
         sessionId: SESSION_ID,
         record: record,
+        recordFromFlutter: recordFromFlutter,
         flush: scheduleFlush,
         clearLocal: function () { try { localStorage.removeItem(LS_KEY); } catch (_) {} },
       };

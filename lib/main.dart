@@ -79,6 +79,7 @@ import 'package:system_tray/system_tray.dart' as st;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:tray_manager/tray_manager.dart';
+import 'dart:js' as js;
 import 'package:universal_html/html.dart' as html;
 import 'package:universal_io/io.dart';
 import 'package:window_manager/window_manager.dart';
@@ -1510,53 +1511,23 @@ class _HomeState extends OptimizedState<Home>
   }
 
   // DIAGNOSTIC INSTRUMENTATION (temporary) — DIAG-PWA-TOPBAR.
-  // Pushes a pointer-event marker into the JS-side __pwaTapDiag pipe so
-  // we can compare what the JS document-level listener saw vs what
-  // Flutter actually got. Removed once the dead-tap root cause is found.
+  // ROOT CAUSE the prior agent missed: writing rows to localStorage and
+  // console.debug never reaches Supabase. The JS-side flush only POSTs
+  // entries pushed onto its `pending` array via record()/recordFromFlutter().
+  // That's why pwa_debug_log shows 900+ js rows and 0 flutter rows across
+  // every session. Fix: actually call window.__pwaTapDiag.recordFromFlutter
+  // via dart:js so the row enters the same pending/flush pipeline.
   void _pwaDiagPush(String type, {double? x, double? y, String? extra}) {
     if (!kIsWeb) return;
     try {
-      final w = html.window;
-      // Use JSON.stringify-friendly object via JS interop. universal_html
-      // exposes window.callMethod which forwards to the JS function with
-      // a JSON-encoded payload.
-      final payload = <String, dynamic>{
-        'event_type': type,
-        if (x != null) 'x': x,
-        if (y != null) 'y': y,
-        'metadata': {
-          'from': 'flutter_listener',
-          'topbar': 'mobile',
-          if (extra != null) 'extra': extra,
-        },
-      };
-      // Cheapest cross-bridge: stash the JSON on a known global that the
-      // diag JS can read. We use eval through window.console since
-      // universal_html doesn't expose a clean callMethod helper for nested
-      // objects on every browser.
-      final encoded = jsonEncode(payload);
-      // ignore: undefined_prefixed_name
-      w.console.debug('[PWA-DIAG-FLUTTER] $type $encoded');
-      // Also write to localStorage so the same rolling buffer captures it.
-      try {
-        final raw = w.localStorage['pwa_tap_diag_v1'] ?? '[]';
-        final decoded = jsonDecode(raw);
-        final arr = decoded is List ? decoded : <dynamic>[];
-        arr.add({
-          'ts_client': DateTime.now().toUtc().toIso8601String(),
-          'layer': 'flutter',
-          'event_type': type,
-          'x': x,
-          'y': y,
-          'target_path': 'flutter:_buildMobileTopBar',
-          'session_id': w.sessionStorage['pwa_tap_diag_session'] ?? 'flt',
-          'metadata': payload['metadata'],
-        });
-        while (arr.length > 80) {
-          arr.removeAt(0);
-        }
-        w.localStorage['pwa_tap_diag_v1'] = jsonEncode(arr);
-      } catch (_) {}
+      final diag = js.context['__pwaTapDiag'];
+      if (diag == null) return;
+      final extraJson = jsonEncode({
+        'from': 'flutter_listener',
+        'topbar': 'mobile',
+        if (extra != null) 'extra': extra,
+      });
+      diag.callMethod('recordFromFlutter', [type, x ?? 0, y ?? 0, extraJson]);
     } catch (_) {}
   }
 
@@ -1650,7 +1621,10 @@ class _HomeState extends OptimizedState<Home>
                     message: 'Open navigation menu',
                     child: InkWell(
                       borderRadius: BorderRadius.circular(24),
-                      onTap: () => _showMobileMenu(context, crmReady),
+                      onTap: () {
+                        _pwaDiagPush('flutter_inkwell_ontap', extra: 'hamburger');
+                        _showMobileMenu(context, crmReady);
+                      },
                       child: const Padding(
                         padding: EdgeInsets.all(12),
                         child: Icon(Icons.menu),
@@ -1675,7 +1649,10 @@ class _HomeState extends OptimizedState<Home>
                     child: InkWell(
                       borderRadius: BorderRadius.circular(24),
                       onTap: crmReady
-                          ? () => _openGlobalSearch(context)
+                          ? () {
+                              _pwaDiagPush('flutter_inkwell_ontap', extra: 'search');
+                              _openGlobalSearch(context);
+                            }
                           : null,
                       child: Padding(
                         padding: const EdgeInsets.all(12),
