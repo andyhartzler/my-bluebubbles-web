@@ -86,11 +86,11 @@ class _EmbeddedMediaState extends CustomState<EmbeddedMedia, void, MessageWidget
   }
 
   @override
-  void updateWidget(void _) {
+  void updateWidget(void val) {
     if (File(message.interactiveMediaPath!).existsSync()) {
       File(message.interactiveMediaPath!).deleteSync();
       content = null;
-      super.updateWidget(_);
+      super.updateWidget(val);
       getContent();
     }
   }

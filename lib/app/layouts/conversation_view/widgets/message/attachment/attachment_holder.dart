@@ -81,9 +81,9 @@ class _AttachmentHolderState extends CustomState<AttachmentHolder, void, Message
   }
 
   @override
-  void updateWidget(void _) {
+  void updateWidget(void val) {
     updateContent();
-    super.updateWidget(_);
+    super.updateWidget(val);
   }
 
   void onComplete(PlatformFile file) {

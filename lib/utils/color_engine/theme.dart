@@ -124,22 +124,22 @@ class DynamicColorScheme extends ColorScheme {
   // Main background color. Tinted with the primary color.
   @override
   ColorSwatch get neutral1 =>
-      _transformSwatch(targetColors.neutral1, primaryNeutral, (_) => _);
+      _transformSwatch(targetColors.neutral1, primaryNeutral, (x) => x);
 
   // Secondary background color. Slightly tinted with the primary color.
   @override
   ColorSwatch get neutral2 =>
-      _transformSwatch(targetColors.neutral2, primaryNeutral, (_) => _);
+      _transformSwatch(targetColors.neutral2, primaryNeutral, (x) => x);
 
   // Main accent color. Generally, this is close to the primary color.
   @override
   ColorSwatch get accent1 =>
-      _transformSwatch(targetColors.accent1, primaryAccent, (_) => _);
+      _transformSwatch(targetColors.accent1, primaryAccent, (x) => x);
 
   // Secondary accent color. Darker shades of accent1.
   @override
   ColorSwatch get accent2 =>
-      _transformSwatch(targetColors.accent2, primaryAccent, (_) => _);
+      _transformSwatch(targetColors.accent2, primaryAccent, (x) => x);
 
   // Tertiary accent color. Primary color shifted to the next secondary color via hue offset.
   @override

@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'dart:html' as html;
 import 'dart:ui' as ui;
 import 'dart:js' as js;
-// dart:js no longer re-exports allowInterop in newer Dart SDKs — pull it
-// from dart:js_util directly.
-import 'dart:js_util' show allowInterop;
+// dart:js_interop's `.toJS` getter on Function is the modern replacement
+// for allowInterop and is cross-platform-resolvable by flutter analyze.
+import 'dart:js_interop';
 import '../utils/mapkit_token_manager.dart';
+
+// Shim: re-introduce an `allowInterop`-style helper that works on the new
+// SDK. Returns a JSFunction; legacy `dart:js` callMethod still accepts it.
+Object allowInterop(Function f) => f.toJS;
 
 class EventMapWidget extends StatefulWidget {
   final String location;

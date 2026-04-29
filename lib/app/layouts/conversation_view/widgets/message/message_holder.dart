@@ -109,9 +109,9 @@ class _MessageHolderState extends CustomState<MessageHolder, void, MessageWidget
   }
 
   @override
-  void updateWidget(void _) {
+  void updateWidget(void val) {
     messageParts = controller.parts;
-    super.updateWidget(_);
+    super.updateWidget(val);
   }
 
   List<Color> getBubbleColors() {
