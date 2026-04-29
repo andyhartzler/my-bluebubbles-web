@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
+import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1458,8 +1459,7 @@ class _MeetingRecordingEmbedState extends State<MeetingRecordingEmbed> {
           throw Exception('Forced registration failure for testing');
         }
 
-        // ignore: undefined_prefixed_name
-        ui.platformViewRegistry.registerViewFactory(
+        ui_web.platformViewRegistry.registerViewFactory(
           _viewType,
           (int viewId) {
             final element = html.IFrameElement()

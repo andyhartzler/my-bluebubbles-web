@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:html' as html;
-import 'dart:ui' as ui;
+import 'dart:ui_web' as ui_web;
 import 'dart:js' as js;
 // dart:js_interop's `.toJS` getter on Function is the modern replacement
 // for allowInterop and is cross-platform-resolvable by flutter analyze.
@@ -9,7 +9,10 @@ import '../utils/mapkit_token_manager.dart';
 
 // Shim: re-introduce an `allowInterop`-style helper that works on the new
 // SDK. Returns a JSFunction; legacy `dart:js` callMethod still accepts it.
-Object allowInterop(Function f) => f.toJS;
+// Use a precise function type so toJS is happy under dart2js.
+JSFunction _ai0(void Function() f) => f.toJS;
+JSFunction _ai1(void Function(dynamic) f) => f.toJS;
+JSFunction _ai2(void Function(dynamic, dynamic) f) => f.toJS;
 
 class EventMapWidget extends StatefulWidget {
   final String location;
@@ -58,7 +61,7 @@ class _EventMapWidgetState extends State<EventMapWidget> with AutomaticKeepAlive
     print('[EventMap] Starting map initialization for ${widget.location}');
 
     // ignore: undefined_prefixed_name
-    ui.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
+    ui_web.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
       print('[EventMap] Platform view factory called with viewId: $viewId');
 
       _actualViewId = viewId;
@@ -126,7 +129,7 @@ class _EventMapWidgetState extends State<EventMapWidget> with AutomaticKeepAlive
 
       try {
         js.context.callMethod('whenMapKitReady', [
-          allowInterop(() {
+          _ai0(() {
             print('[EventMap] MapKit is ready, initializing...');
             _initializeMapKit();
           })
@@ -166,7 +169,7 @@ class _EventMapWidgetState extends State<EventMapWidget> with AutomaticKeepAlive
         print('[EventMap] First MapKit initialization');
 
         js.JsObject authCallback = js.JsObject.jsify({
-          'authorizationCallback': allowInterop((done) {
+          'authorizationCallback': _ai1((done) {
             print('[EventMap] Authorization callback invoked');
             js.JsFunction doneFunc = done as js.JsFunction;
             doneFunc.apply([token]);
@@ -228,7 +231,7 @@ class _EventMapWidgetState extends State<EventMapWidget> with AutomaticKeepAlive
 
       geocoder.callMethod('lookup', [
         addressToGeocode,
-        allowInterop((error, data) {
+        _ai2((error, data) {
           if (error != null) {
             print('[EventMap] Geocoding error: $error');
             if (mounted) {
