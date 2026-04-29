@@ -1,6 +1,7 @@
 import 'dart:core';
 
 import 'package:bluebubbles/database/database.dart';
+import 'package:bluebubbles/database/global/theme_colors.dart';
 import 'package:bluebubbles/objectbox.dart';
 import 'package:bluebubbles/database/io/theme_entry.dart';
 import 'package:bluebubbles/services/services.dart';

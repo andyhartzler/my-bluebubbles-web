@@ -16,7 +16,10 @@ export 'package:bluebubbles/database/io/launch_at_startup.dart'
     if (dart.library.html) 'package:bluebubbles/database/html/launch_at_startup.dart';
 export 'package:bluebubbles/database/io/message.dart'
     if (dart.library.html) 'package:bluebubbles/database/html/message.dart';
-export 'package:bluebubbles/objectbox.dart';
+// objectbox 5.x exports a `Version` symbol that collides with package:version's
+// Version. We use the latter throughout the app for SemVer parsing, so hide
+// objectbox's Version here.
+export 'package:bluebubbles/objectbox.dart' hide Version;
 export 'package:bluebubbles/database/io/theme.dart'
     if (dart.library.html) 'package:bluebubbles/database/html/theme.dart';
 export 'package:bluebubbles/database/io/theme_entry.dart'

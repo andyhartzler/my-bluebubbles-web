@@ -8,7 +8,7 @@ part of 'account_cache.dart';
 
 class AccountCacheAdapter extends TypeAdapter<AccountCache> {
   @override
-  final int typeId = 9;
+  final typeId = 9;
 
   @override
   AccountCache read(BinaryReader reader) {

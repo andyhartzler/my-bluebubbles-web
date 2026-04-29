@@ -2,7 +2,7 @@
 // Do not modify
 // Check in to version control
 
-import 'package:hive_ce/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/caching/entries/sentry_configuration_cache.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/caching/entries/sentry_user_cache.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/home/data/model/session_hive_obj.dart';
@@ -27,6 +27,33 @@ import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread/d
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/thread/data/model/email_cache.dart';
 
 extension HiveRegistrar on HiveInterface {
+  void registerAdapters() {
+    registerAdapter(AccountCacheAdapter());
+    registerAdapter(AttachmentHiveCacheAdapter());
+    registerAdapter(AuthenticationInfoCacheAdapter());
+    registerAdapter(DetailedEmailHiveCacheAdapter());
+    registerAdapter(EmailAddressHiveCacheAdapter());
+    registerAdapter(EmailCacheAdapter());
+    registerAdapter(EmailHeaderHiveCacheAdapter());
+    registerAdapter(EncryptionKeyCacheAdapter());
+    registerAdapter(FirebaseRegistrationCacheAdapter());
+    registerAdapter(MailboxCacheAdapter());
+    registerAdapter(MailboxRightsCacheAdapter());
+    registerAdapter(OidcConfigurationCacheAdapter());
+    registerAdapter(RecentLoginUrlCacheAdapter());
+    registerAdapter(RecentLoginUsernameCacheAdapter());
+    registerAdapter(RecentSearchCacheAdapter());
+    registerAdapter(SendingEmailHiveCacheAdapter());
+    registerAdapter(SentryConfigurationCacheAdapter());
+    registerAdapter(SentryUserCacheAdapter());
+    registerAdapter(SessionHiveObjAdapter());
+    registerAdapter(StateCacheAdapter());
+    registerAdapter(StateTypeAdapter());
+    registerAdapter(TokenOidcCacheAdapter());
+  }
+}
+
+extension IsolatedHiveRegistrar on IsolatedHiveInterface {
   void registerAdapters() {
     registerAdapter(AccountCacheAdapter());
     registerAdapter(AttachmentHiveCacheAdapter());

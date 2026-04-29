@@ -8,7 +8,7 @@ part of 'state_type.dart';
 
 class StateTypeAdapter extends TypeAdapter<StateType> {
   @override
-  final int typeId = 4;
+  final typeId = 4;
 
   @override
   StateType read(BinaryReader reader) {

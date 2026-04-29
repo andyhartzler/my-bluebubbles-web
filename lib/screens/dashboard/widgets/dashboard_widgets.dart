@@ -552,7 +552,7 @@ class BarChartWidget extends StatelessWidget {
         barTouchData: BarTouchData(
           enabled: true,
           touchTooltipData: BarTouchTooltipData(
-            tooltipBgColor: _unityBlue.withOpacity(0.95),
+            getTooltipColor: (_) => _unityBlue.withOpacity(0.95),
             tooltipRoundedRadius: 8,
             fitInsideHorizontally: true,
             fitInsideVertically: true,
@@ -1077,7 +1077,7 @@ class _DynamicDistributionChartWidgetState
         barTouchData: BarTouchData(
           enabled: true,
           touchTooltipData: BarTouchTooltipData(
-            tooltipBgColor: _unityBlue.withOpacity(0.95),
+            getTooltipColor: (_) => _unityBlue.withOpacity(0.95),
             tooltipRoundedRadius: 8,
             fitInsideHorizontally: true,
             fitInsideVertically: true,
@@ -1794,7 +1794,7 @@ class LineChartWidget extends StatelessWidget {
                       ],
                       lineTouchData: LineTouchData(
                         touchTooltipData: LineTouchTooltipData(
-                          tooltipBgColor: _unityBlue.withOpacity(0.9),
+                          getTooltipColor: (_) => _unityBlue.withOpacity(0.9),
                           getTooltipItems: (touchedSpots) {
                             return touchedSpots.map((spot) {
                               final entry = sortedData[spot.x.toInt()];

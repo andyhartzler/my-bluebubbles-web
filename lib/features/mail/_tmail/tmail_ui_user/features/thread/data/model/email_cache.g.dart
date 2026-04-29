@@ -8,7 +8,7 @@ part of 'email_cache.dart';
 
 class EmailCacheAdapter extends TypeAdapter<EmailCache> {
   @override
-  final int typeId = 5;
+  final typeId = 5;
 
   @override
   EmailCache read(BinaryReader reader) {

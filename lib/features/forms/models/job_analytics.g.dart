@@ -6,9 +6,8 @@ part of 'job_analytics.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$JobAnalyticsEventImpl _$$JobAnalyticsEventImplFromJson(
-        Map<String, dynamic> json) =>
-    _$JobAnalyticsEventImpl(
+_JobAnalyticsEvent _$JobAnalyticsEventFromJson(Map<String, dynamic> json) =>
+    _JobAnalyticsEvent(
       id: (json['id'] as num).toInt(),
       createdAt: DateTime.parse(json['created_at'] as String),
       jobId: json['job_id'] as String,
@@ -54,8 +53,7 @@ _$JobAnalyticsEventImpl _$$JobAnalyticsEventImplFromJson(
           .toList(),
     );
 
-Map<String, dynamic> _$$JobAnalyticsEventImplToJson(
-        _$JobAnalyticsEventImpl instance) =>
+Map<String, dynamic> _$JobAnalyticsEventToJson(_JobAnalyticsEvent instance) =>
     <String, dynamic>{
       'id': instance.id,
       'created_at': instance.createdAt.toIso8601String(),
@@ -100,9 +98,9 @@ Map<String, dynamic> _$$JobAnalyticsEventImplToJson(
       'languages': instance.languages,
     };
 
-_$JobMemberInteractionImpl _$$JobMemberInteractionImplFromJson(
+_JobMemberInteraction _$JobMemberInteractionFromJson(
         Map<String, dynamic> json) =>
-    _$JobMemberInteractionImpl(
+    _JobMemberInteraction(
       id: json['id'] as String,
       createdAt: json['created_at'] == null
           ? null
@@ -182,8 +180,8 @@ _$JobMemberInteractionImpl _$$JobMemberInteractionImplFromJson(
       lastExternalApplyUrl: json['last_external_apply_url'] as String?,
     );
 
-Map<String, dynamic> _$$JobMemberInteractionImplToJson(
-        _$JobMemberInteractionImpl instance) =>
+Map<String, dynamic> _$JobMemberInteractionToJson(
+        _JobMemberInteraction instance) =>
     <String, dynamic>{
       'id': instance.id,
       'created_at': instance.createdAt?.toIso8601String(),

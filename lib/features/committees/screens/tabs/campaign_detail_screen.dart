@@ -645,7 +645,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                   barTouchData: BarTouchData(
                     enabled: true,
                     touchTooltipData: BarTouchTooltipData(
-                      tooltipBgColor: Colors.white,
+                      getTooltipColor: (_) => Colors.white,
                       getTooltipItem: (group, groupIndex, rod, rodIndex) {
                         return BarTooltipItem(
                           '${displayEntries[groupIndex].key}\n${rod.toY.toInt()} participants',
@@ -960,7 +960,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                   barTouchData: BarTouchData(
                     enabled: true,
                     touchTooltipData: BarTouchTooltipData(
-                      tooltipBgColor: Colors.white,
+                      getTooltipColor: (_) => Colors.white,
                       getTooltipItem: (group, groupIndex, rod, rodIndex) {
                         return BarTooltipItem(
                           'ZIP ${topZips[groupIndex].key}\n${rod.toY.toInt()} participants',

@@ -9,7 +9,7 @@ part of 'recent_login_username_cache.dart';
 class RecentLoginUsernameCacheAdapter
     extends TypeAdapter<RecentLoginUsernameCache> {
   @override
-  final int typeId = 13;
+  final typeId = 13;
 
   @override
   RecentLoginUsernameCache read(BinaryReader reader) {

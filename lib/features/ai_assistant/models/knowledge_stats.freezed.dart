@@ -1,5 +1,5 @@
-// coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// coverage:ignore-file
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
@@ -9,121 +9,78 @@ part of 'knowledge_stats.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// dart format off
 T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
-
-KnowledgeStats _$KnowledgeStatsFromJson(Map<String, dynamic> json) {
-  return _KnowledgeStats.fromJson(json);
-}
 
 /// @nodoc
 mixin _$KnowledgeStats {
-  int get totalDocuments => throw _privateConstructorUsedError;
-  int get pendingEmbeddings => throw _privateConstructorUsedError;
-  int get failedEmbeddings => throw _privateConstructorUsedError;
-  Map<String, int> get documentsByTable => throw _privateConstructorUsedError;
-  Map<String, int> get documentsByType => throw _privateConstructorUsedError;
-  double get monthlyUsageDollars => throw _privateConstructorUsedError;
-  int get totalQueries => throw _privateConstructorUsedError;
-  List<TableConfig> get tableConfigs => throw _privateConstructorUsedError;
-
-  /// Serializes this KnowledgeStats to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  int get totalDocuments;
+  int get pendingEmbeddings;
+  int get failedEmbeddings;
+  Map<String, int> get documentsByTable;
+  Map<String, int> get documentsByType;
+  double get monthlyUsageDollars;
+  int get totalQueries;
+  List<TableConfig> get tableConfigs;
 
   /// Create a copy of KnowledgeStats
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
-  $KnowledgeStatsCopyWith<KnowledgeStats> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $KnowledgeStatsCopyWith<$Res> {
-  factory $KnowledgeStatsCopyWith(
-          KnowledgeStats value, $Res Function(KnowledgeStats) then) =
-      _$KnowledgeStatsCopyWithImpl<$Res, KnowledgeStats>;
-  @useResult
-  $Res call(
-      {int totalDocuments,
-      int pendingEmbeddings,
-      int failedEmbeddings,
-      Map<String, int> documentsByTable,
-      Map<String, int> documentsByType,
-      double monthlyUsageDollars,
-      int totalQueries,
-      List<TableConfig> tableConfigs});
-}
-
-/// @nodoc
-class _$KnowledgeStatsCopyWithImpl<$Res, $Val extends KnowledgeStats>
-    implements $KnowledgeStatsCopyWith<$Res> {
-  _$KnowledgeStatsCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of KnowledgeStats
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
+  $KnowledgeStatsCopyWith<KnowledgeStats> get copyWith =>
+      _$KnowledgeStatsCopyWithImpl<KnowledgeStats>(
+          this as KnowledgeStats, _$identity);
+
+  /// Serializes this KnowledgeStats to a JSON map.
+  Map<String, dynamic> toJson();
+
   @override
-  $Res call({
-    Object? totalDocuments = null,
-    Object? pendingEmbeddings = null,
-    Object? failedEmbeddings = null,
-    Object? documentsByTable = null,
-    Object? documentsByType = null,
-    Object? monthlyUsageDollars = null,
-    Object? totalQueries = null,
-    Object? tableConfigs = null,
-  }) {
-    return _then(_value.copyWith(
-      totalDocuments: null == totalDocuments
-          ? _value.totalDocuments
-          : totalDocuments // ignore: cast_nullable_to_non_nullable
-              as int,
-      pendingEmbeddings: null == pendingEmbeddings
-          ? _value.pendingEmbeddings
-          : pendingEmbeddings // ignore: cast_nullable_to_non_nullable
-              as int,
-      failedEmbeddings: null == failedEmbeddings
-          ? _value.failedEmbeddings
-          : failedEmbeddings // ignore: cast_nullable_to_non_nullable
-              as int,
-      documentsByTable: null == documentsByTable
-          ? _value.documentsByTable
-          : documentsByTable // ignore: cast_nullable_to_non_nullable
-              as Map<String, int>,
-      documentsByType: null == documentsByType
-          ? _value.documentsByType
-          : documentsByType // ignore: cast_nullable_to_non_nullable
-              as Map<String, int>,
-      monthlyUsageDollars: null == monthlyUsageDollars
-          ? _value.monthlyUsageDollars
-          : monthlyUsageDollars // ignore: cast_nullable_to_non_nullable
-              as double,
-      totalQueries: null == totalQueries
-          ? _value.totalQueries
-          : totalQueries // ignore: cast_nullable_to_non_nullable
-              as int,
-      tableConfigs: null == tableConfigs
-          ? _value.tableConfigs
-          : tableConfigs // ignore: cast_nullable_to_non_nullable
-              as List<TableConfig>,
-    ) as $Val);
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is KnowledgeStats &&
+            (identical(other.totalDocuments, totalDocuments) ||
+                other.totalDocuments == totalDocuments) &&
+            (identical(other.pendingEmbeddings, pendingEmbeddings) ||
+                other.pendingEmbeddings == pendingEmbeddings) &&
+            (identical(other.failedEmbeddings, failedEmbeddings) ||
+                other.failedEmbeddings == failedEmbeddings) &&
+            const DeepCollectionEquality()
+                .equals(other.documentsByTable, documentsByTable) &&
+            const DeepCollectionEquality()
+                .equals(other.documentsByType, documentsByType) &&
+            (identical(other.monthlyUsageDollars, monthlyUsageDollars) ||
+                other.monthlyUsageDollars == monthlyUsageDollars) &&
+            (identical(other.totalQueries, totalQueries) ||
+                other.totalQueries == totalQueries) &&
+            const DeepCollectionEquality()
+                .equals(other.tableConfigs, tableConfigs));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+      runtimeType,
+      totalDocuments,
+      pendingEmbeddings,
+      failedEmbeddings,
+      const DeepCollectionEquality().hash(documentsByTable),
+      const DeepCollectionEquality().hash(documentsByType),
+      monthlyUsageDollars,
+      totalQueries,
+      const DeepCollectionEquality().hash(tableConfigs));
+
+  @override
+  String toString() {
+    return 'KnowledgeStats(totalDocuments: $totalDocuments, pendingEmbeddings: $pendingEmbeddings, failedEmbeddings: $failedEmbeddings, documentsByTable: $documentsByTable, documentsByType: $documentsByType, monthlyUsageDollars: $monthlyUsageDollars, totalQueries: $totalQueries, tableConfigs: $tableConfigs)';
   }
 }
 
 /// @nodoc
-abstract class _$$KnowledgeStatsImplCopyWith<$Res>
-    implements $KnowledgeStatsCopyWith<$Res> {
-  factory _$$KnowledgeStatsImplCopyWith(_$KnowledgeStatsImpl value,
-          $Res Function(_$KnowledgeStatsImpl) then) =
-      __$$KnowledgeStatsImplCopyWithImpl<$Res>;
-  @override
+abstract mixin class $KnowledgeStatsCopyWith<$Res> {
+  factory $KnowledgeStatsCopyWith(
+          KnowledgeStats value, $Res Function(KnowledgeStats) _then) =
+      _$KnowledgeStatsCopyWithImpl;
   @useResult
   $Res call(
       {int totalDocuments,
@@ -137,12 +94,12 @@ abstract class _$$KnowledgeStatsImplCopyWith<$Res>
 }
 
 /// @nodoc
-class __$$KnowledgeStatsImplCopyWithImpl<$Res>
-    extends _$KnowledgeStatsCopyWithImpl<$Res, _$KnowledgeStatsImpl>
-    implements _$$KnowledgeStatsImplCopyWith<$Res> {
-  __$$KnowledgeStatsImplCopyWithImpl(
-      _$KnowledgeStatsImpl _value, $Res Function(_$KnowledgeStatsImpl) _then)
-      : super(_value, _then);
+class _$KnowledgeStatsCopyWithImpl<$Res>
+    implements $KnowledgeStatsCopyWith<$Res> {
+  _$KnowledgeStatsCopyWithImpl(this._self, this._then);
+
+  final KnowledgeStats _self;
+  final $Res Function(KnowledgeStats) _then;
 
   /// Create a copy of KnowledgeStats
   /// with the given fields replaced by the non-null parameter values.
@@ -158,47 +115,255 @@ class __$$KnowledgeStatsImplCopyWithImpl<$Res>
     Object? totalQueries = null,
     Object? tableConfigs = null,
   }) {
-    return _then(_$KnowledgeStatsImpl(
+    return _then(_self.copyWith(
       totalDocuments: null == totalDocuments
-          ? _value.totalDocuments
+          ? _self.totalDocuments
           : totalDocuments // ignore: cast_nullable_to_non_nullable
               as int,
       pendingEmbeddings: null == pendingEmbeddings
-          ? _value.pendingEmbeddings
+          ? _self.pendingEmbeddings
           : pendingEmbeddings // ignore: cast_nullable_to_non_nullable
               as int,
       failedEmbeddings: null == failedEmbeddings
-          ? _value.failedEmbeddings
+          ? _self.failedEmbeddings
           : failedEmbeddings // ignore: cast_nullable_to_non_nullable
               as int,
       documentsByTable: null == documentsByTable
-          ? _value._documentsByTable
+          ? _self.documentsByTable
           : documentsByTable // ignore: cast_nullable_to_non_nullable
               as Map<String, int>,
       documentsByType: null == documentsByType
-          ? _value._documentsByType
+          ? _self.documentsByType
           : documentsByType // ignore: cast_nullable_to_non_nullable
               as Map<String, int>,
       monthlyUsageDollars: null == monthlyUsageDollars
-          ? _value.monthlyUsageDollars
+          ? _self.monthlyUsageDollars
           : monthlyUsageDollars // ignore: cast_nullable_to_non_nullable
               as double,
       totalQueries: null == totalQueries
-          ? _value.totalQueries
+          ? _self.totalQueries
           : totalQueries // ignore: cast_nullable_to_non_nullable
               as int,
       tableConfigs: null == tableConfigs
-          ? _value._tableConfigs
+          ? _self.tableConfigs
           : tableConfigs // ignore: cast_nullable_to_non_nullable
               as List<TableConfig>,
     ));
   }
 }
 
+/// Adds pattern-matching-related methods to [KnowledgeStats].
+extension KnowledgeStatsPatterns on KnowledgeStats {
+  /// A variant of `map` that fallback to returning `orElse`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_KnowledgeStats value)? $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _KnowledgeStats() when $default != null:
+        return $default(_that);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// Callbacks receives the raw object, upcasted.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case final Subclass2 value:
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_KnowledgeStats value) $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _KnowledgeStats():
+        return $default(_that);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `map` that fallback to returning `null`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_KnowledgeStats value)? $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _KnowledgeStats() when $default != null:
+        return $default(_that);
+      case _:
+        return null;
+    }
+  }
+
+  /// A variant of `when` that fallback to an `orElse` callback.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(
+            int totalDocuments,
+            int pendingEmbeddings,
+            int failedEmbeddings,
+            Map<String, int> documentsByTable,
+            Map<String, int> documentsByType,
+            double monthlyUsageDollars,
+            int totalQueries,
+            List<TableConfig> tableConfigs)?
+        $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _KnowledgeStats() when $default != null:
+        return $default(
+            _that.totalDocuments,
+            _that.pendingEmbeddings,
+            _that.failedEmbeddings,
+            _that.documentsByTable,
+            _that.documentsByType,
+            _that.monthlyUsageDollars,
+            _that.totalQueries,
+            _that.tableConfigs);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// As opposed to `map`, this offers destructuring.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case Subclass2(:final field2):
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(
+            int totalDocuments,
+            int pendingEmbeddings,
+            int failedEmbeddings,
+            Map<String, int> documentsByTable,
+            Map<String, int> documentsByType,
+            double monthlyUsageDollars,
+            int totalQueries,
+            List<TableConfig> tableConfigs)
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _KnowledgeStats():
+        return $default(
+            _that.totalDocuments,
+            _that.pendingEmbeddings,
+            _that.failedEmbeddings,
+            _that.documentsByTable,
+            _that.documentsByType,
+            _that.monthlyUsageDollars,
+            _that.totalQueries,
+            _that.tableConfigs);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `when` that fallback to returning `null`
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(
+            int totalDocuments,
+            int pendingEmbeddings,
+            int failedEmbeddings,
+            Map<String, int> documentsByTable,
+            Map<String, int> documentsByType,
+            double monthlyUsageDollars,
+            int totalQueries,
+            List<TableConfig> tableConfigs)?
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _KnowledgeStats() when $default != null:
+        return $default(
+            _that.totalDocuments,
+            _that.pendingEmbeddings,
+            _that.failedEmbeddings,
+            _that.documentsByTable,
+            _that.documentsByType,
+            _that.monthlyUsageDollars,
+            _that.totalQueries,
+            _that.tableConfigs);
+      case _:
+        return null;
+    }
+  }
+}
+
 /// @nodoc
 @JsonSerializable()
-class _$KnowledgeStatsImpl extends _KnowledgeStats {
-  const _$KnowledgeStatsImpl(
+class _KnowledgeStats extends KnowledgeStats {
+  const _KnowledgeStats(
       {this.totalDocuments = 0,
       this.pendingEmbeddings = 0,
       this.failedEmbeddings = 0,
@@ -211,9 +376,8 @@ class _$KnowledgeStatsImpl extends _KnowledgeStats {
         _documentsByType = documentsByType,
         _tableConfigs = tableConfigs,
         super._();
-
-  factory _$KnowledgeStatsImpl.fromJson(Map<String, dynamic> json) =>
-      _$$KnowledgeStatsImplFromJson(json);
+  factory _KnowledgeStats.fromJson(Map<String, dynamic> json) =>
+      _$KnowledgeStatsFromJson(json);
 
   @override
   @JsonKey()
@@ -257,16 +421,26 @@ class _$KnowledgeStatsImpl extends _KnowledgeStats {
     return EqualUnmodifiableListView(_tableConfigs);
   }
 
+  /// Create a copy of KnowledgeStats
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  String toString() {
-    return 'KnowledgeStats(totalDocuments: $totalDocuments, pendingEmbeddings: $pendingEmbeddings, failedEmbeddings: $failedEmbeddings, documentsByTable: $documentsByTable, documentsByType: $documentsByType, monthlyUsageDollars: $monthlyUsageDollars, totalQueries: $totalQueries, tableConfigs: $tableConfigs)';
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  _$KnowledgeStatsCopyWith<_KnowledgeStats> get copyWith =>
+      __$KnowledgeStatsCopyWithImpl<_KnowledgeStats>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$KnowledgeStatsToJson(
+      this,
+    );
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$KnowledgeStatsImpl &&
+            other is _KnowledgeStats &&
             (identical(other.totalDocuments, totalDocuments) ||
                 other.totalDocuments == totalDocuments) &&
             (identical(other.pendingEmbeddings, pendingEmbeddings) ||
@@ -298,165 +472,150 @@ class _$KnowledgeStatsImpl extends _KnowledgeStats {
       totalQueries,
       const DeepCollectionEquality().hash(_tableConfigs));
 
-  /// Create a copy of KnowledgeStats
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  @pragma('vm:prefer-inline')
-  _$$KnowledgeStatsImplCopyWith<_$KnowledgeStatsImpl> get copyWith =>
-      __$$KnowledgeStatsImplCopyWithImpl<_$KnowledgeStatsImpl>(
-          this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$KnowledgeStatsImplToJson(
-      this,
-    );
+  String toString() {
+    return 'KnowledgeStats(totalDocuments: $totalDocuments, pendingEmbeddings: $pendingEmbeddings, failedEmbeddings: $failedEmbeddings, documentsByTable: $documentsByTable, documentsByType: $documentsByType, monthlyUsageDollars: $monthlyUsageDollars, totalQueries: $totalQueries, tableConfigs: $tableConfigs)';
   }
 }
 
-abstract class _KnowledgeStats extends KnowledgeStats {
-  const factory _KnowledgeStats(
-      {final int totalDocuments,
-      final int pendingEmbeddings,
-      final int failedEmbeddings,
-      final Map<String, int> documentsByTable,
-      final Map<String, int> documentsByType,
-      final double monthlyUsageDollars,
-      final int totalQueries,
-      final List<TableConfig> tableConfigs}) = _$KnowledgeStatsImpl;
-  const _KnowledgeStats._() : super._();
+/// @nodoc
+abstract mixin class _$KnowledgeStatsCopyWith<$Res>
+    implements $KnowledgeStatsCopyWith<$Res> {
+  factory _$KnowledgeStatsCopyWith(
+          _KnowledgeStats value, $Res Function(_KnowledgeStats) _then) =
+      __$KnowledgeStatsCopyWithImpl;
+  @override
+  @useResult
+  $Res call(
+      {int totalDocuments,
+      int pendingEmbeddings,
+      int failedEmbeddings,
+      Map<String, int> documentsByTable,
+      Map<String, int> documentsByType,
+      double monthlyUsageDollars,
+      int totalQueries,
+      List<TableConfig> tableConfigs});
+}
 
-  factory _KnowledgeStats.fromJson(Map<String, dynamic> json) =
-      _$KnowledgeStatsImpl.fromJson;
+/// @nodoc
+class __$KnowledgeStatsCopyWithImpl<$Res>
+    implements _$KnowledgeStatsCopyWith<$Res> {
+  __$KnowledgeStatsCopyWithImpl(this._self, this._then);
 
-  @override
-  int get totalDocuments;
-  @override
-  int get pendingEmbeddings;
-  @override
-  int get failedEmbeddings;
-  @override
-  Map<String, int> get documentsByTable;
-  @override
-  Map<String, int> get documentsByType;
-  @override
-  double get monthlyUsageDollars;
-  @override
-  int get totalQueries;
-  @override
-  List<TableConfig> get tableConfigs;
+  final _KnowledgeStats _self;
+  final $Res Function(_KnowledgeStats) _then;
 
   /// Create a copy of KnowledgeStats
   /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$KnowledgeStatsImplCopyWith<_$KnowledgeStatsImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-TableConfig _$TableConfigFromJson(Map<String, dynamic> json) {
-  return _TableConfig.fromJson(json);
+  @pragma('vm:prefer-inline')
+  $Res call({
+    Object? totalDocuments = null,
+    Object? pendingEmbeddings = null,
+    Object? failedEmbeddings = null,
+    Object? documentsByTable = null,
+    Object? documentsByType = null,
+    Object? monthlyUsageDollars = null,
+    Object? totalQueries = null,
+    Object? tableConfigs = null,
+  }) {
+    return _then(_KnowledgeStats(
+      totalDocuments: null == totalDocuments
+          ? _self.totalDocuments
+          : totalDocuments // ignore: cast_nullable_to_non_nullable
+              as int,
+      pendingEmbeddings: null == pendingEmbeddings
+          ? _self.pendingEmbeddings
+          : pendingEmbeddings // ignore: cast_nullable_to_non_nullable
+              as int,
+      failedEmbeddings: null == failedEmbeddings
+          ? _self.failedEmbeddings
+          : failedEmbeddings // ignore: cast_nullable_to_non_nullable
+              as int,
+      documentsByTable: null == documentsByTable
+          ? _self._documentsByTable
+          : documentsByTable // ignore: cast_nullable_to_non_nullable
+              as Map<String, int>,
+      documentsByType: null == documentsByType
+          ? _self._documentsByType
+          : documentsByType // ignore: cast_nullable_to_non_nullable
+              as Map<String, int>,
+      monthlyUsageDollars: null == monthlyUsageDollars
+          ? _self.monthlyUsageDollars
+          : monthlyUsageDollars // ignore: cast_nullable_to_non_nullable
+              as double,
+      totalQueries: null == totalQueries
+          ? _self.totalQueries
+          : totalQueries // ignore: cast_nullable_to_non_nullable
+              as int,
+      tableConfigs: null == tableConfigs
+          ? _self._tableConfigs
+          : tableConfigs // ignore: cast_nullable_to_non_nullable
+              as List<TableConfig>,
+    ));
+  }
 }
 
 /// @nodoc
 mixin _$TableConfig {
   @JsonKey(name: 'table_name')
-  String get tableName => throw _privateConstructorUsedError;
+  String get tableName;
   @JsonKey(name: 'is_enabled')
-  bool get isEnabled => throw _privateConstructorUsedError;
+  bool get isEnabled;
   @JsonKey(name: 'is_discovered')
-  bool get isDiscovered => throw _privateConstructorUsedError;
+  bool get isDiscovered;
   @JsonKey(name: 'trigger_installed')
-  bool get triggerInstalled => throw _privateConstructorUsedError;
+  bool get triggerInstalled;
   @JsonKey(name: 'last_full_sync_at')
-  DateTime? get lastSyncAt => throw _privateConstructorUsedError;
+  DateTime? get lastSyncAt;
   @JsonKey(name: 'row_count')
-  int? get rowCount => throw _privateConstructorUsedError;
-
-  /// Serializes this TableConfig to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  int? get rowCount;
 
   /// Create a copy of TableConfig
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
-  $TableConfigCopyWith<TableConfig> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $TableConfigCopyWith<$Res> {
-  factory $TableConfigCopyWith(
-          TableConfig value, $Res Function(TableConfig) then) =
-      _$TableConfigCopyWithImpl<$Res, TableConfig>;
-  @useResult
-  $Res call(
-      {@JsonKey(name: 'table_name') String tableName,
-      @JsonKey(name: 'is_enabled') bool isEnabled,
-      @JsonKey(name: 'is_discovered') bool isDiscovered,
-      @JsonKey(name: 'trigger_installed') bool triggerInstalled,
-      @JsonKey(name: 'last_full_sync_at') DateTime? lastSyncAt,
-      @JsonKey(name: 'row_count') int? rowCount});
-}
-
-/// @nodoc
-class _$TableConfigCopyWithImpl<$Res, $Val extends TableConfig>
-    implements $TableConfigCopyWith<$Res> {
-  _$TableConfigCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of TableConfig
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
+  $TableConfigCopyWith<TableConfig> get copyWith =>
+      _$TableConfigCopyWithImpl<TableConfig>(this as TableConfig, _$identity);
+
+  /// Serializes this TableConfig to a JSON map.
+  Map<String, dynamic> toJson();
+
   @override
-  $Res call({
-    Object? tableName = null,
-    Object? isEnabled = null,
-    Object? isDiscovered = null,
-    Object? triggerInstalled = null,
-    Object? lastSyncAt = freezed,
-    Object? rowCount = freezed,
-  }) {
-    return _then(_value.copyWith(
-      tableName: null == tableName
-          ? _value.tableName
-          : tableName // ignore: cast_nullable_to_non_nullable
-              as String,
-      isEnabled: null == isEnabled
-          ? _value.isEnabled
-          : isEnabled // ignore: cast_nullable_to_non_nullable
-              as bool,
-      isDiscovered: null == isDiscovered
-          ? _value.isDiscovered
-          : isDiscovered // ignore: cast_nullable_to_non_nullable
-              as bool,
-      triggerInstalled: null == triggerInstalled
-          ? _value.triggerInstalled
-          : triggerInstalled // ignore: cast_nullable_to_non_nullable
-              as bool,
-      lastSyncAt: freezed == lastSyncAt
-          ? _value.lastSyncAt
-          : lastSyncAt // ignore: cast_nullable_to_non_nullable
-              as DateTime?,
-      rowCount: freezed == rowCount
-          ? _value.rowCount
-          : rowCount // ignore: cast_nullable_to_non_nullable
-              as int?,
-    ) as $Val);
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is TableConfig &&
+            (identical(other.tableName, tableName) ||
+                other.tableName == tableName) &&
+            (identical(other.isEnabled, isEnabled) ||
+                other.isEnabled == isEnabled) &&
+            (identical(other.isDiscovered, isDiscovered) ||
+                other.isDiscovered == isDiscovered) &&
+            (identical(other.triggerInstalled, triggerInstalled) ||
+                other.triggerInstalled == triggerInstalled) &&
+            (identical(other.lastSyncAt, lastSyncAt) ||
+                other.lastSyncAt == lastSyncAt) &&
+            (identical(other.rowCount, rowCount) ||
+                other.rowCount == rowCount));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, tableName, isEnabled,
+      isDiscovered, triggerInstalled, lastSyncAt, rowCount);
+
+  @override
+  String toString() {
+    return 'TableConfig(tableName: $tableName, isEnabled: $isEnabled, isDiscovered: $isDiscovered, triggerInstalled: $triggerInstalled, lastSyncAt: $lastSyncAt, rowCount: $rowCount)';
   }
 }
 
 /// @nodoc
-abstract class _$$TableConfigImplCopyWith<$Res>
-    implements $TableConfigCopyWith<$Res> {
-  factory _$$TableConfigImplCopyWith(
-          _$TableConfigImpl value, $Res Function(_$TableConfigImpl) then) =
-      __$$TableConfigImplCopyWithImpl<$Res>;
-  @override
+abstract mixin class $TableConfigCopyWith<$Res> {
+  factory $TableConfigCopyWith(
+          TableConfig value, $Res Function(TableConfig) _then) =
+      _$TableConfigCopyWithImpl;
   @useResult
   $Res call(
       {@JsonKey(name: 'table_name') String tableName,
@@ -468,12 +627,11 @@ abstract class _$$TableConfigImplCopyWith<$Res>
 }
 
 /// @nodoc
-class __$$TableConfigImplCopyWithImpl<$Res>
-    extends _$TableConfigCopyWithImpl<$Res, _$TableConfigImpl>
-    implements _$$TableConfigImplCopyWith<$Res> {
-  __$$TableConfigImplCopyWithImpl(
-      _$TableConfigImpl _value, $Res Function(_$TableConfigImpl) _then)
-      : super(_value, _then);
+class _$TableConfigCopyWithImpl<$Res> implements $TableConfigCopyWith<$Res> {
+  _$TableConfigCopyWithImpl(this._self, this._then);
+
+  final TableConfig _self;
+  final $Res Function(TableConfig) _then;
 
   /// Create a copy of TableConfig
   /// with the given fields replaced by the non-null parameter values.
@@ -487,48 +645,228 @@ class __$$TableConfigImplCopyWithImpl<$Res>
     Object? lastSyncAt = freezed,
     Object? rowCount = freezed,
   }) {
-    return _then(_$TableConfigImpl(
+    return _then(_self.copyWith(
       tableName: null == tableName
-          ? _value.tableName
+          ? _self.tableName
           : tableName // ignore: cast_nullable_to_non_nullable
               as String,
       isEnabled: null == isEnabled
-          ? _value.isEnabled
+          ? _self.isEnabled
           : isEnabled // ignore: cast_nullable_to_non_nullable
               as bool,
       isDiscovered: null == isDiscovered
-          ? _value.isDiscovered
+          ? _self.isDiscovered
           : isDiscovered // ignore: cast_nullable_to_non_nullable
               as bool,
       triggerInstalled: null == triggerInstalled
-          ? _value.triggerInstalled
+          ? _self.triggerInstalled
           : triggerInstalled // ignore: cast_nullable_to_non_nullable
               as bool,
       lastSyncAt: freezed == lastSyncAt
-          ? _value.lastSyncAt
+          ? _self.lastSyncAt
           : lastSyncAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
       rowCount: freezed == rowCount
-          ? _value.rowCount
+          ? _self.rowCount
           : rowCount // ignore: cast_nullable_to_non_nullable
               as int?,
     ));
   }
 }
 
+/// Adds pattern-matching-related methods to [TableConfig].
+extension TableConfigPatterns on TableConfig {
+  /// A variant of `map` that fallback to returning `orElse`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_TableConfig value)? $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _TableConfig() when $default != null:
+        return $default(_that);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// Callbacks receives the raw object, upcasted.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case final Subclass2 value:
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_TableConfig value) $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _TableConfig():
+        return $default(_that);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `map` that fallback to returning `null`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_TableConfig value)? $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _TableConfig() when $default != null:
+        return $default(_that);
+      case _:
+        return null;
+    }
+  }
+
+  /// A variant of `when` that fallback to an `orElse` callback.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(
+            @JsonKey(name: 'table_name') String tableName,
+            @JsonKey(name: 'is_enabled') bool isEnabled,
+            @JsonKey(name: 'is_discovered') bool isDiscovered,
+            @JsonKey(name: 'trigger_installed') bool triggerInstalled,
+            @JsonKey(name: 'last_full_sync_at') DateTime? lastSyncAt,
+            @JsonKey(name: 'row_count') int? rowCount)?
+        $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _TableConfig() when $default != null:
+        return $default(_that.tableName, _that.isEnabled, _that.isDiscovered,
+            _that.triggerInstalled, _that.lastSyncAt, _that.rowCount);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// As opposed to `map`, this offers destructuring.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case Subclass2(:final field2):
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(
+            @JsonKey(name: 'table_name') String tableName,
+            @JsonKey(name: 'is_enabled') bool isEnabled,
+            @JsonKey(name: 'is_discovered') bool isDiscovered,
+            @JsonKey(name: 'trigger_installed') bool triggerInstalled,
+            @JsonKey(name: 'last_full_sync_at') DateTime? lastSyncAt,
+            @JsonKey(name: 'row_count') int? rowCount)
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _TableConfig():
+        return $default(_that.tableName, _that.isEnabled, _that.isDiscovered,
+            _that.triggerInstalled, _that.lastSyncAt, _that.rowCount);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `when` that fallback to returning `null`
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(
+            @JsonKey(name: 'table_name') String tableName,
+            @JsonKey(name: 'is_enabled') bool isEnabled,
+            @JsonKey(name: 'is_discovered') bool isDiscovered,
+            @JsonKey(name: 'trigger_installed') bool triggerInstalled,
+            @JsonKey(name: 'last_full_sync_at') DateTime? lastSyncAt,
+            @JsonKey(name: 'row_count') int? rowCount)?
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _TableConfig() when $default != null:
+        return $default(_that.tableName, _that.isEnabled, _that.isDiscovered,
+            _that.triggerInstalled, _that.lastSyncAt, _that.rowCount);
+      case _:
+        return null;
+    }
+  }
+}
+
 /// @nodoc
 @JsonSerializable()
-class _$TableConfigImpl implements _TableConfig {
-  const _$TableConfigImpl(
+class _TableConfig implements TableConfig {
+  const _TableConfig(
       {@JsonKey(name: 'table_name') required this.tableName,
       @JsonKey(name: 'is_enabled') this.isEnabled = false,
       @JsonKey(name: 'is_discovered') this.isDiscovered = false,
       @JsonKey(name: 'trigger_installed') this.triggerInstalled = false,
       @JsonKey(name: 'last_full_sync_at') this.lastSyncAt,
       @JsonKey(name: 'row_count') this.rowCount});
-
-  factory _$TableConfigImpl.fromJson(Map<String, dynamic> json) =>
-      _$$TableConfigImplFromJson(json);
+  factory _TableConfig.fromJson(Map<String, dynamic> json) =>
+      _$TableConfigFromJson(json);
 
   @override
   @JsonKey(name: 'table_name')
@@ -549,16 +887,26 @@ class _$TableConfigImpl implements _TableConfig {
   @JsonKey(name: 'row_count')
   final int? rowCount;
 
+  /// Create a copy of TableConfig
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  String toString() {
-    return 'TableConfig(tableName: $tableName, isEnabled: $isEnabled, isDiscovered: $isDiscovered, triggerInstalled: $triggerInstalled, lastSyncAt: $lastSyncAt, rowCount: $rowCount)';
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  _$TableConfigCopyWith<_TableConfig> get copyWith =>
+      __$TableConfigCopyWithImpl<_TableConfig>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$TableConfigToJson(
+      this,
+    );
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$TableConfigImpl &&
+            other is _TableConfig &&
             (identical(other.tableName, tableName) ||
                 other.tableName == tableName) &&
             (identical(other.isEnabled, isEnabled) ||
@@ -578,57 +926,75 @@ class _$TableConfigImpl implements _TableConfig {
   int get hashCode => Object.hash(runtimeType, tableName, isEnabled,
       isDiscovered, triggerInstalled, lastSyncAt, rowCount);
 
-  /// Create a copy of TableConfig
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  @pragma('vm:prefer-inline')
-  _$$TableConfigImplCopyWith<_$TableConfigImpl> get copyWith =>
-      __$$TableConfigImplCopyWithImpl<_$TableConfigImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$TableConfigImplToJson(
-      this,
-    );
+  String toString() {
+    return 'TableConfig(tableName: $tableName, isEnabled: $isEnabled, isDiscovered: $isDiscovered, triggerInstalled: $triggerInstalled, lastSyncAt: $lastSyncAt, rowCount: $rowCount)';
   }
 }
 
-abstract class _TableConfig implements TableConfig {
-  const factory _TableConfig(
-      {@JsonKey(name: 'table_name') required final String tableName,
-      @JsonKey(name: 'is_enabled') final bool isEnabled,
-      @JsonKey(name: 'is_discovered') final bool isDiscovered,
-      @JsonKey(name: 'trigger_installed') final bool triggerInstalled,
-      @JsonKey(name: 'last_full_sync_at') final DateTime? lastSyncAt,
-      @JsonKey(name: 'row_count') final int? rowCount}) = _$TableConfigImpl;
+/// @nodoc
+abstract mixin class _$TableConfigCopyWith<$Res>
+    implements $TableConfigCopyWith<$Res> {
+  factory _$TableConfigCopyWith(
+          _TableConfig value, $Res Function(_TableConfig) _then) =
+      __$TableConfigCopyWithImpl;
+  @override
+  @useResult
+  $Res call(
+      {@JsonKey(name: 'table_name') String tableName,
+      @JsonKey(name: 'is_enabled') bool isEnabled,
+      @JsonKey(name: 'is_discovered') bool isDiscovered,
+      @JsonKey(name: 'trigger_installed') bool triggerInstalled,
+      @JsonKey(name: 'last_full_sync_at') DateTime? lastSyncAt,
+      @JsonKey(name: 'row_count') int? rowCount});
+}
 
-  factory _TableConfig.fromJson(Map<String, dynamic> json) =
-      _$TableConfigImpl.fromJson;
+/// @nodoc
+class __$TableConfigCopyWithImpl<$Res> implements _$TableConfigCopyWith<$Res> {
+  __$TableConfigCopyWithImpl(this._self, this._then);
 
-  @override
-  @JsonKey(name: 'table_name')
-  String get tableName;
-  @override
-  @JsonKey(name: 'is_enabled')
-  bool get isEnabled;
-  @override
-  @JsonKey(name: 'is_discovered')
-  bool get isDiscovered;
-  @override
-  @JsonKey(name: 'trigger_installed')
-  bool get triggerInstalled;
-  @override
-  @JsonKey(name: 'last_full_sync_at')
-  DateTime? get lastSyncAt;
-  @override
-  @JsonKey(name: 'row_count')
-  int? get rowCount;
+  final _TableConfig _self;
+  final $Res Function(_TableConfig) _then;
 
   /// Create a copy of TableConfig
   /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$TableConfigImplCopyWith<_$TableConfigImpl> get copyWith =>
-      throw _privateConstructorUsedError;
+  @pragma('vm:prefer-inline')
+  $Res call({
+    Object? tableName = null,
+    Object? isEnabled = null,
+    Object? isDiscovered = null,
+    Object? triggerInstalled = null,
+    Object? lastSyncAt = freezed,
+    Object? rowCount = freezed,
+  }) {
+    return _then(_TableConfig(
+      tableName: null == tableName
+          ? _self.tableName
+          : tableName // ignore: cast_nullable_to_non_nullable
+              as String,
+      isEnabled: null == isEnabled
+          ? _self.isEnabled
+          : isEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isDiscovered: null == isDiscovered
+          ? _self.isDiscovered
+          : isDiscovered // ignore: cast_nullable_to_non_nullable
+              as bool,
+      triggerInstalled: null == triggerInstalled
+          ? _self.triggerInstalled
+          : triggerInstalled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      lastSyncAt: freezed == lastSyncAt
+          ? _self.lastSyncAt
+          : lastSyncAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      rowCount: freezed == rowCount
+          ? _self.rowCount
+          : rowCount // ignore: cast_nullable_to_non_nullable
+              as int?,
+    ));
+  }
 }
+
+// dart format on

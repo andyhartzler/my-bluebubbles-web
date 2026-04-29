@@ -8,7 +8,7 @@ part of 'attachment_hive_cache.dart';
 
 class AttachmentHiveCacheAdapter extends TypeAdapter<AttachmentHiveCache> {
   @override
-  final int typeId = 15;
+  final typeId = 15;
 
   @override
   AttachmentHiveCache read(BinaryReader reader) {

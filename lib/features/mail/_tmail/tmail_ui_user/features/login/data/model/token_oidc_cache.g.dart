@@ -8,7 +8,7 @@ part of 'token_oidc_cache.dart';
 
 class TokenOidcCacheAdapter extends TypeAdapter<TokenOidcCache> {
   @override
-  final int typeId = 8;
+  final typeId = 8;
 
   @override
   TokenOidcCache read(BinaryReader reader) {

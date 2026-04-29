@@ -8,7 +8,7 @@ part of 'sentry_user_cache.dart';
 
 class SentryUserCacheAdapter extends TypeAdapter<SentryUserCache> {
   @override
-  final int typeId = 22;
+  final typeId = 22;
 
   @override
   SentryUserCache read(BinaryReader reader) {

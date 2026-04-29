@@ -86,6 +86,10 @@ class ColorPickerDialogBuilder {
                     color: _currentColor.value,
                     colorCodeHasColor: true,
                     shouldUpdate: _shouldUpdate,
+                    // flex_color_picker 3.5+ added two required params; pass
+                    // sensible defaults that preserve previous behavior.
+                    requestFocus: false,
+                    focusedEditHasNoColor: false,
                     onColorChanged: (Color color) {
                       if (AppColor.listColorsPicker.any((element) => element.toInt() == color.toInt())) {
                         _shouldUpdate = true;

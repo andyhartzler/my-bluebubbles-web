@@ -103,7 +103,7 @@ class FileUploader {
           if (argsUpload.fileInfo.filePath?.isNotEmpty == true)
             filePathExtraKey: argsUpload.fileInfo.filePath,
           if (argsUpload.fileInfo.bytes?.isNotEmpty == true)
-            streamDataExtraKey: BodyBytesStream.fromBytes(argsUpload.fileInfo.bytes!),
+            streamDataExtraKey: Stream<List<int>>.fromIterable([argsUpload.fileInfo.bytes!]),
         }
       };
 
@@ -116,7 +116,7 @@ class FileUploader {
         data: argsUpload.fileInfo.filePath?.isNotEmpty == true
           ? File(argsUpload.fileInfo.filePath!).openRead()
           : argsUpload.fileInfo.bytes != null
-              ? BodyBytesStream.fromBytes(argsUpload.fileInfo.bytes!)
+              ? Stream<List<int>>.fromIterable([argsUpload.fileInfo.bytes!])
               : null,
         onSendProgress: (count, total) {
           log('FileUploader::_handleUploadAttachmentAction():onSendProgress: FILE[${argsUpload.uploadId.id}] : { PROGRESS = $count | TOTAL = $total}');
@@ -175,7 +175,7 @@ class FileUploader {
     final mapExtra = <String, dynamic>{
       uploadAttachmentExtraKey: {
         if (fileInfo.bytes?.isNotEmpty == true)
-          streamDataExtraKey: BodyBytesStream.fromBytes(fileInfo.bytes!),
+          streamDataExtraKey: Stream<List<int>>.fromIterable([fileInfo.bytes!]),
       }
     };
 
@@ -185,7 +185,7 @@ class FileUploader {
         headers: headerParam,
         extra: mapExtra
       ),
-      data: BodyBytesStream.fromBytes(fileInfo.bytes!),
+      data: Stream<List<int>>.fromIterable([fileInfo.bytes!]),
       cancelToken: cancelToken,
       onSendProgress: (count, total) {
         log('FileUploader::_handleUploadAttachmentActionOnMainIsolate():onSendProgress: FILE[${uploadId.id}] : { PROGRESS = $count | TOTAL = $total}');

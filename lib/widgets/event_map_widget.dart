@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:html' as html;
 import 'dart:ui' as ui;
 import 'dart:js' as js;
+// dart:js no longer re-exports allowInterop in newer Dart SDKs — pull it
+// from dart:js_util directly.
+import 'dart:js_util' show allowInterop;
 import '../utils/mapkit_token_manager.dart';
 
 class EventMapWidget extends StatefulWidget {
@@ -119,7 +122,7 @@ class _EventMapWidgetState extends State<EventMapWidget> with AutomaticKeepAlive
 
       try {
         js.context.callMethod('whenMapKitReady', [
-          js.allowInterop(() {
+          allowInterop(() {
             print('[EventMap] MapKit is ready, initializing...');
             _initializeMapKit();
           })
@@ -159,7 +162,7 @@ class _EventMapWidgetState extends State<EventMapWidget> with AutomaticKeepAlive
         print('[EventMap] First MapKit initialization');
 
         js.JsObject authCallback = js.JsObject.jsify({
-          'authorizationCallback': js.allowInterop((done) {
+          'authorizationCallback': allowInterop((done) {
             print('[EventMap] Authorization callback invoked');
             js.JsFunction doneFunc = done as js.JsFunction;
             doneFunc.apply([token]);
@@ -221,7 +224,7 @@ class _EventMapWidgetState extends State<EventMapWidget> with AutomaticKeepAlive
 
       geocoder.callMethod('lookup', [
         addressToGeocode,
-        js.allowInterop((error, data) {
+        allowInterop((error, data) {
           if (error != null) {
             print('[EventMap] Geocoding error: $error');
             if (mounted) {

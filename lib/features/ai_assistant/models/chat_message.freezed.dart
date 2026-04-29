@@ -1,5 +1,5 @@
-// coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// coverage:ignore-file
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
@@ -9,128 +9,79 @@ part of 'chat_message.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// dart format off
 T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
-
-ChatMessage _$ChatMessageFromJson(Map<String, dynamic> json) {
-  return _ChatMessage.fromJson(json);
-}
 
 /// @nodoc
 mixin _$ChatMessage {
-  String get id => throw _privateConstructorUsedError;
+  String get id;
   @JsonKey(name: 'created_at')
-  DateTime get createdAt => throw _privateConstructorUsedError;
+  DateTime get createdAt;
   @JsonKey(name: 'session_id')
-  String get sessionId => throw _privateConstructorUsedError;
-  String get role => throw _privateConstructorUsedError;
-  String get content => throw _privateConstructorUsedError;
+  String get sessionId;
+  String get role;
+  String get content;
   @JsonKey(name: 'source_documents')
-  List<SourceDocument> get sourceDocuments =>
-      throw _privateConstructorUsedError;
+  List<SourceDocument> get sourceDocuments;
   @JsonKey(name: 'tokens_used')
-  Map<String, dynamic>? get tokensUsed => throw _privateConstructorUsedError;
+  Map<String, dynamic>? get tokensUsed;
   @JsonKey(includeFromJson: false, includeToJson: false)
-  FeedbackState get feedbackState => throw _privateConstructorUsedError;
+  FeedbackState get feedbackState;
+
+  /// Create a copy of ChatMessage
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  $ChatMessageCopyWith<ChatMessage> get copyWith =>
+      _$ChatMessageCopyWithImpl<ChatMessage>(this as ChatMessage, _$identity);
 
   /// Serializes this ChatMessage to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  Map<String, dynamic> toJson();
 
-  /// Create a copy of ChatMessage
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $ChatMessageCopyWith<ChatMessage> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $ChatMessageCopyWith<$Res> {
-  factory $ChatMessageCopyWith(
-          ChatMessage value, $Res Function(ChatMessage) then) =
-      _$ChatMessageCopyWithImpl<$Res, ChatMessage>;
-  @useResult
-  $Res call(
-      {String id,
-      @JsonKey(name: 'created_at') DateTime createdAt,
-      @JsonKey(name: 'session_id') String sessionId,
-      String role,
-      String content,
-      @JsonKey(name: 'source_documents') List<SourceDocument> sourceDocuments,
-      @JsonKey(name: 'tokens_used') Map<String, dynamic>? tokensUsed,
-      @JsonKey(includeFromJson: false, includeToJson: false)
-      FeedbackState feedbackState});
-}
-
-/// @nodoc
-class _$ChatMessageCopyWithImpl<$Res, $Val extends ChatMessage>
-    implements $ChatMessageCopyWith<$Res> {
-  _$ChatMessageCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of ChatMessage
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
   @override
-  $Res call({
-    Object? id = null,
-    Object? createdAt = null,
-    Object? sessionId = null,
-    Object? role = null,
-    Object? content = null,
-    Object? sourceDocuments = null,
-    Object? tokensUsed = freezed,
-    Object? feedbackState = null,
-  }) {
-    return _then(_value.copyWith(
-      id: null == id
-          ? _value.id
-          : id // ignore: cast_nullable_to_non_nullable
-              as String,
-      createdAt: null == createdAt
-          ? _value.createdAt
-          : createdAt // ignore: cast_nullable_to_non_nullable
-              as DateTime,
-      sessionId: null == sessionId
-          ? _value.sessionId
-          : sessionId // ignore: cast_nullable_to_non_nullable
-              as String,
-      role: null == role
-          ? _value.role
-          : role // ignore: cast_nullable_to_non_nullable
-              as String,
-      content: null == content
-          ? _value.content
-          : content // ignore: cast_nullable_to_non_nullable
-              as String,
-      sourceDocuments: null == sourceDocuments
-          ? _value.sourceDocuments
-          : sourceDocuments // ignore: cast_nullable_to_non_nullable
-              as List<SourceDocument>,
-      tokensUsed: freezed == tokensUsed
-          ? _value.tokensUsed
-          : tokensUsed // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
-      feedbackState: null == feedbackState
-          ? _value.feedbackState
-          : feedbackState // ignore: cast_nullable_to_non_nullable
-              as FeedbackState,
-    ) as $Val);
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is ChatMessage &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt) &&
+            (identical(other.sessionId, sessionId) ||
+                other.sessionId == sessionId) &&
+            (identical(other.role, role) || other.role == role) &&
+            (identical(other.content, content) || other.content == content) &&
+            const DeepCollectionEquality()
+                .equals(other.sourceDocuments, sourceDocuments) &&
+            const DeepCollectionEquality()
+                .equals(other.tokensUsed, tokensUsed) &&
+            (identical(other.feedbackState, feedbackState) ||
+                other.feedbackState == feedbackState));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      createdAt,
+      sessionId,
+      role,
+      content,
+      const DeepCollectionEquality().hash(sourceDocuments),
+      const DeepCollectionEquality().hash(tokensUsed),
+      feedbackState);
+
+  @override
+  String toString() {
+    return 'ChatMessage(id: $id, createdAt: $createdAt, sessionId: $sessionId, role: $role, content: $content, sourceDocuments: $sourceDocuments, tokensUsed: $tokensUsed, feedbackState: $feedbackState)';
   }
 }
 
 /// @nodoc
-abstract class _$$ChatMessageImplCopyWith<$Res>
-    implements $ChatMessageCopyWith<$Res> {
-  factory _$$ChatMessageImplCopyWith(
-          _$ChatMessageImpl value, $Res Function(_$ChatMessageImpl) then) =
-      __$$ChatMessageImplCopyWithImpl<$Res>;
-  @override
+abstract mixin class $ChatMessageCopyWith<$Res> {
+  factory $ChatMessageCopyWith(
+          ChatMessage value, $Res Function(ChatMessage) _then) =
+      _$ChatMessageCopyWithImpl;
   @useResult
   $Res call(
       {String id,
@@ -145,12 +96,11 @@ abstract class _$$ChatMessageImplCopyWith<$Res>
 }
 
 /// @nodoc
-class __$$ChatMessageImplCopyWithImpl<$Res>
-    extends _$ChatMessageCopyWithImpl<$Res, _$ChatMessageImpl>
-    implements _$$ChatMessageImplCopyWith<$Res> {
-  __$$ChatMessageImplCopyWithImpl(
-      _$ChatMessageImpl _value, $Res Function(_$ChatMessageImpl) _then)
-      : super(_value, _then);
+class _$ChatMessageCopyWithImpl<$Res> implements $ChatMessageCopyWith<$Res> {
+  _$ChatMessageCopyWithImpl(this._self, this._then);
+
+  final ChatMessage _self;
+  final $Res Function(ChatMessage) _then;
 
   /// Create a copy of ChatMessage
   /// with the given fields replaced by the non-null parameter values.
@@ -166,47 +116,261 @@ class __$$ChatMessageImplCopyWithImpl<$Res>
     Object? tokensUsed = freezed,
     Object? feedbackState = null,
   }) {
-    return _then(_$ChatMessageImpl(
+    return _then(_self.copyWith(
       id: null == id
-          ? _value.id
+          ? _self.id
           : id // ignore: cast_nullable_to_non_nullable
               as String,
       createdAt: null == createdAt
-          ? _value.createdAt
+          ? _self.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
       sessionId: null == sessionId
-          ? _value.sessionId
+          ? _self.sessionId
           : sessionId // ignore: cast_nullable_to_non_nullable
               as String,
       role: null == role
-          ? _value.role
+          ? _self.role
           : role // ignore: cast_nullable_to_non_nullable
               as String,
       content: null == content
-          ? _value.content
+          ? _self.content
           : content // ignore: cast_nullable_to_non_nullable
               as String,
       sourceDocuments: null == sourceDocuments
-          ? _value._sourceDocuments
+          ? _self.sourceDocuments
           : sourceDocuments // ignore: cast_nullable_to_non_nullable
               as List<SourceDocument>,
       tokensUsed: freezed == tokensUsed
-          ? _value._tokensUsed
+          ? _self.tokensUsed
           : tokensUsed // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>?,
       feedbackState: null == feedbackState
-          ? _value.feedbackState
+          ? _self.feedbackState
           : feedbackState // ignore: cast_nullable_to_non_nullable
               as FeedbackState,
     ));
   }
 }
 
+/// Adds pattern-matching-related methods to [ChatMessage].
+extension ChatMessagePatterns on ChatMessage {
+  /// A variant of `map` that fallback to returning `orElse`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_ChatMessage value)? $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _ChatMessage() when $default != null:
+        return $default(_that);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// Callbacks receives the raw object, upcasted.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case final Subclass2 value:
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_ChatMessage value) $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _ChatMessage():
+        return $default(_that);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `map` that fallback to returning `null`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_ChatMessage value)? $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _ChatMessage() when $default != null:
+        return $default(_that);
+      case _:
+        return null;
+    }
+  }
+
+  /// A variant of `when` that fallback to an `orElse` callback.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(
+            String id,
+            @JsonKey(name: 'created_at') DateTime createdAt,
+            @JsonKey(name: 'session_id') String sessionId,
+            String role,
+            String content,
+            @JsonKey(name: 'source_documents')
+            List<SourceDocument> sourceDocuments,
+            @JsonKey(name: 'tokens_used') Map<String, dynamic>? tokensUsed,
+            @JsonKey(includeFromJson: false, includeToJson: false)
+            FeedbackState feedbackState)?
+        $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _ChatMessage() when $default != null:
+        return $default(
+            _that.id,
+            _that.createdAt,
+            _that.sessionId,
+            _that.role,
+            _that.content,
+            _that.sourceDocuments,
+            _that.tokensUsed,
+            _that.feedbackState);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// As opposed to `map`, this offers destructuring.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case Subclass2(:final field2):
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(
+            String id,
+            @JsonKey(name: 'created_at') DateTime createdAt,
+            @JsonKey(name: 'session_id') String sessionId,
+            String role,
+            String content,
+            @JsonKey(name: 'source_documents')
+            List<SourceDocument> sourceDocuments,
+            @JsonKey(name: 'tokens_used') Map<String, dynamic>? tokensUsed,
+            @JsonKey(includeFromJson: false, includeToJson: false)
+            FeedbackState feedbackState)
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _ChatMessage():
+        return $default(
+            _that.id,
+            _that.createdAt,
+            _that.sessionId,
+            _that.role,
+            _that.content,
+            _that.sourceDocuments,
+            _that.tokensUsed,
+            _that.feedbackState);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `when` that fallback to returning `null`
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(
+            String id,
+            @JsonKey(name: 'created_at') DateTime createdAt,
+            @JsonKey(name: 'session_id') String sessionId,
+            String role,
+            String content,
+            @JsonKey(name: 'source_documents')
+            List<SourceDocument> sourceDocuments,
+            @JsonKey(name: 'tokens_used') Map<String, dynamic>? tokensUsed,
+            @JsonKey(includeFromJson: false, includeToJson: false)
+            FeedbackState feedbackState)?
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _ChatMessage() when $default != null:
+        return $default(
+            _that.id,
+            _that.createdAt,
+            _that.sessionId,
+            _that.role,
+            _that.content,
+            _that.sourceDocuments,
+            _that.tokensUsed,
+            _that.feedbackState);
+      case _:
+        return null;
+    }
+  }
+}
+
 /// @nodoc
 @JsonSerializable()
-class _$ChatMessageImpl implements _ChatMessage {
-  const _$ChatMessageImpl(
+class _ChatMessage implements ChatMessage {
+  const _ChatMessage(
       {required this.id,
       @JsonKey(name: 'created_at') required this.createdAt,
       @JsonKey(name: 'session_id') required this.sessionId,
@@ -219,9 +383,8 @@ class _$ChatMessageImpl implements _ChatMessage {
       this.feedbackState = FeedbackState.none})
       : _sourceDocuments = sourceDocuments,
         _tokensUsed = tokensUsed;
-
-  factory _$ChatMessageImpl.fromJson(Map<String, dynamic> json) =>
-      _$$ChatMessageImplFromJson(json);
+  factory _ChatMessage.fromJson(Map<String, dynamic> json) =>
+      _$ChatMessageFromJson(json);
 
   @override
   final String id;
@@ -259,16 +422,26 @@ class _$ChatMessageImpl implements _ChatMessage {
   @JsonKey(includeFromJson: false, includeToJson: false)
   final FeedbackState feedbackState;
 
+  /// Create a copy of ChatMessage
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  String toString() {
-    return 'ChatMessage(id: $id, createdAt: $createdAt, sessionId: $sessionId, role: $role, content: $content, sourceDocuments: $sourceDocuments, tokensUsed: $tokensUsed, feedbackState: $feedbackState)';
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  _$ChatMessageCopyWith<_ChatMessage> get copyWith =>
+      __$ChatMessageCopyWithImpl<_ChatMessage>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$ChatMessageToJson(
+      this,
+    );
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$ChatMessageImpl &&
+            other is _ChatMessage &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
@@ -297,64 +470,88 @@ class _$ChatMessageImpl implements _ChatMessage {
       const DeepCollectionEquality().hash(_tokensUsed),
       feedbackState);
 
-  /// Create a copy of ChatMessage
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  @pragma('vm:prefer-inline')
-  _$$ChatMessageImplCopyWith<_$ChatMessageImpl> get copyWith =>
-      __$$ChatMessageImplCopyWithImpl<_$ChatMessageImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$ChatMessageImplToJson(
-      this,
-    );
+  String toString() {
+    return 'ChatMessage(id: $id, createdAt: $createdAt, sessionId: $sessionId, role: $role, content: $content, sourceDocuments: $sourceDocuments, tokensUsed: $tokensUsed, feedbackState: $feedbackState)';
   }
 }
 
-abstract class _ChatMessage implements ChatMessage {
-  const factory _ChatMessage(
-      {required final String id,
-      @JsonKey(name: 'created_at') required final DateTime createdAt,
-      @JsonKey(name: 'session_id') required final String sessionId,
-      required final String role,
-      required final String content,
-      @JsonKey(name: 'source_documents')
-      final List<SourceDocument> sourceDocuments,
-      @JsonKey(name: 'tokens_used') final Map<String, dynamic>? tokensUsed,
+/// @nodoc
+abstract mixin class _$ChatMessageCopyWith<$Res>
+    implements $ChatMessageCopyWith<$Res> {
+  factory _$ChatMessageCopyWith(
+          _ChatMessage value, $Res Function(_ChatMessage) _then) =
+      __$ChatMessageCopyWithImpl;
+  @override
+  @useResult
+  $Res call(
+      {String id,
+      @JsonKey(name: 'created_at') DateTime createdAt,
+      @JsonKey(name: 'session_id') String sessionId,
+      String role,
+      String content,
+      @JsonKey(name: 'source_documents') List<SourceDocument> sourceDocuments,
+      @JsonKey(name: 'tokens_used') Map<String, dynamic>? tokensUsed,
       @JsonKey(includeFromJson: false, includeToJson: false)
-      final FeedbackState feedbackState}) = _$ChatMessageImpl;
+      FeedbackState feedbackState});
+}
 
-  factory _ChatMessage.fromJson(Map<String, dynamic> json) =
-      _$ChatMessageImpl.fromJson;
+/// @nodoc
+class __$ChatMessageCopyWithImpl<$Res> implements _$ChatMessageCopyWith<$Res> {
+  __$ChatMessageCopyWithImpl(this._self, this._then);
 
-  @override
-  String get id;
-  @override
-  @JsonKey(name: 'created_at')
-  DateTime get createdAt;
-  @override
-  @JsonKey(name: 'session_id')
-  String get sessionId;
-  @override
-  String get role;
-  @override
-  String get content;
-  @override
-  @JsonKey(name: 'source_documents')
-  List<SourceDocument> get sourceDocuments;
-  @override
-  @JsonKey(name: 'tokens_used')
-  Map<String, dynamic>? get tokensUsed;
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  FeedbackState get feedbackState;
+  final _ChatMessage _self;
+  final $Res Function(_ChatMessage) _then;
 
   /// Create a copy of ChatMessage
   /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ChatMessageImplCopyWith<_$ChatMessageImpl> get copyWith =>
-      throw _privateConstructorUsedError;
+  @pragma('vm:prefer-inline')
+  $Res call({
+    Object? id = null,
+    Object? createdAt = null,
+    Object? sessionId = null,
+    Object? role = null,
+    Object? content = null,
+    Object? sourceDocuments = null,
+    Object? tokensUsed = freezed,
+    Object? feedbackState = null,
+  }) {
+    return _then(_ChatMessage(
+      id: null == id
+          ? _self.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String,
+      createdAt: null == createdAt
+          ? _self.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime,
+      sessionId: null == sessionId
+          ? _self.sessionId
+          : sessionId // ignore: cast_nullable_to_non_nullable
+              as String,
+      role: null == role
+          ? _self.role
+          : role // ignore: cast_nullable_to_non_nullable
+              as String,
+      content: null == content
+          ? _self.content
+          : content // ignore: cast_nullable_to_non_nullable
+              as String,
+      sourceDocuments: null == sourceDocuments
+          ? _self._sourceDocuments
+          : sourceDocuments // ignore: cast_nullable_to_non_nullable
+              as List<SourceDocument>,
+      tokensUsed: freezed == tokensUsed
+          ? _self._tokensUsed
+          : tokensUsed // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
+      feedbackState: null == feedbackState
+          ? _self.feedbackState
+          : feedbackState // ignore: cast_nullable_to_non_nullable
+              as FeedbackState,
+    ));
+  }
 }
+
+// dart format on

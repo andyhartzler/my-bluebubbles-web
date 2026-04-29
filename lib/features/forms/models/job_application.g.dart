@@ -6,8 +6,8 @@ part of 'job_application.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$JobApplicationImpl _$$JobApplicationImplFromJson(Map<String, dynamic> json) =>
-    _$JobApplicationImpl(
+_JobApplication _$JobApplicationFromJson(Map<String, dynamic> json) =>
+    _JobApplication(
       id: json['id'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
       jobId: json['job_id'] as String,
@@ -26,8 +26,7 @@ _$JobApplicationImpl _$$JobApplicationImplFromJson(Map<String, dynamic> json) =>
       memberId: json['member_id'] as String?,
     );
 
-Map<String, dynamic> _$$JobApplicationImplToJson(
-        _$JobApplicationImpl instance) =>
+Map<String, dynamic> _$JobApplicationToJson(_JobApplication instance) =>
     <String, dynamic>{
       'id': instance.id,
       'created_at': instance.createdAt.toIso8601String(),

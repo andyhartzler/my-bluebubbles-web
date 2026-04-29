@@ -11,6 +11,34 @@ bool _coerceBool(dynamic value, {bool defaultValue = false}) {
   return defaultValue;
 }
 
+/// Event type — used by widgets to color-code/icon events. The Supabase
+/// model stores `event_type` as a free-form String; the helper below maps
+/// known strings to enum cases.
+enum EventType {
+  committee,
+  executive,
+  social,
+  deadline,
+  general;
+
+  static EventType fromString(String? value) {
+    if (value == null) return EventType.general;
+    switch (value.toLowerCase()) {
+      case 'committee':
+        return EventType.committee;
+      case 'executive':
+      case 'exec':
+        return EventType.executive;
+      case 'social':
+        return EventType.social;
+      case 'deadline':
+        return EventType.deadline;
+      default:
+        return EventType.general;
+    }
+  }
+}
+
 /// Event status
 enum EventStatus {
   confirmed,

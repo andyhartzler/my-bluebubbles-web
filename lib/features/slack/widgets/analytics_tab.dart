@@ -501,7 +501,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                 ],
                 lineTouchData: LineTouchData(
                   touchTooltipData: LineTouchTooltipData(
-                    tooltipBgColor: BrandColors.unityBlue,
+                    getTooltipColor: (_) => BrandColors.unityBlue,
                     getTooltipItems: (spots) {
                       return spots.map((spot) {
                         final index = spot.x.toInt();
@@ -874,7 +874,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                 minY: 0,
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
-                    tooltipBgColor: BrandColors.unityBlue,
+                    getTooltipColor: (_) => BrandColors.unityBlue,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       final day = _dayOfWeekActivity[group.x.toInt()];
                       return BarTooltipItem(
@@ -1033,7 +1033,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                 minY: 0,
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
-                    tooltipBgColor: BrandColors.unityBlue,
+                    getTooltipColor: (_) => BrandColors.unityBlue,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       final hour = _hourlyActivity[group.x.toInt()];
                       return BarTooltipItem(

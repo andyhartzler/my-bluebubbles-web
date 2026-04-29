@@ -104,7 +104,9 @@ class _AudioPlayerState extends OptimizedState<AudioPlayer>
                     await controller!.pausePlayer();
                   } else {
                     animController.forward();
-                    await controller!.startPlayer(finishMode: FinishMode.pause);
+                    // audio_waveforms 1.3.x moved finishMode out of startPlayer.
+                    await controller!.setFinishMode(finishMode: FinishMode.pause);
+                    await controller!.startPlayer();
                   }
                   setState(() {});
                 },

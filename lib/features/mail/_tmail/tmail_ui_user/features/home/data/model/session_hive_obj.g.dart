@@ -8,7 +8,7 @@ part of 'session_hive_obj.dart';
 
 class SessionHiveObjAdapter extends TypeAdapter<SessionHiveObj> {
   @override
-  final int typeId = 19;
+  final typeId = 19;
 
   @override
   SessionHiveObj read(BinaryReader reader) {

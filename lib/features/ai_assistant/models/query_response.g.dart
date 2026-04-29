@@ -6,9 +6,8 @@ part of 'query_response.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$TaskClassificationImpl _$$TaskClassificationImplFromJson(
-        Map<String, dynamic> json) =>
-    _$TaskClassificationImpl(
+_TaskClassification _$TaskClassificationFromJson(Map<String, dynamic> json) =>
+    _TaskClassification(
       type: json['type'] as String,
       scope: json['scope'] as String,
       dataNeeds: (json['dataNeeds'] as List<dynamic>?)
@@ -18,8 +17,7 @@ _$TaskClassificationImpl _$$TaskClassificationImplFromJson(
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0.5,
     );
 
-Map<String, dynamic> _$$TaskClassificationImplToJson(
-        _$TaskClassificationImpl instance) =>
+Map<String, dynamic> _$TaskClassificationToJson(_TaskClassification instance) =>
     <String, dynamic>{
       'type': instance.type,
       'scope': instance.scope,
@@ -27,15 +25,14 @@ Map<String, dynamic> _$$TaskClassificationImplToJson(
       'confidence': instance.confidence,
     };
 
-_$UsageInfoImpl _$$UsageInfoImplFromJson(Map<String, dynamic> json) =>
-    _$UsageInfoImpl(
+_UsageInfo _$UsageInfoFromJson(Map<String, dynamic> json) => _UsageInfo(
       inputTokens: (json['input_tokens'] as num?)?.toInt() ?? 0,
       outputTokens: (json['output_tokens'] as num?)?.toInt() ?? 0,
       model: json['model'] as String?,
       processingTimeMs: (json['processing_time_ms'] as num?)?.toInt() ?? 0,
     );
 
-Map<String, dynamic> _$$UsageInfoImplToJson(_$UsageInfoImpl instance) =>
+Map<String, dynamic> _$UsageInfoToJson(_UsageInfo instance) =>
     <String, dynamic>{
       'input_tokens': instance.inputTokens,
       'output_tokens': instance.outputTokens,

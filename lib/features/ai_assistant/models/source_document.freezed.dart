@@ -1,5 +1,5 @@
-// coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// coverage:ignore-file
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
@@ -9,209 +9,37 @@ part of 'source_document.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// dart format off
 T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
-
-SourceDocument _$SourceDocumentFromJson(Map<String, dynamic> json) {
-  return _SourceDocument.fromJson(json);
-}
 
 /// @nodoc
 mixin _$SourceDocument {
-  String get id => throw _privateConstructorUsedError;
+  String get id;
   @JsonKey(name: 'source_type')
-  String get sourceType => throw _privateConstructorUsedError;
+  String get sourceType;
   @JsonKey(name: 'source_table')
-  String? get sourceTable => throw _privateConstructorUsedError;
-  String? get title => throw _privateConstructorUsedError;
-  double? get similarity => throw _privateConstructorUsedError;
+  String? get sourceTable;
+  String? get title;
+  double? get similarity;
   @JsonKey(name: 'retrieval_method')
-  String? get retrievalMethod => throw _privateConstructorUsedError;
-
-  /// Serializes this SourceDocument to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  String? get retrievalMethod;
 
   /// Create a copy of SourceDocument
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
   $SourceDocumentCopyWith<SourceDocument> get copyWith =>
-      throw _privateConstructorUsedError;
-}
+      _$SourceDocumentCopyWithImpl<SourceDocument>(
+          this as SourceDocument, _$identity);
 
-/// @nodoc
-abstract class $SourceDocumentCopyWith<$Res> {
-  factory $SourceDocumentCopyWith(
-          SourceDocument value, $Res Function(SourceDocument) then) =
-      _$SourceDocumentCopyWithImpl<$Res, SourceDocument>;
-  @useResult
-  $Res call(
-      {String id,
-      @JsonKey(name: 'source_type') String sourceType,
-      @JsonKey(name: 'source_table') String? sourceTable,
-      String? title,
-      double? similarity,
-      @JsonKey(name: 'retrieval_method') String? retrievalMethod});
-}
-
-/// @nodoc
-class _$SourceDocumentCopyWithImpl<$Res, $Val extends SourceDocument>
-    implements $SourceDocumentCopyWith<$Res> {
-  _$SourceDocumentCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of SourceDocument
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? sourceType = null,
-    Object? sourceTable = freezed,
-    Object? title = freezed,
-    Object? similarity = freezed,
-    Object? retrievalMethod = freezed,
-  }) {
-    return _then(_value.copyWith(
-      id: null == id
-          ? _value.id
-          : id // ignore: cast_nullable_to_non_nullable
-              as String,
-      sourceType: null == sourceType
-          ? _value.sourceType
-          : sourceType // ignore: cast_nullable_to_non_nullable
-              as String,
-      sourceTable: freezed == sourceTable
-          ? _value.sourceTable
-          : sourceTable // ignore: cast_nullable_to_non_nullable
-              as String?,
-      title: freezed == title
-          ? _value.title
-          : title // ignore: cast_nullable_to_non_nullable
-              as String?,
-      similarity: freezed == similarity
-          ? _value.similarity
-          : similarity // ignore: cast_nullable_to_non_nullable
-              as double?,
-      retrievalMethod: freezed == retrievalMethod
-          ? _value.retrievalMethod
-          : retrievalMethod // ignore: cast_nullable_to_non_nullable
-              as String?,
-    ) as $Val);
-  }
-}
-
-/// @nodoc
-abstract class _$$SourceDocumentImplCopyWith<$Res>
-    implements $SourceDocumentCopyWith<$Res> {
-  factory _$$SourceDocumentImplCopyWith(_$SourceDocumentImpl value,
-          $Res Function(_$SourceDocumentImpl) then) =
-      __$$SourceDocumentImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call(
-      {String id,
-      @JsonKey(name: 'source_type') String sourceType,
-      @JsonKey(name: 'source_table') String? sourceTable,
-      String? title,
-      double? similarity,
-      @JsonKey(name: 'retrieval_method') String? retrievalMethod});
-}
-
-/// @nodoc
-class __$$SourceDocumentImplCopyWithImpl<$Res>
-    extends _$SourceDocumentCopyWithImpl<$Res, _$SourceDocumentImpl>
-    implements _$$SourceDocumentImplCopyWith<$Res> {
-  __$$SourceDocumentImplCopyWithImpl(
-      _$SourceDocumentImpl _value, $Res Function(_$SourceDocumentImpl) _then)
-      : super(_value, _then);
-
-  /// Create a copy of SourceDocument
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? sourceType = null,
-    Object? sourceTable = freezed,
-    Object? title = freezed,
-    Object? similarity = freezed,
-    Object? retrievalMethod = freezed,
-  }) {
-    return _then(_$SourceDocumentImpl(
-      id: null == id
-          ? _value.id
-          : id // ignore: cast_nullable_to_non_nullable
-              as String,
-      sourceType: null == sourceType
-          ? _value.sourceType
-          : sourceType // ignore: cast_nullable_to_non_nullable
-              as String,
-      sourceTable: freezed == sourceTable
-          ? _value.sourceTable
-          : sourceTable // ignore: cast_nullable_to_non_nullable
-              as String?,
-      title: freezed == title
-          ? _value.title
-          : title // ignore: cast_nullable_to_non_nullable
-              as String?,
-      similarity: freezed == similarity
-          ? _value.similarity
-          : similarity // ignore: cast_nullable_to_non_nullable
-              as double?,
-      retrievalMethod: freezed == retrievalMethod
-          ? _value.retrievalMethod
-          : retrievalMethod // ignore: cast_nullable_to_non_nullable
-              as String?,
-    ));
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$SourceDocumentImpl implements _SourceDocument {
-  const _$SourceDocumentImpl(
-      {required this.id,
-      @JsonKey(name: 'source_type') required this.sourceType,
-      @JsonKey(name: 'source_table') this.sourceTable,
-      this.title,
-      this.similarity,
-      @JsonKey(name: 'retrieval_method') this.retrievalMethod});
-
-  factory _$SourceDocumentImpl.fromJson(Map<String, dynamic> json) =>
-      _$$SourceDocumentImplFromJson(json);
-
-  @override
-  final String id;
-  @override
-  @JsonKey(name: 'source_type')
-  final String sourceType;
-  @override
-  @JsonKey(name: 'source_table')
-  final String? sourceTable;
-  @override
-  final String? title;
-  @override
-  final double? similarity;
-  @override
-  @JsonKey(name: 'retrieval_method')
-  final String? retrievalMethod;
-
-  @override
-  String toString() {
-    return 'SourceDocument(id: $id, sourceType: $sourceType, sourceTable: $sourceTable, title: $title, similarity: $similarity, retrievalMethod: $retrievalMethod)';
-  }
+  /// Serializes this SourceDocument to a JSON map.
+  Map<String, dynamic> toJson();
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$SourceDocumentImpl &&
+            other is SourceDocument &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.sourceType, sourceType) ||
                 other.sourceType == sourceType) &&
@@ -229,56 +57,393 @@ class _$SourceDocumentImpl implements _SourceDocument {
   int get hashCode => Object.hash(runtimeType, id, sourceType, sourceTable,
       title, similarity, retrievalMethod);
 
-  /// Create a copy of SourceDocument
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  @pragma('vm:prefer-inline')
-  _$$SourceDocumentImplCopyWith<_$SourceDocumentImpl> get copyWith =>
-      __$$SourceDocumentImplCopyWithImpl<_$SourceDocumentImpl>(
-          this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$SourceDocumentImplToJson(
-      this,
-    );
+  String toString() {
+    return 'SourceDocument(id: $id, sourceType: $sourceType, sourceTable: $sourceTable, title: $title, similarity: $similarity, retrievalMethod: $retrievalMethod)';
   }
 }
 
-abstract class _SourceDocument implements SourceDocument {
-  const factory _SourceDocument(
-          {required final String id,
-          @JsonKey(name: 'source_type') required final String sourceType,
-          @JsonKey(name: 'source_table') final String? sourceTable,
-          final String? title,
-          final double? similarity,
-          @JsonKey(name: 'retrieval_method') final String? retrievalMethod}) =
-      _$SourceDocumentImpl;
+/// @nodoc
+abstract mixin class $SourceDocumentCopyWith<$Res> {
+  factory $SourceDocumentCopyWith(
+          SourceDocument value, $Res Function(SourceDocument) _then) =
+      _$SourceDocumentCopyWithImpl;
+  @useResult
+  $Res call(
+      {String id,
+      @JsonKey(name: 'source_type') String sourceType,
+      @JsonKey(name: 'source_table') String? sourceTable,
+      String? title,
+      double? similarity,
+      @JsonKey(name: 'retrieval_method') String? retrievalMethod});
+}
 
-  factory _SourceDocument.fromJson(Map<String, dynamic> json) =
-      _$SourceDocumentImpl.fromJson;
+/// @nodoc
+class _$SourceDocumentCopyWithImpl<$Res>
+    implements $SourceDocumentCopyWith<$Res> {
+  _$SourceDocumentCopyWithImpl(this._self, this._then);
+
+  final SourceDocument _self;
+  final $Res Function(SourceDocument) _then;
+
+  /// Create a copy of SourceDocument
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? sourceType = null,
+    Object? sourceTable = freezed,
+    Object? title = freezed,
+    Object? similarity = freezed,
+    Object? retrievalMethod = freezed,
+  }) {
+    return _then(_self.copyWith(
+      id: null == id
+          ? _self.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String,
+      sourceType: null == sourceType
+          ? _self.sourceType
+          : sourceType // ignore: cast_nullable_to_non_nullable
+              as String,
+      sourceTable: freezed == sourceTable
+          ? _self.sourceTable
+          : sourceTable // ignore: cast_nullable_to_non_nullable
+              as String?,
+      title: freezed == title
+          ? _self.title
+          : title // ignore: cast_nullable_to_non_nullable
+              as String?,
+      similarity: freezed == similarity
+          ? _self.similarity
+          : similarity // ignore: cast_nullable_to_non_nullable
+              as double?,
+      retrievalMethod: freezed == retrievalMethod
+          ? _self.retrievalMethod
+          : retrievalMethod // ignore: cast_nullable_to_non_nullable
+              as String?,
+    ));
+  }
+}
+
+/// Adds pattern-matching-related methods to [SourceDocument].
+extension SourceDocumentPatterns on SourceDocument {
+  /// A variant of `map` that fallback to returning `orElse`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_SourceDocument value)? $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _SourceDocument() when $default != null:
+        return $default(_that);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// Callbacks receives the raw object, upcasted.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case final Subclass2 value:
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_SourceDocument value) $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _SourceDocument():
+        return $default(_that);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `map` that fallback to returning `null`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_SourceDocument value)? $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _SourceDocument() when $default != null:
+        return $default(_that);
+      case _:
+        return null;
+    }
+  }
+
+  /// A variant of `when` that fallback to an `orElse` callback.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(
+            String id,
+            @JsonKey(name: 'source_type') String sourceType,
+            @JsonKey(name: 'source_table') String? sourceTable,
+            String? title,
+            double? similarity,
+            @JsonKey(name: 'retrieval_method') String? retrievalMethod)?
+        $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _SourceDocument() when $default != null:
+        return $default(_that.id, _that.sourceType, _that.sourceTable,
+            _that.title, _that.similarity, _that.retrievalMethod);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// As opposed to `map`, this offers destructuring.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case Subclass2(:final field2):
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(
+            String id,
+            @JsonKey(name: 'source_type') String sourceType,
+            @JsonKey(name: 'source_table') String? sourceTable,
+            String? title,
+            double? similarity,
+            @JsonKey(name: 'retrieval_method') String? retrievalMethod)
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _SourceDocument():
+        return $default(_that.id, _that.sourceType, _that.sourceTable,
+            _that.title, _that.similarity, _that.retrievalMethod);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `when` that fallback to returning `null`
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(
+            String id,
+            @JsonKey(name: 'source_type') String sourceType,
+            @JsonKey(name: 'source_table') String? sourceTable,
+            String? title,
+            double? similarity,
+            @JsonKey(name: 'retrieval_method') String? retrievalMethod)?
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _SourceDocument() when $default != null:
+        return $default(_that.id, _that.sourceType, _that.sourceTable,
+            _that.title, _that.similarity, _that.retrievalMethod);
+      case _:
+        return null;
+    }
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _SourceDocument implements SourceDocument {
+  const _SourceDocument(
+      {required this.id,
+      @JsonKey(name: 'source_type') required this.sourceType,
+      @JsonKey(name: 'source_table') this.sourceTable,
+      this.title,
+      this.similarity,
+      @JsonKey(name: 'retrieval_method') this.retrievalMethod});
+  factory _SourceDocument.fromJson(Map<String, dynamic> json) =>
+      _$SourceDocumentFromJson(json);
 
   @override
-  String get id;
+  final String id;
   @override
   @JsonKey(name: 'source_type')
-  String get sourceType;
+  final String sourceType;
   @override
   @JsonKey(name: 'source_table')
-  String? get sourceTable;
+  final String? sourceTable;
   @override
-  String? get title;
+  final String? title;
   @override
-  double? get similarity;
+  final double? similarity;
   @override
   @JsonKey(name: 'retrieval_method')
-  String? get retrievalMethod;
+  final String? retrievalMethod;
 
   /// Create a copy of SourceDocument
   /// with the given fields replaced by the non-null parameter values.
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$SourceDocumentImplCopyWith<_$SourceDocumentImpl> get copyWith =>
-      throw _privateConstructorUsedError;
+  @pragma('vm:prefer-inline')
+  _$SourceDocumentCopyWith<_SourceDocument> get copyWith =>
+      __$SourceDocumentCopyWithImpl<_SourceDocument>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$SourceDocumentToJson(
+      this,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _SourceDocument &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.sourceType, sourceType) ||
+                other.sourceType == sourceType) &&
+            (identical(other.sourceTable, sourceTable) ||
+                other.sourceTable == sourceTable) &&
+            (identical(other.title, title) || other.title == title) &&
+            (identical(other.similarity, similarity) ||
+                other.similarity == similarity) &&
+            (identical(other.retrievalMethod, retrievalMethod) ||
+                other.retrievalMethod == retrievalMethod));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, id, sourceType, sourceTable,
+      title, similarity, retrievalMethod);
+
+  @override
+  String toString() {
+    return 'SourceDocument(id: $id, sourceType: $sourceType, sourceTable: $sourceTable, title: $title, similarity: $similarity, retrievalMethod: $retrievalMethod)';
+  }
 }
+
+/// @nodoc
+abstract mixin class _$SourceDocumentCopyWith<$Res>
+    implements $SourceDocumentCopyWith<$Res> {
+  factory _$SourceDocumentCopyWith(
+          _SourceDocument value, $Res Function(_SourceDocument) _then) =
+      __$SourceDocumentCopyWithImpl;
+  @override
+  @useResult
+  $Res call(
+      {String id,
+      @JsonKey(name: 'source_type') String sourceType,
+      @JsonKey(name: 'source_table') String? sourceTable,
+      String? title,
+      double? similarity,
+      @JsonKey(name: 'retrieval_method') String? retrievalMethod});
+}
+
+/// @nodoc
+class __$SourceDocumentCopyWithImpl<$Res>
+    implements _$SourceDocumentCopyWith<$Res> {
+  __$SourceDocumentCopyWithImpl(this._self, this._then);
+
+  final _SourceDocument _self;
+  final $Res Function(_SourceDocument) _then;
+
+  /// Create a copy of SourceDocument
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $Res call({
+    Object? id = null,
+    Object? sourceType = null,
+    Object? sourceTable = freezed,
+    Object? title = freezed,
+    Object? similarity = freezed,
+    Object? retrievalMethod = freezed,
+  }) {
+    return _then(_SourceDocument(
+      id: null == id
+          ? _self.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String,
+      sourceType: null == sourceType
+          ? _self.sourceType
+          : sourceType // ignore: cast_nullable_to_non_nullable
+              as String,
+      sourceTable: freezed == sourceTable
+          ? _self.sourceTable
+          : sourceTable // ignore: cast_nullable_to_non_nullable
+              as String?,
+      title: freezed == title
+          ? _self.title
+          : title // ignore: cast_nullable_to_non_nullable
+              as String?,
+      similarity: freezed == similarity
+          ? _self.similarity
+          : similarity // ignore: cast_nullable_to_non_nullable
+              as double?,
+      retrievalMethod: freezed == retrievalMethod
+          ? _self.retrievalMethod
+          : retrievalMethod // ignore: cast_nullable_to_non_nullable
+              as String?,
+    ));
+  }
+}
+
+// dart format on

@@ -8,7 +8,7 @@ part of 'recent_search_cache.dart';
 
 class RecentSearchCacheAdapter extends TypeAdapter<RecentSearchCache> {
   @override
-  final int typeId = 7;
+  final typeId = 7;
 
   @override
   RecentSearchCache read(BinaryReader reader) {

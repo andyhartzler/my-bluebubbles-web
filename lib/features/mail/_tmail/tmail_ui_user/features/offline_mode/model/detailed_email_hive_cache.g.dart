@@ -9,7 +9,7 @@ part of 'detailed_email_hive_cache.dart';
 class DetailedEmailHiveCacheAdapter
     extends TypeAdapter<DetailedEmailHiveCache> {
   @override
-  final int typeId = 17;
+  final typeId = 17;
 
   @override
   DetailedEmailHiveCache read(BinaryReader reader) {

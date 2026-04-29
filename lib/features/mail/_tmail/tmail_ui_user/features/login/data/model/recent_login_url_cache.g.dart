@@ -8,7 +8,7 @@ part of 'recent_login_url_cache.dart';
 
 class RecentLoginUrlCacheAdapter extends TypeAdapter<RecentLoginUrlCache> {
   @override
-  final int typeId = 12;
+  final typeId = 12;
 
   @override
   RecentLoginUrlCache read(BinaryReader reader) {

@@ -760,7 +760,7 @@ class _CandidateAnalyticsScreenState extends State<CandidateAnalyticsScreen>
                     maxY: _maxAgeCount.toDouble() * 1.2,
                     barTouchData: BarTouchData(
                       touchTooltipData: BarTouchTooltipData(
-                        tooltipBgColor: BrandColors.unityBlue,
+                        getTooltipColor: (_) => BrandColors.unityBlue,
                         getTooltipItem: (group, gIdx, rod, rIdx) {
                           final labels = ['<25', '25-35', '36-50', '51-65', '65+', '?'];
                           return BarTooltipItem(

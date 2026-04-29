@@ -24,7 +24,8 @@ class ThemeStruct {
   @Transient()
   ThemeData data;
 
-  @Property(type: PropertyType.string)
+  // PropertyType.string removed in objectbox 5.x — String is the default for
+  // dart String fields, no annotation needed.
   String get dbThemeData {
     final map = toMap()['data'];
     return jsonEncode(map);

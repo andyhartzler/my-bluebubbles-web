@@ -283,7 +283,7 @@ class _MonthViewCalendarState extends State<MonthViewCalendar> {
   }
 
   Color _getEventColor(CalendarEvent event, ThemeData theme) {
-    switch (event.eventType) {
+    switch (EventType.fromString(event.eventType)) {
       case EventType.committee:
         return Colors.blue;
       case EventType.executive:

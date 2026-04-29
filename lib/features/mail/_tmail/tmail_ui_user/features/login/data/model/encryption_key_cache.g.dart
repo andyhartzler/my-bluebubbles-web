@@ -8,7 +8,7 @@ part of 'encryption_key_cache.dart';
 
 class EncryptionKeyCacheAdapter extends TypeAdapter<EncryptionKeyCache> {
   @override
-  final int typeId = 10;
+  final typeId = 10;
 
   @override
   EncryptionKeyCache read(BinaryReader reader) {

@@ -9,7 +9,7 @@ part of 'oidc_configuration_cache.dart';
 class OidcConfigurationCacheAdapter
     extends TypeAdapter<OidcConfigurationCache> {
   @override
-  final int typeId = 20;
+  final typeId = 20;
 
   @override
   OidcConfigurationCache read(BinaryReader reader) {

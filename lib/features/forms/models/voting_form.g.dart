@@ -6,8 +6,7 @@ part of 'voting_form.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$VotingFormImpl _$$VotingFormImplFromJson(Map<String, dynamic> json) =>
-    _$VotingFormImpl(
+_VotingForm _$VotingFormFromJson(Map<String, dynamic> json) => _VotingForm(
       id: json['id'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
@@ -58,7 +57,7 @@ _$VotingFormImpl _$$VotingFormImplFromJson(Map<String, dynamic> json) =>
       committee: json['committee'] as String?,
     );
 
-Map<String, dynamic> _$$VotingFormImplToJson(_$VotingFormImpl instance) =>
+Map<String, dynamic> _$VotingFormToJson(_VotingForm instance) =>
     <String, dynamic>{
       'id': instance.id,
       'created_at': instance.createdAt.toIso8601String(),
@@ -92,15 +91,15 @@ Map<String, dynamic> _$$VotingFormImplToJson(_$VotingFormImpl instance) =>
       'committee': instance.committee,
     };
 
-_$VotingOptionImpl _$$VotingOptionImplFromJson(Map<String, dynamic> json) =>
-    _$VotingOptionImpl(
+_VotingOption _$VotingOptionFromJson(Map<String, dynamic> json) =>
+    _VotingOption(
       id: json['id'] as String,
       label: json['label'] as String,
       description: json['description'] as String?,
       votes: (json['votes'] as num?)?.toInt() ?? 0,
     );
 
-Map<String, dynamic> _$$VotingOptionImplToJson(_$VotingOptionImpl instance) =>
+Map<String, dynamic> _$VotingOptionToJson(_VotingOption instance) =>
     <String, dynamic>{
       'id': instance.id,
       'label': instance.label,
@@ -108,7 +107,7 @@ Map<String, dynamic> _$$VotingOptionImplToJson(_$VotingOptionImpl instance) =>
       'votes': instance.votes,
     };
 
-_$VoteImpl _$$VoteImplFromJson(Map<String, dynamic> json) => _$VoteImpl(
+_Vote _$VoteFromJson(Map<String, dynamic> json) => _Vote(
       id: json['id'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
       votingFormId: json['voting_form_id'] as String,
@@ -116,8 +115,7 @@ _$VoteImpl _$$VoteImplFromJson(Map<String, dynamic> json) => _$VoteImpl(
       voteData: json['vote_data'] as Map<String, dynamic>,
     );
 
-Map<String, dynamic> _$$VoteImplToJson(_$VoteImpl instance) =>
-    <String, dynamic>{
+Map<String, dynamic> _$VoteToJson(_Vote instance) => <String, dynamic>{
       'id': instance.id,
       'created_at': instance.createdAt.toIso8601String(),
       'voting_form_id': instance.votingFormId,

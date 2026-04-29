@@ -6,8 +6,8 @@ part of 'knowledge_stats.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$KnowledgeStatsImpl _$$KnowledgeStatsImplFromJson(Map<String, dynamic> json) =>
-    _$KnowledgeStatsImpl(
+_KnowledgeStats _$KnowledgeStatsFromJson(Map<String, dynamic> json) =>
+    _KnowledgeStats(
       totalDocuments: (json['totalDocuments'] as num?)?.toInt() ?? 0,
       pendingEmbeddings: (json['pendingEmbeddings'] as num?)?.toInt() ?? 0,
       failedEmbeddings: (json['failedEmbeddings'] as num?)?.toInt() ?? 0,
@@ -29,8 +29,7 @@ _$KnowledgeStatsImpl _$$KnowledgeStatsImplFromJson(Map<String, dynamic> json) =>
           const [],
     );
 
-Map<String, dynamic> _$$KnowledgeStatsImplToJson(
-        _$KnowledgeStatsImpl instance) =>
+Map<String, dynamic> _$KnowledgeStatsToJson(_KnowledgeStats instance) =>
     <String, dynamic>{
       'totalDocuments': instance.totalDocuments,
       'pendingEmbeddings': instance.pendingEmbeddings,
@@ -42,8 +41,7 @@ Map<String, dynamic> _$$KnowledgeStatsImplToJson(
       'tableConfigs': instance.tableConfigs,
     };
 
-_$TableConfigImpl _$$TableConfigImplFromJson(Map<String, dynamic> json) =>
-    _$TableConfigImpl(
+_TableConfig _$TableConfigFromJson(Map<String, dynamic> json) => _TableConfig(
       tableName: json['table_name'] as String,
       isEnabled: json['is_enabled'] as bool? ?? false,
       isDiscovered: json['is_discovered'] as bool? ?? false,
@@ -54,7 +52,7 @@ _$TableConfigImpl _$$TableConfigImplFromJson(Map<String, dynamic> json) =>
       rowCount: (json['row_count'] as num?)?.toInt(),
     );
 
-Map<String, dynamic> _$$TableConfigImplToJson(_$TableConfigImpl instance) =>
+Map<String, dynamic> _$TableConfigToJson(_TableConfig instance) =>
     <String, dynamic>{
       'table_name': instance.tableName,
       'is_enabled': instance.isEnabled,

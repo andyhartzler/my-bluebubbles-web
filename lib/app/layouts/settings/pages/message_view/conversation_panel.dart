@@ -248,7 +248,9 @@ class _ConversationPanelState extends OptimizedState<ConversationPanel> {
                                               await _sendPlayer.preparePlayer(path: ss.settings.sendSoundPath.value!, volume: ss.settings.soundVolume.value.toDouble() / 100);
                                               sendPrepared = true;
                                             }
-                                            await _sendPlayer.startPlayer(finishMode: aw.FinishMode.pause);
+                                            // audio_waveforms 1.3.x moved finishMode out of startPlayer.
+                                            await _sendPlayer.setFinishMode(finishMode: aw.FinishMode.pause);
+                                            await _sendPlayer.startPlayer();
                                           }
                                         }
                                       }),
@@ -310,7 +312,9 @@ class _ConversationPanelState extends OptimizedState<ConversationPanel> {
                                               await _receivePlayer.preparePlayer(path: ss.settings.receiveSoundPath.value!, volume: ss.settings.soundVolume.value / 100);
                                               receivePrepared = true;
                                             }
-                                            await _receivePlayer.startPlayer(finishMode: aw.FinishMode.pause);
+                                            // audio_waveforms 1.3.x moved finishMode out of startPlayer.
+                                            await _receivePlayer.setFinishMode(finishMode: aw.FinishMode.pause);
+                                            await _receivePlayer.startPlayer();
                                           }
                                         }
                                       }),

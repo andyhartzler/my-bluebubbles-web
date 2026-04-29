@@ -9,7 +9,7 @@ part of 'authentication_info_cache.dart';
 class AuthenticationInfoCacheAdapter
     extends TypeAdapter<AuthenticationInfoCache> {
   @override
-  final int typeId = 11;
+  final typeId = 11;
 
   @override
   AuthenticationInfoCache read(BinaryReader reader) {

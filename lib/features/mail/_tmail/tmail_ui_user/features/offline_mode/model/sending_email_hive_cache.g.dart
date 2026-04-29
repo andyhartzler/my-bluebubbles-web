@@ -8,7 +8,7 @@ part of 'sending_email_hive_cache.dart';
 
 class SendingEmailHiveCacheAdapter extends TypeAdapter<SendingEmailHiveCache> {
   @override
-  final int typeId = 18;
+  final typeId = 18;
 
   @override
   SendingEmailHiveCache read(BinaryReader reader) {

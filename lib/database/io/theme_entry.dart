@@ -17,7 +17,7 @@ class ThemeEntry {
 
   @Transient()
   Color? color;
-  @Property(type: PropertyType.string)
+  // PropertyType.string removed in objectbox 5.x — String is the default.
   String? get dbColor => color?.value.toRadixString(16);
   set dbColor(String? s) => s == null ? color = null : color = HexColor(s);
 

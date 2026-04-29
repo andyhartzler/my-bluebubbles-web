@@ -6,9 +6,9 @@ part of 'job_notification_template.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$JobNotificationTemplateImpl _$$JobNotificationTemplateImplFromJson(
+_JobNotificationTemplate _$JobNotificationTemplateFromJson(
         Map<String, dynamic> json) =>
-    _$JobNotificationTemplateImpl(
+    _JobNotificationTemplate(
       id: json['id'] as String,
       triggerType: json['trigger_type'] as String,
       recipientType: json['recipient_type'] as String,
@@ -32,8 +32,8 @@ _$JobNotificationTemplateImpl _$$JobNotificationTemplateImplFromJson(
       updatedBy: json['updated_by'] as String?,
     );
 
-Map<String, dynamic> _$$JobNotificationTemplateImplToJson(
-        _$JobNotificationTemplateImpl instance) =>
+Map<String, dynamic> _$JobNotificationTemplateToJson(
+        _JobNotificationTemplate instance) =>
     <String, dynamic>{
       'id': instance.id,
       'trigger_type': instance.triggerType,

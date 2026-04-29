@@ -1,5 +1,5 @@
-// coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// coverage:ignore-file
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
@@ -9,292 +9,175 @@ part of 'voting_form.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// dart format off
 T _$identity<T>(T value) => value;
-
-final _privateConstructorUsedError = UnsupportedError(
-    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
-
-VotingForm _$VotingFormFromJson(Map<String, dynamic> json) {
-  return _VotingForm.fromJson(json);
-}
 
 /// @nodoc
 mixin _$VotingForm {
-  String get id => throw _privateConstructorUsedError;
+  String get id;
   @JsonKey(name: 'created_at')
-  DateTime get createdAt => throw _privateConstructorUsedError;
+  DateTime get createdAt;
   @JsonKey(name: 'updated_at')
-  DateTime get updatedAt => throw _privateConstructorUsedError;
+  DateTime get updatedAt;
   @JsonKey(name: 'created_by')
-  String? get createdBy => throw _privateConstructorUsedError;
-  String get title => throw _privateConstructorUsedError;
-  String? get description =>
-      throw _privateConstructorUsedError; // Schema contains the voting options and configuration
-  Map<String, dynamic> get schema =>
-      throw _privateConstructorUsedError; // Settings for vote configuration
-  Map<String, dynamic> get settings => throw _privateConstructorUsedError;
-  String get status =>
-      throw _privateConstructorUsedError; // Voting-specific fields from form_schemas
+  String? get createdBy;
+  String get title;
+  String?
+      get description; // Schema contains the voting options and configuration
+  Map<String, dynamic> get schema; // Settings for vote configuration
+  Map<String, dynamic> get settings;
+  String get status; // Voting-specific fields from form_schemas
   @JsonKey(name: 'voting_starts_at')
-  DateTime? get votingStartsAt => throw _privateConstructorUsedError;
+  DateTime? get votingStartsAt;
   @JsonKey(name: 'voting_ends_at')
-  DateTime? get votingEndsAt => throw _privateConstructorUsedError;
+  DateTime? get votingEndsAt;
   @JsonKey(name: 'eligible_members')
-  Map<String, dynamic>? get eligibleMembers =>
-      throw _privateConstructorUsedError;
+  Map<String, dynamic>? get eligibleMembers;
   @JsonKey(name: 'results_public')
   @SafeBoolConverter()
-  bool get resultsPublic => throw _privateConstructorUsedError;
+  bool get resultsPublic;
   @JsonKey(name: 'results_data')
-  Map<String, dynamic>? get resultsData =>
-      throw _privateConstructorUsedError; // Page management
+  Map<String, dynamic>? get resultsData; // Page management
   @JsonKey(name: 'page_count')
-  int get pageCount => throw _privateConstructorUsedError; // Custom URL slug
-  String? get slug => throw _privateConstructorUsedError; // Submission tracking
+  int get pageCount; // Custom URL slug
+  String? get slug; // Submission tracking
   @JsonKey(name: 'submission_count')
-  int get submissionCount => throw _privateConstructorUsedError; // Scheduling
+  int get submissionCount; // Scheduling
   @JsonKey(name: 'opens_at')
-  DateTime? get opensAt => throw _privateConstructorUsedError;
+  DateTime? get opensAt;
   @JsonKey(name: 'closes_at')
-  DateTime? get closesAt =>
-      throw _privateConstructorUsedError; // Submission limits
+  DateTime? get closesAt; // Submission limits
   @JsonKey(name: 'max_submissions')
-  int? get maxSubmissions =>
-      throw _privateConstructorUsedError; // Access control
+  int? get maxSubmissions; // Access control
   @JsonKey(name: 'require_login')
   @SafeBoolConverter()
-  bool get requireLogin => throw _privateConstructorUsedError;
+  bool get requireLogin;
   @JsonKey(name: 'one_submission_per_user')
   @SafeBoolTrueConverter()
-  bool get oneSubmissionPerUser =>
-      throw _privateConstructorUsedError; // Email settings
+  bool get oneSubmissionPerUser; // Email settings
   @JsonKey(name: 'confirmation_email_template')
-  String? get confirmationEmailTemplate => throw _privateConstructorUsedError;
+  String? get confirmationEmailTemplate;
   @JsonKey(name: 'notification_emails')
-  List<String>? get notificationEmails =>
-      throw _privateConstructorUsedError; // Supporting documents (list of document metadata objects)
+  List<String>?
+      get notificationEmails; // Supporting documents (list of document metadata objects)
   @JsonKey(name: 'supporting_documents')
-  List<Map<String, dynamic>>? get supportingDocuments =>
-      throw _privateConstructorUsedError; // Executive Committee Only - restricts voting to executive committee members
+  List<Map<String, dynamic>>?
+      get supportingDocuments; // Executive Committee Only - restricts voting to executive committee members
   @JsonKey(name: 'executive_only')
   @SafeBoolConverter()
-  bool get executiveOnly =>
-      throw _privateConstructorUsedError; // Committee association - ties vote to a specific committee
-  String? get committee => throw _privateConstructorUsedError;
-
-  /// Serializes this VotingForm to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  bool
+      get executiveOnly; // Committee association - ties vote to a specific committee
+  String? get committee;
 
   /// Create a copy of VotingForm
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
-  $VotingFormCopyWith<VotingForm> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $VotingFormCopyWith<$Res> {
-  factory $VotingFormCopyWith(
-          VotingForm value, $Res Function(VotingForm) then) =
-      _$VotingFormCopyWithImpl<$Res, VotingForm>;
-  @useResult
-  $Res call(
-      {String id,
-      @JsonKey(name: 'created_at') DateTime createdAt,
-      @JsonKey(name: 'updated_at') DateTime updatedAt,
-      @JsonKey(name: 'created_by') String? createdBy,
-      String title,
-      String? description,
-      Map<String, dynamic> schema,
-      Map<String, dynamic> settings,
-      String status,
-      @JsonKey(name: 'voting_starts_at') DateTime? votingStartsAt,
-      @JsonKey(name: 'voting_ends_at') DateTime? votingEndsAt,
-      @JsonKey(name: 'eligible_members') Map<String, dynamic>? eligibleMembers,
-      @JsonKey(name: 'results_public') @SafeBoolConverter() bool resultsPublic,
-      @JsonKey(name: 'results_data') Map<String, dynamic>? resultsData,
-      @JsonKey(name: 'page_count') int pageCount,
-      String? slug,
-      @JsonKey(name: 'submission_count') int submissionCount,
-      @JsonKey(name: 'opens_at') DateTime? opensAt,
-      @JsonKey(name: 'closes_at') DateTime? closesAt,
-      @JsonKey(name: 'max_submissions') int? maxSubmissions,
-      @JsonKey(name: 'require_login') @SafeBoolConverter() bool requireLogin,
-      @JsonKey(name: 'one_submission_per_user')
-      @SafeBoolTrueConverter()
-      bool oneSubmissionPerUser,
-      @JsonKey(name: 'confirmation_email_template')
-      String? confirmationEmailTemplate,
-      @JsonKey(name: 'notification_emails') List<String>? notificationEmails,
-      @JsonKey(name: 'supporting_documents')
-      List<Map<String, dynamic>>? supportingDocuments,
-      @JsonKey(name: 'executive_only') @SafeBoolConverter() bool executiveOnly,
-      String? committee});
-}
-
-/// @nodoc
-class _$VotingFormCopyWithImpl<$Res, $Val extends VotingForm>
-    implements $VotingFormCopyWith<$Res> {
-  _$VotingFormCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of VotingForm
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
+  $VotingFormCopyWith<VotingForm> get copyWith =>
+      _$VotingFormCopyWithImpl<VotingForm>(this as VotingForm, _$identity);
+
+  /// Serializes this VotingForm to a JSON map.
+  Map<String, dynamic> toJson();
+
   @override
-  $Res call({
-    Object? id = null,
-    Object? createdAt = null,
-    Object? updatedAt = null,
-    Object? createdBy = freezed,
-    Object? title = null,
-    Object? description = freezed,
-    Object? schema = null,
-    Object? settings = null,
-    Object? status = null,
-    Object? votingStartsAt = freezed,
-    Object? votingEndsAt = freezed,
-    Object? eligibleMembers = freezed,
-    Object? resultsPublic = null,
-    Object? resultsData = freezed,
-    Object? pageCount = null,
-    Object? slug = freezed,
-    Object? submissionCount = null,
-    Object? opensAt = freezed,
-    Object? closesAt = freezed,
-    Object? maxSubmissions = freezed,
-    Object? requireLogin = null,
-    Object? oneSubmissionPerUser = null,
-    Object? confirmationEmailTemplate = freezed,
-    Object? notificationEmails = freezed,
-    Object? supportingDocuments = freezed,
-    Object? executiveOnly = null,
-    Object? committee = freezed,
-  }) {
-    return _then(_value.copyWith(
-      id: null == id
-          ? _value.id
-          : id // ignore: cast_nullable_to_non_nullable
-              as String,
-      createdAt: null == createdAt
-          ? _value.createdAt
-          : createdAt // ignore: cast_nullable_to_non_nullable
-              as DateTime,
-      updatedAt: null == updatedAt
-          ? _value.updatedAt
-          : updatedAt // ignore: cast_nullable_to_non_nullable
-              as DateTime,
-      createdBy: freezed == createdBy
-          ? _value.createdBy
-          : createdBy // ignore: cast_nullable_to_non_nullable
-              as String?,
-      title: null == title
-          ? _value.title
-          : title // ignore: cast_nullable_to_non_nullable
-              as String,
-      description: freezed == description
-          ? _value.description
-          : description // ignore: cast_nullable_to_non_nullable
-              as String?,
-      schema: null == schema
-          ? _value.schema
-          : schema // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>,
-      settings: null == settings
-          ? _value.settings
-          : settings // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>,
-      status: null == status
-          ? _value.status
-          : status // ignore: cast_nullable_to_non_nullable
-              as String,
-      votingStartsAt: freezed == votingStartsAt
-          ? _value.votingStartsAt
-          : votingStartsAt // ignore: cast_nullable_to_non_nullable
-              as DateTime?,
-      votingEndsAt: freezed == votingEndsAt
-          ? _value.votingEndsAt
-          : votingEndsAt // ignore: cast_nullable_to_non_nullable
-              as DateTime?,
-      eligibleMembers: freezed == eligibleMembers
-          ? _value.eligibleMembers
-          : eligibleMembers // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
-      resultsPublic: null == resultsPublic
-          ? _value.resultsPublic
-          : resultsPublic // ignore: cast_nullable_to_non_nullable
-              as bool,
-      resultsData: freezed == resultsData
-          ? _value.resultsData
-          : resultsData // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
-      pageCount: null == pageCount
-          ? _value.pageCount
-          : pageCount // ignore: cast_nullable_to_non_nullable
-              as int,
-      slug: freezed == slug
-          ? _value.slug
-          : slug // ignore: cast_nullable_to_non_nullable
-              as String?,
-      submissionCount: null == submissionCount
-          ? _value.submissionCount
-          : submissionCount // ignore: cast_nullable_to_non_nullable
-              as int,
-      opensAt: freezed == opensAt
-          ? _value.opensAt
-          : opensAt // ignore: cast_nullable_to_non_nullable
-              as DateTime?,
-      closesAt: freezed == closesAt
-          ? _value.closesAt
-          : closesAt // ignore: cast_nullable_to_non_nullable
-              as DateTime?,
-      maxSubmissions: freezed == maxSubmissions
-          ? _value.maxSubmissions
-          : maxSubmissions // ignore: cast_nullable_to_non_nullable
-              as int?,
-      requireLogin: null == requireLogin
-          ? _value.requireLogin
-          : requireLogin // ignore: cast_nullable_to_non_nullable
-              as bool,
-      oneSubmissionPerUser: null == oneSubmissionPerUser
-          ? _value.oneSubmissionPerUser
-          : oneSubmissionPerUser // ignore: cast_nullable_to_non_nullable
-              as bool,
-      confirmationEmailTemplate: freezed == confirmationEmailTemplate
-          ? _value.confirmationEmailTemplate
-          : confirmationEmailTemplate // ignore: cast_nullable_to_non_nullable
-              as String?,
-      notificationEmails: freezed == notificationEmails
-          ? _value.notificationEmails
-          : notificationEmails // ignore: cast_nullable_to_non_nullable
-              as List<String>?,
-      supportingDocuments: freezed == supportingDocuments
-          ? _value.supportingDocuments
-          : supportingDocuments // ignore: cast_nullable_to_non_nullable
-              as List<Map<String, dynamic>>?,
-      executiveOnly: null == executiveOnly
-          ? _value.executiveOnly
-          : executiveOnly // ignore: cast_nullable_to_non_nullable
-              as bool,
-      committee: freezed == committee
-          ? _value.committee
-          : committee // ignore: cast_nullable_to_non_nullable
-              as String?,
-    ) as $Val);
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is VotingForm &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt) &&
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt) &&
+            (identical(other.createdBy, createdBy) ||
+                other.createdBy == createdBy) &&
+            (identical(other.title, title) || other.title == title) &&
+            (identical(other.description, description) ||
+                other.description == description) &&
+            const DeepCollectionEquality().equals(other.schema, schema) &&
+            const DeepCollectionEquality().equals(other.settings, settings) &&
+            (identical(other.status, status) || other.status == status) &&
+            (identical(other.votingStartsAt, votingStartsAt) ||
+                other.votingStartsAt == votingStartsAt) &&
+            (identical(other.votingEndsAt, votingEndsAt) ||
+                other.votingEndsAt == votingEndsAt) &&
+            const DeepCollectionEquality()
+                .equals(other.eligibleMembers, eligibleMembers) &&
+            (identical(other.resultsPublic, resultsPublic) ||
+                other.resultsPublic == resultsPublic) &&
+            const DeepCollectionEquality()
+                .equals(other.resultsData, resultsData) &&
+            (identical(other.pageCount, pageCount) ||
+                other.pageCount == pageCount) &&
+            (identical(other.slug, slug) || other.slug == slug) &&
+            (identical(other.submissionCount, submissionCount) ||
+                other.submissionCount == submissionCount) &&
+            (identical(other.opensAt, opensAt) || other.opensAt == opensAt) &&
+            (identical(other.closesAt, closesAt) ||
+                other.closesAt == closesAt) &&
+            (identical(other.maxSubmissions, maxSubmissions) ||
+                other.maxSubmissions == maxSubmissions) &&
+            (identical(other.requireLogin, requireLogin) ||
+                other.requireLogin == requireLogin) &&
+            (identical(other.oneSubmissionPerUser, oneSubmissionPerUser) ||
+                other.oneSubmissionPerUser == oneSubmissionPerUser) &&
+            (identical(other.confirmationEmailTemplate,
+                    confirmationEmailTemplate) ||
+                other.confirmationEmailTemplate == confirmationEmailTemplate) &&
+            const DeepCollectionEquality()
+                .equals(other.notificationEmails, notificationEmails) &&
+            const DeepCollectionEquality()
+                .equals(other.supportingDocuments, supportingDocuments) &&
+            (identical(other.executiveOnly, executiveOnly) ||
+                other.executiveOnly == executiveOnly) &&
+            (identical(other.committee, committee) ||
+                other.committee == committee));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        id,
+        createdAt,
+        updatedAt,
+        createdBy,
+        title,
+        description,
+        const DeepCollectionEquality().hash(schema),
+        const DeepCollectionEquality().hash(settings),
+        status,
+        votingStartsAt,
+        votingEndsAt,
+        const DeepCollectionEquality().hash(eligibleMembers),
+        resultsPublic,
+        const DeepCollectionEquality().hash(resultsData),
+        pageCount,
+        slug,
+        submissionCount,
+        opensAt,
+        closesAt,
+        maxSubmissions,
+        requireLogin,
+        oneSubmissionPerUser,
+        confirmationEmailTemplate,
+        const DeepCollectionEquality().hash(notificationEmails),
+        const DeepCollectionEquality().hash(supportingDocuments),
+        executiveOnly,
+        committee
+      ]);
+
+  @override
+  String toString() {
+    return 'VotingForm(id: $id, createdAt: $createdAt, updatedAt: $updatedAt, createdBy: $createdBy, title: $title, description: $description, schema: $schema, settings: $settings, status: $status, votingStartsAt: $votingStartsAt, votingEndsAt: $votingEndsAt, eligibleMembers: $eligibleMembers, resultsPublic: $resultsPublic, resultsData: $resultsData, pageCount: $pageCount, slug: $slug, submissionCount: $submissionCount, opensAt: $opensAt, closesAt: $closesAt, maxSubmissions: $maxSubmissions, requireLogin: $requireLogin, oneSubmissionPerUser: $oneSubmissionPerUser, confirmationEmailTemplate: $confirmationEmailTemplate, notificationEmails: $notificationEmails, supportingDocuments: $supportingDocuments, executiveOnly: $executiveOnly, committee: $committee)';
   }
 }
 
 /// @nodoc
-abstract class _$$VotingFormImplCopyWith<$Res>
-    implements $VotingFormCopyWith<$Res> {
-  factory _$$VotingFormImplCopyWith(
-          _$VotingFormImpl value, $Res Function(_$VotingFormImpl) then) =
-      __$$VotingFormImplCopyWithImpl<$Res>;
-  @override
+abstract mixin class $VotingFormCopyWith<$Res> {
+  factory $VotingFormCopyWith(
+          VotingForm value, $Res Function(VotingForm) _then) =
+      _$VotingFormCopyWithImpl;
   @useResult
   $Res call(
       {String id,
@@ -331,12 +214,11 @@ abstract class _$$VotingFormImplCopyWith<$Res>
 }
 
 /// @nodoc
-class __$$VotingFormImplCopyWithImpl<$Res>
-    extends _$VotingFormCopyWithImpl<$Res, _$VotingFormImpl>
-    implements _$$VotingFormImplCopyWith<$Res> {
-  __$$VotingFormImplCopyWithImpl(
-      _$VotingFormImpl _value, $Res Function(_$VotingFormImpl) _then)
-      : super(_value, _then);
+class _$VotingFormCopyWithImpl<$Res> implements $VotingFormCopyWith<$Res> {
+  _$VotingFormCopyWithImpl(this._self, this._then);
+
+  final VotingForm _self;
+  final $Res Function(VotingForm) _then;
 
   /// Create a copy of VotingForm
   /// with the given fields replaced by the non-null parameter values.
@@ -371,123 +253,481 @@ class __$$VotingFormImplCopyWithImpl<$Res>
     Object? executiveOnly = null,
     Object? committee = freezed,
   }) {
-    return _then(_$VotingFormImpl(
+    return _then(_self.copyWith(
       id: null == id
-          ? _value.id
+          ? _self.id
           : id // ignore: cast_nullable_to_non_nullable
               as String,
       createdAt: null == createdAt
-          ? _value.createdAt
+          ? _self.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
       updatedAt: null == updatedAt
-          ? _value.updatedAt
+          ? _self.updatedAt
           : updatedAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
       createdBy: freezed == createdBy
-          ? _value.createdBy
+          ? _self.createdBy
           : createdBy // ignore: cast_nullable_to_non_nullable
               as String?,
       title: null == title
-          ? _value.title
+          ? _self.title
           : title // ignore: cast_nullable_to_non_nullable
               as String,
       description: freezed == description
-          ? _value.description
+          ? _self.description
           : description // ignore: cast_nullable_to_non_nullable
               as String?,
       schema: null == schema
-          ? _value._schema
+          ? _self.schema
           : schema // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>,
       settings: null == settings
-          ? _value._settings
+          ? _self.settings
           : settings // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>,
       status: null == status
-          ? _value.status
+          ? _self.status
           : status // ignore: cast_nullable_to_non_nullable
               as String,
       votingStartsAt: freezed == votingStartsAt
-          ? _value.votingStartsAt
+          ? _self.votingStartsAt
           : votingStartsAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
       votingEndsAt: freezed == votingEndsAt
-          ? _value.votingEndsAt
+          ? _self.votingEndsAt
           : votingEndsAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
       eligibleMembers: freezed == eligibleMembers
-          ? _value._eligibleMembers
+          ? _self.eligibleMembers
           : eligibleMembers // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>?,
       resultsPublic: null == resultsPublic
-          ? _value.resultsPublic
+          ? _self.resultsPublic
           : resultsPublic // ignore: cast_nullable_to_non_nullable
               as bool,
       resultsData: freezed == resultsData
-          ? _value._resultsData
+          ? _self.resultsData
           : resultsData // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>?,
       pageCount: null == pageCount
-          ? _value.pageCount
+          ? _self.pageCount
           : pageCount // ignore: cast_nullable_to_non_nullable
               as int,
       slug: freezed == slug
-          ? _value.slug
+          ? _self.slug
           : slug // ignore: cast_nullable_to_non_nullable
               as String?,
       submissionCount: null == submissionCount
-          ? _value.submissionCount
+          ? _self.submissionCount
           : submissionCount // ignore: cast_nullable_to_non_nullable
               as int,
       opensAt: freezed == opensAt
-          ? _value.opensAt
+          ? _self.opensAt
           : opensAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
       closesAt: freezed == closesAt
-          ? _value.closesAt
+          ? _self.closesAt
           : closesAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
       maxSubmissions: freezed == maxSubmissions
-          ? _value.maxSubmissions
+          ? _self.maxSubmissions
           : maxSubmissions // ignore: cast_nullable_to_non_nullable
               as int?,
       requireLogin: null == requireLogin
-          ? _value.requireLogin
+          ? _self.requireLogin
           : requireLogin // ignore: cast_nullable_to_non_nullable
               as bool,
       oneSubmissionPerUser: null == oneSubmissionPerUser
-          ? _value.oneSubmissionPerUser
+          ? _self.oneSubmissionPerUser
           : oneSubmissionPerUser // ignore: cast_nullable_to_non_nullable
               as bool,
       confirmationEmailTemplate: freezed == confirmationEmailTemplate
-          ? _value.confirmationEmailTemplate
+          ? _self.confirmationEmailTemplate
           : confirmationEmailTemplate // ignore: cast_nullable_to_non_nullable
               as String?,
       notificationEmails: freezed == notificationEmails
-          ? _value._notificationEmails
+          ? _self.notificationEmails
           : notificationEmails // ignore: cast_nullable_to_non_nullable
               as List<String>?,
       supportingDocuments: freezed == supportingDocuments
-          ? _value._supportingDocuments
+          ? _self.supportingDocuments
           : supportingDocuments // ignore: cast_nullable_to_non_nullable
               as List<Map<String, dynamic>>?,
       executiveOnly: null == executiveOnly
-          ? _value.executiveOnly
+          ? _self.executiveOnly
           : executiveOnly // ignore: cast_nullable_to_non_nullable
               as bool,
       committee: freezed == committee
-          ? _value.committee
+          ? _self.committee
           : committee // ignore: cast_nullable_to_non_nullable
               as String?,
     ));
   }
 }
 
+/// Adds pattern-matching-related methods to [VotingForm].
+extension VotingFormPatterns on VotingForm {
+  /// A variant of `map` that fallback to returning `orElse`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_VotingForm value)? $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _VotingForm() when $default != null:
+        return $default(_that);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// Callbacks receives the raw object, upcasted.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case final Subclass2 value:
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_VotingForm value) $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _VotingForm():
+        return $default(_that);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `map` that fallback to returning `null`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_VotingForm value)? $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _VotingForm() when $default != null:
+        return $default(_that);
+      case _:
+        return null;
+    }
+  }
+
+  /// A variant of `when` that fallback to an `orElse` callback.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(
+            String id,
+            @JsonKey(name: 'created_at') DateTime createdAt,
+            @JsonKey(name: 'updated_at') DateTime updatedAt,
+            @JsonKey(name: 'created_by') String? createdBy,
+            String title,
+            String? description,
+            Map<String, dynamic> schema,
+            Map<String, dynamic> settings,
+            String status,
+            @JsonKey(name: 'voting_starts_at') DateTime? votingStartsAt,
+            @JsonKey(name: 'voting_ends_at') DateTime? votingEndsAt,
+            @JsonKey(name: 'eligible_members')
+            Map<String, dynamic>? eligibleMembers,
+            @JsonKey(name: 'results_public')
+            @SafeBoolConverter()
+            bool resultsPublic,
+            @JsonKey(name: 'results_data') Map<String, dynamic>? resultsData,
+            @JsonKey(name: 'page_count') int pageCount,
+            String? slug,
+            @JsonKey(name: 'submission_count') int submissionCount,
+            @JsonKey(name: 'opens_at') DateTime? opensAt,
+            @JsonKey(name: 'closes_at') DateTime? closesAt,
+            @JsonKey(name: 'max_submissions') int? maxSubmissions,
+            @JsonKey(name: 'require_login')
+            @SafeBoolConverter()
+            bool requireLogin,
+            @JsonKey(name: 'one_submission_per_user')
+            @SafeBoolTrueConverter()
+            bool oneSubmissionPerUser,
+            @JsonKey(name: 'confirmation_email_template')
+            String? confirmationEmailTemplate,
+            @JsonKey(name: 'notification_emails')
+            List<String>? notificationEmails,
+            @JsonKey(name: 'supporting_documents')
+            List<Map<String, dynamic>>? supportingDocuments,
+            @JsonKey(name: 'executive_only')
+            @SafeBoolConverter()
+            bool executiveOnly,
+            String? committee)?
+        $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _VotingForm() when $default != null:
+        return $default(
+            _that.id,
+            _that.createdAt,
+            _that.updatedAt,
+            _that.createdBy,
+            _that.title,
+            _that.description,
+            _that.schema,
+            _that.settings,
+            _that.status,
+            _that.votingStartsAt,
+            _that.votingEndsAt,
+            _that.eligibleMembers,
+            _that.resultsPublic,
+            _that.resultsData,
+            _that.pageCount,
+            _that.slug,
+            _that.submissionCount,
+            _that.opensAt,
+            _that.closesAt,
+            _that.maxSubmissions,
+            _that.requireLogin,
+            _that.oneSubmissionPerUser,
+            _that.confirmationEmailTemplate,
+            _that.notificationEmails,
+            _that.supportingDocuments,
+            _that.executiveOnly,
+            _that.committee);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// As opposed to `map`, this offers destructuring.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case Subclass2(:final field2):
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(
+            String id,
+            @JsonKey(name: 'created_at') DateTime createdAt,
+            @JsonKey(name: 'updated_at') DateTime updatedAt,
+            @JsonKey(name: 'created_by') String? createdBy,
+            String title,
+            String? description,
+            Map<String, dynamic> schema,
+            Map<String, dynamic> settings,
+            String status,
+            @JsonKey(name: 'voting_starts_at') DateTime? votingStartsAt,
+            @JsonKey(name: 'voting_ends_at') DateTime? votingEndsAt,
+            @JsonKey(name: 'eligible_members')
+            Map<String, dynamic>? eligibleMembers,
+            @JsonKey(name: 'results_public')
+            @SafeBoolConverter()
+            bool resultsPublic,
+            @JsonKey(name: 'results_data') Map<String, dynamic>? resultsData,
+            @JsonKey(name: 'page_count') int pageCount,
+            String? slug,
+            @JsonKey(name: 'submission_count') int submissionCount,
+            @JsonKey(name: 'opens_at') DateTime? opensAt,
+            @JsonKey(name: 'closes_at') DateTime? closesAt,
+            @JsonKey(name: 'max_submissions') int? maxSubmissions,
+            @JsonKey(name: 'require_login')
+            @SafeBoolConverter()
+            bool requireLogin,
+            @JsonKey(name: 'one_submission_per_user')
+            @SafeBoolTrueConverter()
+            bool oneSubmissionPerUser,
+            @JsonKey(name: 'confirmation_email_template')
+            String? confirmationEmailTemplate,
+            @JsonKey(name: 'notification_emails')
+            List<String>? notificationEmails,
+            @JsonKey(name: 'supporting_documents')
+            List<Map<String, dynamic>>? supportingDocuments,
+            @JsonKey(name: 'executive_only')
+            @SafeBoolConverter()
+            bool executiveOnly,
+            String? committee)
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _VotingForm():
+        return $default(
+            _that.id,
+            _that.createdAt,
+            _that.updatedAt,
+            _that.createdBy,
+            _that.title,
+            _that.description,
+            _that.schema,
+            _that.settings,
+            _that.status,
+            _that.votingStartsAt,
+            _that.votingEndsAt,
+            _that.eligibleMembers,
+            _that.resultsPublic,
+            _that.resultsData,
+            _that.pageCount,
+            _that.slug,
+            _that.submissionCount,
+            _that.opensAt,
+            _that.closesAt,
+            _that.maxSubmissions,
+            _that.requireLogin,
+            _that.oneSubmissionPerUser,
+            _that.confirmationEmailTemplate,
+            _that.notificationEmails,
+            _that.supportingDocuments,
+            _that.executiveOnly,
+            _that.committee);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `when` that fallback to returning `null`
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(
+            String id,
+            @JsonKey(name: 'created_at') DateTime createdAt,
+            @JsonKey(name: 'updated_at') DateTime updatedAt,
+            @JsonKey(name: 'created_by') String? createdBy,
+            String title,
+            String? description,
+            Map<String, dynamic> schema,
+            Map<String, dynamic> settings,
+            String status,
+            @JsonKey(name: 'voting_starts_at') DateTime? votingStartsAt,
+            @JsonKey(name: 'voting_ends_at') DateTime? votingEndsAt,
+            @JsonKey(name: 'eligible_members')
+            Map<String, dynamic>? eligibleMembers,
+            @JsonKey(name: 'results_public')
+            @SafeBoolConverter()
+            bool resultsPublic,
+            @JsonKey(name: 'results_data') Map<String, dynamic>? resultsData,
+            @JsonKey(name: 'page_count') int pageCount,
+            String? slug,
+            @JsonKey(name: 'submission_count') int submissionCount,
+            @JsonKey(name: 'opens_at') DateTime? opensAt,
+            @JsonKey(name: 'closes_at') DateTime? closesAt,
+            @JsonKey(name: 'max_submissions') int? maxSubmissions,
+            @JsonKey(name: 'require_login')
+            @SafeBoolConverter()
+            bool requireLogin,
+            @JsonKey(name: 'one_submission_per_user')
+            @SafeBoolTrueConverter()
+            bool oneSubmissionPerUser,
+            @JsonKey(name: 'confirmation_email_template')
+            String? confirmationEmailTemplate,
+            @JsonKey(name: 'notification_emails')
+            List<String>? notificationEmails,
+            @JsonKey(name: 'supporting_documents')
+            List<Map<String, dynamic>>? supportingDocuments,
+            @JsonKey(name: 'executive_only')
+            @SafeBoolConverter()
+            bool executiveOnly,
+            String? committee)?
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _VotingForm() when $default != null:
+        return $default(
+            _that.id,
+            _that.createdAt,
+            _that.updatedAt,
+            _that.createdBy,
+            _that.title,
+            _that.description,
+            _that.schema,
+            _that.settings,
+            _that.status,
+            _that.votingStartsAt,
+            _that.votingEndsAt,
+            _that.eligibleMembers,
+            _that.resultsPublic,
+            _that.resultsData,
+            _that.pageCount,
+            _that.slug,
+            _that.submissionCount,
+            _that.opensAt,
+            _that.closesAt,
+            _that.maxSubmissions,
+            _that.requireLogin,
+            _that.oneSubmissionPerUser,
+            _that.confirmationEmailTemplate,
+            _that.notificationEmails,
+            _that.supportingDocuments,
+            _that.executiveOnly,
+            _that.committee);
+      case _:
+        return null;
+    }
+  }
+}
+
 /// @nodoc
 @JsonSerializable()
-class _$VotingFormImpl implements _VotingForm {
-  const _$VotingFormImpl(
+class _VotingForm implements VotingForm {
+  const _VotingForm(
       {required this.id,
       @JsonKey(name: 'created_at') required this.createdAt,
       @JsonKey(name: 'updated_at') required this.updatedAt,
@@ -533,9 +773,8 @@ class _$VotingFormImpl implements _VotingForm {
         _resultsData = resultsData,
         _notificationEmails = notificationEmails,
         _supportingDocuments = supportingDocuments;
-
-  factory _$VotingFormImpl.fromJson(Map<String, dynamic> json) =>
-      _$$VotingFormImplFromJson(json);
+  factory _VotingForm.fromJson(Map<String, dynamic> json) =>
+      _$VotingFormFromJson(json);
 
   @override
   final String id;
@@ -679,16 +918,26 @@ class _$VotingFormImpl implements _VotingForm {
   @override
   final String? committee;
 
+  /// Create a copy of VotingForm
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  String toString() {
-    return 'VotingForm(id: $id, createdAt: $createdAt, updatedAt: $updatedAt, createdBy: $createdBy, title: $title, description: $description, schema: $schema, settings: $settings, status: $status, votingStartsAt: $votingStartsAt, votingEndsAt: $votingEndsAt, eligibleMembers: $eligibleMembers, resultsPublic: $resultsPublic, resultsData: $resultsData, pageCount: $pageCount, slug: $slug, submissionCount: $submissionCount, opensAt: $opensAt, closesAt: $closesAt, maxSubmissions: $maxSubmissions, requireLogin: $requireLogin, oneSubmissionPerUser: $oneSubmissionPerUser, confirmationEmailTemplate: $confirmationEmailTemplate, notificationEmails: $notificationEmails, supportingDocuments: $supportingDocuments, executiveOnly: $executiveOnly, committee: $committee)';
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  _$VotingFormCopyWith<_VotingForm> get copyWith =>
+      __$VotingFormCopyWithImpl<_VotingForm>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$VotingFormToJson(
+      this,
+    );
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$VotingFormImpl &&
+            other is _VotingForm &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
@@ -772,310 +1021,230 @@ class _$VotingFormImpl implements _VotingForm {
         committee
       ]);
 
-  /// Create a copy of VotingForm
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  @pragma('vm:prefer-inline')
-  _$$VotingFormImplCopyWith<_$VotingFormImpl> get copyWith =>
-      __$$VotingFormImplCopyWithImpl<_$VotingFormImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$VotingFormImplToJson(
-      this,
-    );
+  String toString() {
+    return 'VotingForm(id: $id, createdAt: $createdAt, updatedAt: $updatedAt, createdBy: $createdBy, title: $title, description: $description, schema: $schema, settings: $settings, status: $status, votingStartsAt: $votingStartsAt, votingEndsAt: $votingEndsAt, eligibleMembers: $eligibleMembers, resultsPublic: $resultsPublic, resultsData: $resultsData, pageCount: $pageCount, slug: $slug, submissionCount: $submissionCount, opensAt: $opensAt, closesAt: $closesAt, maxSubmissions: $maxSubmissions, requireLogin: $requireLogin, oneSubmissionPerUser: $oneSubmissionPerUser, confirmationEmailTemplate: $confirmationEmailTemplate, notificationEmails: $notificationEmails, supportingDocuments: $supportingDocuments, executiveOnly: $executiveOnly, committee: $committee)';
   }
 }
 
-abstract class _VotingForm implements VotingForm {
-  const factory _VotingForm(
-      {required final String id,
-      @JsonKey(name: 'created_at') required final DateTime createdAt,
-      @JsonKey(name: 'updated_at') required final DateTime updatedAt,
-      @JsonKey(name: 'created_by') final String? createdBy,
-      required final String title,
-      final String? description,
-      required final Map<String, dynamic> schema,
-      final Map<String, dynamic> settings,
-      final String status,
-      @JsonKey(name: 'voting_starts_at') final DateTime? votingStartsAt,
-      @JsonKey(name: 'voting_ends_at') final DateTime? votingEndsAt,
-      @JsonKey(name: 'eligible_members')
-      final Map<String, dynamic>? eligibleMembers,
-      @JsonKey(name: 'results_public')
-      @SafeBoolConverter()
-      final bool resultsPublic,
-      @JsonKey(name: 'results_data') final Map<String, dynamic>? resultsData,
-      @JsonKey(name: 'page_count') final int pageCount,
-      final String? slug,
-      @JsonKey(name: 'submission_count') final int submissionCount,
-      @JsonKey(name: 'opens_at') final DateTime? opensAt,
-      @JsonKey(name: 'closes_at') final DateTime? closesAt,
-      @JsonKey(name: 'max_submissions') final int? maxSubmissions,
-      @JsonKey(name: 'require_login')
-      @SafeBoolConverter()
-      final bool requireLogin,
+/// @nodoc
+abstract mixin class _$VotingFormCopyWith<$Res>
+    implements $VotingFormCopyWith<$Res> {
+  factory _$VotingFormCopyWith(
+          _VotingForm value, $Res Function(_VotingForm) _then) =
+      __$VotingFormCopyWithImpl;
+  @override
+  @useResult
+  $Res call(
+      {String id,
+      @JsonKey(name: 'created_at') DateTime createdAt,
+      @JsonKey(name: 'updated_at') DateTime updatedAt,
+      @JsonKey(name: 'created_by') String? createdBy,
+      String title,
+      String? description,
+      Map<String, dynamic> schema,
+      Map<String, dynamic> settings,
+      String status,
+      @JsonKey(name: 'voting_starts_at') DateTime? votingStartsAt,
+      @JsonKey(name: 'voting_ends_at') DateTime? votingEndsAt,
+      @JsonKey(name: 'eligible_members') Map<String, dynamic>? eligibleMembers,
+      @JsonKey(name: 'results_public') @SafeBoolConverter() bool resultsPublic,
+      @JsonKey(name: 'results_data') Map<String, dynamic>? resultsData,
+      @JsonKey(name: 'page_count') int pageCount,
+      String? slug,
+      @JsonKey(name: 'submission_count') int submissionCount,
+      @JsonKey(name: 'opens_at') DateTime? opensAt,
+      @JsonKey(name: 'closes_at') DateTime? closesAt,
+      @JsonKey(name: 'max_submissions') int? maxSubmissions,
+      @JsonKey(name: 'require_login') @SafeBoolConverter() bool requireLogin,
       @JsonKey(name: 'one_submission_per_user')
       @SafeBoolTrueConverter()
-      final bool oneSubmissionPerUser,
+      bool oneSubmissionPerUser,
       @JsonKey(name: 'confirmation_email_template')
-      final String? confirmationEmailTemplate,
-      @JsonKey(name: 'notification_emails')
-      final List<String>? notificationEmails,
+      String? confirmationEmailTemplate,
+      @JsonKey(name: 'notification_emails') List<String>? notificationEmails,
       @JsonKey(name: 'supporting_documents')
-      final List<Map<String, dynamic>>? supportingDocuments,
-      @JsonKey(name: 'executive_only')
-      @SafeBoolConverter()
-      final bool executiveOnly,
-      final String? committee}) = _$VotingFormImpl;
+      List<Map<String, dynamic>>? supportingDocuments,
+      @JsonKey(name: 'executive_only') @SafeBoolConverter() bool executiveOnly,
+      String? committee});
+}
 
-  factory _VotingForm.fromJson(Map<String, dynamic> json) =
-      _$VotingFormImpl.fromJson;
+/// @nodoc
+class __$VotingFormCopyWithImpl<$Res> implements _$VotingFormCopyWith<$Res> {
+  __$VotingFormCopyWithImpl(this._self, this._then);
 
-  @override
-  String get id;
-  @override
-  @JsonKey(name: 'created_at')
-  DateTime get createdAt;
-  @override
-  @JsonKey(name: 'updated_at')
-  DateTime get updatedAt;
-  @override
-  @JsonKey(name: 'created_by')
-  String? get createdBy;
-  @override
-  String get title;
-  @override
-  String?
-      get description; // Schema contains the voting options and configuration
-  @override
-  Map<String, dynamic> get schema; // Settings for vote configuration
-  @override
-  Map<String, dynamic> get settings;
-  @override
-  String get status; // Voting-specific fields from form_schemas
-  @override
-  @JsonKey(name: 'voting_starts_at')
-  DateTime? get votingStartsAt;
-  @override
-  @JsonKey(name: 'voting_ends_at')
-  DateTime? get votingEndsAt;
-  @override
-  @JsonKey(name: 'eligible_members')
-  Map<String, dynamic>? get eligibleMembers;
-  @override
-  @JsonKey(name: 'results_public')
-  @SafeBoolConverter()
-  bool get resultsPublic;
-  @override
-  @JsonKey(name: 'results_data')
-  Map<String, dynamic>? get resultsData; // Page management
-  @override
-  @JsonKey(name: 'page_count')
-  int get pageCount; // Custom URL slug
-  @override
-  String? get slug; // Submission tracking
-  @override
-  @JsonKey(name: 'submission_count')
-  int get submissionCount; // Scheduling
-  @override
-  @JsonKey(name: 'opens_at')
-  DateTime? get opensAt;
-  @override
-  @JsonKey(name: 'closes_at')
-  DateTime? get closesAt; // Submission limits
-  @override
-  @JsonKey(name: 'max_submissions')
-  int? get maxSubmissions; // Access control
-  @override
-  @JsonKey(name: 'require_login')
-  @SafeBoolConverter()
-  bool get requireLogin;
-  @override
-  @JsonKey(name: 'one_submission_per_user')
-  @SafeBoolTrueConverter()
-  bool get oneSubmissionPerUser; // Email settings
-  @override
-  @JsonKey(name: 'confirmation_email_template')
-  String? get confirmationEmailTemplate;
-  @override
-  @JsonKey(name: 'notification_emails')
-  List<String>?
-      get notificationEmails; // Supporting documents (list of document metadata objects)
-  @override
-  @JsonKey(name: 'supporting_documents')
-  List<Map<String, dynamic>>?
-      get supportingDocuments; // Executive Committee Only - restricts voting to executive committee members
-  @override
-  @JsonKey(name: 'executive_only')
-  @SafeBoolConverter()
-  bool
-      get executiveOnly; // Committee association - ties vote to a specific committee
-  @override
-  String? get committee;
+  final _VotingForm _self;
+  final $Res Function(_VotingForm) _then;
 
   /// Create a copy of VotingForm
   /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$VotingFormImplCopyWith<_$VotingFormImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-VotingOption _$VotingOptionFromJson(Map<String, dynamic> json) {
-  return _VotingOption.fromJson(json);
-}
-
-/// @nodoc
-mixin _$VotingOption {
-  String get id => throw _privateConstructorUsedError;
-  String get label => throw _privateConstructorUsedError;
-  String? get description => throw _privateConstructorUsedError;
-  int get votes => throw _privateConstructorUsedError;
-
-  /// Serializes this VotingOption to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
-
-  /// Create a copy of VotingOption
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  $VotingOptionCopyWith<VotingOption> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $VotingOptionCopyWith<$Res> {
-  factory $VotingOptionCopyWith(
-          VotingOption value, $Res Function(VotingOption) then) =
-      _$VotingOptionCopyWithImpl<$Res, VotingOption>;
-  @useResult
-  $Res call({String id, String label, String? description, int votes});
-}
-
-/// @nodoc
-class _$VotingOptionCopyWithImpl<$Res, $Val extends VotingOption>
-    implements $VotingOptionCopyWith<$Res> {
-  _$VotingOptionCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of VotingOption
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
-  @override
   $Res call({
     Object? id = null,
-    Object? label = null,
+    Object? createdAt = null,
+    Object? updatedAt = null,
+    Object? createdBy = freezed,
+    Object? title = null,
     Object? description = freezed,
-    Object? votes = null,
+    Object? schema = null,
+    Object? settings = null,
+    Object? status = null,
+    Object? votingStartsAt = freezed,
+    Object? votingEndsAt = freezed,
+    Object? eligibleMembers = freezed,
+    Object? resultsPublic = null,
+    Object? resultsData = freezed,
+    Object? pageCount = null,
+    Object? slug = freezed,
+    Object? submissionCount = null,
+    Object? opensAt = freezed,
+    Object? closesAt = freezed,
+    Object? maxSubmissions = freezed,
+    Object? requireLogin = null,
+    Object? oneSubmissionPerUser = null,
+    Object? confirmationEmailTemplate = freezed,
+    Object? notificationEmails = freezed,
+    Object? supportingDocuments = freezed,
+    Object? executiveOnly = null,
+    Object? committee = freezed,
   }) {
-    return _then(_value.copyWith(
+    return _then(_VotingForm(
       id: null == id
-          ? _value.id
+          ? _self.id
           : id // ignore: cast_nullable_to_non_nullable
               as String,
-      label: null == label
-          ? _value.label
-          : label // ignore: cast_nullable_to_non_nullable
+      createdAt: null == createdAt
+          ? _self.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime,
+      updatedAt: null == updatedAt
+          ? _self.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime,
+      createdBy: freezed == createdBy
+          ? _self.createdBy
+          : createdBy // ignore: cast_nullable_to_non_nullable
+              as String?,
+      title: null == title
+          ? _self.title
+          : title // ignore: cast_nullable_to_non_nullable
               as String,
       description: freezed == description
-          ? _value.description
+          ? _self.description
           : description // ignore: cast_nullable_to_non_nullable
               as String?,
-      votes: null == votes
-          ? _value.votes
-          : votes // ignore: cast_nullable_to_non_nullable
+      schema: null == schema
+          ? _self._schema
+          : schema // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>,
+      settings: null == settings
+          ? _self._settings
+          : settings // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>,
+      status: null == status
+          ? _self.status
+          : status // ignore: cast_nullable_to_non_nullable
+              as String,
+      votingStartsAt: freezed == votingStartsAt
+          ? _self.votingStartsAt
+          : votingStartsAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      votingEndsAt: freezed == votingEndsAt
+          ? _self.votingEndsAt
+          : votingEndsAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      eligibleMembers: freezed == eligibleMembers
+          ? _self._eligibleMembers
+          : eligibleMembers // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
+      resultsPublic: null == resultsPublic
+          ? _self.resultsPublic
+          : resultsPublic // ignore: cast_nullable_to_non_nullable
+              as bool,
+      resultsData: freezed == resultsData
+          ? _self._resultsData
+          : resultsData // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
+      pageCount: null == pageCount
+          ? _self.pageCount
+          : pageCount // ignore: cast_nullable_to_non_nullable
               as int,
-    ) as $Val);
-  }
-}
-
-/// @nodoc
-abstract class _$$VotingOptionImplCopyWith<$Res>
-    implements $VotingOptionCopyWith<$Res> {
-  factory _$$VotingOptionImplCopyWith(
-          _$VotingOptionImpl value, $Res Function(_$VotingOptionImpl) then) =
-      __$$VotingOptionImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({String id, String label, String? description, int votes});
-}
-
-/// @nodoc
-class __$$VotingOptionImplCopyWithImpl<$Res>
-    extends _$VotingOptionCopyWithImpl<$Res, _$VotingOptionImpl>
-    implements _$$VotingOptionImplCopyWith<$Res> {
-  __$$VotingOptionImplCopyWithImpl(
-      _$VotingOptionImpl _value, $Res Function(_$VotingOptionImpl) _then)
-      : super(_value, _then);
-
-  /// Create a copy of VotingOption
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? id = null,
-    Object? label = null,
-    Object? description = freezed,
-    Object? votes = null,
-  }) {
-    return _then(_$VotingOptionImpl(
-      id: null == id
-          ? _value.id
-          : id // ignore: cast_nullable_to_non_nullable
-              as String,
-      label: null == label
-          ? _value.label
-          : label // ignore: cast_nullable_to_non_nullable
-              as String,
-      description: freezed == description
-          ? _value.description
-          : description // ignore: cast_nullable_to_non_nullable
+      slug: freezed == slug
+          ? _self.slug
+          : slug // ignore: cast_nullable_to_non_nullable
               as String?,
-      votes: null == votes
-          ? _value.votes
-          : votes // ignore: cast_nullable_to_non_nullable
+      submissionCount: null == submissionCount
+          ? _self.submissionCount
+          : submissionCount // ignore: cast_nullable_to_non_nullable
               as int,
+      opensAt: freezed == opensAt
+          ? _self.opensAt
+          : opensAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      closesAt: freezed == closesAt
+          ? _self.closesAt
+          : closesAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      maxSubmissions: freezed == maxSubmissions
+          ? _self.maxSubmissions
+          : maxSubmissions // ignore: cast_nullable_to_non_nullable
+              as int?,
+      requireLogin: null == requireLogin
+          ? _self.requireLogin
+          : requireLogin // ignore: cast_nullable_to_non_nullable
+              as bool,
+      oneSubmissionPerUser: null == oneSubmissionPerUser
+          ? _self.oneSubmissionPerUser
+          : oneSubmissionPerUser // ignore: cast_nullable_to_non_nullable
+              as bool,
+      confirmationEmailTemplate: freezed == confirmationEmailTemplate
+          ? _self.confirmationEmailTemplate
+          : confirmationEmailTemplate // ignore: cast_nullable_to_non_nullable
+              as String?,
+      notificationEmails: freezed == notificationEmails
+          ? _self._notificationEmails
+          : notificationEmails // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
+      supportingDocuments: freezed == supportingDocuments
+          ? _self._supportingDocuments
+          : supportingDocuments // ignore: cast_nullable_to_non_nullable
+              as List<Map<String, dynamic>>?,
+      executiveOnly: null == executiveOnly
+          ? _self.executiveOnly
+          : executiveOnly // ignore: cast_nullable_to_non_nullable
+              as bool,
+      committee: freezed == committee
+          ? _self.committee
+          : committee // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
 
 /// @nodoc
-@JsonSerializable()
-class _$VotingOptionImpl implements _VotingOption {
-  const _$VotingOptionImpl(
-      {required this.id,
-      required this.label,
-      this.description,
-      this.votes = 0});
+mixin _$VotingOption {
+  String get id;
+  String get label;
+  String? get description;
+  int get votes;
 
-  factory _$VotingOptionImpl.fromJson(Map<String, dynamic> json) =>
-      _$$VotingOptionImplFromJson(json);
+  /// Create a copy of VotingOption
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  $VotingOptionCopyWith<VotingOption> get copyWith =>
+      _$VotingOptionCopyWithImpl<VotingOption>(
+          this as VotingOption, _$identity);
 
-  @override
-  final String id;
-  @override
-  final String label;
-  @override
-  final String? description;
-  @override
-  @JsonKey()
-  final int votes;
-
-  @override
-  String toString() {
-    return 'VotingOption(id: $id, label: $label, description: $description, votes: $votes)';
-  }
+  /// Serializes this VotingOption to a JSON map.
+  Map<String, dynamic> toJson();
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$VotingOptionImpl &&
+            other is VotingOption &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.label, label) || other.label == label) &&
             (identical(other.description, description) ||
@@ -1087,139 +1256,379 @@ class _$VotingOptionImpl implements _VotingOption {
   @override
   int get hashCode => Object.hash(runtimeType, id, label, description, votes);
 
-  /// Create a copy of VotingOption
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  @pragma('vm:prefer-inline')
-  _$$VotingOptionImplCopyWith<_$VotingOptionImpl> get copyWith =>
-      __$$VotingOptionImplCopyWithImpl<_$VotingOptionImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$VotingOptionImplToJson(
-      this,
-    );
+  String toString() {
+    return 'VotingOption(id: $id, label: $label, description: $description, votes: $votes)';
   }
 }
 
-abstract class _VotingOption implements VotingOption {
-  const factory _VotingOption(
-      {required final String id,
-      required final String label,
-      final String? description,
-      final int votes}) = _$VotingOptionImpl;
+/// @nodoc
+abstract mixin class $VotingOptionCopyWith<$Res> {
+  factory $VotingOptionCopyWith(
+          VotingOption value, $Res Function(VotingOption) _then) =
+      _$VotingOptionCopyWithImpl;
+  @useResult
+  $Res call({String id, String label, String? description, int votes});
+}
 
-  factory _VotingOption.fromJson(Map<String, dynamic> json) =
-      _$VotingOptionImpl.fromJson;
+/// @nodoc
+class _$VotingOptionCopyWithImpl<$Res> implements $VotingOptionCopyWith<$Res> {
+  _$VotingOptionCopyWithImpl(this._self, this._then);
+
+  final VotingOption _self;
+  final $Res Function(VotingOption) _then;
+
+  /// Create a copy of VotingOption
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? label = null,
+    Object? description = freezed,
+    Object? votes = null,
+  }) {
+    return _then(_self.copyWith(
+      id: null == id
+          ? _self.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String,
+      label: null == label
+          ? _self.label
+          : label // ignore: cast_nullable_to_non_nullable
+              as String,
+      description: freezed == description
+          ? _self.description
+          : description // ignore: cast_nullable_to_non_nullable
+              as String?,
+      votes: null == votes
+          ? _self.votes
+          : votes // ignore: cast_nullable_to_non_nullable
+              as int,
+    ));
+  }
+}
+
+/// Adds pattern-matching-related methods to [VotingOption].
+extension VotingOptionPatterns on VotingOption {
+  /// A variant of `map` that fallback to returning `orElse`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_VotingOption value)? $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _VotingOption() when $default != null:
+        return $default(_that);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// Callbacks receives the raw object, upcasted.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case final Subclass2 value:
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_VotingOption value) $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _VotingOption():
+        return $default(_that);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `map` that fallback to returning `null`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_VotingOption value)? $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _VotingOption() when $default != null:
+        return $default(_that);
+      case _:
+        return null;
+    }
+  }
+
+  /// A variant of `when` that fallback to an `orElse` callback.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(String id, String label, String? description, int votes)?
+        $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _VotingOption() when $default != null:
+        return $default(_that.id, _that.label, _that.description, _that.votes);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// As opposed to `map`, this offers destructuring.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case Subclass2(:final field2):
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(String id, String label, String? description, int votes)
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _VotingOption():
+        return $default(_that.id, _that.label, _that.description, _that.votes);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `when` that fallback to returning `null`
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(String id, String label, String? description, int votes)?
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _VotingOption() when $default != null:
+        return $default(_that.id, _that.label, _that.description, _that.votes);
+      case _:
+        return null;
+    }
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _VotingOption implements VotingOption {
+  const _VotingOption(
+      {required this.id,
+      required this.label,
+      this.description,
+      this.votes = 0});
+  factory _VotingOption.fromJson(Map<String, dynamic> json) =>
+      _$VotingOptionFromJson(json);
 
   @override
-  String get id;
+  final String id;
   @override
-  String get label;
+  final String label;
   @override
-  String? get description;
+  final String? description;
   @override
-  int get votes;
+  @JsonKey()
+  final int votes;
 
   /// Create a copy of VotingOption
   /// with the given fields replaced by the non-null parameter values.
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$VotingOptionImplCopyWith<_$VotingOptionImpl> get copyWith =>
-      throw _privateConstructorUsedError;
+  @pragma('vm:prefer-inline')
+  _$VotingOptionCopyWith<_VotingOption> get copyWith =>
+      __$VotingOptionCopyWithImpl<_VotingOption>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$VotingOptionToJson(
+      this,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _VotingOption &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.label, label) || other.label == label) &&
+            (identical(other.description, description) ||
+                other.description == description) &&
+            (identical(other.votes, votes) || other.votes == votes));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, id, label, description, votes);
+
+  @override
+  String toString() {
+    return 'VotingOption(id: $id, label: $label, description: $description, votes: $votes)';
+  }
 }
 
-Vote _$VoteFromJson(Map<String, dynamic> json) {
-  return _Vote.fromJson(json);
+/// @nodoc
+abstract mixin class _$VotingOptionCopyWith<$Res>
+    implements $VotingOptionCopyWith<$Res> {
+  factory _$VotingOptionCopyWith(
+          _VotingOption value, $Res Function(_VotingOption) _then) =
+      __$VotingOptionCopyWithImpl;
+  @override
+  @useResult
+  $Res call({String id, String label, String? description, int votes});
+}
+
+/// @nodoc
+class __$VotingOptionCopyWithImpl<$Res>
+    implements _$VotingOptionCopyWith<$Res> {
+  __$VotingOptionCopyWithImpl(this._self, this._then);
+
+  final _VotingOption _self;
+  final $Res Function(_VotingOption) _then;
+
+  /// Create a copy of VotingOption
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $Res call({
+    Object? id = null,
+    Object? label = null,
+    Object? description = freezed,
+    Object? votes = null,
+  }) {
+    return _then(_VotingOption(
+      id: null == id
+          ? _self.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String,
+      label: null == label
+          ? _self.label
+          : label // ignore: cast_nullable_to_non_nullable
+              as String,
+      description: freezed == description
+          ? _self.description
+          : description // ignore: cast_nullable_to_non_nullable
+              as String?,
+      votes: null == votes
+          ? _self.votes
+          : votes // ignore: cast_nullable_to_non_nullable
+              as int,
+    ));
+  }
 }
 
 /// @nodoc
 mixin _$Vote {
-  String get id => throw _privateConstructorUsedError;
+  String get id;
   @JsonKey(name: 'created_at')
-  DateTime get createdAt => throw _privateConstructorUsedError;
+  DateTime get createdAt;
   @JsonKey(name: 'voting_form_id')
-  String get votingFormId => throw _privateConstructorUsedError;
+  String get votingFormId;
   @JsonKey(name: 'member_id')
-  String get memberId => throw _privateConstructorUsedError;
+  String get memberId;
   @JsonKey(name: 'vote_data')
-  Map<String, dynamic> get voteData => throw _privateConstructorUsedError;
-
-  /// Serializes this Vote to a JSON map.
-  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  Map<String, dynamic> get voteData;
 
   /// Create a copy of Vote
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
-  $VoteCopyWith<Vote> get copyWith => throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class $VoteCopyWith<$Res> {
-  factory $VoteCopyWith(Vote value, $Res Function(Vote) then) =
-      _$VoteCopyWithImpl<$Res, Vote>;
-  @useResult
-  $Res call(
-      {String id,
-      @JsonKey(name: 'created_at') DateTime createdAt,
-      @JsonKey(name: 'voting_form_id') String votingFormId,
-      @JsonKey(name: 'member_id') String memberId,
-      @JsonKey(name: 'vote_data') Map<String, dynamic> voteData});
-}
-
-/// @nodoc
-class _$VoteCopyWithImpl<$Res, $Val extends Vote>
-    implements $VoteCopyWith<$Res> {
-  _$VoteCopyWithImpl(this._value, this._then);
-
-  // ignore: unused_field
-  final $Val _value;
-  // ignore: unused_field
-  final $Res Function($Val) _then;
-
-  /// Create a copy of Vote
-  /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
+  $VoteCopyWith<Vote> get copyWith =>
+      _$VoteCopyWithImpl<Vote>(this as Vote, _$identity);
+
+  /// Serializes this Vote to a JSON map.
+  Map<String, dynamic> toJson();
+
   @override
-  $Res call({
-    Object? id = null,
-    Object? createdAt = null,
-    Object? votingFormId = null,
-    Object? memberId = null,
-    Object? voteData = null,
-  }) {
-    return _then(_value.copyWith(
-      id: null == id
-          ? _value.id
-          : id // ignore: cast_nullable_to_non_nullable
-              as String,
-      createdAt: null == createdAt
-          ? _value.createdAt
-          : createdAt // ignore: cast_nullable_to_non_nullable
-              as DateTime,
-      votingFormId: null == votingFormId
-          ? _value.votingFormId
-          : votingFormId // ignore: cast_nullable_to_non_nullable
-              as String,
-      memberId: null == memberId
-          ? _value.memberId
-          : memberId // ignore: cast_nullable_to_non_nullable
-              as String,
-      voteData: null == voteData
-          ? _value.voteData
-          : voteData // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>,
-    ) as $Val);
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is Vote &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt) &&
+            (identical(other.votingFormId, votingFormId) ||
+                other.votingFormId == votingFormId) &&
+            (identical(other.memberId, memberId) ||
+                other.memberId == memberId) &&
+            const DeepCollectionEquality().equals(other.voteData, voteData));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, id, createdAt, votingFormId,
+      memberId, const DeepCollectionEquality().hash(voteData));
+
+  @override
+  String toString() {
+    return 'Vote(id: $id, createdAt: $createdAt, votingFormId: $votingFormId, memberId: $memberId, voteData: $voteData)';
   }
 }
 
 /// @nodoc
-abstract class _$$VoteImplCopyWith<$Res> implements $VoteCopyWith<$Res> {
-  factory _$$VoteImplCopyWith(
-          _$VoteImpl value, $Res Function(_$VoteImpl) then) =
-      __$$VoteImplCopyWithImpl<$Res>;
-  @override
+abstract mixin class $VoteCopyWith<$Res> {
+  factory $VoteCopyWith(Vote value, $Res Function(Vote) _then) =
+      _$VoteCopyWithImpl;
   @useResult
   $Res call(
       {String id,
@@ -1230,11 +1639,11 @@ abstract class _$$VoteImplCopyWith<$Res> implements $VoteCopyWith<$Res> {
 }
 
 /// @nodoc
-class __$$VoteImplCopyWithImpl<$Res>
-    extends _$VoteCopyWithImpl<$Res, _$VoteImpl>
-    implements _$$VoteImplCopyWith<$Res> {
-  __$$VoteImplCopyWithImpl(_$VoteImpl _value, $Res Function(_$VoteImpl) _then)
-      : super(_value, _then);
+class _$VoteCopyWithImpl<$Res> implements $VoteCopyWith<$Res> {
+  _$VoteCopyWithImpl(this._self, this._then);
+
+  final Vote _self;
+  final $Res Function(Vote) _then;
 
   /// Create a copy of Vote
   /// with the given fields replaced by the non-null parameter values.
@@ -1247,44 +1656,220 @@ class __$$VoteImplCopyWithImpl<$Res>
     Object? memberId = null,
     Object? voteData = null,
   }) {
-    return _then(_$VoteImpl(
+    return _then(_self.copyWith(
       id: null == id
-          ? _value.id
+          ? _self.id
           : id // ignore: cast_nullable_to_non_nullable
               as String,
       createdAt: null == createdAt
-          ? _value.createdAt
+          ? _self.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
       votingFormId: null == votingFormId
-          ? _value.votingFormId
+          ? _self.votingFormId
           : votingFormId // ignore: cast_nullable_to_non_nullable
               as String,
       memberId: null == memberId
-          ? _value.memberId
+          ? _self.memberId
           : memberId // ignore: cast_nullable_to_non_nullable
               as String,
       voteData: null == voteData
-          ? _value._voteData
+          ? _self.voteData
           : voteData // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>,
     ));
   }
 }
 
+/// Adds pattern-matching-related methods to [Vote].
+extension VotePatterns on Vote {
+  /// A variant of `map` that fallback to returning `orElse`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>(
+    TResult Function(_Vote value)? $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _Vote() when $default != null:
+        return $default(_that);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// Callbacks receives the raw object, upcasted.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case final Subclass2 value:
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>(
+    TResult Function(_Vote value) $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _Vote():
+        return $default(_that);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `map` that fallback to returning `null`.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case final Subclass value:
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>(
+    TResult? Function(_Vote value)? $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _Vote() when $default != null:
+        return $default(_that);
+      case _:
+        return null;
+    }
+  }
+
+  /// A variant of `when` that fallback to an `orElse` callback.
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return orElse();
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>(
+    TResult Function(
+            String id,
+            @JsonKey(name: 'created_at') DateTime createdAt,
+            @JsonKey(name: 'voting_form_id') String votingFormId,
+            @JsonKey(name: 'member_id') String memberId,
+            @JsonKey(name: 'vote_data') Map<String, dynamic> voteData)?
+        $default, {
+    required TResult orElse(),
+  }) {
+    final _that = this;
+    switch (_that) {
+      case _Vote() when $default != null:
+        return $default(_that.id, _that.createdAt, _that.votingFormId,
+            _that.memberId, _that.voteData);
+      case _:
+        return orElse();
+    }
+  }
+
+  /// A `switch`-like method, using callbacks.
+  ///
+  /// As opposed to `map`, this offers destructuring.
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case Subclass2(:final field2):
+  ///     return ...;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>(
+    TResult Function(
+            String id,
+            @JsonKey(name: 'created_at') DateTime createdAt,
+            @JsonKey(name: 'voting_form_id') String votingFormId,
+            @JsonKey(name: 'member_id') String memberId,
+            @JsonKey(name: 'vote_data') Map<String, dynamic> voteData)
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _Vote():
+        return $default(_that.id, _that.createdAt, _that.votingFormId,
+            _that.memberId, _that.voteData);
+      case _:
+        throw StateError('Unexpected subclass');
+    }
+  }
+
+  /// A variant of `when` that fallback to returning `null`
+  ///
+  /// It is equivalent to doing:
+  /// ```dart
+  /// switch (sealedClass) {
+  ///   case Subclass(:final field):
+  ///     return ...;
+  ///   case _:
+  ///     return null;
+  /// }
+  /// ```
+
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>(
+    TResult? Function(
+            String id,
+            @JsonKey(name: 'created_at') DateTime createdAt,
+            @JsonKey(name: 'voting_form_id') String votingFormId,
+            @JsonKey(name: 'member_id') String memberId,
+            @JsonKey(name: 'vote_data') Map<String, dynamic> voteData)?
+        $default,
+  ) {
+    final _that = this;
+    switch (_that) {
+      case _Vote() when $default != null:
+        return $default(_that.id, _that.createdAt, _that.votingFormId,
+            _that.memberId, _that.voteData);
+      case _:
+        return null;
+    }
+  }
+}
+
 /// @nodoc
 @JsonSerializable()
-class _$VoteImpl implements _Vote {
-  const _$VoteImpl(
+class _Vote implements Vote {
+  const _Vote(
       {required this.id,
       @JsonKey(name: 'created_at') required this.createdAt,
       @JsonKey(name: 'voting_form_id') required this.votingFormId,
       @JsonKey(name: 'member_id') required this.memberId,
       @JsonKey(name: 'vote_data') required final Map<String, dynamic> voteData})
       : _voteData = voteData;
-
-  factory _$VoteImpl.fromJson(Map<String, dynamic> json) =>
-      _$$VoteImplFromJson(json);
+  factory _Vote.fromJson(Map<String, dynamic> json) => _$VoteFromJson(json);
 
   @override
   final String id;
@@ -1306,16 +1891,26 @@ class _$VoteImpl implements _Vote {
     return EqualUnmodifiableMapView(_voteData);
   }
 
+  /// Create a copy of Vote
+  /// with the given fields replaced by the non-null parameter values.
   @override
-  String toString() {
-    return 'Vote(id: $id, createdAt: $createdAt, votingFormId: $votingFormId, memberId: $memberId, voteData: $voteData)';
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @pragma('vm:prefer-inline')
+  _$VoteCopyWith<_Vote> get copyWith =>
+      __$VoteCopyWithImpl<_Vote>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$VoteToJson(
+      this,
+    );
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$VoteImpl &&
+            other is _Vote &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
@@ -1331,52 +1926,67 @@ class _$VoteImpl implements _Vote {
   int get hashCode => Object.hash(runtimeType, id, createdAt, votingFormId,
       memberId, const DeepCollectionEquality().hash(_voteData));
 
-  /// Create a copy of Vote
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  @pragma('vm:prefer-inline')
-  _$$VoteImplCopyWith<_$VoteImpl> get copyWith =>
-      __$$VoteImplCopyWithImpl<_$VoteImpl>(this, _$identity);
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$VoteImplToJson(
-      this,
-    );
+  String toString() {
+    return 'Vote(id: $id, createdAt: $createdAt, votingFormId: $votingFormId, memberId: $memberId, voteData: $voteData)';
   }
 }
 
-abstract class _Vote implements Vote {
-  const factory _Vote(
-      {required final String id,
-      @JsonKey(name: 'created_at') required final DateTime createdAt,
-      @JsonKey(name: 'voting_form_id') required final String votingFormId,
-      @JsonKey(name: 'member_id') required final String memberId,
-      @JsonKey(name: 'vote_data')
-      required final Map<String, dynamic> voteData}) = _$VoteImpl;
+/// @nodoc
+abstract mixin class _$VoteCopyWith<$Res> implements $VoteCopyWith<$Res> {
+  factory _$VoteCopyWith(_Vote value, $Res Function(_Vote) _then) =
+      __$VoteCopyWithImpl;
+  @override
+  @useResult
+  $Res call(
+      {String id,
+      @JsonKey(name: 'created_at') DateTime createdAt,
+      @JsonKey(name: 'voting_form_id') String votingFormId,
+      @JsonKey(name: 'member_id') String memberId,
+      @JsonKey(name: 'vote_data') Map<String, dynamic> voteData});
+}
 
-  factory _Vote.fromJson(Map<String, dynamic> json) = _$VoteImpl.fromJson;
+/// @nodoc
+class __$VoteCopyWithImpl<$Res> implements _$VoteCopyWith<$Res> {
+  __$VoteCopyWithImpl(this._self, this._then);
 
-  @override
-  String get id;
-  @override
-  @JsonKey(name: 'created_at')
-  DateTime get createdAt;
-  @override
-  @JsonKey(name: 'voting_form_id')
-  String get votingFormId;
-  @override
-  @JsonKey(name: 'member_id')
-  String get memberId;
-  @override
-  @JsonKey(name: 'vote_data')
-  Map<String, dynamic> get voteData;
+  final _Vote _self;
+  final $Res Function(_Vote) _then;
 
   /// Create a copy of Vote
   /// with the given fields replaced by the non-null parameter values.
   @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$VoteImplCopyWith<_$VoteImpl> get copyWith =>
-      throw _privateConstructorUsedError;
+  @pragma('vm:prefer-inline')
+  $Res call({
+    Object? id = null,
+    Object? createdAt = null,
+    Object? votingFormId = null,
+    Object? memberId = null,
+    Object? voteData = null,
+  }) {
+    return _then(_Vote(
+      id: null == id
+          ? _self.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String,
+      createdAt: null == createdAt
+          ? _self.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime,
+      votingFormId: null == votingFormId
+          ? _self.votingFormId
+          : votingFormId // ignore: cast_nullable_to_non_nullable
+              as String,
+      memberId: null == memberId
+          ? _self.memberId
+          : memberId // ignore: cast_nullable_to_non_nullable
+              as String,
+      voteData: null == voteData
+          ? _self._voteData
+          : voteData // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>,
+    ));
+  }
 }
+
+// dart format on

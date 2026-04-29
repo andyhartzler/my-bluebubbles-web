@@ -6,8 +6,8 @@ part of 'job.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$CustomQuestionImpl _$$CustomQuestionImplFromJson(Map<String, dynamic> json) =>
-    _$CustomQuestionImpl(
+_CustomQuestion _$CustomQuestionFromJson(Map<String, dynamic> json) =>
+    _CustomQuestion(
       id: json['id'] as String,
       question: json['question'] as String,
       type: $enumDecodeNullable(_$CustomQuestionTypeEnumMap, json['type']) ??
@@ -22,8 +22,7 @@ _$CustomQuestionImpl _$$CustomQuestionImplFromJson(Map<String, dynamic> json) =>
       order: (json['order'] as num?)?.toInt() ?? 0,
     );
 
-Map<String, dynamic> _$$CustomQuestionImplToJson(
-        _$CustomQuestionImpl instance) =>
+Map<String, dynamic> _$CustomQuestionToJson(_CustomQuestion instance) =>
     <String, dynamic>{
       'id': instance.id,
       'question': instance.question,
@@ -41,7 +40,7 @@ const _$CustomQuestionTypeEnumMap = {
   CustomQuestionType.radio: 'radio',
 };
 
-_$JobImpl _$$JobImplFromJson(Map<String, dynamic> json) => _$JobImpl(
+_Job _$JobFromJson(Map<String, dynamic> json) => _Job(
       id: json['id'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
@@ -106,7 +105,7 @@ _$JobImpl _$$JobImplFromJson(Map<String, dynamic> json) => _$JobImpl(
           : const SafeBoolConverter().fromJson(json['use_external_apply']),
     );
 
-Map<String, dynamic> _$$JobImplToJson(_$JobImpl instance) => <String, dynamic>{
+Map<String, dynamic> _$JobToJson(_Job instance) => <String, dynamic>{
       'id': instance.id,
       'created_at': instance.createdAt.toIso8601String(),
       'updated_at': instance.updatedAt.toIso8601String(),

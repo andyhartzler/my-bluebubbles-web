@@ -6,8 +6,8 @@ part of 'source_document.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$SourceDocumentImpl _$$SourceDocumentImplFromJson(Map<String, dynamic> json) =>
-    _$SourceDocumentImpl(
+_SourceDocument _$SourceDocumentFromJson(Map<String, dynamic> json) =>
+    _SourceDocument(
       id: json['id'] as String,
       sourceType: json['source_type'] as String,
       sourceTable: json['source_table'] as String?,
@@ -16,8 +16,7 @@ _$SourceDocumentImpl _$$SourceDocumentImplFromJson(Map<String, dynamic> json) =>
       retrievalMethod: json['retrieval_method'] as String?,
     );
 
-Map<String, dynamic> _$$SourceDocumentImplToJson(
-        _$SourceDocumentImpl instance) =>
+Map<String, dynamic> _$SourceDocumentToJson(_SourceDocument instance) =>
     <String, dynamic>{
       'id': instance.id,
       'source_type': instance.sourceType,

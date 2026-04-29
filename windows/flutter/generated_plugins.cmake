@@ -20,10 +20,8 @@ list(APPEND FLUTTER_PLUGIN_LIST
   media_kit_video
   objectbox_flutter_libs
   pasteboard
-  permission_handler_windows
   printing
   record_windows
-  screen_brightness_windows
   secure_application
   share_plus
   super_native_extensions
@@ -32,6 +30,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
+  jni
   media_kit_native_event_loop
 )
 

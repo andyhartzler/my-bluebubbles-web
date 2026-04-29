@@ -71,8 +71,9 @@ class CalendarEventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = _getEventTypeColor(event.eventType, theme);
-    final icon = _getEventTypeIcon(event.eventType);
+    final eventType = EventType.fromString(event.eventType);
+    final color = _getEventTypeColor(eventType, theme);
+    final icon = _getEventTypeIcon(eventType);
 
     if (compact) {
       return _buildCompactCard(context, theme, color, icon);

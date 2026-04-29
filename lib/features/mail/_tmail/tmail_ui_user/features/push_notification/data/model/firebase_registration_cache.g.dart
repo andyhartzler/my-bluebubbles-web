@@ -9,7 +9,7 @@ part of 'firebase_registration_cache.dart';
 class FirebaseRegistrationCacheAdapter
     extends TypeAdapter<FirebaseRegistrationCache> {
   @override
-  final int typeId = 14;
+  final typeId = 14;
 
   @override
   FirebaseRegistrationCache read(BinaryReader reader) {

@@ -8,7 +8,7 @@ part of 'mailbox_rights_cache.dart';
 
 class MailboxRightsCacheAdapter extends TypeAdapter<MailboxRightsCache> {
   @override
-  final int typeId = 2;
+  final typeId = 2;
 
   @override
   MailboxRightsCache read(BinaryReader reader) {
