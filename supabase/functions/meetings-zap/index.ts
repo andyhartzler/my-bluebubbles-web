@@ -1100,19 +1100,25 @@ serve(async (req)=>{
       headers: corsHeaders
     });
   }
-  // Webhook-secret verification (optional — fails open if env unset to
-  // preserve current behavior until Andrew configures it).
+  // Webhook auth gate. Accept either:
+  //   (a) ZOOM_WEBHOOK_SECRET match via x-zoom-request-token (legacy/manual replay), or
+  //   (b) a Supabase-shaped Bearer JWT in Authorization (n8n workflow, zoom-webhook
+  //       internal fan-out, or CRM service-role calls — verify_jwt is false on this
+  //       function so we still require *some* gate here).
+  // Falls open if neither secret nor any auth header is present AND no env is set
+  // (preserves the original audit-comment intent).
   const webhookSecret = Deno.env.get('ZOOM_WEBHOOK_SECRET') ?? '';
-  if (webhookSecret) {
-    const zoomToken = req.headers.get('x-zoom-request-token') ?? req.headers.get('authorization') ?? '';
-    if (!zoomToken.includes(webhookSecret)) {
-      return new Response(JSON.stringify({
-        error: 'Invalid or missing Zoom webhook secret'
-      }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+  const zoomTokenHeader = req.headers.get('x-zoom-request-token') ?? '';
+  const authHeader = req.headers.get('authorization') ?? '';
+  const hasBearerJwt = /^Bearer\s+eyJ[A-Za-z0-9_\-]+\.eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+$/.test(authHeader);
+  const secretMatches = webhookSecret && zoomTokenHeader.includes(webhookSecret);
+  if (webhookSecret && !secretMatches && !hasBearerJwt) {
+    return new Response(JSON.stringify({
+      error: 'Invalid or missing Zoom webhook secret'
+    }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
   let payload = null;
   try {
