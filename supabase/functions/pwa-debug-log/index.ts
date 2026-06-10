@@ -19,12 +19,27 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// sendBeacon always sends credentials-mode 'include', and browsers reject a
+// wildcard Allow-Origin for credentialed requests — echo an allowlisted
+// origin instead.
+const ALLOWED_ORIGINS = new Set([
+  "https://moyd.app",
+  "http://localhost:3000",
+]);
+
+function corsHeadersFor(req: Request) {
+  const origin = req.headers.get("origin") ?? "";
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.has(origin)
+      ? origin
+      : "https://moyd.app",
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
 
 interface DebugEntry {
   ts_client?: string | null;
@@ -41,6 +56,7 @@ interface DebugEntry {
 }
 
 serve(async (req) => {
+  const corsHeaders = corsHeadersFor(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
