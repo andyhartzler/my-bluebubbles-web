@@ -97,7 +97,9 @@
 
   <script>
     // The value below is injected by flutter build, do not touch.
-    const serviceWorkerVersion = '{{flutter_service_worker_version}}';
+    // Flutter ≥3.41 substitutes this token as `"<hash>" /* deprecation comment */`,
+    // so it must NOT be wrapped in quotes (the comment contains an apostrophe).
+    const serviceWorkerVersion = {{flutter_service_worker_version}};
   </script>
   <!-- Plaid Link JS SDK (required for plaid_flutter on web) -->
   <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
