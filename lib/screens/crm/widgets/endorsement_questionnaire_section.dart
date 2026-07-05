@@ -234,7 +234,7 @@ class _EndorsementQuestionnaireSectionState
         collapsedIconColor: Colors.white70,
         childrenPadding: const EdgeInsets.only(top: 8),
         children: entries.map((e) {
-          final value = e.value.toString();
+          final value = _formatAnswer(e.value);
           final isLong = value.length > 180;
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -297,6 +297,26 @@ class _EndorsementQuestionnaireSectionState
       default:
         return v;
     }
+  }
+
+  // Render an answer for display. Multiselect questions (endorsements, voting
+  // history, etc.) now arrive as JSON arrays — join them into a readable,
+  // humanized list instead of Dart's "[a, b]" toString.
+  String _formatAnswer(dynamic v) {
+    if (v is List) {
+      return v.map((e) => _humanizeToken(e?.toString() ?? '')).where((s) => s.isNotEmpty).join(', ');
+    }
+    return v?.toString() ?? '';
+  }
+
+  // Turn a snake_case option value into a Title Case label as a fallback.
+  String _humanizeToken(String s) {
+    if (s.isEmpty) return s;
+    return s
+        .split('_')
+        .where((p) => p.isNotEmpty)
+        .map((p) => p[0].toUpperCase() + p.substring(1))
+        .join(' ');
   }
 
   String? _currency(dynamic v) {
