@@ -208,18 +208,72 @@ class CandidateRepository {
   Future<List<Candidate>> fetchCandidatesForAnalytics() async {
     if (!isReady) return [];
     try {
-      final response = await _client
-          .from('candidates')
-          .select(_analyticsColumns)
-          .order('name');
-      return (response as List<dynamic>)
-          .whereType<Map<String, dynamic>>()
-          .map(Candidate.fromJson)
-          .toList();
+      // PostgREST caps a single request at 1000 rows. The candidates table is
+      // ~2869 rows and growing, so paginate to exhaustion instead of silently
+      // truncating analytics to the first page.
+      final all = <Candidate>[];
+      const pageSize = 1000;
+      var offset = 0;
+      while (true) {
+        final response = await _client
+            .from('candidates')
+            .select(_analyticsColumns)
+            .order('name')
+            .range(offset, offset + pageSize - 1);
+        final rows = (response as List<dynamic>)
+            .whereType<Map<String, dynamic>>()
+            .map(Candidate.fromJson)
+            .toList();
+        all.addAll(rows);
+        if (rows.length < pageSize) break;
+        offset += pageSize;
+      }
+      return all;
     } catch (e) {
       debugPrint('❌ CandidateRepository.fetchCandidatesForAnalytics error: $e');
       return [];
     }
+  }
+
+  /// Fetch every candidate matching the given filters by paginating past the
+  /// PostgREST 1000-row cap. Used by the full candidates list pages, which
+  /// previously requested a fixed cap (600/500) that silently dropped rows.
+  Future<List<Candidate>> fetchAllCandidates({
+    String? searchQuery,
+    String? party,
+    String? officeLevel,
+    String? district,
+    bool? isYoungDem,
+    bool? isEndorsed,
+    bool? isContacted,
+    bool? hasCampaignSite,
+    String sortBy = 'name',
+    bool ascending = true,
+  }) async {
+    if (!isReady) return [];
+    final all = <Candidate>[];
+    const pageSize = 1000;
+    var offset = 0;
+    while (true) {
+      final page = await fetchCandidates(
+        searchQuery: searchQuery,
+        party: party,
+        officeLevel: officeLevel,
+        district: district,
+        isYoungDem: isYoungDem,
+        isEndorsed: isEndorsed,
+        isContacted: isContacted,
+        hasCampaignSite: hasCampaignSite,
+        sortBy: sortBy,
+        ascending: ascending,
+        limit: pageSize,
+        offset: offset,
+      );
+      all.addAll(page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
+    return all;
   }
 
   // ─── Fetch only Young Democrats ────────────────────────────────

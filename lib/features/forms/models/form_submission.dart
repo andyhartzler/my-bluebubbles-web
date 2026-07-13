@@ -16,6 +16,7 @@ class FormSubmission {
   final List<String>? fileUrls;
   final Map<String, dynamic>? pageData;
   final String? subscriberId;
+  final String? candidateId;
   final String status;
   final Map<String, dynamic>? members;
   final Map<String, dynamic>? subscribers;
@@ -34,6 +35,7 @@ class FormSubmission {
     this.fileUrls,
     this.pageData,
     this.subscriberId,
+    this.candidateId,
     this.status = 'submitted',
     this.members,
     this.subscribers,
@@ -54,6 +56,7 @@ class FormSubmission {
       fileUrls: (json['file_urls'] as List<dynamic>?)?.map((e) => e as String).toList(),
       pageData: json['page_data'] as Map<String, dynamic>?,
       subscriberId: json['subscriber_id'] as String?,
+      candidateId: json['candidate_id'] as String?,
       status: (json['status'] as String?) ?? 'submitted',
       members: json['members'] as Map<String, dynamic>?,
       subscribers: json['subscribers'] as Map<String, dynamic>?,
@@ -75,6 +78,7 @@ class FormSubmission {
       'file_urls': fileUrls,
       'page_data': pageData,
       'subscriber_id': subscriberId,
+      'candidate_id': candidateId,
       'status': status,
       'members': members,
       'subscribers': subscribers,
@@ -95,6 +99,7 @@ class FormSubmission {
     List<String>? fileUrls,
     Map<String, dynamic>? pageData,
     String? subscriberId,
+    String? candidateId,
     String? status,
     Map<String, dynamic>? members,
     Map<String, dynamic>? subscribers,
@@ -113,6 +118,7 @@ class FormSubmission {
       fileUrls: fileUrls ?? this.fileUrls,
       pageData: pageData ?? this.pageData,
       subscriberId: subscriberId ?? this.subscriberId,
+      candidateId: candidateId ?? this.candidateId,
       status: status ?? this.status,
       members: members ?? this.members,
       subscribers: subscribers ?? this.subscribers,

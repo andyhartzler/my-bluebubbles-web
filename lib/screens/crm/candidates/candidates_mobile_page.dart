@@ -85,7 +85,7 @@ class _CandidatesMobilePageState extends State<CandidatesMobilePage>
   Future<void> _load() async {
     setState(() => _loading = true);
     final results = await Future.wait([
-      _repo.fetchCandidates(limit: 600),
+      _repo.fetchAllCandidates(),
       _repo.fetchYoungDemocrats(),
       _repo.fetchPrimaryChallengePairs(),
       _repo.fetchStats(),

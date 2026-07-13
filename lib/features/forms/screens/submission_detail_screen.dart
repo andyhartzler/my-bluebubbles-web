@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/form_schema.dart';
 import '../models/form_submission.dart';
 import '../models/form_field_config.dart';
@@ -258,11 +259,26 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Field responses
-          ...form!.schema.fields.map((field) {
+          // Field responses.
+          // Skip display-only field types (they carry no answer of their own)
+          // and conditional fields the applicant never triggered, so we don't
+          // render spurious "No response" cards.
+          ...form!.schema.fields.where((field) {
+            const displayOnly = {'section_header', 'reference_block'};
+            if (displayOnly.contains(field.type)) return false;
+            return field.isVisibleFor(submission!.data);
+          }).map((field) {
             final value = submission!.data[field.id];
             return _buildFieldResponseCard(context, field, value);
           }),
+
+          // References are stored under flat ref_N_* keys (not schema field
+          // ids), so render them from a dedicated card where the
+          // reference_block field would otherwise have appeared.
+          ...(() {
+            final refCard = _buildReferencesCard(context);
+            return refCard != null ? [refCard] : const <Widget>[];
+          })(),
 
           const SizedBox(height: 24),
 
@@ -683,9 +699,10 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       case 'color_picker':
         return _buildColorValue(context, value);
 
+      case 'file_upload':
       case 'file_picker':
       case 'image_picker':
-        return _buildFileValue(context, value);
+        return _buildFileValue(context, field, value);
 
       case 'signature_pad':
         return _buildSignatureValue(context, value);
@@ -929,33 +946,194 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     );
   }
 
-  Widget _buildFileValue(BuildContext context, dynamic value) {
+  /// Files are stored as arrays of objects [{url, name, storage_path, type}]
+  /// (or occasionally a single object / bare url string). Image files render
+  /// as tappable thumbnails; other files as a tappable row that opens the url.
+  Widget _buildFileValue(BuildContext context, FormFieldConfig field, dynamic value) {
+    final files = <Map<String, dynamic>>[];
+    if (value is List) {
+      for (final v in value) {
+        if (v is Map) {
+          files.add(v.map((k, val) => MapEntry(k.toString(), val)));
+        } else if (v is String && v.isNotEmpty) {
+          files.add({'url': v, 'name': v});
+        }
+      }
+    } else if (value is Map) {
+      files.add(value.map((k, val) => MapEntry(k.toString(), val)));
+    } else if (value is String && value.isNotEmpty) {
+      files.add({'url': value, 'name': value});
+    }
+
+    if (files.isEmpty) {
+      return _buildTextValue(context, value);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (int i = 0; i < files.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          _buildSingleFile(context, field, files[i]),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSingleFile(
+    BuildContext context,
+    FormFieldConfig field,
+    Map<String, dynamic> file,
+  ) {
+    final url = file['url']?.toString() ?? '';
+    final rawName = file['name']?.toString();
+    final name = (rawName != null && rawName.isNotEmpty)
+        ? rawName
+        : (url.isNotEmpty ? url.split('/').last : 'File');
+    final mime = file['type']?.toString() ?? '';
+    final lowerName = name.toLowerCase();
+    final isImage = field.type == 'image_picker' ||
+        mime.startsWith('image/') ||
+        lowerName.endsWith('.png') ||
+        lowerName.endsWith('.jpg') ||
+        lowerName.endsWith('.jpeg') ||
+        lowerName.endsWith('.gif') ||
+        lowerName.endsWith('.webp');
+
+    if (isImage && url.isNotEmpty) {
+      return InkWell(
+        onTap: () => _openUrl(url),
+        borderRadius: BorderRadius.circular(8),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            url,
+            height: 180,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) =>
+                _buildFileRow(context, name, url),
+          ),
+        ),
+      );
+    }
+
+    return _buildFileRow(context, name, url);
+  }
+
+  Widget _buildFileRow(BuildContext context, String name, String url) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    return InkWell(
+      onTap: url.isEmpty ? null : () => _openUrl(url),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.attach_file, size: 18, color: colorScheme.primary),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                name,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.primary,
+                  decoration:
+                      url.isEmpty ? null : TextDecoration.underline,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (url.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Icon(Icons.open_in_new, size: 16, color: colorScheme.primary),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('Failed to open url $url: $e');
+    }
+  }
+
+  Widget _buildSignatureValue(BuildContext context, dynamic value) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final str = value?.toString() ?? '';
+
+    if (str.startsWith('http')) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: colorScheme.outline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.draw, size: 18, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Text(
+                  'Signature',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.network(
+                str,
+                height: 120,
+                fit: BoxFit.contain,
+                alignment: Alignment.centerLeft,
+                errorBuilder: (context, error, stackTrace) => Text(
+                  'Signature on file',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colorScheme.outline),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.attach_file,
-            size: 18,
-            color: colorScheme.primary,
-          ),
+          Icon(Icons.draw, size: 18, color: colorScheme.onSurfaceVariant),
           const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              value.toString(),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.primary,
-                decoration: TextDecoration.underline,
-              ),
-              overflow: TextOverflow.ellipsis,
+          Text(
+            'Signature on file',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -963,35 +1141,111 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     );
   }
 
-  Widget _buildSignatureValue(BuildContext context, dynamic value) {
+  /// Renders the applicant's references (stored under flat ref_1_*, ref_2_*,
+  /// ref_3_* keys) as grouped "Reference N" cards. Returns null when no
+  /// reference has any data so the section is omitted entirely.
+  Widget? _buildReferencesCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final data = submission!.data;
 
-    // Signature is usually base64 encoded image
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colorScheme.outline),
+    final references = <int, Map<String, String>>{};
+    for (int i = 1; i <= 3; i++) {
+      final fields = <String, String>{};
+      void add(String label, String key) {
+        final v = data['ref_${i}_$key'];
+        if (v != null && v.toString().trim().isNotEmpty) {
+          fields[label] = v.toString();
+        }
+      }
+
+      add('Name', 'name');
+      add('Relationship', 'relationship');
+      add('Phone', 'phone');
+      add('Email', 'email');
+      if (fields.isNotEmpty) references[i] = fields;
+    }
+
+    if (references.isEmpty) return null;
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colorScheme.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.draw, size: 18, color: colorScheme.onSurfaceVariant),
-              const SizedBox(width: 8),
-              Text(
-                'Signature provided',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.people_outline, size: 18, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'References',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            for (final entry in references.entries) ...[
+              if (entry.key != references.keys.first)
+                const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Reference ${entry.key}',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    for (final f in entry.value.entries)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 96,
+                              child: Text(
+                                f.key,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                f.value,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
-          ),
-          // TODO: Render actual signature if it's a base64 image
-        ],
+          ],
+        ),
       ),
     );
   }

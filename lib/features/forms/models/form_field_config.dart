@@ -110,6 +110,12 @@ class FormFieldConfig {
   // Each condition is {field: String, value: dynamic, operator: String?}
   final List<Map<String, dynamic>>? conditions;
 
+  /// The raw `condition` map exactly as stored in the form schema JSON, e.g.
+  /// {field, value}, {field, notEmpty:true}, {and:[...]}, or {or:[...]}.
+  /// Preserved so the submission viewer can evaluate whether a conditional
+  /// field should be shown against a submission's answers (see [isVisibleFor]).
+  final Map<String, dynamic>? rawCondition;
+
   // Form page (for multi-page forms)
   final int? pageNumber; // Which page this field belongs to (0-indexed)
 
@@ -192,6 +198,7 @@ class FormFieldConfig {
     this.conditionalValue,
     this.showWhenConditionMet = true,
     this.conditions,
+    this.rawCondition,
     this.pageNumber,
     this.enabled = true,
     this.defaultValue,
@@ -341,6 +348,7 @@ class FormFieldConfig {
       conditionalOperator: conditionalOperator,
       conditionalValue: conditionalValue,
       conditions: conditions,
+      rawCondition: conditionData is Map<String, dynamic> ? conditionData : null,
       fileConfig: fileConfig,
       showWhenConditionMet: _coerceBool(json['showWhenConditionMet'] ?? json['show_when_condition_met'], defaultValue: true),
       pageNumber: (json['pageNumber'] as num?)?.toInt() ?? (json['page_number'] as num?)?.toInt() ?? (json['page'] as num?)?.toInt(),
@@ -485,6 +493,7 @@ class FormFieldConfig {
     String? conditionalOperator,
     dynamic conditionalValue,
     List<Map<String, dynamic>>? conditions,
+    Map<String, dynamic>? rawCondition,
     Map<String, dynamic>? fileConfig,
     bool? showWhenConditionMet,
     int? pageNumber,
@@ -554,6 +563,7 @@ class FormFieldConfig {
       conditionalOperator: conditionalOperator ?? this.conditionalOperator,
       conditionalValue: conditionalValue ?? this.conditionalValue,
       conditions: conditions ?? this.conditions,
+      rawCondition: rawCondition ?? this.rawCondition,
       fileConfig: fileConfig ?? this.fileConfig,
       showWhenConditionMet: showWhenConditionMet ?? this.showWhenConditionMet,
       pageNumber: pageNumber ?? this.pageNumber,
@@ -566,6 +576,56 @@ class FormFieldConfig {
       prefillFormat: prefillFormat ?? this.prefillFormat,
       fallbackQuestionType: fallbackQuestionType ?? this.fallbackQuestionType,
     );
+  }
+
+  /// Whether this field should be shown given a submission's [data].
+  ///
+  /// A null [rawCondition] means the field is always visible. Otherwise the
+  /// condition is evaluated:
+  ///   - {and: [...]}  → every nested condition must pass
+  ///   - {or: [...]}   → at least one nested condition must pass
+  ///   - {field, value} → the data value equals `value` (string compare; if the
+  ///     data value is a List, `value` must be a member)
+  ///   - {field, notEmpty: true} → the data value must be non-empty
+  bool isVisibleFor(Map<String, dynamic> data) =>
+      _evalCondition(rawCondition, data);
+
+  static bool _evalCondition(dynamic cond, Map<String, dynamic> data) {
+    if (cond == null) return true;
+    if (cond is! Map) return true;
+    final map = cond.map((k, v) => MapEntry(k.toString(), v));
+
+    final andList = map['and'];
+    if (andList is List) {
+      return andList.every((c) => _evalCondition(c, data));
+    }
+    final orList = map['or'];
+    if (orList is List) {
+      return orList.any((c) => _evalCondition(c, data));
+    }
+
+    final field = map['field'];
+    if (field == null) return true;
+    final actual = data[field.toString()];
+
+    if (map['notEmpty'] == true) {
+      if (actual == null) return false;
+      if (actual is String) return actual.isNotEmpty;
+      if (actual is Iterable) return actual.isNotEmpty;
+      if (actual is Map) return actual.isNotEmpty;
+      return true;
+    }
+
+    final expected = map['value'];
+    if (expected == null) {
+      // No target value provided → treat as a presence check.
+      return actual != null && actual.toString().isNotEmpty;
+    }
+    final expectedStr = expected.toString();
+    if (actual is List) {
+      return actual.map((e) => e.toString()).contains(expectedStr);
+    }
+    return actual?.toString() == expectedStr;
   }
 
   @override

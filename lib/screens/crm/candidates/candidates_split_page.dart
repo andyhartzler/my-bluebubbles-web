@@ -56,7 +56,7 @@ class _CandidatesSplitPageState extends State<CandidatesSplitPage> {
     setState(() => _loading = true);
 
     final results = await Future.wait([
-      _repo.fetchCandidates(limit: 600),
+      _repo.fetchAllCandidates(),
       _repo.fetchYoungDemocrats(),
       _repo.fetchPrimaryChallengePairs(),
     ]);

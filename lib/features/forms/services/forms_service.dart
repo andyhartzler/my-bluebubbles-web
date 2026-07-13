@@ -315,12 +315,15 @@ class FormsService {
             )
           ''')
           .eq('form_id', formId)
+          // Only completed submissions — exclude in_progress/abandoned autosave
+          // drafts that would otherwise show up as spurious duplicate rows.
+          .inFilter('status', const ['submitted', 'reviewed', 'processed'])
           .order('created_at', ascending: false);
 
       final data = response as List;
       debugPrint('FormsService.getSubmissions: Found ${data.length} submissions for form $formId');
 
-      return data.map((json) {
+      final submissions = data.map((json) {
         try {
           return FormSubmission.fromJson(json as Map<String, dynamic>);
         } catch (e) {
@@ -329,6 +332,18 @@ class FormsService {
           rethrow;
         }
       }).toList();
+
+      // Dedupe: if the same person has multiple completed submissions, keep
+      // only the newest. Rows are ordered newest-first, so the first occurrence
+      // of each key wins. Key on candidate_id, then submitter_phone; rows with
+      // neither fall back to their unique id (never dropped).
+      final seen = <String>{};
+      final deduped = <FormSubmission>[];
+      for (final s in submissions) {
+        final key = s.candidateId ?? s.submitterPhone ?? s.id;
+        if (seen.add(key)) deduped.add(s);
+      }
+      return deduped;
     } catch (e) {
       debugPrint('FormsService.getSubmissions: Error fetching submissions: $e');
       rethrow;
