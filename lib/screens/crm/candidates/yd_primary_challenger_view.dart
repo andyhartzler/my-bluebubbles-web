@@ -460,12 +460,10 @@ class _Side extends StatelessWidget {
                     // translate into a more confident visual hierarchy.
                     radius: fullWidth ? 28 : 20,
                     backgroundColor: accent.withOpacity(0.3),
-                    backgroundImage: (candidate?.photoUrl != null &&
-                            candidate!.photoUrl!.isNotEmpty)
-                        ? NetworkImage(candidate!.photoUrl!)
+                    backgroundImage: (candidate?.avatarUrl != null)
+                        ? NetworkImage(candidate!.avatarUrl!)
                         : null,
-                    child: (candidate?.photoUrl == null ||
-                            candidate!.photoUrl!.isEmpty)
+                    child: (candidate?.avatarUrl == null)
                         ? Text(initials,
                             style: TextStyle(
                                 color: accent,
@@ -560,11 +558,10 @@ class _YdListRow extends StatelessWidget {
               CircleAvatar(
                 radius: 18,
                 backgroundColor: BrandColors.sunriseGold.withOpacity(0.25),
-                backgroundImage:
-                    (c.photoUrl != null && c.photoUrl!.isNotEmpty)
-                        ? NetworkImage(c.photoUrl!)
-                        : null,
-                child: (c.photoUrl == null || c.photoUrl!.isEmpty)
+                backgroundImage: (c.avatarUrl != null)
+                    ? NetworkImage(c.avatarUrl!)
+                    : null,
+                child: (c.avatarUrl == null)
                     ? Text(c.initials,
                         style: const TextStyle(
                             color: BrandColors.sunriseGold,

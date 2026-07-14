@@ -247,8 +247,8 @@ class _CandidatesMapFullscreenState extends State<CandidatesMapFullscreen> {
               CircleAvatar(
                 radius: 16,
                 backgroundColor: BrandColors.navyBlue,
-                backgroundImage: (c.photoUrl != null && c.photoUrl!.isNotEmpty) ? NetworkImage(c.photoUrl!) : null,
-                child: (c.photoUrl == null || c.photoUrl!.isEmpty)
+                backgroundImage: (c.avatarUrl != null) ? NetworkImage(c.avatarUrl!) : null,
+                child: (c.avatarUrl == null)
                     ? Text(c.initials, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700))
                     : null,
               ),

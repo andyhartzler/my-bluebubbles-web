@@ -127,11 +127,10 @@ class _GridCard extends StatelessWidget {
                   CircleAvatar(
                     radius: 26,
                     backgroundColor: partyColor.withOpacity(0.25),
-                    backgroundImage:
-                        (c.photoUrl != null && c.photoUrl!.isNotEmpty)
-                            ? NetworkImage(c.photoUrl!)
-                            : null,
-                    child: (c.photoUrl == null || c.photoUrl!.isEmpty)
+                    backgroundImage: (c.avatarUrl != null)
+                        ? NetworkImage(c.avatarUrl!)
+                        : null,
+                    child: (c.avatarUrl == null)
                         ? Text(c.initials,
                             style: TextStyle(
                                 color: partyColor,

@@ -82,6 +82,13 @@ class Candidate {
   final Map<String, dynamic>? assignedMember; // members row when moyd_assigned_to is set
   final Map<String, dynamic>? linkedMember;   // members row when member_id is set
 
+  // Headshot the candidate uploaded through the public endorsement survey
+  // (public.form_submissions.data['headshot'][0].url, latest submitted row for
+  // this candidate_id). NOT persisted on `public.candidates` — the repository
+  // merges it in at fetch time. When present it takes priority over every other
+  // avatar source so the candidate's own photo shows everywhere in the CRM.
+  final String? endorsementHeadshotUrl;
+
   const Candidate({
     required this.id,
     required this.name,
@@ -144,6 +151,7 @@ class Candidate {
     this.legislatorPhotoUrl,
     this.assignedMember,
     this.linkedMember,
+    this.endorsementHeadshotUrl,
   });
 
   factory Candidate.fromJson(Map<String, dynamic> json) {
@@ -373,13 +381,31 @@ class Candidate {
     return parts.length >= 2 ? parts.last : '';
   }
 
+  /// The avatar photo to show wherever this candidate is rendered in the
+  /// candidates area (list, split, mobile, detail header, race cards, …).
+  /// Prefers the headshot the candidate uploaded through the public
+  /// endorsement survey; otherwise falls back to the stored candidate photo.
+  /// Returns null when neither exists so callers render their initials
+  /// fallback exactly as before.
+  String? get avatarUrl {
+    if (endorsementHeadshotUrl != null && endorsementHeadshotUrl!.isNotEmpty) {
+      return endorsementHeadshotUrl;
+    }
+    if (photoUrl != null && photoUrl!.isNotEmpty) return photoUrl;
+    return null;
+  }
+
   /// Best-available photo for this candidate, in priority order:
-  ///   1. Uploaded `photoUrl` (candidates.photo_url)
-  ///   2. Incumbent legislator headshot (legislation_legislators.photo_url)
-  ///   3. Linked MOYD member's primary profile picture
+  ///   1. Endorsement-survey headshot (form_submissions.data.headshot)
+  ///   2. Uploaded `photoUrl` (candidates.photo_url)
+  ///   3. Incumbent legislator headshot (legislation_legislators.photo_url)
+  ///   4. Linked MOYD member's primary profile picture
   /// Returns null when nothing usable is available — UI should fall back
   /// to initials.
   String? get effectivePhotoUrl {
+    if (endorsementHeadshotUrl != null && endorsementHeadshotUrl!.isNotEmpty) {
+      return endorsementHeadshotUrl;
+    }
     if (photoUrl != null && photoUrl!.isNotEmpty) return photoUrl;
     if (legislatorPhotoUrl != null && legislatorPhotoUrl!.isNotEmpty) {
       return legislatorPhotoUrl;
@@ -575,6 +601,7 @@ class Candidate {
     String? legislatorPhotoUrl,
     Map<String, dynamic>? assignedMember,
     Map<String, dynamic>? linkedMember,
+    String? endorsementHeadshotUrl,
   }) {
     return Candidate(
       id: id ?? this.id,
@@ -631,6 +658,8 @@ class Candidate {
       legislatorPhotoUrl: legislatorPhotoUrl ?? this.legislatorPhotoUrl,
       assignedMember: assignedMember ?? this.assignedMember,
       linkedMember: linkedMember ?? this.linkedMember,
+      endorsementHeadshotUrl:
+          endorsementHeadshotUrl ?? this.endorsementHeadshotUrl,
     );
   }
 

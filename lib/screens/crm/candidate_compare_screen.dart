@@ -384,11 +384,10 @@ class _CandidateCompareScreenState extends State<CandidateCompareScreen>
           CircleAvatar(
             radius: 28,
             backgroundColor: partyColor.withOpacity(0.2),
-            backgroundImage:
-                c.photoUrl != null && c.photoUrl!.isNotEmpty
-                    ? NetworkImage(c.photoUrl!)
-                    : null,
-            child: c.photoUrl == null || c.photoUrl!.isEmpty
+            backgroundImage: c.avatarUrl != null
+                ? NetworkImage(c.avatarUrl!)
+                : null,
+            child: c.avatarUrl == null
                 ? Text(
                     c.initials,
                     style: const TextStyle(

@@ -1266,11 +1266,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                       CircleAvatar(
                         radius: 34,
                         backgroundColor: BrandColors.navyBlue,
-                        backgroundImage:
-                            c.photoUrl != null && c.photoUrl!.isNotEmpty
-                                ? NetworkImage(c.photoUrl!)
-                                : null,
-                        child: c.photoUrl == null || c.photoUrl!.isEmpty
+                        backgroundImage: c.avatarUrl != null
+                            ? NetworkImage(c.avatarUrl!)
+                            : null,
+                        child: c.avatarUrl == null
                             ? Text(
                                 c.initials,
                                 style: TextStyle(
@@ -5127,10 +5126,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 CircleAvatar(
                   radius: 22,
                   backgroundColor: partyColor.withOpacity(0.15),
-                  backgroundImage: cand.photoUrl != null && cand.photoUrl!.isNotEmpty
-                      ? NetworkImage(cand.photoUrl!)
+                  backgroundImage: cand.avatarUrl != null
+                      ? NetworkImage(cand.avatarUrl!)
                       : null,
-                  child: cand.photoUrl == null || cand.photoUrl!.isEmpty
+                  child: cand.avatarUrl == null
                       ? Text(cand.initials, style: TextStyle(color: partyColor, fontSize: 14, fontWeight: FontWeight.bold))
                       : null,
                 ),

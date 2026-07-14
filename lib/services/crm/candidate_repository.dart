@@ -52,6 +52,90 @@ class CandidateRepository {
     _financeCache.clear();
   }
 
+  // ── Endorsement-survey headshot lookup (candidate_id → public URL) ─────
+  //
+  // Candidates upload a headshot when they submit the public endorsement
+  // survey. When present, that headshot is the canonical face for the
+  // candidate everywhere in the CRM (see Candidate.avatarUrl). We resolve the
+  // whole map in one query and cache it (1hr TTL) so list pages don't fan out
+  // per-row lookups.
+  static const String endorsementFormId =
+      '945738f0-ff66-420f-8707-afb4a23ca58b';
+  static Map<String, String>? _headshotCache;
+  static DateTime? _headshotFetchedAt;
+
+  /// Clear the endorsement-headshot cache (session teardown + manual refresh).
+  static void clearHeadshotCache() {
+    _headshotCache = null;
+    _headshotFetchedAt = null;
+  }
+
+  /// Map of candidateId → latest submitted endorsement-survey headshot URL.
+  /// Only rows with a non-null `candidate_id` and a usable headshot are
+  /// included; ordering by `created_at desc` + first-wins keeps the newest
+  /// submission per candidate. Cached for an hour.
+  Future<Map<String, String>> fetchEndorsementHeadshots(
+      {bool forceRefresh = false}) async {
+    if (!isReady) return const {};
+    final cached = _headshotCache;
+    if (!forceRefresh &&
+        cached != null &&
+        _headshotFetchedAt != null &&
+        DateTime.now().difference(_headshotFetchedAt!).inMinutes < 60) {
+      return cached;
+    }
+    try {
+      final response = await _client
+          .from('form_submissions')
+          .select('candidate_id, data, created_at')
+          .eq('form_id', endorsementFormId)
+          .eq('status', 'submitted')
+          .not('candidate_id', 'is', null)
+          .order('created_at', ascending: false);
+
+      final map = <String, String>{};
+      for (final row in (response as List<dynamic>)) {
+        if (row is! Map) continue;
+        final cid = row['candidate_id'] as String?;
+        if (cid == null || map.containsKey(cid)) continue; // first row = latest
+        final url = _headshotUrlFromData(row['data']);
+        if (url != null && url.isNotEmpty) map[cid] = url;
+      }
+      _headshotCache = map;
+      _headshotFetchedAt = DateTime.now();
+      return map;
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.fetchEndorsementHeadshots error: $e');
+      return _headshotCache ?? const {};
+    }
+  }
+
+  /// Pull the first headshot URL out of a form_submissions `data` blob.
+  /// Shape: data['headshot'] = [{url, name, storage_path, …}]. The
+  /// form-uploads bucket is public so the url resolves directly.
+  static String? _headshotUrlFromData(dynamic data) {
+    if (data is! Map) return null;
+    final hs = data['headshot'];
+    if (hs is List && hs.isNotEmpty && hs.first is Map) {
+      final url = (hs.first as Map)['url'];
+      if (url is String && url.isNotEmpty) return url;
+    }
+    return null;
+  }
+
+  /// Merge the cached endorsement headshots onto a batch of candidates. Only
+  /// candidates whose id is in [headshots] are copied; the rest are returned
+  /// untouched so existing avatar behavior is preserved.
+  List<Candidate> _applyHeadshots(
+      List<Candidate> candidates, Map<String, String> headshots) {
+    if (headshots.isEmpty) return candidates;
+    return candidates.map((c) {
+      final url = headshots[c.id];
+      if (url == null || url.isEmpty) return c;
+      return c.copyWith(endorsementHeadshotUrl: url);
+    }).toList();
+  }
+
   // ─── Fetch all candidates (with optional filters) ──────────────
 
   Future<List<Candidate>> fetchCandidates({
@@ -132,7 +216,7 @@ class CandidateRepository {
           .map(Candidate.fromJson)
           .toList();
 
-      return results;
+      return _applyHeadshots(results, await fetchEndorsementHeadshots());
     } catch (e) {
       debugPrint('❌ CandidateRepository.fetchCandidates error: $e');
       return [];
@@ -171,7 +255,7 @@ class CandidateRepository {
           .maybeSingle();
 
       if (response == null) return null;
-      return Candidate.fromJson(response);
+      return _withHeadshot(Candidate.fromJson(response));
     } catch (e) {
       debugPrint('❌ CandidateRepository.fetchCandidate error: $e');
       // If the embedded select hits a missing FK relationship name on a
@@ -183,11 +267,18 @@ class CandidateRepository {
             .eq('id', id)
             .maybeSingle();
         if (fallback == null) return null;
-        return Candidate.fromJson(fallback);
+        return _withHeadshot(Candidate.fromJson(fallback));
       } catch (_) {
         return null;
       }
     }
+  }
+
+  /// Merge the endorsement headshot onto a single candidate (detail header).
+  Future<Candidate> _withHeadshot(Candidate candidate) async {
+    final headshots = await fetchEndorsementHeadshots();
+    final merged = _applyHeadshots([candidate], headshots);
+    return merged.first;
   }
 
   // ─── Fetch the MO voter-file record for this candidate ─────────
@@ -289,10 +380,11 @@ class CandidateRepository {
           .eq('is_young_dem', true)
           .order('estimated_age', ascending: true);
 
-      return (response as List<dynamic>)
+      final results = (response as List<dynamic>)
           .whereType<Map<String, dynamic>>()
           .map(Candidate.fromJson)
           .toList();
+      return _applyHeadshots(results, await fetchEndorsementHeadshots());
     } catch (e) {
       debugPrint('❌ CandidateRepository.fetchYoungDemocrats error: $e');
       return [];
@@ -856,10 +948,11 @@ class CandidateRepository {
           .eq('office_level', 'state')
           .order('party');
 
-      return (response as List<dynamic>)
+      final results = (response as List<dynamic>)
           .whereType<Map<String, dynamic>>()
           .map(Candidate.fromJson)
           .toList();
+      return _applyHeadshots(results, await fetchEndorsementHeadshots());
     } catch (e) {
       debugPrint('❌ CandidateRepository.fetchCandidatesByDistrict error: $e');
       return [];
@@ -1558,10 +1651,11 @@ class CandidateRepository {
           .eq('district', district)
           .order('party');
 
-      return (response as List<dynamic>)
+      final results = (response as List<dynamic>)
           .whereType<Map<String, dynamic>>()
           .map(Candidate.fromJson)
           .toList();
+      return _applyHeadshots(results, await fetchEndorsementHeadshots());
     } catch (e) {
       debugPrint('❌ CandidateRepository.getDistrictCandidates error: $e');
       return [];

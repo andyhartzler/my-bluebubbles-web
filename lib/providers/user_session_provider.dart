@@ -348,6 +348,7 @@ class UserSessionProvider extends ChangeNotifier {
     // Flush cross-user static caches.
     try {
       CandidateRepository.clearFinanceCache();
+      CandidateRepository.clearHeadshotCache();
     } catch (e) {
       debugPrint('UserSessionProvider.clearSession: CandidateRepository.clearFinanceCache failed: $e');
     }

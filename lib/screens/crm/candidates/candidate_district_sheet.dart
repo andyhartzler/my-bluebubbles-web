@@ -368,8 +368,8 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasPhoto =
-        candidate.photoUrl != null && candidate.photoUrl!.isNotEmpty;
+    final avatarUrl = candidate.avatarUrl;
+    final hasPhoto = avatarUrl != null && avatarUrl.isNotEmpty;
     return Container(
       width: 52,
       height: 52,
@@ -381,7 +381,7 @@ class _Avatar extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: hasPhoto
           ? Image.network(
-              candidate.photoUrl!,
+              avatarUrl,
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => _fallback(),
             )
