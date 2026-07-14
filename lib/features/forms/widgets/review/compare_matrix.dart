@@ -21,10 +21,16 @@ class CompareMatrix extends StatefulWidget {
   final FormSchema form;
   final List<FormSubmission> submissions;
 
+  /// Optional: when supplied, tapping a candidate name or alignment cell opens
+  /// the candidate (e.g. push the deep-dive) instead of the built-in stance
+  /// popover. Leaving it null preserves the default popover behavior.
+  final void Function(FormSubmission submission)? onOpenCandidate;
+
   const CompareMatrix({
     Key? key,
     required this.form,
     required this.submissions,
+    this.onOpenCandidate,
   }) : super(key: key);
 
   @override
@@ -623,6 +629,12 @@ class _CompareMatrixState extends State<CompareMatrix> {
   }
 
   void _openCandidate(_CandidateRow row) {
+    // Delegate to the host when a callback is provided (e.g. deep-dive push).
+    final cb = widget.onOpenCandidate;
+    if (cb != null) {
+      cb(row.submission);
+      return;
+    }
     // Small stance-summary popover for the whole candidate.
     final tally = row.model.stanceTally;
     showDialog(

@@ -1,35 +1,60 @@
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/forms/screens/endorsement_hub/endorsement_hub_screen.dart';
+import 'package:bluebubbles/features/forms/theme/moyd_brand.dart';
 import 'package:bluebubbles/screens/crm/candidates/candidates_mobile_page.dart';
 import 'package:bluebubbles/screens/crm/candidates/candidates_split_page.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATES INTELLIGENCE PAGE — ROUTER
 //
-//  This file used to be a 2630-line monolith. It is now a thin
-//  width-based router:
+//  A thin area switch sits above two workspaces:
 //
-//   • ≥ 1200px   → CandidatesSplitPage    (sticky map + list panel)
-//   • <  1200px  → CandidatesMobilePage   (hero map, stats, filters,
-//                                          view-mode body, district
-//                                          bottom sheet on tap)
+//   • Field          → the width-based candidate map/list router
+//                       (≥1200px CandidatesSplitPage, else Mobile)
+//   • Endorsement HQ  → the 2026 candidate-survey intelligence hub
+//                       (EndorsementHubScreen)
 //
-//  All actual UI lives in lib/screens/crm/candidates/*. See the plan
-//  doc at "Projects/2026-04-22 Candidates Page Redesign.md" for the
-//  redesign rationale.
+//  All field UI lives in lib/screens/crm/candidates/*.
 // ═══════════════════════════════════════════════════════════════
 
-class CandidatesPage extends StatelessWidget {
+enum CandidatesArea { field, endorsementHq }
+
+class CandidatesPage extends StatefulWidget {
   const CandidatesPage({super.key});
 
   static const double desktopBreakpoint = 1200;
 
   @override
+  State<CandidatesPage> createState() => _CandidatesPageState();
+}
+
+class _CandidatesPageState extends State<CandidatesPage> {
+  CandidatesArea _area = CandidatesArea.field;
+
+  @override
   Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _AreaSwitcher(
+          area: _area,
+          onChanged: (a) => setState(() => _area = a),
+        ),
+        Expanded(
+          child: _area == CandidatesArea.endorsementHq
+              ? const EndorsementHubScreen()
+              : _fieldBody(),
+        ),
+      ],
+    );
+  }
+
+  Widget _fieldBody() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= desktopBreakpoint;
+        final isDesktop =
+            constraints.maxWidth >= CandidatesPage.desktopBreakpoint;
         final body =
             isDesktop ? const CandidatesSplitPage() : const CandidatesMobilePage();
 
@@ -49,6 +74,64 @@ class CandidatesPage extends StatelessWidget {
           child: body,
         );
       },
+    );
+  }
+}
+
+/// A compact solid-navy strip hosting the {Field · Endorsement HQ} switch.
+class _AreaSwitcher extends StatelessWidget {
+  final CandidatesArea area;
+  final ValueChanged<CandidatesArea> onChanged;
+  const _AreaSwitcher({required this.area, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: MoydBrand.navy,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              SegmentedButton<CandidatesArea>(
+                segments: const [
+                  ButtonSegment(
+                    value: CandidatesArea.field,
+                    icon: Icon(Icons.map_outlined),
+                    label: Text('Field'),
+                  ),
+                  ButtonSegment(
+                    value: CandidatesArea.endorsementHq,
+                    icon: Icon(Icons.workspace_premium),
+                    label: Text('Endorsement HQ'),
+                  ),
+                ],
+                selected: {area},
+                onSelectionChanged: (s) => onChanged(s.first),
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  backgroundColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return MoydBrand.gold;
+                    }
+                    return Colors.transparent;
+                  }),
+                  foregroundColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return MoydBrand.navy;
+                    }
+                    return Colors.white;
+                  }),
+                  side: WidgetStatePropertyAll(
+                    BorderSide(color: Colors.white.withOpacity(0.4)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
