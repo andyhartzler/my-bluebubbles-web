@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/submission_review_model.dart';
 import '../../theme/moyd_brand.dart';
+import '../review/stance_visuals.dart';
 import '../submission_status_badge.dart';
 
 /// Solid-navy hero for the endorsement review: 96px headshot (initial
@@ -253,6 +254,7 @@ class AtAGlanceBar extends StatelessWidget {
   static const double height = 58;
 
   bool get hasContent =>
+      model.alignmentPct != null ||
       model.office != null ||
       model.district != null ||
       model.raisedToDate != null ||
@@ -278,6 +280,12 @@ class AtAGlanceBar extends StatelessWidget {
     final tiles = <Widget>[];
     void add(String label, String value, {Color? valueColor}) {
       tiles.add(_GlanceTile(label: label, value: value, valueColor: valueColor));
+    }
+
+    // Alignment leads the strip when the form is scored.
+    final align = model.alignment;
+    if (align != null && align.pct != null) {
+      tiles.add(_AlignmentGlanceTile(score: align));
     }
 
     if (model.office != null) add('Office', model.office!);
@@ -344,6 +352,61 @@ class AtAGlanceBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         child: Row(children: children),
       ),
+    );
+  }
+}
+
+/// Prominent alignment tile: a color-ramped "% aligned" badge with a
+/// strong/partial/oppose subline and a "draft weights" tooltip. Self-contained
+/// badge colors keep contrast safe on both light and dark glance surfaces.
+class _AlignmentGlanceTile extends StatelessWidget {
+  final AlignmentScore score;
+  const _AlignmentGlanceTile({required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final pct = score.pct!;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'ALIGNMENT',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: cs.onSurfaceVariant,
+                letterSpacing: 0.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Tooltip(
+              message:
+                  'Draft weights — score uses tunable committee weights and '
+                  'may change.',
+              child: Icon(
+                Icons.info_outline,
+                size: 13,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        AlignmentBadge(pct: pct, dense: true, showWord: true),
+        const SizedBox(height: 2),
+        Text(
+          score.breakdownLine,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: cs.onSurfaceVariant,
+            fontSize: 10,
+          ),
+        ),
+      ],
     );
   }
 }

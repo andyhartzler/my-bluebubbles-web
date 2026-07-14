@@ -114,6 +114,101 @@ class ReferenceEntry {
   }
 }
 
+/// Committee-alignment score for one submission, computed from the schema's
+/// `scoring` config (`schema.scoring.fields`: fieldId -> {answerValue: weight}).
+///
+/// Weights are 0..1 (1 = fully aligned). Only scored questions the candidate
+/// answered with a *mapped* value count toward [pct]; a question answered with
+/// a value absent from its map (e.g. "unsure") is excluded from the score
+/// (never counted as 0). Questions absent from the map (e.g. pos_housing) are
+/// ignored entirely.
+class AlignmentScore {
+  /// Rounded 0..100 alignment percentage, or null when no scored question was
+  /// answered with a mapped value.
+  final double? pct;
+
+  /// Scored questions answered with a mapped value (the [pct] denominator).
+  final int scoredAnswered;
+
+  /// Scored questions the candidate answered at all (mapped or not).
+  final int scoredTotal;
+
+  /// Total scored questions defined in the map (draft weight coverage).
+  final int mapTotal;
+
+  /// Breakdown across the [scoredAnswered] set.
+  final int strong; // weight >= 0.75
+  final int partial; // 0 < weight < 0.75
+  final int oppose; // weight == 0
+
+  const AlignmentScore({
+    required this.pct,
+    required this.scoredAnswered,
+    required this.scoredTotal,
+    required this.mapTotal,
+    required this.strong,
+    required this.partial,
+    required this.oppose,
+  });
+
+  bool get hasScore => pct != null;
+
+  /// "11 strong / 2 partial / 0 oppose".
+  String get breakdownLine =>
+      '$strong strong / $partial partial / $oppose oppose';
+
+  /// Parse [scoring] + [data] into a score. Returns null when the form carries
+  /// no scoring config.
+  static AlignmentScore? compute(
+    Map<String, dynamic>? scoring,
+    Map<String, dynamic> data,
+  ) {
+    if (scoring == null) return null;
+    final fieldsMap = scoring['fields'];
+    if (fieldsMap is! Map) return null;
+
+    double weightSum = 0;
+    int answeredMapped = 0;
+    int answeredAny = 0;
+    int strong = 0, partial = 0, oppose = 0;
+
+    fieldsMap.forEach((fieldId, weights) {
+      if (weights is! Map) return;
+      final raw = data[fieldId.toString()];
+      if (SubmissionReviewModel._isEmptyValue(raw)) {
+        return; // question not answered
+      }
+      answeredAny++;
+      final w = weights[raw.toString()];
+      if (w is! num) return; // answer value not in the map -> excluded
+      final weight = w.toDouble();
+      weightSum += weight;
+      answeredMapped++;
+      if (weight >= 0.75) {
+        strong++;
+      } else if (weight > 0) {
+        partial++;
+      } else {
+        oppose++;
+      }
+    });
+
+    final pct = answeredMapped > 0
+        ? (weightSum / answeredMapped * 100).round().toDouble()
+        : null;
+
+    return AlignmentScore(
+      pct: pct,
+      scoredAnswered: answeredMapped,
+      scoredTotal: answeredAny,
+      mapTotal: fieldsMap.length,
+      strong: strong,
+      partial: partial,
+      oppose: oppose,
+    );
+  }
+}
+
 /// A single stance question inside a policy-positions grid.
 class PolicyPosition {
   final String id;
@@ -202,6 +297,9 @@ class SubmissionReviewModel {
 
   final List<ReferenceEntry> references;
 
+  /// Committee-alignment score, or null when the form has no scoring config.
+  final AlignmentScore? alignment;
+
   const SubmissionReviewModel({
     required this.sections,
     required this.candidateName,
@@ -224,11 +322,22 @@ class SubmissionReviewModel {
     this.certified = false,
     this.documentAnswers = const [],
     this.references = const [],
+    this.alignment,
   });
 
   /// All policy positions across every section, flattened.
   List<PolicyPosition> get allPolicyPositions =>
       sections.expand((s) => s.policyPositions).toList();
+
+  /// Rounded 0..100 committee-alignment percentage (null when unscored).
+  double? get alignmentPct => alignment?.pct;
+
+  /// Scored questions answered with a mapped value (the [alignmentPct]
+  /// denominator).
+  int get scoredAnswered => alignment?.scoredAnswered ?? 0;
+
+  /// Scored questions the candidate answered at all (mapped or not).
+  int get scoredTotal => alignment?.scoredTotal ?? 0;
 
   /// True when there is anything to show in the DocumentsCard.
   bool get hasDocuments =>
@@ -533,6 +642,8 @@ class SubmissionReviewModel {
     final headshots = ReviewFile.parse(data['headshot']);
     final budgets = ReviewFile.parse(data['budget_file']);
 
+    final alignment = AlignmentScore.compute(form.schema.scoring, data);
+
     return SubmissionReviewModel(
       sections: sections,
       candidateName: name,
@@ -555,6 +666,7 @@ class SubmissionReviewModel {
       certified: (str('certify') ?? '').toLowerCase() == 'yes',
       documentAnswers: documentAnswers,
       references: references,
+      alignment: alignment,
     );
   }
 }

@@ -4,7 +4,10 @@ import 'package:bluebubbles/features/forms/models/form_schema.dart';
 import 'package:bluebubbles/features/forms/models/form_submission.dart';
 import 'package:bluebubbles/features/forms/models/submission_review_model.dart';
 
-FormSchema _schema(List<Map<String, dynamic>> fields) {
+FormSchema _schema(
+  List<Map<String, dynamic>> fields, {
+  Map<String, dynamic>? scoring,
+}) {
   return FormSchema(
     id: 'form-1',
     createdAt: DateTime(2026, 1, 1),
@@ -13,9 +16,26 @@ FormSchema _schema(List<Map<String, dynamic>> fields) {
     formType: 'form',
     schema: FormSchemaData(
       fields: fields.map((f) => FormFieldConfig.fromJson(f)).toList(),
+      scoring: scoring,
     ),
   );
 }
+
+/// A 3-question scoring config mirroring the real `schema.scoring.fields`
+/// shape (weights 0..1, 1 = fully aligned).
+const _scoring = {
+  'note': 'DRAFT alignment weights, tune per committee.',
+  'fields': {
+    'pos_medicare_for_all': {
+      'yes': 1,
+      'public_option': 0.75,
+      'public_option_only': 0.5,
+      'no': 0,
+    },
+    'pos_right_to_work': {'yes': 1, 'qualified': 0.5, 'no': 0},
+    'pos_aipac_money': {'no': 1, 'prefer_not_to_answer': 0.5, 'yes': 0},
+  },
+};
 
 FormSubmission _submission(Map<String, dynamic> data) {
   return FormSubmission(
@@ -242,6 +262,75 @@ void main() {
       expect(model.nonDemHistory, isTrue);
       expect(model.raisedToDate, 167000);
       expect(model.track, 'Young Dem');
+    });
+
+    test('alignment: all-aligned answers score ~100%', () {
+      final model = SubmissionReviewModel.from(
+        _schema(const [], scoring: _scoring),
+        _submission({
+          'pos_medicare_for_all': 'yes', // 1
+          'pos_right_to_work': 'yes', // 1
+          'pos_aipac_money': 'no', // 1
+        }),
+      );
+      expect(model.alignmentPct, 100);
+      expect(model.scoredAnswered, 3);
+      expect(model.scoredTotal, 3);
+      expect(model.alignment!.strong, 3);
+      expect(model.alignment!.partial, 0);
+      expect(model.alignment!.oppose, 0);
+    });
+
+    test('alignment: mixed answers score lower with a breakdown', () {
+      final model = SubmissionReviewModel.from(
+        _schema(const [], scoring: _scoring),
+        _submission({
+          'pos_medicare_for_all': 'public_option', // 0.75 strong
+          'pos_right_to_work': 'qualified', // 0.5 partial
+          'pos_aipac_money': 'yes', // 0 oppose
+        }),
+      );
+      // (0.75 + 0.5 + 0) / 3 * 100 = 41.67 -> 42
+      expect(model.alignmentPct, 42);
+      expect(model.scoredAnswered, 3);
+      expect(model.alignment!.strong, 1);
+      expect(model.alignment!.partial, 1);
+      expect(model.alignment!.oppose, 1);
+      expect(model.alignment!.breakdownLine, '1 strong / 1 partial / 1 oppose');
+    });
+
+    test('alignment: unmapped values excluded, unanswered ignored', () {
+      final model = SubmissionReviewModel.from(
+        _schema(const [], scoring: _scoring),
+        _submission({
+          'pos_medicare_for_all': 'yes', // 1, counted
+          'pos_right_to_work': 'unsure', // answered but NOT in map -> excluded
+          // pos_aipac_money not answered at all -> ignored
+        }),
+      );
+      expect(model.alignmentPct, 100); // 1 / 1
+      expect(model.scoredAnswered, 1); // only the mapped answer
+      expect(model.scoredTotal, 2); // both answered questions
+      expect(model.alignment!.mapTotal, 3);
+    });
+
+    test('alignment: null pct when no scored question has a mapped answer', () {
+      final model = SubmissionReviewModel.from(
+        _schema(const [], scoring: _scoring),
+        _submission({'pos_housing': 'renter', 'pos_right_to_work': 'unsure'}),
+      );
+      expect(model.alignmentPct, isNull);
+      expect(model.scoredAnswered, 0);
+    });
+
+    test('alignment: null when form carries no scoring config', () {
+      final model = SubmissionReviewModel.from(
+        _schema(const []),
+        _submission({'pos_medicare_for_all': 'yes'}),
+      );
+      expect(model.alignment, isNull);
+      expect(model.alignmentPct, isNull);
+      expect(model.scoredAnswered, 0);
     });
 
     test('stanceFor covers the convention buckets', () {

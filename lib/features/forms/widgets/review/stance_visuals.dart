@@ -102,6 +102,75 @@ class StanceVisuals {
   }
 }
 
+/// Color ramp for a committee-alignment percentage. Self-contained light-bg /
+/// dark-fg pairs (drawn from the MOYD stance palette) so an alignment badge
+/// stays >= 4.5:1 on BOTH light and dark theme surfaces without branching:
+///   >= 80 support-green · 50–79 amber · < 50 oppose-red.
+class AlignmentVisuals {
+  const AlignmentVisuals._();
+
+  static Color fg(double pct) {
+    if (pct >= 80) return MoydBrand.supportFg;
+    if (pct >= 50) return MoydBrand.qualifiedFg;
+    return MoydBrand.opposeFg;
+  }
+
+  static Color bg(double pct) {
+    if (pct >= 80) return MoydBrand.supportBg;
+    if (pct >= 50) return MoydBrand.qualifiedBg;
+    return MoydBrand.opposeBg;
+  }
+}
+
+/// A self-contained alignment badge, e.g. "84%" or "84% aligned". Reused by the
+/// glance bar, the submission list card, and the compare matrix.
+class AlignmentBadge extends StatelessWidget {
+  final double pct;
+  final bool dense;
+
+  /// Append the word "aligned" after the percentage.
+  final bool showWord;
+
+  const AlignmentBadge({
+    super.key,
+    required this.pct,
+    this.dense = false,
+    this.showWord = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = AlignmentVisuals.fg(pct);
+    final bg = AlignmentVisuals.bg(pct);
+    final text = showWord ? '${pct.round()}% aligned' : '${pct.round()}%';
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 7 : 9,
+        vertical: dense ? 2 : 4,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(dense ? 6 : 8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.insights_rounded, size: dense ? 13 : 15, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              color: fg,
+              fontWeight: FontWeight.w700,
+              fontSize: dense ? 12 : 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Small formatting helpers shared across the endorsement review surfaces.
 class ReviewFormat {
   const ReviewFormat._();

@@ -303,11 +303,17 @@ class FormSchemaData {
   /// If null, defaults to standard identity config
   final IdentityConfig? identityConfig;
 
+  /// Optional alignment-scoring config (`schema.scoring`). Shape:
+  /// `{ note: String, fields: { <fieldId>: { <answerValue>: weight0..1 } } }`.
+  /// Preserved verbatim so [SubmissionReviewModel] can compute alignment.
+  final Map<String, dynamic>? scoring;
+
   const FormSchemaData({
     required this.fields,
     this.styling = const {},
     this.confirmation = const {},
     this.identityConfig,
+    this.scoring,
   });
 
   factory FormSchemaData.fromJson(Map<String, dynamic> json) {
@@ -333,6 +339,7 @@ class FormSchemaData {
       styling: (json['styling'] as Map<String, dynamic>?) ?? {},
       confirmation: (json['confirmation'] as Map<String, dynamic>?) ?? {},
       identityConfig: identityConfig,
+      scoring: json['scoring'] as Map<String, dynamic>?,
     );
   }
 
@@ -341,6 +348,7 @@ class FormSchemaData {
     'styling': styling,
     'confirmation': confirmation,
     if (identityConfig != null) 'identity_config': identityConfig!.toJson(),
+    if (scoring != null) 'scoring': scoring,
   };
 
   /// Get the effective identity config (defaults to standard if not set)
@@ -355,12 +363,14 @@ class FormSchemaData {
     Map<String, dynamic>? styling,
     Map<String, dynamic>? confirmation,
     IdentityConfig? identityConfig,
+    Map<String, dynamic>? scoring,
   }) {
     return FormSchemaData(
       fields: fields ?? this.fields,
       styling: styling ?? this.styling,
       confirmation: confirmation ?? this.confirmation,
       identityConfig: identityConfig ?? this.identityConfig,
+      scoring: scoring ?? this.scoring,
     );
   }
 }

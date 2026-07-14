@@ -49,8 +49,12 @@ class _Column {
 class _CompareMatrixState extends State<CompareMatrix> {
   static const double _nameColWidth = 184;
   static const double _colWidth = 128;
+  static const double _alignColWidth = 116;
   static const double _rowHeight = 54;
   static const double _headerHeight = 104;
+
+  /// Sentinel column id for the alignment-score column.
+  static const String _alignmentColId = '__alignment__';
 
   late List<_CandidateRow> _rows;
   late List<_Column> _columns;
@@ -63,6 +67,11 @@ class _CompareMatrixState extends State<CompareMatrix> {
   void initState() {
     super.initState();
     _build();
+    // Rank the slate by alignment out of the gate when the form is scored.
+    if (_rows.any((r) => r.model.alignmentPct != null)) {
+      _sortColId = _alignmentColId;
+      _sortDesc = true;
+    }
   }
 
   @override
@@ -93,7 +102,12 @@ class _CompareMatrixState extends State<CompareMatrix> {
     }
     final ids = labels.keys.toList()
       ..sort((a, b) => (order[a] ?? 1 << 30).compareTo(order[b] ?? 1 << 30));
-    _columns = ids.map((id) => _Column(id, labels[id]!)).toList();
+    _columns = [
+      // Alignment leads the columns when the form carries a scoring config.
+      if (_rows.any((r) => r.model.alignmentPct != null))
+        const _Column(_alignmentColId, 'Alignment'),
+      ...ids.map((id) => _Column(id, labels[id]!)),
+    ];
   }
 
   // Support-first ranking for sorting; missing answers sink to the bottom.
@@ -133,6 +147,19 @@ class _CompareMatrixState extends State<CompareMatrix> {
       if (_sortDesc) {
         return sorted.reversed.toList();
       }
+      return sorted;
+    }
+    if (_sortColId == _alignmentColId) {
+      // Unscored candidates (null pct) sink to the bottom regardless of order.
+      sorted.sort((a, b) {
+        final pa = a.model.alignmentPct ?? -1;
+        final pb = b.model.alignmentPct ?? -1;
+        final cmp = pa.compareTo(pb);
+        if (cmp != 0) return _sortDesc ? -cmp : cmp;
+        return a.model.candidateName
+            .toLowerCase()
+            .compareTo(b.model.candidateName.toLowerCase());
+      });
       return sorted;
     }
     sorted.sort((a, b) {
@@ -406,10 +433,11 @@ class _CompareMatrixState extends State<CompareMatrix> {
   Widget _buildColumnHeader(
       ThemeData theme, ColorScheme colorScheme, _Column c) {
     final active = _sortColId == c.id;
+    final isAlignment = c.id == _alignmentColId;
     return InkWell(
       onTap: () => _toggleSort(c.id),
       child: Container(
-        width: _colWidth,
+        width: isAlignment ? _alignColWidth : _colWidth,
         height: _headerHeight,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         decoration: BoxDecoration(
@@ -433,7 +461,9 @@ class _CompareMatrixState extends State<CompareMatrix> {
               ),
             Expanded(
               child: Tooltip(
-                message: c.label,
+                message: isAlignment
+                    ? 'Alignment — draft committee weights, tunable'
+                    : c.label,
                 child: Text(
                   _shortLabel(c.label),
                   maxLines: active ? 4 : 5,
@@ -455,6 +485,9 @@ class _CompareMatrixState extends State<CompareMatrix> {
 
   Widget _buildCell(ThemeData theme, ColorScheme colorScheme,
       _CandidateRow row, _Column c, int index) {
+    if (c.id == _alignmentColId) {
+      return _buildAlignmentCell(theme, colorScheme, row, index);
+    }
     final pos = row.byId[c.id];
     final stance = pos?.stance ?? Stance.neutral;
     final zebra = index.isOdd;
@@ -509,6 +542,34 @@ class _CompareMatrixState extends State<CompareMatrix> {
                       ),
                   ],
                 ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAlignmentCell(ThemeData theme, ColorScheme colorScheme,
+      _CandidateRow row, int index) {
+    final pct = row.model.alignmentPct;
+    final zebra = index.isOdd;
+    return InkWell(
+      onTap: () => _openCandidate(row),
+      child: Container(
+        width: _alignColWidth,
+        height: _rowHeight,
+        decoration: BoxDecoration(
+          color: zebra
+              ? colorScheme.surfaceContainerHighest.withOpacity(0.25)
+              : colorScheme.surface,
+          border: Border(
+            right: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.4)),
+            bottom: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.6)),
+          ),
+        ),
+        child: Center(
+          child: pct == null
+              ? Icon(Icons.horizontal_rule_rounded,
+                  size: 16, color: colorScheme.outline)
+              : AlignmentBadge(pct: pct, dense: true),
         ),
       ),
     );
@@ -585,6 +646,28 @@ class _CompareMatrixState extends State<CompareMatrix> {
                   style: theme.textTheme.bodyMedium
                       ?.copyWith(color: colorScheme.onSurfaceVariant),
                 ),
+              if (row.model.alignmentPct != null) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    AlignmentBadge(pct: row.model.alignmentPct!, showWord: true),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        row.model.alignment!.breakdownLine,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Draft committee weights, tunable.',
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
+              ],
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,

@@ -889,13 +889,18 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
             if (model.track != null) _trackBadge(theme, model.track!),
           ],
         ),
-        // Stance summary.
-        if (tally.support + tally.qualified + tally.oppose + tally.other > 0) ...[
+        // Alignment badge + stance summary.
+        if (model.alignmentPct != null ||
+            tally.support + tally.qualified + tally.oppose + tally.other >
+                0) ...[
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              if (model.alignmentPct != null)
+                AlignmentBadge(pct: model.alignmentPct!, showWord: true),
               if (tally.support > 0)
                 StanceVisuals.pill(Stance.support,
                     text: '${tally.support} support', dense: true),
