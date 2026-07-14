@@ -3,19 +3,22 @@
 //  Renders a candidate's response to the 2026 endorsement questionnaire
 //  inside the Intel tab of CandidateDetailScreen.
 //
-//  Status: PROPOSED — wire up in candidate_detail_screen.dart by calling
-//  EndorsementQuestionnaireSection(candidateId: c.id) inside the Intel tab
-//  (suggested: a new 4th segment "Endorsement" or inline at the top of
-//  the existing "MOYD" segment).
-//
 //  Data source: public.candidate_endorsement_responses view
 //  (see supabase/migrations/20260422000000_endorsement_questionnaire_link.sql)
+//  plus the form schema (public.form_schemas) so codes resolve to option
+//  labels via SubmissionReviewModel — the SAME model the full results page
+//  uses, so the two surfaces never drift.
 // ═══════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/forms/models/form_schema.dart';
+import 'package:bluebubbles/features/forms/models/form_submission.dart';
+import 'package:bluebubbles/features/forms/models/submission_review_model.dart';
+import 'package:bluebubbles/features/forms/screens/submission_detail_screen.dart';
+import 'package:bluebubbles/features/forms/theme/moyd_brand.dart';
 
 class EndorsementQuestionnaireSection extends StatefulWidget {
   final String candidateId;
@@ -32,8 +35,12 @@ class EndorsementQuestionnaireSection extends StatefulWidget {
 
 class _EndorsementQuestionnaireSectionState
     extends State<EndorsementQuestionnaireSection> {
-  Map<String, dynamic>? _response;
+  SubmissionReviewModel? _model;
+  FormSchema? _form;
+  FormSubmission? _submission;
+  DateTime? _submittedAt;
   bool _loading = true;
+  bool _hasResponse = false;
   String? _error;
 
   @override
@@ -44,15 +51,59 @@ class _EndorsementQuestionnaireSectionState
 
   Future<void> _load() async {
     try {
-      final rows = await Supabase.instance.client
+      final client = Supabase.instance.client;
+      final rows = await client
           .from('candidate_endorsement_responses')
           .select()
           .eq('candidate_id', widget.candidateId)
           .order('submitted_at', ascending: false)
           .limit(1);
 
+      if (rows.isEmpty) {
+        setState(() {
+          _hasResponse = false;
+          _loading = false;
+        });
+        return;
+      }
+
+      final row = rows.first;
+      final responses =
+          (row['responses'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+      final slug = row['form_slug']?.toString() ?? 'endorsement-questionnaire-2026';
+
+      final schemaRows = await client
+          .from('form_schemas')
+          .select()
+          .eq('slug', slug)
+          .limit(1);
+
+      FormSchema? form;
+      if (schemaRows.isNotEmpty) {
+        form = FormSchema.fromJson(schemaRows.first);
+      }
+
+      final submittedAt = DateTime.tryParse(row['submitted_at']?.toString() ?? '');
+      final submission = FormSubmission(
+        id: row['submission_id']?.toString() ?? '',
+        createdAt: submittedAt ?? DateTime.now(),
+        formId: form?.id ?? '',
+        data: responses,
+        submitterName: row['submitter_name']?.toString(),
+        submitterEmail: row['submitter_email']?.toString(),
+        submitterPhone: row['submitter_phone']?.toString(),
+        candidateId: row['candidate_id']?.toString(),
+        status: row['status']?.toString() ?? 'submitted',
+      );
+
       setState(() {
-        _response = rows.isNotEmpty ? rows.first as Map<String, dynamic> : null;
+        _hasResponse = true;
+        _form = form;
+        _submission = submission;
+        _submittedAt = submittedAt;
+        _model = form != null
+            ? SubmissionReviewModel.from(form, submission)
+            : null;
         _loading = false;
       });
     } catch (e) {
@@ -79,191 +130,211 @@ class _EndorsementQuestionnaireSectionState
       );
     }
 
-    if (_response == null) {
-      return _card(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.description_outlined,
-                    color: BrandColors.sunriseGold, size: 22),
-                SizedBox(width: 10),
-                Text('Endorsement Questionnaire',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    )),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'No response submitted yet.',
-              style: TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () async {
-                final link =
-                    'https://forms.moyoungdemocrats.org/endorsement-questionnaire-2026?candidate_id=${widget.candidateId}';
-                await Clipboard.setData(ClipboardData(text: link));
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Copied: $link'),
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.link, size: 16),
-              label: const Text('Copy candidate-specific link'),
-            ),
-          ],
-        ),
-      );
+    if (!_hasResponse || _model == null) {
+      return _emptyCard();
     }
 
-    final responses = (_response!['responses'] as Map<String, dynamic>?) ?? {};
-    final submittedAt = DateTime.tryParse(_response!['submitted_at'] ?? '');
+    return _card(child: _reviewSummary(_model!));
+  }
 
+  Widget _emptyCard() {
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.check_circle,
-                  color: Color(0xFF4ADE80), size: 22),
-              const SizedBox(width: 10),
-              const Text('Endorsement Questionnaire',
+              Icon(Icons.description_outlined,
+                  color: BrandColors.sunriseGold, size: 22),
+              SizedBox(width: 10),
+              Text('Endorsement Questionnaire',
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                   )),
-              const Spacer(),
-              if (submittedAt != null)
-                Text(
-                  _formatDate(submittedAt),
-                  style: const TextStyle(
-                      color: Colors.white60, fontSize: 12),
-                ),
             ],
           ),
-          const SizedBox(height: 16),
-          _highlights(responses),
-          const SizedBox(height: 16),
-          _fullResponse(responses),
+          const SizedBox(height: 12),
+          const Text('No response submitted yet.',
+              style: TextStyle(color: Colors.white70)),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () async {
+              final link =
+                  'https://forms.moyoungdemocrats.org/endorsement-questionnaire-2026?candidate_id=${widget.candidateId}';
+              await Clipboard.setData(ClipboardData(text: link));
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Copied: $link'),
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            },
+            icon: const Icon(Icons.link, size: 16),
+            label: const Text('Copy candidate-specific link'),
+          ),
         ],
       ),
     );
   }
 
-  Widget _highlights(Map<String, dynamic> r) {
-    // Surface the most important fields up top as chips + key quotes
+  Widget _reviewSummary(SubmissionReviewModel m) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.check_circle, color: Color(0xFF4ADE80), size: 22),
+            const SizedBox(width: 10),
+            const Text('Endorsement Questionnaire',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                )),
+            const Spacer(),
+            if (_submittedAt != null)
+              Text(_formatDate(_submittedAt!),
+                  style: const TextStyle(color: Colors.white60, fontSize: 12)),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _chips(m),
+        if (m.allPolicyPositions.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          _stanceStrip(m),
+        ],
+        if (m.topPriority != null && m.topPriority!.trim().isNotEmpty) ...[
+          const SizedBox(height: 14),
+          _topPriorityQuote(m.topPriority!.trim()),
+        ],
+        const SizedBox(height: 14),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: MoydBrand.gold,
+              foregroundColor: const Color(0xFF1A1200),
+            ),
+            onPressed: (_form != null && _submission != null)
+                ? () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => SubmissionDetailScreen(
+                          submission: _submission,
+                          form: _form,
+                        ),
+                      ),
+                    );
+                  }
+                : null,
+            icon: const Icon(Icons.open_in_full, size: 16),
+            label: const Text('Open full review'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _chips(SubmissionReviewModel m) {
     final chips = <Widget>[];
-    void addChip(String label, String? value, {Color? tint}) {
+    void add(String label, String? value, {bool amber = false}) {
       if (value == null || value.isEmpty) return;
+      final base = amber ? MoydBrand.amber : BrandColors.sunriseGold;
       chips.add(Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: (tint ?? BrandColors.sunriseGold).withOpacity(0.18),
+          color: base.withOpacity(0.18),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-              color: (tint ?? BrandColors.sunriseGold).withOpacity(0.4)),
+          border: Border.all(color: base.withOpacity(0.45)),
         ),
-        child: Text(
-          '$label: $value',
-          style: const TextStyle(color: Colors.white, fontSize: 12),
-        ),
+        child: Text('$label: $value',
+            style: const TextStyle(color: Colors.white, fontSize: 12)),
       ));
     }
 
-    addChip('Race', _prettyRaceType(r['race_type']?.toString()));
-    addChip('Ideology', r['ideology']?.toString());
-    addChip('Party history', r['party_history']?.toString());
-    addChip('M4A', r['pos_medicare_for_all']?.toString());
-    addChip('Repro', r['pos_reproductive_rights']?.toString());
-    addChip('Min wage', r['pos_minimum_wage']?.toString());
-    addChip('Raised', _currency(r['raised_to_date']));
+    final officeDistrict = [
+      if (m.office != null) m.office,
+      if (m.district != null) m.district,
+    ].whereType<String>().join(' · ');
 
+    add('Office', officeDistrict.isEmpty ? null : officeDistrict);
+    add('Ideology', m.ideology);
+    if (m.nonDemHistory) add('Party history', m.partyHistory, amber: true);
+    add('Raised', m.raisedToDate == null ? null : _currency(m.raisedToDate!));
+    add('Track', m.track);
+
+    if (chips.isEmpty) return const SizedBox.shrink();
     return Wrap(spacing: 8, runSpacing: 8, children: chips);
   }
 
-  Widget _fullResponse(Map<String, dynamic> r) {
-    final entries = r.entries
-        .where((e) => e.value != null && e.value.toString().isNotEmpty)
-        .toList();
-
-    return Theme(
-      // Remove the default list-tile splash behavior so the header taps
-      // cleanly on mobile without the Material ripple extending past the
-      // rounded corners.
-      data: Theme.of(context).copyWith(
-        dividerColor: Colors.transparent,
-        splashColor: Colors.transparent,
-      ),
-      child: ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        // Clip the expansion content so long answers don't overflow
-        // horizontally past the card's rounded border on narrow screens.
-        clipBehavior: Clip.antiAlias,
-        title: Row(
-          children: [
-            const Text('Full response',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: BrandColors.sunriseGold.withOpacity(0.16),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                '${entries.length}',
-                style: const TextStyle(
-                    color: BrandColors.sunriseGold,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
+  Widget _stanceStrip(SubmissionReviewModel m) {
+    final t = m.stanceTally;
+    final segs = <Widget>[];
+    void seg(String label, int count, Color fg, Color bg) {
+      if (count <= 0) return;
+      segs.add(Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
         ),
-        iconColor: Colors.white70,
-        collapsedIconColor: Colors.white70,
-        childrenPadding: const EdgeInsets.only(top: 8),
-        children: entries.map((e) {
-          final value = _formatAnswer(e.value);
-          final isLong = value.length > 180;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_humanize(e.key),
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 11,
-                      letterSpacing: 0.4,
-                      fontWeight: FontWeight.w600,
-                    )),
-                const SizedBox(height: 2),
-                // Long free-text answers collapse to 3 lines by default
-                // with a "Show more" toggle. Short answers render
-                // inline so the reader doesn't have to tap through
-                // every chip/yes-no to see its value.
-                isLong
-                    ? _ExpandableAnswer(text: value)
-                    : Text(
-                        value,
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 14, height: 1.4),
-                      ),
-              ],
-            ),
-          );
-        }).toList(),
+        child: Text('$count $label',
+            style: TextStyle(
+                color: fg, fontSize: 12, fontWeight: FontWeight.w700)),
+      ));
+    }
+
+    seg('support', t.support, MoydBrand.supportFg, MoydBrand.supportBg);
+    seg('oppose', t.oppose, MoydBrand.opposeFg, MoydBrand.opposeBg);
+    seg('qualified', t.qualified, MoydBrand.qualifiedFg, MoydBrand.qualifiedBg);
+    if (t.other > 0) {
+      seg('other', t.other, MoydBrand.neutralFg, MoydBrand.neutralBg);
+    }
+
+    if (segs.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Positions',
+            style: TextStyle(
+                color: Colors.white60,
+                fontSize: 11,
+                letterSpacing: 0.4,
+                fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Wrap(spacing: 8, runSpacing: 8, children: segs),
+      ],
+    );
+  }
+
+  Widget _topPriorityQuote(String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: const Border(
+          left: BorderSide(color: MoydBrand.gold, width: 3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Would fight hardest for',
+              style: TextStyle(
+                  color: Colors.white60,
+                  fontSize: 11,
+                  letterSpacing: 0.4,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Text('“$text”',
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 14, height: 1.4)),
+        ],
       ),
     );
   }
@@ -280,119 +351,7 @@ class _EndorsementQuestionnaireSectionState
     );
   }
 
-  String _humanize(String key) => key
-      .replaceAll('_', ' ')
-      .replaceAllMapped(RegExp(r'\b\w'), (m) => m[0]!.toUpperCase());
+  String _currency(num v) => '\$${v.toStringAsFixed(0)}';
 
-  String? _prettyRaceType(String? v) {
-    switch (v) {
-      case 'open_seat':
-        return 'Open seat';
-      case 'primary_incumbent_d':
-        return 'Primary vs D incumbent';
-      case 'challenger_to_r':
-        return 'Challenger to R';
-      case 'reelection':
-        return 'Re-election';
-      default:
-        return v;
-    }
-  }
-
-  // Render an answer for display. Multiselect questions (endorsements, voting
-  // history, etc.) now arrive as JSON arrays — join them into a readable,
-  // humanized list instead of Dart's "[a, b]" toString.
-  String _formatAnswer(dynamic v) {
-    if (v is List) {
-      return v.map((e) => _humanizeToken(e?.toString() ?? '')).where((s) => s.isNotEmpty).join(', ');
-    }
-    return v?.toString() ?? '';
-  }
-
-  // Turn a snake_case option value into a Title Case label as a fallback.
-  String _humanizeToken(String s) {
-    if (s.isEmpty) return s;
-    return s
-        .split('_')
-        .where((p) => p.isNotEmpty)
-        .map((p) => p[0].toUpperCase() + p.substring(1))
-        .join(' ');
-  }
-
-  String? _currency(dynamic v) {
-    if (v == null) return null;
-    final n = double.tryParse(v.toString());
-    if (n == null) return null;
-    return '\$${n.toStringAsFixed(0)}';
-  }
-
-  String _formatDate(DateTime d) =>
-      '${d.month}/${d.day}/${d.year}';
-}
-
-/// Collapsible free-text answer: shows 3 lines by default with a
-/// "Show more" / "Show less" toggle at the bottom. Used for long-form
-/// questionnaire answers so the full response card doesn't balloon to
-/// 4 screen-heights tall on mobile when the candidate writes a novel.
-class _ExpandableAnswer extends StatefulWidget {
-  final String text;
-  const _ExpandableAnswer({required this.text});
-
-  @override
-  State<_ExpandableAnswer> createState() => _ExpandableAnswerState();
-}
-
-class _ExpandableAnswerState extends State<_ExpandableAnswer> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AnimatedSize(
-          duration: MediaQuery.of(context).disableAnimations
-              ? Duration.zero
-              : const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.topLeft,
-          child: Text(
-            widget.text,
-            style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
-            maxLines: _expanded ? null : 3,
-            overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-          ),
-        ),
-        const SizedBox(height: 4),
-        InkWell(
-          onTap: () => setState(() => _expanded = !_expanded),
-          borderRadius: BorderRadius.circular(6),
-          child: Padding(
-            // Padding gets the tap area up to a comfortable 44×~28 — still
-            // small but paired with the large adjacent text it's reliable.
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _expanded ? 'Show less' : 'Show more',
-                  style: const TextStyle(
-                    color: BrandColors.sunriseGold,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  _expanded ? Icons.expand_less : Icons.expand_more,
-                  color: BrandColors.sunriseGold,
-                  size: 16,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  String _formatDate(DateTime d) => '${d.month}/${d.day}/${d.year}';
 }
