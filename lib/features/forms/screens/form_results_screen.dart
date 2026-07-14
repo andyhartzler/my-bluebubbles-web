@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import '../models/form_schema.dart';
 import '../models/form_submission.dart';
+import '../models/submission_review_model.dart';
 import '../services/forms_service.dart';
 import '../services/form_analytics_service.dart';
+import '../theme/moyd_brand.dart';
 import '../widgets/results/results_summary_card.dart';
 import '../widgets/results/response_charts.dart';
+import '../widgets/review/compare_matrix.dart';
+import '../widgets/review/policy_stance_bars.dart';
+import '../widgets/review/stance_visuals.dart';
 import 'submission_detail_screen.dart';
 
 /// Beautiful unified form results screen showing analytics and submissions together
@@ -35,8 +39,25 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
 
   // View state
   bool _showCharts = true;
+  bool _compareMode = false;
   String _searchQuery = '';
   String _statusFilter = 'all';
+
+  /// True when the loaded form is "endorsement-shaped": it has the candidate
+  /// office field and at least four single-select policy questions. Detected
+  /// structurally (not by form id) so it degrades safely for other forms.
+  bool get _isEndorsementForm {
+    final form = _form;
+    if (form == null) return false;
+    final fields = form.schema.fields;
+    final hasOffice = fields.any((f) => f.id == 'office_sought');
+    final policyCount = fields
+        .where((f) =>
+            f.id.startsWith('pos_') &&
+            const {'radio', 'dropdown', 'choice_chips'}.contains(f.type))
+        .length;
+    return hasOffice && policyCount >= 4;
+  }
 
   @override
   void initState() {
@@ -101,6 +122,10 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    if (!_isLoading && _error == null && _compareMode && _isEndorsementForm) {
+      return Scaffold(body: _buildCompareBody(theme, colorScheme));
+    }
+
     return Scaffold(
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -114,6 +139,65 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
                     ),
                   ],
                 ),
+    );
+  }
+
+  /// Full-height compare view. Kept out of the CustomScrollView so the matrix
+  /// can own its own vertical + horizontal scrolling.
+  Widget _buildCompareBody(ThemeData theme, ColorScheme colorScheme) {
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            color: MoydBrand.navy,
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  tooltip: 'Back to list',
+                  onPressed: () => setState(() => _compareMode = false),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Compare candidates',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        _form?.title ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.white),
+                  tooltip: 'Refresh',
+                  onPressed: _loadData,
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: CompareMatrix(
+                form: _form!,
+                submissions: _filteredSubmissions,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -140,6 +224,12 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
         ),
       ),
       actions: [
+        if (_isEndorsementForm)
+          IconButton(
+            icon: const Icon(Icons.grid_view_outlined),
+            onPressed: () => setState(() => _compareMode = true),
+            tooltip: 'Compare candidates',
+          ),
         IconButton(
           icon: Icon(_showCharts ? Icons.list : Icons.bar_chart),
           onPressed: () {
@@ -398,6 +488,17 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
   }
 
   Widget _buildResponseBreakdown(ThemeData theme, ColorScheme colorScheme) {
+    // Endorsement form: replace the arbitrary select-field charts with a
+    // per-policy 100%-stacked stance breakdown computed across all candidates.
+    if (_isEndorsementForm) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PolicyStanceBars(form: _form!, submissions: _submissions),
+        ],
+      );
+    }
+
     final fields = _form!.schema.fields;
     final aggregatedData = ResponseAggregator.aggregate(fields, _submissions);
 
@@ -425,7 +526,7 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
           ],
         ),
         const SizedBox(height: 16),
-        ...chartableFields.take(3).map((fieldData) => Padding(
+        ...chartableFields.map((fieldData) => Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: _buildFieldChart(fieldData),
             )),
@@ -638,7 +739,20 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
     FormSubmission submission,
     int index,
   ) {
-    final previewFields = submission.data.entries.take(3).toList();
+    final model =
+        _isEndorsementForm ? SubmissionReviewModel.from(_form!, submission) : null;
+
+    // Avatar: prefer the endorsement headshot, then any joined member photo.
+    final photoUrl = model?.headshot?.url ?? submission.displayPhotoUrl;
+    final displayName = model?.candidateName ?? submission.displayName;
+    final subtitle = model != null
+        ? [model.office, model.district]
+            .where((e) => e != null && e.isNotEmpty)
+            .join(' · ')
+        : (submission.displayEmail != null &&
+                submission.displayEmail != submission.displayName
+            ? submission.displayEmail!
+            : '');
 
     return Card(
       elevation: 0,
@@ -658,14 +772,12 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
               // Header row
               Row(
                 children: [
-                  // Avatar with photo if available
                   CircleAvatar(
                     backgroundColor: colorScheme.primaryContainer,
                     radius: 20,
-                    backgroundImage: submission.displayPhotoUrl != null
-                        ? NetworkImage(submission.displayPhotoUrl!)
-                        : null,
-                    child: submission.displayPhotoUrl == null
+                    backgroundImage:
+                        photoUrl != null ? NetworkImage(photoUrl) : null,
+                    child: photoUrl == null
                         ? Text(
                             submission.displayInitial,
                             style: TextStyle(
@@ -676,21 +788,21 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
                         : null,
                   ),
                   const SizedBox(width: 12),
-                  // Name and email
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          submission.displayName,
+                          displayName,
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        if (submission.displayEmail != null &&
-                            submission.displayEmail != submission.displayName)
+                        if (subtitle.isNotEmpty)
                           Text(
-                            submission.displayEmail!,
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -698,7 +810,6 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
                       ],
                     ),
                   ),
-                  // Status and date
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -715,53 +826,11 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
                 ],
               ),
 
-              // Preview fields
-              if (previewFields.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: previewFields.map((entry) {
-                      final fieldLabel = _getFieldLabel(entry.key);
-                      final value = _formatValue(entry.value);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                              width: 100,
-                              child: Text(
-                                fieldLabel,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                value,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
+              // Curated preview (endorsement) or schema-order fallback.
+              if (model != null)
+                _buildEndorsementPreview(theme, colorScheme, model)
+              else
+                _buildGenericPreview(theme, colorScheme, submission),
 
               // View details link
               const SizedBox(height: 8),
@@ -780,6 +849,198 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Curated endorsement card body: raised amount + track, stance summary,
+  /// and review flags. Built from the [SubmissionReviewModel] curated getters.
+  Widget _buildEndorsementPreview(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    SubmissionReviewModel model,
+  ) {
+    final tally = model.stanceTally;
+    final flags = _endorsementFlags(model);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        // Raised + track row.
+        Row(
+          children: [
+            Icon(Icons.savings_outlined, size: 16, color: MoydBrand.navy),
+            const SizedBox(width: 6),
+            Text(
+              ReviewFormat.currency(model.raisedToDate),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: MoydBrand.navy,
+              ),
+            ),
+            Text(
+              ' raised',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
+            const Spacer(),
+            if (model.track != null) _trackBadge(theme, model.track!),
+          ],
+        ),
+        // Stance summary.
+        if (tally.support + tally.qualified + tally.oppose + tally.other > 0) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              if (tally.support > 0)
+                StanceVisuals.pill(Stance.support,
+                    text: '${tally.support} support', dense: true),
+              if (tally.qualified > 0)
+                StanceVisuals.pill(Stance.qualified,
+                    text: '${tally.qualified} qualified', dense: true),
+              if (tally.oppose > 0)
+                StanceVisuals.pill(Stance.oppose,
+                    text: '${tally.oppose} oppose', dense: true),
+            ],
+          ),
+        ],
+        // Flags.
+        if (flags.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: flags.map((f) => _flagChip(theme, f)).toList(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  List<String> _endorsementFlags(SubmissionReviewModel model) {
+    final flags = <String>[];
+    if (model.nonDemHistory) flags.add('Non-Dem party history');
+    final pct = model.selfFundedPct;
+    if (pct != null && pct > 50) {
+      flags.add('Self-funded ${pct.round()}%');
+    }
+    if (model.headshot == null) flags.add('No headshot');
+    if (model.budgetFile == null) flags.add('No budget');
+    return flags;
+  }
+
+  Widget _trackBadge(ThemeData theme, String track) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: MoydBrand.navy,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        track,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+
+  Widget _flagChip(ThemeData theme, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: MoydBrand.amberBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: MoydBrand.amber.withOpacity(0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.flag_outlined, size: 13, color: MoydBrand.amber),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              color: MoydBrand.amber,
+              fontWeight: FontWeight.w600,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Fallback preview for non-endorsement forms: the first few ANSWERED fields
+  /// in schema order (not random JSONB keys).
+  Widget _buildGenericPreview(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    FormSubmission submission,
+  ) {
+    final previewFields = <MapEntry<String, String>>[];
+    final fields = _form?.schema.fields ?? const [];
+    for (final f in fields) {
+      if (f.type == 'section_header' || f.type == 'reference_block') continue;
+      final raw = submission.data[f.id];
+      if (raw == null) continue;
+      if (raw is String && raw.trim().isEmpty) continue;
+      if (raw is Iterable && raw.isEmpty) continue;
+      final display = SubmissionReviewModel.resolveDisplay(f, raw);
+      previewFields.add(
+          MapEntry(f.label, display.isEmpty ? _formatValue(raw) : display));
+      if (previewFields.length >= 3) break;
+    }
+
+    if (previewFields.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: previewFields.map((entry) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 100,
+                    child: Text(
+                      entry.key,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      entry.value,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
         ),
       ),
     );
@@ -817,12 +1078,6 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
       default:
         return Colors.blue;
     }
-  }
-
-  String _getFieldLabel(String fieldId) {
-    if (_form == null) return fieldId;
-    final field = _form!.schema.fields.where((f) => f.id == fieldId).firstOrNull;
-    return field?.label ?? fieldId;
   }
 
   String _formatValue(dynamic value) {
