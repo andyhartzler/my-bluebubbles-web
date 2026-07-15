@@ -3,12 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
-
-import '../../../../theme/moyd_brand.dart';
 import '../../../../widgets/review/stance_visuals.dart';
 import '../../models/candidate_entry.dart';
 import '../../slate_controller.dart';
+import '../../theme/hub_theme.dart';
 import '../headshot_avatar.dart';
 import 'decision_activity.dart';
 import 'decision_chip.dart';
@@ -190,33 +188,12 @@ class _DecisionBoardState extends State<DecisionBoard> {
   }
 
   Widget _empty(ThemeData theme) {
-    final cs = theme.colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.how_to_reg_outlined,
-                size: 56, color: cs.onSurfaceVariant.withOpacity(0.6)),
-            const SizedBox(height: 16),
-            Text('No candidates to decide on yet',
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Text(
-                'Once submissions arrive, sort them into Interview, Endorse or '
-                'Decline. Decisions sync live to every exec.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: cs.onSurfaceVariant),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return const HubEmptyState(
+      icon: Icons.how_to_reg_outlined,
+      title: 'No candidates to decide on yet',
+      message:
+          'Once submissions arrive, sort them into Interview, Endorse or '
+          'Decline. Decisions sync live to every exec.',
     );
   }
 }
@@ -257,12 +234,15 @@ class _TallyHeader extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [BrandColors.unityBlue, BrandColors.royalBlue],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
+        gradient: HubTheme.hero,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: HubTheme.royal.withOpacity(0.30),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       child: Column(
@@ -270,7 +250,15 @@ class _TallyHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.how_to_vote, color: MoydBrand.gold, size: 20),
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.16),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: const Icon(Icons.how_to_vote,
+                    color: HubTheme.gold, size: 18),
+              ),
               const SizedBox(width: 10),
               const Expanded(
                 child: Text('Committee decisions',
@@ -296,8 +284,8 @@ class _TallyHeader extends StatelessWidget {
           Text(subline,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  color: Colors.white.withOpacity(0.75), fontSize: 11.5)),
+              style: const TextStyle(
+                  color: Color(0xE6FFFFFF), fontSize: 11.5)),
           const SizedBox(height: 14),
           Wrap(
             spacing: 10,
@@ -323,7 +311,7 @@ class _TallyHeader extends StatelessWidget {
                     minHeight: 8,
                     backgroundColor: Colors.white24,
                     valueColor:
-                        const AlwaysStoppedAnimation<Color>(MoydBrand.gold),
+                        const AlwaysStoppedAnimation<Color>(HubTheme.gold),
                   ),
                 ),
               ),
@@ -380,8 +368,8 @@ class _TallyTile extends StatelessWidget {
                       height: 1.0)),
               const SizedBox(height: 2),
               Text(state.label.toUpperCase(),
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(0.78),
+                  style: const TextStyle(
+                      color: Color(0xE6FFFFFF),
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.6)),
@@ -881,7 +869,9 @@ class _DecisionPanelState extends State<_DecisionPanel> {
                       Navigator.pop(context);
                     },
                     style:
-                        FilledButton.styleFrom(backgroundColor: MoydBrand.navy),
+                        FilledButton.styleFrom(
+                            backgroundColor: HubTheme.navy,
+                            foregroundColor: Colors.white),
                     child: const Text('Done'),
                   ),
                 ],

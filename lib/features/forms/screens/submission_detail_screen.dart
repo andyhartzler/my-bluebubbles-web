@@ -169,11 +169,27 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Submission Details'),
+        title: const Text(
+          'Candidate Review',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        // Same verified navy -> royal -> deep-sky sweep as the Endorsement HQ
+        // hero (white stays >= 4.5:1 at every stop).
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF263351), Color(0xFF2B4B8C), Color(0xFF1D6FA8)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         actions: [
           if (!_isLoading && submission != null && form != null)
             IconButton(
-              icon: const Icon(Icons.content_copy),
+              icon: const Icon(Icons.content_copy, color: Colors.white),
               onPressed: () => _copySubmission(context),
               tooltip: 'Copy to clipboard',
             ),
@@ -229,10 +245,19 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
 
     final glance = AtAGlanceBar(model: model);
 
+    // Readable measure on ultrawide monitors: cap the content column.
+    const maxContentWidth = 1040.0;
+    Widget constrain(Widget child) => Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: maxContentWidth),
+            child: child,
+          ),
+        );
+
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
-          child: Padding(
+          child: constrain(Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: CandidateHeroHeader(
               model: model,
@@ -240,30 +265,34 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               onOpenLinkedProfile: onOpenProfile,
               linkedProfileLabel: linkedLabel,
             ),
-          ),
+          )),
         ),
         if (glance.hasContent)
           SliverPersistentHeader(
             pinned: true,
             delegate: _PinnedBarDelegate(child: glance, height: AtAGlanceBar.height),
           ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              for (final section in model.sections)
-                SectionCard(
-                  section: section,
-                  leading: section.isPolicyGrid
-                      ? PolicyPositionsGrid(positions: section.policyPositions)
-                      : null,
-                ),
-              if (model.hasDocuments) DocumentsCard(model: model),
-              if (model.references.isNotEmpty)
-                ReferencesCard(references: model.references),
-              _MetadataTile(submission: submission!, form: form!),
-            ]),
-          ),
+        SliverToBoxAdapter(
+          child: constrain(Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final section in model.sections)
+                  SectionCard(
+                    section: section,
+                    leading: section.isPolicyGrid
+                        ? PolicyPositionsGrid(
+                            positions: section.policyPositions)
+                        : null,
+                  ),
+                if (model.hasDocuments) DocumentsCard(model: model),
+                if (model.references.isNotEmpty)
+                  ReferencesCard(references: model.references),
+                _MetadataTile(submission: submission!, form: form!),
+              ],
+            ),
+          )),
         ),
       ],
     );

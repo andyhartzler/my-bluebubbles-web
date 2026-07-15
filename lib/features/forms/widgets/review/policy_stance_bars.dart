@@ -61,23 +61,42 @@ class PolicyStanceBars extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.how_to_vote_outlined, color: MoydBrand.navy),
-                const SizedBox(width: 8),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [MoydBrand.navy, Color(0xFF2B4B8C)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.how_to_vote_outlined,
+                      color: Colors.white, size: 19),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    'Where the field stands',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Where the field stands',
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Stance split across ${submissions.length} candidate${submissions.length == 1 ? '' : 's'}',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Stance split across ${submissions.length} candidate${submissions.length == 1 ? '' : 's'}',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 20),
             for (final id in ids)

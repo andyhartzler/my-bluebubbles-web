@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../models/form_submission.dart';
-import '../../theme/moyd_brand.dart';
 import '../../widgets/review/compare_matrix.dart';
 import '../../widgets/review/policy_stance_bars.dart';
 import '../submission_detail_screen.dart';
 import 'models/candidate_entry.dart';
 import 'slate_controller.dart';
+import 'theme/hub_theme.dart';
 import 'widgets/analytics/alignment_histogram.dart';
 import 'widgets/analytics/battleground_card.dart';
 import 'widgets/analytics/question_breakdown.dart';
@@ -18,8 +18,9 @@ import 'widgets/decisions/decision_chip.dart';
 import 'widgets/decisions/decision_repository.dart';
 import 'widgets/roster/roster_gallery.dart';
 
-/// "Endorsement HQ 2026" — the candidate survey intelligence hub. A navy banner
-/// with live KPIs sits over four tabs: Roster, Compare, Analytics, Decisions.
+/// "Endorsement HQ 2026" — the candidate survey intelligence hub. A gradient
+/// hero banner with live KPIs sits over four tabs: Roster, Compare, Analytics,
+/// Decisions.
 class EndorsementHubScreen extends StatefulWidget {
   const EndorsementHubScreen({super.key});
 
@@ -94,7 +95,7 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
               animation: _controller,
               builder: (context, _) {
                 if (_controller.loading) {
-                  return const Center(child: CircularProgressIndicator());
+                  return _loadingState(context);
                 }
                 if (_controller.error != null) {
                   return _errorState(context);
@@ -144,42 +145,61 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
   // ---------------- banner ----------------
 
   Widget _banner(BuildContext context) {
-    return Material(
-      color: MoydBrand.navy,
+    return Container(
+      decoration: const BoxDecoration(gradient: HubTheme.hero),
       child: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            SizedBox(
-              height: 96,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                child: Row(
-                  children: [
-                    const Icon(Icons.workspace_premium,
-                        color: MoydBrand.gold, size: 30),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Endorsement HQ 2026',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800)),
-                          const SizedBox(height: 2),
-                          Text('Candidate survey intelligence',
-                              style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 12.5)),
-                        ],
-                      ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: HubTheme.gold.withOpacity(0.55), width: 1.4),
                     ),
-                    _bannerKpis(),
-                  ],
-                ),
+                    child: const Icon(Icons.workspace_premium,
+                        color: HubTheme.gold, size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Endorsement HQ 2026',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 21,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.2)),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Container(
+                              width: 26,
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: HubTheme.gold,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text('Candidate survey intelligence',
+                                style: TextStyle(
+                                    color: Color(0xE6FFFFFF), fontSize: 12)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  _bannerKpis(),
+                ],
               ),
             ),
             _tabBar(),
@@ -204,21 +224,31 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
           ('${s.youngDemCount}', 'Young Dems'),
           ('${s.unscoredCount}', 'Unscored'),
         ];
-        return LayoutBuilder(builder: (context, _) {
-          final narrow = MediaQuery.of(context).size.width < 640;
-          if (narrow) {
-            // Only the headline number on small screens.
-            return _kpi(kpis.first.$1, kpis.first.$2);
-          }
-          return Row(
+        final narrow = MediaQuery.of(context).size.width < 680;
+        final shown = narrow ? kpis.sublist(0, 1) : kpis;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.18),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withOpacity(0.14)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              for (final k in kpis) ...[
-                _kpi(k.$1, k.$2),
-                const SizedBox(width: 22),
+              for (var i = 0; i < shown.length; i++) ...[
+                if (i > 0)
+                  Container(
+                    width: 1,
+                    height: 26,
+                    margin: const EdgeInsets.symmetric(horizontal: 14),
+                    color: Colors.white.withOpacity(0.18),
+                  ),
+                _kpi(shown[i].$1, shown[i].$2),
               ],
             ],
-          );
-        });
+          ),
+        );
       },
     );
   }
@@ -226,20 +256,21 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
   Widget _kpi(String value, String label) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(value,
             style: const TextStyle(
                 color: Colors.white,
-                fontSize: 20,
+                fontSize: 19,
                 fontWeight: FontWeight.w800,
                 height: 1.0)),
-        const SizedBox(height: 2),
-        Text(label,
-            style: TextStyle(
-                color: MoydBrand.gold.withOpacity(0.95),
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600)),
+        const SizedBox(height: 3),
+        Text(label.toUpperCase(),
+            style: const TextStyle(
+                color: HubTheme.goldBright,
+                fontSize: 9.5,
+                letterSpacing: 0.6,
+                fontWeight: FontWeight.w700)),
       ],
     );
   }
@@ -249,16 +280,21 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
       controller: _tabs,
       isScrollable: true,
       tabAlignment: TabAlignment.start,
-      indicatorColor: MoydBrand.gold,
+      indicatorColor: HubTheme.gold,
       indicatorWeight: 3,
+      indicatorSize: TabBarIndicatorSize.label,
       labelColor: Colors.white,
-      unselectedLabelColor: Colors.white60,
-      labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+      unselectedLabelColor: const Color(0xCCFFFFFF),
+      dividerColor: Colors.transparent,
+      overlayColor: WidgetStatePropertyAll(Colors.white.withOpacity(0.06)),
+      labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+      unselectedLabelStyle:
+          const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
       tabs: const [
-        Tab(text: 'Roster'),
-        Tab(text: 'Compare'),
-        Tab(text: 'Analytics'),
-        Tab(text: 'Decisions'),
+        Tab(icon: Icon(Icons.groups_2_outlined, size: 19), text: 'Roster'),
+        Tab(icon: Icon(Icons.compare_arrows, size: 19), text: 'Compare'),
+        Tab(icon: Icon(Icons.insights_outlined, size: 19), text: 'Analytics'),
+        Tab(icon: Icon(Icons.how_to_vote_outlined, size: 19), text: 'Decisions'),
       ],
     );
   }
@@ -266,30 +302,38 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
   // ---------------- compare tab ----------------
 
   Widget _compareTab(BuildContext context) {
-    final theme = Theme.of(context);
     if (!_controller.hasSubmissions) {
-      return _emptyTab(theme, Icons.compare_arrows, 'Nothing to compare yet',
-          'Candidate submissions will appear here for side-by-side review.');
+      return const HubEmptyState(
+        icon: Icons.compare_arrows,
+        title: 'Nothing to compare yet',
+        message:
+            'Candidate submissions will appear here for side-by-side review '
+            'the moment the first questionnaire lands.',
+      );
     }
     final submissions =
         _controller.all.map((e) => e.submission).toList(growable: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SegmentedButton<_CompareMode>(
-          segments: const [
-            ButtonSegment(
-                value: _CompareMode.matrix,
-                icon: Icon(Icons.grid_on),
-                label: Text('Matrix')),
-            ButtonSegment(
-                value: _CompareMode.sideBySide,
-                icon: Icon(Icons.view_column),
-                label: Text('Side-by-side')),
+        Row(
+          children: [
+            _CompareModeSwitch(
+              mode: _compareMode,
+              onChanged: (m) => setState(() => _compareMode = m),
+            ),
+            const Spacer(),
+            if (_compareMode == _CompareMode.sideBySide)
+              HubCountPill(
+                icon: Icons.person_outline,
+                text: '${_controller.selectedCount} selected',
+              )
+            else
+              HubCountPill(
+                icon: Icons.grid_on,
+                text: '${submissions.length} candidates',
+              ),
           ],
-          selected: {_compareMode},
-          onSelectionChanged: (s) =>
-              setState(() => _compareMode = s.first),
         ),
         const SizedBox(height: 12),
         Expanded(
@@ -300,7 +344,9 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
                   onOpenCandidate: _openBySubmission,
                 )
               : SideBySideCompare(
-                  entries: _controller.selectedEntries,
+                  selected: _controller.selectedEntries,
+                  all: _controller.all,
+                  onToggleSelect: _controller.toggleSelected,
                   onOpen: _openCandidate,
                 ),
         ),
@@ -311,10 +357,14 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
   // ---------------- analytics tab ----------------
 
   Widget _analyticsTab(BuildContext context) {
-    final theme = Theme.of(context);
     if (!_controller.hasSubmissions) {
-      return _emptyTab(theme, Icons.insights, 'No analytics yet',
-          'Distributions, battleground questions and the slate scoreboard populate as submissions arrive.');
+      return const HubEmptyState(
+        icon: Icons.insights,
+        title: 'No analytics yet',
+        message:
+            'Distributions, battleground questions and the slate scoreboard '
+            'populate as submissions arrive.',
+      );
     }
     final submissions =
         _controller.all.map((e) => e.submission).toList(growable: false);
@@ -368,67 +418,114 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
     );
   }
 
-  // ---------------- shared ----------------
+  // ---------------- loading / error ----------------
 
-  Widget _emptyTab(
-      ThemeData theme, IconData icon, String title, String message) {
-    final cs = theme.colorScheme;
+  Widget _loadingState(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 56, color: cs.onSurfaceVariant.withOpacity(0.6)),
-            const SizedBox(height: 16),
-            Text(title,
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Text(message,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: cs.onSurfaceVariant)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: HubTheme.hero,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: HubTheme.royal.withOpacity(0.35),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-          ],
-        ),
+            child: const CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text('Loading the slate…',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600)),
+        ],
       ),
     );
   }
 
   Widget _errorState(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline,
-                size: 56, color: theme.colorScheme.error),
-            const SizedBox(height: 16),
-            Text('Could not load the endorsement slate',
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Text(_controller.error ?? '',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant)),
-            ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: _controller.load,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-              style: FilledButton.styleFrom(backgroundColor: MoydBrand.navy),
-            ),
-          ],
+    return HubEmptyState(
+      icon: Icons.error_outline,
+      title: 'Could not load the endorsement slate',
+      message: _controller.error ?? 'Something went wrong.',
+      action: FilledButton.icon(
+        onPressed: _controller.load,
+        icon: const Icon(Icons.refresh),
+        label: const Text('Retry'),
+        style: FilledButton.styleFrom(
+          backgroundColor: HubTheme.navy,
+          foregroundColor: Colors.white,
         ),
+      ),
+    );
+  }
+}
+
+/// The Matrix / Side-by-side mode switch, styled as a navy segmented pill.
+class _CompareModeSwitch extends StatelessWidget {
+  final _CompareMode mode;
+  final ValueChanged<_CompareMode> onChanged;
+  const _CompareModeSwitch({required this.mode, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    Widget seg(_CompareMode m, IconData icon, String label) {
+      final active = mode == m;
+      return InkWell(
+        onTap: () => onChanged(m),
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: active ? HubTheme.chip : null,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon,
+                  size: 16, color: active ? Colors.white : cs.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: active ? Colors.white : cs.onSurface)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          seg(_CompareMode.matrix, Icons.grid_on, 'Matrix'),
+          const SizedBox(width: 2),
+          seg(_CompareMode.sideBySide, Icons.view_column, 'Side-by-side'),
+        ],
       ),
     );
   }

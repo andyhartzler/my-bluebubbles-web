@@ -8,6 +8,7 @@ import '../../../../models/submission_review_model.dart';
 import '../../../../theme/moyd_brand.dart';
 import '../../../../widgets/review/stance_visuals.dart';
 import '../../models/candidate_entry.dart';
+import '../../theme/hub_theme.dart';
 import '../headshot_avatar.dart';
 
 /// Question-by-question response analytics, INCLUDING the "no answer" count
@@ -81,33 +82,30 @@ class _QuestionBreakdownState extends State<QuestionBreakdown> {
     final truncated = !_showAll && visible.length > _collapsedCount;
     final shown = truncated ? visible.sublist(0, _collapsedCount) : visible;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      padding: const EdgeInsets.all(20),
+    return HubCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Branded gradient banner (dark navy throughout: white text >= AA
-          // in both themes).
+          // Branded gradient banner (every stop of the hero sweep carries
+          // white at >= 4.5:1 in both themes).
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [BrandColors.unityBlue, BrandColors.royalBlue],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              gradient: HubTheme.hero,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                const Icon(Icons.fact_check_outlined,
-                    color: MoydBrand.gold, size: 22),
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: const Icon(Icons.fact_check_outlined,
+                      color: HubTheme.gold, size: 20),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -122,9 +120,8 @@ class _QuestionBreakdownState extends State<QuestionBreakdown> {
                       Text(
                         '$totalQ questions · $avgRate% average answer rate · '
                         '$withSkips with no-answers',
-                        style: TextStyle(
-                            color: Colors.white.withOpacity(0.78),
-                            fontSize: 11.5),
+                        style: const TextStyle(
+                            color: Color(0xE6FFFFFF), fontSize: 11.5),
                       ),
                     ],
                   ),

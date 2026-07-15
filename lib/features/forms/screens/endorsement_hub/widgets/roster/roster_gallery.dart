@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../theme/moyd_brand.dart';
 import '../../models/candidate_entry.dart';
 import '../../slate_controller.dart';
+import '../../theme/hub_theme.dart';
 import 'roster_card.dart';
 import 'roster_filter_shelf.dart';
 
@@ -48,7 +48,14 @@ class _RosterGalleryState extends State<RosterGallery> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _toolbar(context, c, visible.length),
-            if (_filtersOpen) RosterFilterShelf(controller: c),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              alignment: Alignment.topCenter,
+              child: _filtersOpen
+                  ? RosterFilterShelf(controller: c)
+                  : const SizedBox(width: double.infinity),
+            ),
             const SizedBox(height: 12),
             Expanded(child: _body(context, c, visible)),
           ],
@@ -80,8 +87,20 @@ class _RosterGalleryState extends State<RosterGallery> {
                           c.setSearch('');
                         },
                       ),
+                filled: true,
+                fillColor: cs.surfaceContainerHighest.withOpacity(0.35),
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(13),
+                  borderSide: BorderSide(color: cs.outlineVariant),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(13),
+                  borderSide: BorderSide(color: cs.outlineVariant),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(13),
+                  borderSide: const BorderSide(color: HubTheme.royal, width: 1.6),
+                ),
               ),
               onChanged: c.setSearch,
             ),
@@ -96,12 +115,10 @@ class _RosterGalleryState extends State<RosterGallery> {
           onTap: () => setState(() => _filtersOpen = !_filtersOpen),
         ),
         const SizedBox(width: 12),
-        Text('$shown',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w700)),
-        Text(shown == 1 ? ' candidate' : ' candidates',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: cs.onSurfaceVariant)),
+        HubCountPill(
+          icon: Icons.person_outline,
+          text: shown == 1 ? '1 candidate' : '$shown candidates',
+        ),
       ],
     );
   }
@@ -122,7 +139,7 @@ class _RosterGalleryState extends State<RosterGallery> {
                       ? Icons.radio_button_checked
                       : Icons.radio_button_unchecked,
                   size: 18,
-                  color: c.sort == s ? MoydBrand.navy : cs.onSurfaceVariant,
+                  color: c.sort == s ? HubTheme.royal : cs.onSurfaceVariant,
                 ),
                 const SizedBox(width: 10),
                 Text(s.label),
@@ -134,8 +151,9 @@ class _RosterGalleryState extends State<RosterGallery> {
         height: 44,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(13),
           border: Border.all(color: cs.outlineVariant),
+          color: cs.surfaceContainerHighest.withOpacity(0.35),
         ),
         child: Row(
           children: [
@@ -143,7 +161,9 @@ class _RosterGalleryState extends State<RosterGallery> {
             const SizedBox(width: 6),
             Text(c.sort.label,
                 style: const TextStyle(
-                    fontSize: 12.5, fontWeight: FontWeight.w600)),
+                    fontSize: 12.5, fontWeight: FontWeight.w700)),
+            const SizedBox(width: 2),
+            Icon(Icons.arrow_drop_down, size: 18, color: cs.onSurfaceVariant),
           ],
         ),
       ),
@@ -153,7 +173,7 @@ class _RosterGalleryState extends State<RosterGallery> {
   Widget _body(
       BuildContext context, SlateController c, List<CandidateEntry> visible) {
     if (!c.hasSubmissions) {
-      return const _EmptyState(
+      return const HubEmptyState(
         icon: Icons.how_to_vote_outlined,
         title: 'No submissions yet',
         message:
@@ -162,20 +182,21 @@ class _RosterGalleryState extends State<RosterGallery> {
       );
     }
     if (visible.isEmpty) {
-      return _EmptyState(
+      return HubEmptyState(
         icon: Icons.filter_alt_off_outlined,
         title: 'No candidates match',
         message: 'Try widening the alignment range or clearing filters.',
         action: c.hasActiveFilters
-            ? TextButton(
+            ? FilledButton.tonalIcon(
                 onPressed: c.clearFilters,
-                child: const Text('Clear filters'),
+                icon: const Icon(Icons.clear, size: 17),
+                label: const Text('Clear filters'),
               )
             : null,
       );
     }
     return GridView.builder(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.only(bottom: 24, top: 4),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 236,
         childAspectRatio: 0.66,
@@ -209,15 +230,17 @@ class _FilterToggle extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
+      borderRadius: BorderRadius.circular(13),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
         height: 44,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: open ? MoydBrand.navy : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          gradient: open ? HubTheme.chip : null,
+          color: open ? null : cs.surfaceContainerHighest.withOpacity(0.35),
+          borderRadius: BorderRadius.circular(13),
           border: Border.all(
-              color: open ? MoydBrand.navy : cs.outlineVariant),
+              color: open ? HubTheme.navy : cs.outlineVariant),
         ),
         child: Row(
           children: [
@@ -227,7 +250,7 @@ class _FilterToggle extends StatelessWidget {
             Text('Filters',
                 style: TextStyle(
                     fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     color: open ? Colors.white : cs.onSurface)),
             if (active) ...[
               const SizedBox(width: 6),
@@ -235,54 +258,9 @@ class _FilterToggle extends StatelessWidget {
                 width: 7,
                 height: 7,
                 decoration: const BoxDecoration(
-                    color: MoydBrand.gold, shape: BoxShape.circle),
+                    color: HubTheme.gold, shape: BoxShape.circle),
               ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String message;
-  final Widget? action;
-  const _EmptyState({
-    required this.icon,
-    required this.title,
-    required this.message,
-    this.action,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 56, color: cs.onSurfaceVariant.withOpacity(0.6)),
-            const SizedBox(height: 16),
-            Text(title,
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Text(
-                message,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: cs.onSurfaceVariant),
-              ),
-            ),
-            if (action != null) ...[const SizedBox(height: 12), action!],
           ],
         ),
       ),

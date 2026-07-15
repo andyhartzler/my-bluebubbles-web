@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../theme/moyd_brand.dart';
 import '../../models/candidate_entry.dart';
 import '../../slate_controller.dart';
+import '../../theme/hub_theme.dart';
 
 /// The collapsible filter panel above the roster gallery. Reads and mutates the
 /// [SlateController]; the parent rebuilds on notify.
@@ -47,7 +47,7 @@ class _RosterFilterShelfState extends State<RosterFilterShelf> {
     final c = widget.controller;
 
     return Container(
-      margin: const EdgeInsets.only(top: 8),
+      margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest.withOpacity(0.35),
@@ -59,11 +59,19 @@ class _RosterFilterShelfState extends State<RosterFilterShelf> {
         children: [
           Row(
             children: [
-              Icon(Icons.tune, size: 18, color: cs.onSurfaceVariant),
-              const SizedBox(width: 8),
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  gradient: HubTheme.chip,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.tune, size: 15, color: Colors.white),
+              ),
+              const SizedBox(width: 10),
               Text('Filters',
                   style: theme.textTheme.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w700)),
+                      ?.copyWith(fontWeight: FontWeight.w800)),
               const Spacer(),
               if (c.hasActiveFilters)
                 TextButton.icon(
@@ -90,7 +98,7 @@ class _RosterFilterShelfState extends State<RosterFilterShelf> {
                   label: Text(level.label),
                   selected: c.officeFilter.contains(level),
                   onSelected: (_) => c.toggleOffice(level),
-                  selectedColor: MoydBrand.navy,
+                  selectedColor: HubTheme.navy,
                   checkmarkColor: Colors.white,
                   labelStyle: TextStyle(
                     color: c.officeFilter.contains(level)
@@ -185,7 +193,7 @@ class _RosterFilterShelfState extends State<RosterFilterShelf> {
       label: Text(label),
       selected: value,
       onSelected: onChanged,
-      selectedColor: MoydBrand.navySoft,
+      selectedColor: HubTheme.royal,
       showCheckmark: false,
       labelStyle: TextStyle(
         color: value ? Colors.white : cs.onSurface,
@@ -223,9 +231,9 @@ class _AlignmentRange extends StatelessWidget {
         ),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            activeTrackColor: MoydBrand.navy,
-            thumbColor: MoydBrand.navy,
-            overlayColor: MoydBrand.navy.withOpacity(0.12),
+            activeTrackColor: HubTheme.royal,
+            thumbColor: HubTheme.royal,
+            overlayColor: HubTheme.royal.withOpacity(0.12),
           ),
           child: RangeSlider(
             values: RangeValues(r.start, r.end),

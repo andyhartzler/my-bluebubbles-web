@@ -59,6 +59,14 @@ class _CompareMatrixState extends State<CompareMatrix> {
   static const double _rowHeight = 54;
   static const double _headerHeight = 104;
 
+  /// Navy -> royal -> deep-sky header sweep. Every stop keeps white text at
+  /// >= 4.5:1 (same verified ramp as the Endorsement HQ hero).
+  static const LinearGradient _headerGradient = LinearGradient(
+    colors: [Color(0xFF263351), Color(0xFF2B4B8C), Color(0xFF1D6FA8)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
   /// Sentinel column id for the alignment-score column.
   static const String _alignmentColId = '__alignment__';
 
@@ -346,7 +354,7 @@ class _CompareMatrixState extends State<CompareMatrix> {
         height: _headerHeight,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: MoydBrand.navy,
+          gradient: _headerGradient,
           border: Border(
             right: BorderSide(color: colorScheme.outlineVariant),
             bottom: BorderSide(color: colorScheme.outlineVariant),
@@ -447,10 +455,12 @@ class _CompareMatrixState extends State<CompareMatrix> {
         height: _headerHeight,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         decoration: BoxDecoration(
-          color: active ? MoydBrand.navySoft : MoydBrand.navy,
+          color: active ? const Color(0xFF2B4B8C) : MoydBrand.navy,
           border: Border(
             right: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.4)),
-            bottom: BorderSide(color: colorScheme.outlineVariant),
+            bottom: active
+                ? const BorderSide(color: MoydBrand.gold, width: 3)
+                : BorderSide(color: colorScheme.outlineVariant),
           ),
         ),
         child: Column(

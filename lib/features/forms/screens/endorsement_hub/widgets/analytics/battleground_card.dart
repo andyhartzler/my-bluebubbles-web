@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../../../models/submission_review_model.dart';
-import '../../../../theme/moyd_brand.dart';
 import '../../../../widgets/review/stance_visuals.dart';
 import '../../models/candidate_entry.dart';
 import '../../models/slate_stats.dart';
+import '../../theme/hub_theme.dart';
 import '../headshot_avatar.dart';
 
-/// The most contested policy questions, ranked by disagreement index, each with
-/// the minority-holding candidates surfaced as tappable avatar chips.
+/// The most contested policy questions, ranked by disagreement index, each
+/// with a split meter and the minority-holding candidates surfaced as
+/// tappable avatar chips (tap for their exact answer + explanation).
 class BattlegroundCard extends StatelessWidget {
   final SlateStats stats;
   final void Function(CandidateEntry) onOpen;
@@ -21,30 +22,16 @@ class BattlegroundCard extends StatelessWidget {
     final all = stats.battlegroundQuestions();
     final top = all.where((q) => q.disagreementIndex > 0).take(5).toList();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      padding: const EdgeInsets.all(20),
+    return HubCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.local_fire_department_outlined,
-                  color: MoydBrand.navy, size: 20),
-              const SizedBox(width: 8),
-              Text('Battleground questions',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700)),
-            ],
+          const HubCardHeader(
+            icon: Icons.local_fire_department,
+            title: 'Battleground questions',
+            subtitle: 'Where the field is most divided.',
+            tileGradient: HubTheme.gradCrimson,
           ),
-          const SizedBox(height: 4),
-          Text('Where the field is most divided.',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: cs.onSurfaceVariant)),
           const SizedBox(height: 16),
           if (top.isEmpty)
             Text(
@@ -88,38 +75,53 @@ class _QuestionRow extends StatelessWidget {
             Expanded(
               child: Text(q.question,
                   style: theme.textTheme.bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.w600)),
+                      ?.copyWith(fontWeight: FontWeight.w700, height: 1.3)),
             ),
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
               decoration: BoxDecoration(
-                color: MoydBrand.navy,
-                borderRadius: BorderRadius.circular(6),
+                gradient: HubTheme.chip,
+                borderRadius: BorderRadius.circular(999),
               ),
-              child: Text('$splitPct% split',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.bolt, size: 12, color: HubTheme.gold),
+                  const SizedBox(width: 3),
+                  Text('$splitPct% split',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800)),
+                ],
+              ),
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        // Stance meter: proportional split of decisive answers.
+        _StanceMeter(counts: q.counts, answered: q.answered),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 6,
           children: [
-            _stanceCount(Stance.support, q.counts[Stance.support] ?? 0),
-            _stanceCount(Stance.qualified, q.counts[Stance.qualified] ?? 0),
-            _stanceCount(Stance.oppose, q.counts[Stance.oppose] ?? 0),
+            StanceVisuals.pill(Stance.support,
+                text: '${q.counts[Stance.support] ?? 0}', dense: true),
+            StanceVisuals.pill(Stance.qualified,
+                text: '${q.counts[Stance.qualified] ?? 0}', dense: true),
+            StanceVisuals.pill(Stance.oppose,
+                text: '${q.counts[Stance.oppose] ?? 0}', dense: true),
           ],
         ),
         if (minority.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text('Minority view',
+          Text('MINORITY VIEW',
               style: theme.textTheme.labelSmall?.copyWith(
-                  color: cs.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                  color: cs.onSurfaceVariant,
+                  letterSpacing: 0.5,
+                  fontWeight: FontWeight.w800)),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -137,12 +139,41 @@ class _QuestionRow extends StatelessWidget {
       ],
     );
   }
+}
 
-  Widget _stanceCount(Stance s, int count) {
-    if (count == 0) {
-      return StanceVisuals.pill(s, text: '0', dense: true);
-    }
-    return StanceVisuals.pill(s, text: '$count', dense: true);
+/// A slim proportional bar of the decisive stances on one question.
+class _StanceMeter extends StatelessWidget {
+  final Map<Stance, int> counts;
+  final int answered;
+  const _StanceMeter({required this.counts, required this.answered});
+
+  @override
+  Widget build(BuildContext context) {
+    if (answered == 0) return const SizedBox.shrink();
+    final segs = <(Stance, int)>[
+      (Stance.support, counts[Stance.support] ?? 0),
+      (Stance.qualified, counts[Stance.qualified] ?? 0),
+      (Stance.oppose, counts[Stance.oppose] ?? 0),
+    ].where((s) => s.$2 > 0).toList();
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: SizedBox(
+        height: 8,
+        child: Row(
+          children: [
+            for (var i = 0; i < segs.length; i++)
+              Expanded(
+                flex: segs[i].$2,
+                child: Container(
+                  margin: EdgeInsets.only(right: i == segs.length - 1 ? 0 : 1),
+                  color: StanceVisuals.fg(segs[i].$1),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -163,6 +194,7 @@ class _MinorityChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final pos = _pos;
     return InkWell(
       onTap: () => _showAnswer(context),
       borderRadius: BorderRadius.circular(20),
@@ -176,11 +208,17 @@ class _MinorityChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            HeadshotAvatar(file: entry.model.headshot, name: entry.name, size: 26),
+            HeadshotAvatar(
+                file: entry.model.headshot, name: entry.name, size: 26),
             const SizedBox(width: 6),
             Text(entry.name,
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600)),
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            if (pos != null) ...[
+              const SizedBox(width: 6),
+              Icon(StanceVisuals.glyph(pos.stance),
+                  size: 13, color: StanceVisuals.fg(pos.stance)),
+            ],
           ],
         ),
       ),
@@ -199,16 +237,27 @@ class _MinorityChip extends StatelessWidget {
         final theme = Theme.of(ctx);
         final cs = theme.colorScheme;
         return AlertDialog(
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
             children: [
-              Text(entry.name,
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(pos.question,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: cs.onSurfaceVariant)),
+              HeadshotAvatar(
+                  file: entry.model.headshot, name: entry.name, size: 38),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(entry.name,
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(pos.question,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant)),
+                  ],
+                ),
+              ),
             ],
           ),
           content: Column(
@@ -222,10 +271,10 @@ class _MinorityChip extends StatelessWidget {
                 Text('Explanation',
                     style: theme.textTheme.labelMedium?.copyWith(
                         color: cs.onSurfaceVariant,
-                        fontWeight: FontWeight.w600)),
+                        fontWeight: FontWeight.w700)),
                 const SizedBox(height: 4),
                 Text(pos.explanation!.trim(),
-                    style: theme.textTheme.bodyMedium),
+                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.4)),
               ],
             ],
           ),

@@ -53,12 +53,21 @@ class CandidateHeroHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
+        // Verified navy -> royal -> deep-sky sweep (white >= 4.5:1 at every
+        // stop), matching the Endorsement HQ hero.
         gradient: const LinearGradient(
-          colors: [MoydBrand.navy, MoydBrand.navySoft],
+          colors: [MoydBrand.navy, Color(0xFF2B4B8C), Color(0xFF1D6FA8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2B4B8C).withOpacity(0.30),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -82,12 +91,17 @@ class CandidateHeroHeader extends StatelessWidget {
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 22,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
                               height: 1.2,
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
+                        if (model.alignmentPct != null) ...[
+                          AlignmentBadge(
+                              pct: model.alignmentPct!, showWord: true),
+                          const SizedBox(width: 8),
+                        ],
                         SubmissionStatusBadge(status: status),
                       ],
                     ),
@@ -103,12 +117,36 @@ class CandidateHeroHeader extends StatelessWidget {
                     ],
                     if (officeLine.isNotEmpty) ...[
                       const SizedBox(height: 8),
-                      Text(
-                        officeLine,
-                        style: const TextStyle(
-                          color: MoydBrand.gold,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                      // Solid navy pill so the gold office line keeps its
+                      // ~5.7:1 contrast regardless of the gradient stop
+                      // beneath it.
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: MoydBrand.navy,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                              color: MoydBrand.gold.withOpacity(0.45)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.account_balance,
+                                size: 14, color: MoydBrand.gold),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                officeLine,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: MoydBrand.gold,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -168,7 +206,7 @@ class _Headshot extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.14),
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white24, width: 2),
+        border: Border.all(color: MoydBrand.gold, width: 2.5),
       ),
       child: Text(
         initial,
@@ -187,7 +225,14 @@ class _Headshot extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white24, width: 2),
+        border: Border.all(color: MoydBrand.gold, width: 2.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: ClipOval(
         child: Image.network(
@@ -214,8 +259,10 @@ class _ContactChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dark translucent fill (not white-over-gradient) so the white label
+    // keeps >= 4.5:1 even at the lightest gradient stop.
     return Material(
-      color: Colors.white.withOpacity(0.12),
+      color: Colors.black.withOpacity(0.22),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: onTap,

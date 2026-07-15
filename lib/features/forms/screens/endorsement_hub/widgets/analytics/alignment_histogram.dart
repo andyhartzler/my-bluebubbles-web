@@ -5,11 +5,13 @@ import '../../../../theme/moyd_brand.dart';
 import '../../../../widgets/review/stance_visuals.dart';
 import '../../models/candidate_entry.dart';
 import '../../models/slate_stats.dart';
+import '../../theme/hub_theme.dart';
 import '../headshot_avatar.dart';
 
-/// A light-panel (in both themes) alignment distribution: fl_chart bars tinted
-/// by the alignment ramp, a median reference line, printed values, a tap-to-
-/// filter affordance per bar, and face strips of the top / bottom candidates.
+/// The alignment distribution panel: fl_chart bars tinted by the alignment
+/// ramp on a fixed light chart panel (identical in both themes), a gold
+/// median reference line, printed values, tap-to-filter per bar, and face
+/// strips of the top / bottom candidates.
 class AlignmentHistogram extends StatelessWidget {
   final SlateStats stats;
 
@@ -24,6 +26,8 @@ class AlignmentHistogram extends StatelessWidget {
     required this.onOpen,
   });
 
+  /// Fixed light panel behind the chart. All in-chart text is a dark navy
+  /// family color, so the chart reads identically in light and dark themes.
   static const Color _panel = Color(0xFFF4F6FA);
 
   @override
@@ -36,10 +40,24 @@ class AlignmentHistogram extends StatelessWidget {
     final median = stats.medianAlignment;
 
     if (stats.scoredCount == 0) {
-      return _card(
-        context,
-        child: _emptyNote(theme,
-            'No scored candidates yet. Alignment scores appear once policy answers come in.'),
+      return HubCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const HubCardHeader(
+              icon: Icons.bar_chart,
+              title: 'Alignment distribution',
+              tileGradient: HubTheme.gradEmerald,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'No scored candidates yet. Alignment scores appear once policy '
+              'answers come in.',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
       );
     }
 
@@ -53,30 +71,31 @@ class AlignmentHistogram extends StatelessWidget {
         ? scored.reversed.take(2).toList()
         : <CandidateEntry>[];
 
-    return _card(
-      context,
+    return HubCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.bar_chart, color: MoydBrand.navy, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('Alignment distribution',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700)),
-              ),
-              if (median != null)
-                Text('median ${median.round()}%',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                        color: MoydBrand.navy, fontWeight: FontWeight.w700)),
-            ],
+          HubCardHeader(
+            icon: Icons.bar_chart,
+            title: 'Alignment distribution',
+            subtitle: 'Tap a bar to filter the roster to that range.',
+            tileGradient: HubTheme.gradEmerald,
+            trailing: median == null
+                ? null
+                : Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      gradient: HubTheme.chip,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text('median ${median.round()}%',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800)),
+                  ),
           ),
-          const SizedBox(height: 4),
-          Text('Tap a bar to filter the roster to that range.',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: cs.onSurfaceVariant)),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.fromLTRB(8, 16, 12, 8),
@@ -93,7 +112,7 @@ class AlignmentHistogram extends StatelessWidget {
                   barTouchData: BarTouchData(
                     enabled: true,
                     touchTooltipData: BarTouchTooltipData(
-                      getTooltipColor: (_) => MoydBrand.navy,
+                      getTooltipColor: (_) => HubTheme.navy,
                       getTooltipItem: (group, gi, rod, ri) {
                         final b = bins[group.x];
                         return BarTooltipItem(
@@ -106,8 +125,7 @@ class AlignmentHistogram extends StatelessWidget {
                       },
                     ),
                     touchCallback: (event, resp) {
-                      if (event is FlTapUpEvent &&
-                          resp?.spot != null) {
+                      if (event is FlTapUpEvent && resp?.spot != null) {
                         final b = bins[resp!.spot!.touchedBarGroupIndex];
                         onSelectRange(b.lo.toDouble(), b.hi.toDouble());
                       }
@@ -155,7 +173,7 @@ class AlignmentHistogram extends StatelessWidget {
                           verticalLines: [
                             VerticalLine(
                               x: (median / 10).clamp(0, 9).toDouble(),
-                              color: MoydBrand.gold,
+                              color: HubTheme.gold,
                               strokeWidth: 2,
                               dashArray: [6, 4],
                             ),
@@ -197,45 +215,17 @@ class AlignmentHistogram extends StatelessWidget {
           ),
           if (top.isNotEmpty) ...[
             const SizedBox(height: 16),
-            _FaceStrip(
-                label: 'Top aligned', entries: top, onOpen: onOpen),
+            _FaceStrip(label: 'Top aligned', entries: top, onOpen: onOpen),
           ],
           if (bottom.isNotEmpty) ...[
             const SizedBox(height: 10),
             _FaceStrip(
-                label: 'Lowest aligned',
-                entries: bottom,
-                onOpen: onOpen),
+                label: 'Lowest aligned', entries: bottom, onOpen: onOpen),
           ],
         ],
       ),
     );
   }
-
-  Widget _card(BuildContext context, {required Widget child}) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: child,
-    );
-  }
-
-  Widget _emptyNote(ThemeData theme, String text) => Row(
-        children: [
-          Icon(Icons.insights, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(text,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          ),
-        ],
-      );
 }
 
 class _FaceStrip extends StatelessWidget {
@@ -252,11 +242,24 @@ class _FaceStrip extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-                color: cs.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.4)),
+        Row(
+          children: [
+            Container(
+              width: 3,
+              height: 12,
+              decoration: BoxDecoration(
+                color: HubTheme.gold,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 7),
+            Text(label.toUpperCase(),
+                style: theme.textTheme.labelSmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5)),
+          ],
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 10,

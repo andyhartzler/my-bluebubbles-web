@@ -3,14 +3,16 @@ import 'package:flutter/material.dart';
 import '../../../../theme/moyd_brand.dart';
 import '../../../../widgets/review/stance_visuals.dart';
 import '../../models/candidate_entry.dart';
+import '../../theme/hub_theme.dart';
 import '../headshot_avatar.dart';
 
-/// A single candidate tile in the roster gallery: face on top, an info block on
-/// the (opaque) card surface below, a 3-segment stance strip, and flag chips.
+/// A single candidate tile in the roster gallery: face on top (with a subtle
+/// navy scrim at the base so the frosted badges always read), an info block on
+/// the opaque card surface below, a 3-segment stance strip, and flag chips.
 ///
-/// The face never carries text; every label sits on the solid card surface so
-/// it stays legible in both themes. Hovering reveals a select checkbox and a
-/// compare affordance.
+/// The face never carries body text; every label sits on the solid card
+/// surface so it stays legible in both themes. Hovering lifts the card and
+/// reveals the compare affordance; selection wraps the card in gold.
 class RosterCard extends StatefulWidget {
   final CandidateEntry entry;
   final bool selected;
@@ -40,6 +42,7 @@ class _RosterCardState extends State<RosterCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
     final entry = widget.entry;
     final model = entry.model;
     final showControls = _hover || widget.selected;
@@ -47,17 +50,31 @@ class _RosterCardState extends State<RosterCard> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
+      cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: widget.onOpen,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOut,
+          transform: Matrix4.translationValues(0, _hover ? -3 : 0, 0),
           decoration: BoxDecoration(
             color: cs.surface,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: widget.selected ? MoydBrand.gold : cs.outlineVariant,
+              color: widget.selected
+                  ? HubTheme.gold
+                  : (_hover ? HubTheme.royal.withOpacity(0.55) : cs.outlineVariant),
               width: widget.selected ? 2 : 1,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: _hover
+                    ? HubTheme.royal.withOpacity(dark ? 0.45 : 0.22)
+                    : Colors.black.withOpacity(dark ? 0.25 : 0.05),
+                blurRadius: _hover ? 16 : 8,
+                offset: Offset(0, _hover ? 8 : 3),
+              ),
+            ],
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
@@ -75,6 +92,22 @@ class _RosterCardState extends State<RosterCard> {
                       circle: false,
                       radius: 0,
                       size: 220,
+                    ),
+                    // Subtle navy scrim at the base of the photo (decorative;
+                    // no text renders on the image itself).
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.center,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              HubTheme.navy.withOpacity(0.32),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                     // status chip (top-left)
                     Positioned(
@@ -114,27 +147,32 @@ class _RosterCardState extends State<RosterCard> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (entry.isYoungDem)
-                          Container(
-                            width: 3,
-                            height: 34,
-                            margin: const EdgeInsets.only(right: 8, top: 1),
-                            decoration: BoxDecoration(
-                              color: MoydBrand.gold,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                entry.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      entry.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.titleSmall
+                                          ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  if (entry.isYoungDem) ...[
+                                    const SizedBox(width: 5),
+                                    const Tooltip(
+                                      message: 'Young Dem',
+                                      child: Icon(Icons.workspace_premium,
+                                          size: 15, color: HubTheme.gold),
+                                    ),
+                                  ],
+                                ],
                               ),
                               if (entry.officeLine.isNotEmpty)
                                 Text(
@@ -205,8 +243,15 @@ class _StanceStrip extends StatelessWidget {
             height: 8,
             child: Row(
               children: [
-                for (final s in segs)
-                  Expanded(flex: s.$2, child: ColoredBox(color: s.$1)),
+                for (var i = 0; i < segs.length; i++)
+                  Expanded(
+                    flex: segs[i].$2,
+                    child: Container(
+                      margin:
+                          EdgeInsets.only(right: i == segs.length - 1 ? 0 : 1),
+                      color: segs[i].$1,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -283,12 +328,16 @@ class _StatusChip extends StatelessWidget {
       _ => 'Submitted',
     };
     return _Frosted(
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
         ),
       ),
     );
@@ -306,7 +355,7 @@ class _Frosted extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
-        color: MoydBrand.navy.withOpacity(0.82),
+        color: HubTheme.navy.withOpacity(0.85),
         borderRadius: BorderRadius.circular(8),
       ),
       child: child,
@@ -327,10 +376,13 @@ class _SelectButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
           decoration: BoxDecoration(
-            color: selected ? MoydBrand.gold : MoydBrand.navy.withOpacity(0.9),
+            color: selected ? HubTheme.gold : HubTheme.navy.withOpacity(0.92),
             borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? HubTheme.gold : Colors.white24,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -338,15 +390,15 @@ class _SelectButton extends StatelessWidget {
               Icon(
                 selected ? Icons.check_circle : Icons.add_circle_outline,
                 size: 15,
-                color: selected ? MoydBrand.navy : Colors.white,
+                color: selected ? HubTheme.navy : Colors.white,
               ),
               const SizedBox(width: 4),
               Text(
                 selected ? 'Added' : 'Compare',
                 style: TextStyle(
-                  color: selected ? MoydBrand.navy : Colors.white,
+                  color: selected ? HubTheme.navy : Colors.white,
                   fontSize: 11,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
