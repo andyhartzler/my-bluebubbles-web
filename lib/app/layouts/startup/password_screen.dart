@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:universal_html/html.dart' as html;
 import 'package:bluebubbles/providers/user_session_provider.dart';
+import 'package:bluebubbles/services/auth_refresh_guard.dart';
 import 'package:bluebubbles/services/session_timeout_service.dart';
 
 class SupabaseAuthGate extends StatefulWidget {
@@ -62,54 +62,6 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
     });
   }
 
-  /// Warn when the device clock disagrees with the auth server by minutes.
-  /// A skewed clock makes the client treat every fresh token as near-expired,
-  /// producing a refresh loop and repeated sign-outs (the 2026-07-14 incident:
-  /// a Windows machine running about an hour ahead was booted every 10-30s
-  /// and then rate-limited on OTP resends). The token's iat is server time,
-  /// stamped moments ago at login, so (local now - iat) measures the skew.
-  void _checkClockSkew(Session? session) {
-    final token = session?.accessToken;
-    if (token == null) return;
-    try {
-      final parts = token.split('.');
-      if (parts.length != 3) return;
-      final payload = jsonDecode(
-              utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))))
-          as Map<String, dynamic>;
-      final iat = payload['iat'] as int?;
-      if (iat == null) return;
-      final skew = DateTime.now()
-          .difference(DateTime.fromMillisecondsSinceEpoch(iat * 1000));
-      if (skew.abs() < const Duration(minutes: 3)) return;
-      final mins = skew.inMinutes.abs();
-      final dir = skew.isNegative ? 'behind' : 'ahead';
-      debugPrint('Device clock skew: ${mins}m $dir of server time');
-      if (!mounted) return;
-      final messenger = ScaffoldMessenger.maybeOf(context);
-      messenger?.showMaterialBanner(MaterialBanner(
-        backgroundColor: const Color(0xFFB91C1C),
-        leading: const Icon(Icons.schedule, color: Colors.white),
-        content: Text(
-          'This device\'s clock is about $mins minutes $dir. That will keep '
-          'signing you out of the app until it is fixed. Turn on automatic '
-          'date and time (and check the time zone) in your device settings.',
-          style: const TextStyle(color: Colors.white),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => messenger.hideCurrentMaterialBanner(),
-            child: const Text('DISMISS',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ));
-    } catch (e) {
-      debugPrint('Clock skew check failed: $e');
-    }
-  }
-
   /// Check if session has expired and sign out if needed
   Future<void> _checkSessionExpiration() async {
     final expired = await _sessionService.checkAndExpireSession();
@@ -148,12 +100,16 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
       return;
     }
 
+    // Refresh-storm circuit breaker: ends runaway token-refresh loops in
+    // seconds (whatever their per-device cause) instead of letting the
+    // server kill the session and boot the user to this screen.
+    AuthRefreshGuard().start(_client!);
+
     _bootstrap();
     _authSubscription = _client!.auth.onAuthStateChange.listen((authState) async {
       switch (authState.event) {
         case AuthChangeEvent.signedIn:
           if (authState.session != null) {
-            _checkClockSkew(authState.session);
             // Record session start for timeout tracking
             await _sessionService.recordSessionStart();
             if (!mounted) return;
@@ -221,7 +177,6 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
       } else {
         // Session is valid - record activity
         await _sessionService.recordActivity();
-        _checkClockSkew(currentSession);
       }
     }
 
