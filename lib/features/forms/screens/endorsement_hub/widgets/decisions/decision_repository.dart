@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bluebubbles/services/crm/supabase_service.dart';
 
 /// The endorsement decision state for a candidate.
 enum DecisionState {
@@ -117,5 +119,121 @@ class LocalDecisionRepository extends DecisionRepository {
     } catch (e) {
       debugPrint('LocalDecisionRepository.persist error: $e');
     }
+  }
+}
+
+/// A Supabase-backed decision store, shared across ALL executive members via the
+/// `public.endorsement_decisions` table with realtime sync. A decision one exec
+/// records shows up live on every other exec's board (replaces the per-device
+/// [LocalDecisionRepository] so the committee sees one shared board).
+class SupabaseDecisionRepository extends DecisionRepository {
+  static const _table = 'endorsement_decisions';
+
+  final CRMSupabaseService _supabase = CRMSupabaseService();
+  final Map<String, DecisionRecord> _records = {};
+  bool _loaded = false;
+  RealtimeChannel? _channel;
+
+  SupabaseClient get _client => _supabase.client;
+
+  @override
+  Map<String, DecisionRecord> get all => Map.unmodifiable(_records);
+
+  @override
+  Future<void> load() async {
+    if (_loaded) return;
+    try {
+      final rows = await _client.from(_table).select();
+      _records.clear();
+      for (final row in (rows as List)) {
+        _applyRow(Map<String, dynamic>.from(row as Map));
+      }
+    } catch (e) {
+      debugPrint('SupabaseDecisionRepository.load error: $e');
+    }
+    _loaded = true;
+    notifyListeners();
+    _subscribe();
+  }
+
+  void _applyRow(Map<String, dynamic> m) {
+    final id = m['candidate_id']?.toString();
+    if (id == null || id.isEmpty) return;
+    _records[id] = DecisionRecord(
+      state: DecisionState.fromName(m['state'] as String?),
+      note: (m['note'] as String?) ?? '',
+    );
+  }
+
+  // Live-sync every other exec's edits into this board.
+  void _subscribe() {
+    if (_channel != null) return;
+    try {
+      _channel = _client.channel('public:$_table')
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: _table,
+          callback: (payload) {
+            if (payload.eventType == PostgresChangeEvent.delete) {
+              final id = payload.oldRecord['candidate_id']?.toString();
+              if (id != null) _records.remove(id);
+            } else if (payload.newRecord.isNotEmpty) {
+              _applyRow(Map<String, dynamic>.from(payload.newRecord));
+            }
+            notifyListeners();
+          },
+        ).subscribe();
+    } catch (e) {
+      debugPrint('SupabaseDecisionRepository.subscribe error: $e');
+    }
+  }
+
+  @override
+  DecisionState stateFor(String candidateId) =>
+      _records[candidateId]?.state ?? DecisionState.undecided;
+
+  @override
+  DecisionRecord recordFor(String candidateId) =>
+      _records[candidateId] ?? const DecisionRecord(state: DecisionState.undecided);
+
+  @override
+  Future<void> setState(String candidateId, DecisionState state) async {
+    final existing = recordFor(candidateId);
+    _records[candidateId] = DecisionRecord(state: state, note: existing.note);
+    notifyListeners();
+    await _upsert(candidateId);
+  }
+
+  @override
+  Future<void> setNote(String candidateId, String note) async {
+    final existing = recordFor(candidateId);
+    _records[candidateId] = DecisionRecord(state: existing.state, note: note);
+    notifyListeners();
+    await _upsert(candidateId);
+  }
+
+  Future<void> _upsert(String candidateId) async {
+    final rec = recordFor(candidateId);
+    try {
+      await _client.from(_table).upsert({
+        'candidate_id': candidateId,
+        'state': rec.state.name,
+        'note': rec.note,
+        'updated_by': _client.auth.currentUser?.id,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('SupabaseDecisionRepository.upsert error: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    try {
+      final ch = _channel;
+      if (ch != null) _client.removeChannel(ch);
+    } catch (_) {}
+    super.dispose();
   }
 }

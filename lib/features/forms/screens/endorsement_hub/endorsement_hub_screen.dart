@@ -31,7 +31,9 @@ enum _CompareMode { matrix, sideBySide }
 class _EndorsementHubScreenState extends State<EndorsementHubScreen>
     with SingleTickerProviderStateMixin {
   final SlateController _controller = SlateController();
-  final DecisionRepository _decisions = LocalDecisionRepository();
+  // Shared across all executive members via public.endorsement_decisions (live
+  // sync), so the committee sees one decision board instead of per-device copies.
+  final DecisionRepository _decisions = SupabaseDecisionRepository();
   late final TabController _tabs = TabController(length: 4, vsync: this);
 
   _CompareMode _compareMode = _CompareMode.matrix;
