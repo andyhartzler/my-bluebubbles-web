@@ -5,10 +5,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
-/// The endorsement decision state for a candidate.
+/// The final endorsement outcome for a candidate. The per-member yes/no
+/// voting board is the committee's working mechanism; this is the lightweight
+/// final call recorded once the committee lands. Rows persisted with any
+/// retired state name fall back to undecided.
 enum DecisionState {
   undecided('Undecided'),
-  interview('Interview'),
   endorse('Endorse'),
   decline('Decline');
 

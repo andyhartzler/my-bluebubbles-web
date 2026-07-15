@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../theme/moyd_brand.dart';
 import '../../../../widgets/review/stance_visuals.dart';
 import '../../models/candidate_entry.dart';
 import '../../slate_controller.dart';
@@ -11,24 +12,28 @@ import '../headshot_avatar.dart';
 import 'decision_activity.dart';
 import 'decision_chip.dart';
 import 'decision_repository.dart';
+import 'endorsement_vote_repository.dart';
 
-/// The committee decision surface: a branded tally header (endorsed /
-/// interview / declined / undecided, live-sync indicator, slate progress)
-/// over a four-column board of candidate cards. Drag a card between columns
-/// to set the decision, or tap it for a side panel with the four-state
-/// control, the shared working note and a full-review link. Every change
-/// syncs live to all execs via the shared repository; each card shows who
-/// last touched it and when. "Copy summary" emits a privacy-safe markdown
-/// table (no headshot URLs).
+/// The committee VOTING board: every exec casts a simple Yes or No on each
+/// candidate, everyone sees everyone's ballots live, and each card shows the
+/// running tally. A branded summary header (majority-yes count, my ballot
+/// progress, live-sync indicator) sits over a responsive grid of vote cards.
+///
+/// Voting is the primary mechanism here. A lightweight shared "final call"
+/// (endorse / decline, plus the shared working note) is still available from
+/// each card for recording where the committee formally lands; it syncs live
+/// via the same shared repository as before.
 class DecisionBoard extends StatefulWidget {
   final SlateController controller;
   final DecisionRepository repository;
+  final EndorsementVoteRepository votes;
   final void Function(CandidateEntry) onOpen;
 
   const DecisionBoard({
     super.key,
     required this.controller,
     required this.repository,
+    required this.votes,
     required this.onOpen,
   });
 
@@ -36,9 +41,16 @@ class DecisionBoard extends StatefulWidget {
   State<DecisionBoard> createState() => _DecisionBoardState();
 }
 
+enum _VoteFilter { all, needsMyVote }
+
+enum _VoteSort { yesShare, name, alignment }
+
 class _DecisionBoardState extends State<DecisionBoard> {
   late final DecisionActivity _activity = DecisionActivity(widget.repository);
   Timer? _clock;
+
+  _VoteFilter _filter = _VoteFilter.all;
+  _VoteSort _sort = _VoteSort.yesShare;
 
   @override
   void initState() {
@@ -56,88 +68,146 @@ class _DecisionBoardState extends State<DecisionBoard> {
     super.dispose();
   }
 
+  List<CandidateEntry> _visibleEntries() {
+    var entries = widget.controller.all.toList();
+    if (_filter == _VoteFilter.needsMyVote) {
+      entries =
+          entries.where((e) => widget.votes.myVote(e.id) == null).toList();
+    }
+    int byName(CandidateEntry a, CandidateEntry b) =>
+        a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    switch (_sort) {
+      case _VoteSort.name:
+        entries.sort(byName);
+      case _VoteSort.alignment:
+        entries.sort((a, b) {
+          final av = a.alignmentPct ?? -1;
+          final bv = b.alignmentPct ?? -1;
+          final c = bv.compareTo(av);
+          return c != 0 ? c : byName(a, b);
+        });
+      case _VoteSort.yesShare:
+        entries.sort((a, b) {
+          final ta = widget.votes.tallyFor(a.id);
+          final tb = widget.votes.tallyFor(b.id);
+          // Voted-on candidates first, highest yes share first, then most
+          // ballots cast, then name.
+          final c = (tb.yesShare ?? -1).compareTo(ta.yesShare ?? -1);
+          if (c != 0) return c;
+          final d = tb.cast.compareTo(ta.cast);
+          return d != 0 ? d : byName(a, b);
+        });
+    }
+    return entries;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (!widget.controller.hasSubmissions) {
-      return _empty(theme);
+      return _empty();
     }
     return AnimatedBuilder(
-      animation: Listenable.merge([widget.repository, _activity]),
+      animation:
+          Listenable.merge([widget.repository, widget.votes, _activity]),
       builder: (context, _) {
-        final entries = widget.controller.all;
-        final byState = <DecisionState, List<CandidateEntry>>{
-          for (final s in DecisionState.values) s: [],
-        };
-        for (final e in entries) {
-          byState[widget.repository.stateFor(e.id)]!.add(e);
-        }
-
+        final all = widget.controller.all;
+        final visible = _visibleEntries();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _TallyHeader(
-              byState: byState,
-              total: entries.length,
-              activity: _activity,
-              nameFor: (id) {
-                for (final e in entries) {
-                  if (e.id == id) return e.name;
-                }
-                return null;
-              },
-              onCopy: () => _copySummary(context, entries),
+            _VoteHeader(
+              entries: all,
+              votes: widget.votes,
+              onCopy: () => _copySummary(context, all),
             ),
             const SizedBox(height: 10),
             Text(
-              'Drag a candidate between columns, or tap a card to set the '
-              'call and leave a working note. Everything here is shared '
-              'live with every exec.',
+              'Tap Yes or No on each candidate to cast your vote. Tap your '
+              'current choice again to withdraw it. Every ballot syncs live '
+              'to all execs.',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 10),
+            Row(
+              children: [
+                _FilterSwitch(
+                  filter: _filter,
+                  needsMyVoteCount:
+                      all.where((e) => widget.votes.myVote(e.id) == null).length,
+                  onChanged: (f) => setState(() => _filter = f),
+                ),
+                const Spacer(),
+                _SortMenu(
+                  sort: _sort,
+                  onChanged: (s) => setState(() => _sort = s),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
             Expanded(
-              child: LayoutBuilder(builder: (context, constraints) {
-                final columns = [
-                  for (final s in DecisionState.values)
-                    _Column(
-                      state: s,
-                      entries: byState[s]!,
-                      repository: widget.repository,
-                      activity: _activity,
-                      onTapTile: (e) => _openPanel(context, e),
-                    ),
-                ];
-                // 4-up on wide screens, horizontal scroll otherwise.
-                if (constraints.maxWidth >= 900) {
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var i = 0; i < columns.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 12),
-                        Expanded(child: columns[i]),
-                      ],
-                    ],
-                  );
-                }
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var i = 0; i < columns.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 12),
-                        SizedBox(width: 272, child: columns[i]),
-                      ],
-                    ],
-                  ),
-                );
-              }),
+              child: visible.isEmpty
+                  ? Center(
+                      child: Text(
+                        'You have voted on every candidate. Nice work.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    )
+                  : LayoutBuilder(builder: (context, constraints) {
+                      final twoUp = constraints.maxWidth >= 1000;
+                      if (!twoUp) {
+                        return ListView.separated(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          itemCount: visible.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, i) => _voteCard(visible[i]),
+                        );
+                      }
+                      // 2-up masonry-ish grid: two independent columns so
+                      // cards keep their natural height.
+                      final left = <CandidateEntry>[];
+                      final right = <CandidateEntry>[];
+                      for (var i = 0; i < visible.length; i++) {
+                        (i.isEven ? left : right).add(visible[i]);
+                      }
+                      Widget column(List<CandidateEntry> list) => Column(
+                            children: [
+                              for (final e in list) ...[
+                                _voteCard(e),
+                                const SizedBox(height: 12),
+                              ],
+                            ],
+                          );
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.only(bottom: 24),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: column(left)),
+                            const SizedBox(width: 12),
+                            Expanded(child: column(right)),
+                          ],
+                        ),
+                      );
+                    }),
             ),
           ],
         );
       },
+    );
+  }
+
+  Widget _voteCard(CandidateEntry e) {
+    return _VoteCard(
+      entry: e,
+      votes: widget.votes,
+      repository: widget.repository,
+      onOpen: () => widget.onOpen(e),
+      onFinalCall: () => _openPanel(context, e),
     );
   }
 
@@ -149,6 +219,7 @@ class _DecisionBoardState extends State<DecisionBoard> {
       builder: (ctx) => _DecisionPanel(
         entry: e,
         repository: widget.repository,
+        votes: widget.votes,
         activity: _activity,
         onOpen: () {
           Navigator.pop(ctx);
@@ -160,77 +231,76 @@ class _DecisionBoardState extends State<DecisionBoard> {
 
   void _copySummary(BuildContext context, List<CandidateEntry> entries) {
     final buf = StringBuffer();
-    buf.writeln('# Endorsement decisions');
+    buf.writeln('# Endorsement committee vote');
     buf.writeln();
-    buf.writeln('| Candidate | Office | Alignment | Decision |');
-    buf.writeln('| --- | --- | --- | --- |');
-    // Group by decision, endorse first.
-    const order = [
-      DecisionState.endorse,
-      DecisionState.interview,
-      DecisionState.undecided,
-      DecisionState.decline,
-    ];
-    for (final state in order) {
-      for (final e in entries) {
-        if (widget.repository.stateFor(e.id) != state) continue;
-        final align =
-            e.alignmentPct == null ? '—' : '${e.alignmentPct!.round()}%';
-        buf.writeln(
-            '| ${e.name} | ${e.officeLine.isEmpty ? '—' : e.officeLine} | $align | ${state.label} |');
-      }
+    buf.writeln('| Candidate | Office | Yes | No | Final call |');
+    buf.writeln('| --- | --- | --- | --- | --- |');
+    final sorted = entries.toList()
+      ..sort((a, b) {
+        final ta = widget.votes.tallyFor(a.id);
+        final tb = widget.votes.tallyFor(b.id);
+        return (tb.yesShare ?? -1).compareTo(ta.yesShare ?? -1);
+      });
+    for (final e in sorted) {
+      final t = widget.votes.tallyFor(e.id);
+      final call = widget.repository.stateFor(e.id);
+      buf.writeln('| ${e.name} '
+          '| ${e.officeLine.isEmpty ? '—' : e.officeLine} '
+          '| ${t.yes} | ${t.no} | ${call.label} |');
     }
     Clipboard.setData(ClipboardData(text: buf.toString()));
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Decision summary copied (markdown)'),
+      content: Text('Vote summary copied (markdown)'),
       behavior: SnackBarBehavior.floating,
     ));
   }
 
-  Widget _empty(ThemeData theme) {
+  Widget _empty() {
     return const HubEmptyState(
-      icon: Icons.how_to_reg_outlined,
-      title: 'No candidates to decide on yet',
-      message:
-          'Once submissions arrive, sort them into Interview, Endorse or '
-          'Decline. Decisions sync live to every exec.',
+      icon: Icons.how_to_vote_outlined,
+      title: 'No candidates to vote on yet',
+      message: 'Once submissions arrive, every exec casts a simple Yes or No '
+          'on each candidate. Ballots sync live to the whole committee.',
     );
   }
 }
 
-// ==================== tally header ====================
+// ==================== summary header ====================
 
-/// Branded gradient scoreboard: one tile per decision state, a slate progress
-/// bar, a pulsing LIVE indicator and the latest shared activity line. Dark
-/// navy gradient with white/gold text so it reads identically in both themes.
-class _TallyHeader extends StatelessWidget {
-  final Map<DecisionState, List<CandidateEntry>> byState;
-  final int total;
-  final DecisionActivity activity;
-  final String? Function(String candidateId) nameFor;
+/// Branded gradient scoreboard for the vote: majority-yes / majority-no /
+/// awaiting-votes tiles, the signed-in member's ballot progress and a pulsing
+/// LIVE indicator. Dark navy gradient with white/gold text so it reads
+/// identically in both themes.
+class _VoteHeader extends StatelessWidget {
+  final List<CandidateEntry> entries;
+  final EndorsementVoteRepository votes;
   final VoidCallback onCopy;
 
-  const _TallyHeader({
-    required this.byState,
-    required this.total,
-    required this.activity,
-    required this.nameFor,
+  const _VoteHeader({
+    required this.entries,
+    required this.votes,
     required this.onCopy,
   });
 
   @override
   Widget build(BuildContext context) {
-    final decided = total - byState[DecisionState.undecided]!.length;
-
-    String subline = 'Shared board · every change syncs live to all execs';
-    final latest = activity.latest;
-    if (latest != null) {
-      final who = activity.actorLabel(latest.by);
-      final candidate = nameFor(latest.candidateId);
-      subline = candidate == null
-          ? 'Latest change by $who · ${DecisionActivity.timeAgo(latest.at)}'
-          : 'Latest: $who updated $candidate · ${DecisionActivity.timeAgo(latest.at)}';
+    var majorityYes = 0;
+    var majorityNo = 0;
+    var noBallots = 0;
+    var mine = 0;
+    for (final e in entries) {
+      final t = votes.tallyFor(e.id);
+      if (!t.hasVotes) {
+        noBallots++;
+      } else if (t.yes > t.no) {
+        majorityYes++;
+      } else if (t.no > t.yes) {
+        majorityNo++;
+      }
+      if (votes.myVote(e.id) != null) mine++;
     }
+    final total = entries.length;
+    final voterCount = votes.knownVoters.length;
 
     return Container(
       decoration: BoxDecoration(
@@ -261,7 +331,7 @@ class _TallyHeader extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               const Expanded(
-                child: Text('Committee decisions',
+                child: Text('Committee vote',
                     style: TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -270,7 +340,7 @@ class _TallyHeader extends StatelessWidget {
               const _LivePill(),
               const SizedBox(width: 6),
               Tooltip(
-                message: 'Copy summary (markdown)',
+                message: 'Copy vote summary (markdown)',
                 child: IconButton(
                   onPressed: onCopy,
                   icon: const Icon(Icons.content_copy,
@@ -281,23 +351,37 @@ class _TallyHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 2),
-          Text(subline,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  color: Color(0xE6FFFFFF), fontSize: 11.5)),
+          Text(
+            voterCount <= 1
+                ? 'One Yes or No per exec, per candidate · everyone sees every ballot live'
+                : '$voterCount execs voting · everyone sees every ballot live',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xE6FFFFFF), fontSize: 11.5),
+          ),
           const SizedBox(height: 14),
           Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
-              for (final s in const [
-                DecisionState.endorse,
-                DecisionState.interview,
-                DecisionState.decline,
-                DecisionState.undecided,
-              ])
-                _TallyTile(state: s, count: byState[s]!.length),
+              _SummaryTile(
+                icon: Icons.thumb_up,
+                iconBg: MoydBrand.supportFg,
+                count: majorityYes,
+                label: 'MAJORITY YES',
+              ),
+              _SummaryTile(
+                icon: Icons.thumb_down,
+                iconBg: MoydBrand.opposeFg,
+                count: majorityNo,
+                label: 'MAJORITY NO',
+              ),
+              _SummaryTile(
+                icon: Icons.hourglass_empty,
+                iconBg: MoydBrand.neutralFg,
+                count: noBallots,
+                label: 'NO BALLOTS YET',
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -307,7 +391,7 @@ class _TallyHeader extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(5),
                   child: LinearProgressIndicator(
-                    value: total == 0 ? 0 : decided / total,
+                    value: total == 0 ? 0 : mine / total,
                     minHeight: 8,
                     backgroundColor: Colors.white24,
                     valueColor:
@@ -316,7 +400,7 @@ class _TallyHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              Text('$decided of $total decided',
+              Text('You voted on $mine of $total',
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -329,10 +413,17 @@ class _TallyHeader extends StatelessWidget {
   }
 }
 
-class _TallyTile extends StatelessWidget {
-  final DecisionState state;
+class _SummaryTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconBg;
   final int count;
-  const _TallyTile({required this.state, required this.count});
+  final String label;
+  const _SummaryTile({
+    required this.icon,
+    required this.iconBg,
+    required this.count,
+    required this.label,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -348,12 +439,8 @@ class _TallyTile extends StatelessWidget {
           Container(
             width: 28,
             height: 28,
-            decoration: BoxDecoration(
-              color: DecisionVisuals.accent(state),
-              shape: BoxShape.circle,
-            ),
-            child:
-                Icon(DecisionVisuals.icon(state), color: Colors.white, size: 15),
+            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+            child: Icon(icon, color: Colors.white, size: 15),
           ),
           const SizedBox(width: 10),
           Column(
@@ -367,7 +454,7 @@ class _TallyTile extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                       height: 1.0)),
               const SizedBox(height: 2),
-              Text(state.label.toUpperCase(),
+              Text(label,
                   style: const TextStyle(
                       color: Color(0xE6FFFFFF),
                       fontSize: 10,
@@ -438,273 +525,118 @@ class _LivePillState extends State<_LivePill>
   }
 }
 
-// ==================== columns ====================
+// ==================== filter / sort ====================
 
-class _Column extends StatefulWidget {
-  final DecisionState state;
-  final List<CandidateEntry> entries;
-  final DecisionRepository repository;
-  final DecisionActivity activity;
-  final void Function(CandidateEntry) onTapTile;
-  const _Column({
-    required this.state,
-    required this.entries,
-    required this.repository,
-    required this.activity,
-    required this.onTapTile,
+/// "All candidates" vs "Needs my vote" segmented pill, matching the hub's
+/// segmented-switch treatment (navy gradient on the active segment).
+class _FilterSwitch extends StatelessWidget {
+  final _VoteFilter filter;
+  final int needsMyVoteCount;
+  final ValueChanged<_VoteFilter> onChanged;
+  const _FilterSwitch({
+    required this.filter,
+    required this.needsMyVoteCount,
+    required this.onChanged,
   });
 
   @override
-  State<_Column> createState() => _ColumnState();
-}
-
-class _ColumnState extends State<_Column> {
-  bool _hovering = false;
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final accent = DecisionVisuals.accent(widget.state);
-    final fg = DecisionVisuals.fg(widget.state);
-
-    return DragTarget<CandidateEntry>(
-      onWillAcceptWithDetails: (_) {
-        setState(() => _hovering = true);
-        return true;
-      },
-      onLeave: (_) => setState(() => _hovering = false),
-      onAcceptWithDetails: (d) {
-        setState(() => _hovering = false);
-        widget.repository.setState(d.data.id, widget.state);
-      },
-      builder: (context, candidate, rejected) {
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
+    final cs = Theme.of(context).colorScheme;
+    Widget seg(_VoteFilter f, IconData icon, String label) {
+      final active = filter == f;
+      return InkWell(
+        onTap: () => onChanged(f),
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: _hovering
-                ? DecisionVisuals.bg(widget.state).withOpacity(0.55)
-                : cs.surfaceContainerHighest.withOpacity(0.3),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: _hovering ? accent : cs.outlineVariant,
-              width: _hovering ? 2 : 1,
-            ),
+            gradient: active ? HubTheme.chip : null,
+            borderRadius: BorderRadius.circular(10),
           ),
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Self-contained light-bg / dark-fg header pill: legible on the
-              // column wash in BOTH themes without theme branching.
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                  color: DecisionVisuals.bg(widget.state),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Icon(DecisionVisuals.icon(widget.state),
-                        size: 15, color: fg),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(widget.state.label,
-                          style: TextStyle(
-                              color: fg,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.3)),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: accent,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text('${widget.entries.length}',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: widget.entries.isEmpty
-                    ? Center(
-                        child: Text('Drop a candidate here',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant.withOpacity(0.7))),
-                      )
-                    : ListView.separated(
-                        itemCount: widget.entries.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (context, i) => _Tile(
-                          entry: widget.entries[i],
-                          repository: widget.repository,
-                          activity: widget.activity,
-                          onTap: () => widget.onTapTile(widget.entries[i]),
-                        ),
-                      ),
-              ),
+              Icon(icon,
+                  size: 15, color: active ? Colors.white : cs.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: active ? Colors.white : cs.onSurface)),
             ],
           ),
-        );
-      },
-    );
-  }
-}
-
-// ==================== candidate cards ====================
-
-class _Tile extends StatelessWidget {
-  final CandidateEntry entry;
-  final DecisionRepository repository;
-  final DecisionActivity activity;
-  final VoidCallback onTap;
-  const _Tile({
-    required this.entry,
-    required this.repository,
-    required this.activity,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tile = _TileContent(
-      entry: entry,
-      repository: repository,
-      activity: activity,
-      onTap: onTap,
-    );
-    // Draggable (not long-press) so mouse users on web can drag immediately;
-    // a plain click still opens the panel.
-    return Draggable<CandidateEntry>(
-      data: entry,
-      feedback: Material(
-        color: Colors.transparent,
-        child: SizedBox(
-          width: 248,
-          child: Opacity(
-            opacity: 0.94,
-            child: _TileContent(
-              entry: entry,
-              repository: repository,
-              activity: activity,
-            ),
-          ),
         ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: cs.outlineVariant),
       ),
-      childWhenDragging: Opacity(opacity: 0.35, child: tile),
-      child: tile,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          seg(_VoteFilter.all, Icons.groups_2_outlined, 'All candidates'),
+          const SizedBox(width: 2),
+          seg(
+            _VoteFilter.needsMyVote,
+            Icons.pending_actions,
+            needsMyVoteCount > 0
+                ? 'Needs my vote ($needsMyVoteCount)'
+                : 'Needs my vote',
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _TileContent extends StatelessWidget {
-  final CandidateEntry entry;
-  final DecisionRepository repository;
-  final DecisionActivity activity;
-  final VoidCallback? onTap;
-  const _TileContent({
-    required this.entry,
-    required this.repository,
-    required this.activity,
-    this.onTap,
-  });
+class _SortMenu extends StatelessWidget {
+  final _VoteSort sort;
+  final ValueChanged<_VoteSort> onChanged;
+  const _SortMenu({required this.sort, required this.onChanged});
+
+  String _label(_VoteSort s) => switch (s) {
+        _VoteSort.yesShare => 'Yes share',
+        _VoteSort.name => 'Name',
+        _VoteSort.alignment => 'Alignment',
+      };
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final record = repository.recordFor(entry.id);
-    final note = record.note.trim();
-    final who = activity.describe(entry.id);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+    final cs = Theme.of(context).colorScheme;
+    return PopupMenuButton<_VoteSort>(
+      tooltip: 'Sort candidates',
+      initialValue: sort,
+      onSelected: onChanged,
+      itemBuilder: (context) => [
+        for (final s in _VoteSort.values)
+          PopupMenuItem(value: s, child: Text('Sort by ${_label(s)}')),
+      ],
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          color: cs.surface,
-          borderRadius: BorderRadius.circular(12),
+          color: cs.surfaceContainerHighest.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(13),
           border: Border.all(color: cs.outlineVariant),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                HeadshotAvatar(
-                    file: entry.model.headshot, name: entry.name, size: 38),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(entry.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w700)),
-                      if (entry.officeLine.isNotEmpty)
-                        Text(entry.officeLine,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.labelSmall
-                                ?.copyWith(color: cs.onSurfaceVariant)),
-                    ],
-                  ),
-                ),
-                if (entry.alignmentPct != null) ...[
-                  const SizedBox(width: 6),
-                  AlignmentBadge(pct: entry.alignmentPct!, dense: true),
-                ],
-              ],
-            ),
-            if (note.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.sticky_note_2_outlined,
-                      size: 13, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(note,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            fontStyle: FontStyle.italic)),
-                  ),
-                ],
-              ),
-            ],
-            if (who != null) ...[
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Icon(Icons.history, size: 12, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(who,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall
-                            ?.copyWith(color: cs.onSurfaceVariant)),
-                  ),
-                ],
-              ),
-            ],
+            Icon(Icons.sort, size: 15, color: cs.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Text(_label(sort),
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface)),
+            const SizedBox(width: 4),
+            Icon(Icons.arrow_drop_down, size: 18, color: cs.onSurfaceVariant),
           ],
         ),
       ),
@@ -712,16 +644,413 @@ class _TileContent extends StatelessWidget {
   }
 }
 
-// ==================== decision panel ====================
+// ==================== vote card ====================
 
+/// One candidate's ballot card: identity row, the big Yes / No control (the
+/// signed-in member's choice fills solid), the live tally bar and the roster
+/// of who voted what.
+class _VoteCard extends StatelessWidget {
+  final CandidateEntry entry;
+  final EndorsementVoteRepository votes;
+  final DecisionRepository repository;
+  final VoidCallback onOpen;
+  final VoidCallback onFinalCall;
+
+  const _VoteCard({
+    required this.entry,
+    required this.votes,
+    required this.repository,
+    required this.onOpen,
+    required this.onFinalCall,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tally = votes.tallyFor(entry.id);
+    final mine = votes.myVote(entry.id);
+    final call = repository.stateFor(entry.id);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(
+                theme.brightness == Brightness.dark ? 0.25 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Identity row.
+          Row(
+            children: [
+              HeadshotAvatar(
+                  file: entry.model.headshot, name: entry.name, size: 44),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(entry.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w800)),
+                    if (entry.officeLine.isNotEmpty)
+                      Text(entry.officeLine,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: cs.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              if (entry.alignmentPct != null) ...[
+                const SizedBox(width: 6),
+                AlignmentBadge(pct: entry.alignmentPct!, dense: true),
+              ],
+              if (call != DecisionState.undecided) ...[
+                const SizedBox(width: 6),
+                DecisionChip(state: call, compact: true),
+              ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          // The vote control: dead-simple Yes / No.
+          Row(
+            children: [
+              Expanded(
+                child: _VoteButton(
+                  label: 'Yes',
+                  icon: Icons.check_circle,
+                  fg: MoydBrand.supportFg,
+                  bg: MoydBrand.supportBg,
+                  selected: mine == 'yes',
+                  onTap: () => votes.castVote(entry.id, 'yes'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _VoteButton(
+                  label: 'No',
+                  icon: Icons.cancel,
+                  fg: MoydBrand.opposeFg,
+                  bg: MoydBrand.opposeBg,
+                  selected: mine == 'no',
+                  onTap: () => votes.castVote(entry.id, 'no'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _TallyBar(tally: tally),
+          const SizedBox(height: 10),
+          _VoterRoster(votes: votes, candidateId: entry.id),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: onFinalCall,
+                icon: Icon(Icons.gavel, size: 16, color: cs.onSurfaceVariant),
+                label: Text('Final call',
+                    style: TextStyle(
+                        color: cs.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5)),
+                style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: onOpen,
+                icon: Icon(Icons.open_in_new,
+                    size: 16, color: cs.onSurfaceVariant),
+                label: Text('Full review',
+                    style: TextStyle(
+                        color: cs.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5)),
+                style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One big vote button. Selected = solid accent fill with white text + icon
+/// (both accents carry white at >= 4.5:1); unselected = self-contained light
+/// bg + dark fg so it reads in both themes. Icon + label together so the
+/// choice never relies on color alone.
+class _VoteButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color fg;
+  final Color bg;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _VoteButton({
+    required this.label,
+    required this.icon,
+    required this.fg,
+    required this.bg,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: selected ? 'Your vote: $label. Tap to withdraw.' : 'Vote $label',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? fg : bg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? fg : fg.withOpacity(0.45),
+              width: selected ? 2 : 1.2,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 19, color: selected ? Colors.white : fg),
+              const SizedBox(width: 7),
+              Text(label,
+                  style: TextStyle(
+                      color: selected ? Colors.white : fg,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15)),
+              if (selected) ...[
+                const SizedBox(width: 7),
+                const Icon(Icons.how_to_vote, size: 15, color: Colors.white),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The live tally: "6 Yes · 2 No" with a green/red proportion bar. The bar is
+/// decorative reinforcement; the counts are always spelled out beside it.
+class _TallyBar extends StatelessWidget {
+  final VoteTally tally;
+  const _TallyBar({required this.tally});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final label = StringBuffer('${tally.yes} Yes · ${tally.no} No');
+    if (tally.pending > 0) {
+      label.write(' · ${tally.pending} waiting');
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                tally.hasVotes ? label.toString() : 'No ballots yet',
+                style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: tally.hasVotes ? cs.onSurface : cs.onSurfaceVariant),
+              ),
+            ),
+            if (tally.hasVotes)
+              Text(
+                tally.majorityYes
+                    ? 'Majority yes'
+                    : (tally.no > tally.yes ? 'Majority no' : 'Tied'),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: tally.majorityYes
+                      ? MoydBrand.supportFg
+                      : (tally.no > tally.yes
+                          ? MoydBrand.opposeFg
+                          : cs.onSurfaceVariant),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(5),
+          child: SizedBox(
+            height: 8,
+            child: Row(
+              children: [
+                if (tally.yes > 0)
+                  Expanded(
+                    flex: tally.yes,
+                    child: const ColoredBox(color: MoydBrand.supportFg),
+                  ),
+                if (tally.yes > 0 && tally.no > 0) const SizedBox(width: 2),
+                if (tally.no > 0)
+                  Expanded(
+                    flex: tally.no,
+                    child: const ColoredBox(color: MoydBrand.opposeFg),
+                  ),
+                if (!tally.hasVotes)
+                  Expanded(
+                    child: ColoredBox(
+                        color: cs.surfaceContainerHighest.withOpacity(0.8)),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Compact roster of who voted what: one pill per known committee voter with
+/// a check (yes) / x (no) / hourglass (not yet) marker plus their name, so
+/// the ballot never reads by color alone.
+class _VoterRoster extends StatelessWidget {
+  final EndorsementVoteRepository votes;
+  final String candidateId;
+  const _VoterRoster({required this.votes, required this.candidateId});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ballots = votes.votesFor(candidateId);
+    final known = votes.knownVoters;
+    if (known.isEmpty) {
+      return Text('Ballots will list every exec by name.',
+          style: Theme.of(context)
+              .textTheme
+              .labelSmall
+              ?.copyWith(color: cs.onSurfaceVariant));
+    }
+
+    // Yes first, then no, then whoever has not voted yet; "You" leads each
+    // group so members can always find themselves at a glance.
+    final me = votes.currentUserId;
+    final ids = known.keys.toList()
+      ..sort((a, b) {
+        int rank(String uid) {
+          final v = ballots[uid]?.vote;
+          if (v == 'yes') return 0;
+          if (v == 'no') return 1;
+          return 2;
+        }
+
+        final r = rank(a).compareTo(rank(b));
+        if (r != 0) return r;
+        if (a == me) return -1;
+        if (b == me) return 1;
+        return (known[a] ?? '').toLowerCase().compareTo(
+            (known[b] ?? '').toLowerCase());
+      });
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final uid in ids)
+          _voterPill(
+            context,
+            name: uid == me ? 'You' : (known[uid] ?? 'An exec'),
+            vote: ballots[uid]?.vote,
+          ),
+      ],
+    );
+  }
+
+  Widget _voterPill(BuildContext context, {required String name, String? vote}) {
+    late final Color fg;
+    late final Color bg;
+    late final IconData icon;
+    switch (vote) {
+      case 'yes':
+        fg = MoydBrand.supportFg;
+        bg = MoydBrand.supportBg;
+        icon = Icons.check_circle;
+      case 'no':
+        fg = MoydBrand.opposeFg;
+        bg = MoydBrand.opposeBg;
+        icon = Icons.cancel;
+      default:
+        fg = MoydBrand.neutralFg;
+        bg = MoydBrand.neutralBg;
+        icon = Icons.hourglass_empty;
+    }
+    return Tooltip(
+      message: switch (vote) {
+        'yes' => '$name voted Yes',
+        'no' => '$name voted No',
+        _ => '$name has not voted yet',
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: fg.withOpacity(0.28)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: fg),
+            const SizedBox(width: 4),
+            Text(name,
+                style: TextStyle(
+                    color: fg, fontSize: 11.5, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==================== final-call panel ====================
+
+/// The lightweight shared final-outcome panel: where the committee formally
+/// lands after the vote (endorse / decline / undecided) plus the shared
+/// working note. Kept secondary to the Yes/No voting on the cards.
 class _DecisionPanel extends StatefulWidget {
   final CandidateEntry entry;
   final DecisionRepository repository;
+  final EndorsementVoteRepository votes;
   final DecisionActivity activity;
   final VoidCallback onOpen;
   const _DecisionPanel({
     required this.entry,
     required this.repository,
+    required this.votes,
     required this.activity,
     required this.onOpen,
   });
@@ -771,11 +1100,12 @@ class _DecisionPanelState extends State<_DecisionPanel> {
         bottom: MediaQuery.of(context).viewInsets.bottom + 20,
       ),
       child: AnimatedBuilder(
-        animation:
-            Listenable.merge([widget.repository, widget.activity]),
+        animation: Listenable.merge(
+            [widget.repository, widget.votes, widget.activity]),
         builder: (context, _) {
           final current = widget.repository.stateFor(e.id);
           final who = widget.activity.describe(e.id);
+          final tally = widget.votes.tallyFor(e.id);
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -794,8 +1124,8 @@ class _DecisionPanelState extends State<_DecisionPanel> {
                                 ?.copyWith(fontWeight: FontWeight.w800)),
                         if (e.officeLine.isNotEmpty)
                           Text(e.officeLine,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                  color: cs.onSurfaceVariant)),
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant)),
                       ],
                     ),
                   ),
@@ -803,8 +1133,10 @@ class _DecisionPanelState extends State<_DecisionPanel> {
                     AlignmentBadge(pct: e.alignmentPct!, showWord: true),
                 ],
               ),
+              const SizedBox(height: 14),
+              _TallyBar(tally: tally),
               const SizedBox(height: 18),
-              Text('Committee call',
+              Text('Final call (after the vote)',
                   style: theme.textTheme.labelMedium?.copyWith(
                       color: cs.onSurfaceVariant, fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
@@ -868,10 +1200,9 @@ class _DecisionPanelState extends State<_DecisionPanel> {
                       _flushNote();
                       Navigator.pop(context);
                     },
-                    style:
-                        FilledButton.styleFrom(
-                            backgroundColor: HubTheme.navy,
-                            foregroundColor: Colors.white),
+                    style: FilledButton.styleFrom(
+                        backgroundColor: HubTheme.navy,
+                        foregroundColor: Colors.white),
                     child: const Text('Done'),
                   ),
                 ],
@@ -884,9 +1215,9 @@ class _DecisionPanelState extends State<_DecisionPanel> {
   }
 }
 
-/// One selectable decision pill: solid accent + white text when selected
-/// (all four accents carry white at >= 4.5:1), self-contained light bg +
-/// dark fg otherwise, so the control is legible in both themes.
+/// One selectable final-call pill: solid accent + white text when selected
+/// (all accents carry white at >= 4.5:1), self-contained light bg + dark fg
+/// otherwise, so the control is legible in both themes.
 class _StatePill extends StatelessWidget {
   final DecisionState state;
   final bool selected;

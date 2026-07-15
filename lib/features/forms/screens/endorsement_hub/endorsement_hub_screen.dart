@@ -16,6 +16,7 @@ import 'widgets/compare/side_by_side_compare.dart';
 import 'widgets/decisions/decision_board.dart';
 import 'widgets/decisions/decision_chip.dart';
 import 'widgets/decisions/decision_repository.dart';
+import 'widgets/decisions/endorsement_vote_repository.dart';
 import 'widgets/roster/roster_gallery.dart';
 
 /// "Endorsement HQ 2026" — the candidate survey intelligence hub. A gradient
@@ -36,6 +37,8 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
   // Shared across all executive members via public.endorsement_decisions (live
   // sync), so the committee sees one decision board instead of per-device copies.
   final DecisionRepository _decisions = SupabaseDecisionRepository();
+  // Per-member yes/no ballots, shared live via public.endorsement_votes.
+  final EndorsementVoteRepository _votes = EndorsementVoteRepository();
   late final TabController _tabs = TabController(length: 4, vsync: this);
 
   _CompareMode _compareMode = _CompareMode.matrix;
@@ -45,12 +48,14 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
     super.initState();
     _controller.load();
     _decisions.load();
+    _votes.load();
   }
 
   @override
   void dispose() {
     _tabs.dispose();
     _controller.dispose();
+    _votes.dispose();
     super.dispose();
   }
 
@@ -113,6 +118,7 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
                     _padded(DecisionBoard(
                       controller: _controller,
                       repository: _decisions,
+                      votes: _votes,
                       onOpen: _openCandidate,
                     )),
                   ],
