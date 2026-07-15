@@ -209,6 +209,97 @@ class AlignmentScore {
   }
 }
 
+/// One issue inside a [AiAlignmentScore]: Gemini's 0..100 judgment of the
+/// candidate's alignment on a single policy question, with a short rationale.
+class AiIssueScore {
+  final String id;
+  final String label;
+  final int score; // 0..100
+  final String stance; // aligned / mostly_aligned / mixed / misaligned / unclear
+  final String rationale;
+
+  const AiIssueScore({
+    required this.id,
+    required this.label,
+    required this.score,
+    required this.stance,
+    required this.rationale,
+  });
+
+  static AiIssueScore? fromJson(dynamic j) {
+    if (j is! Map) return null;
+    final rawScore = j['score'];
+    final s = rawScore is num
+        ? rawScore.round()
+        : int.tryParse('${rawScore ?? ''}') ?? 0;
+    return AiIssueScore(
+      id: (j['id'] ?? '').toString(),
+      label: (j['label'] ?? '').toString(),
+      score: s.clamp(0, 100),
+      stance: (j['stance'] ?? '').toString(),
+      rationale: (j['rationale'] ?? '').toString(),
+    );
+  }
+}
+
+/// A Gemini-judged alignment score for one submission, loaded from
+/// `public.endorsement_ai_scores`. Gemini reads the candidate's FULL answers
+/// (selected option AND written explanation) against the MOYD platform, reading
+/// caveats and nuance fairly. When present it supersedes the rigid rule-based
+/// [AlignmentScore] as the alignment number shown across the endorsement hub.
+class AiAlignmentScore {
+  /// Overall 0..100 holistic alignment.
+  final int overallScore;
+
+  /// Overall rationale (2-4 sentences).
+  final String rationale;
+
+  /// Per-issue breakdown.
+  final List<AiIssueScore> perIssue;
+
+  final String? model;
+  final DateTime? scoredAt;
+
+  const AiAlignmentScore({
+    required this.overallScore,
+    required this.rationale,
+    required this.perIssue,
+    this.model,
+    this.scoredAt,
+  });
+
+  double get pct => overallScore.toDouble();
+
+  /// Build from a `endorsement_ai_scores` row.
+  static AiAlignmentScore? fromRow(Map<String, dynamic> row) {
+    final raw = row['overall_score'];
+    if (raw == null) return null;
+    final overall =
+        raw is num ? raw.round() : int.tryParse(raw.toString()) ?? 0;
+
+    final issues = <AiIssueScore>[];
+    final pi = row['per_issue'];
+    if (pi is List) {
+      for (final e in pi) {
+        final parsed = AiIssueScore.fromJson(e);
+        if (parsed != null) issues.add(parsed);
+      }
+    }
+
+    DateTime? scoredAt;
+    final sa = row['scored_at'];
+    if (sa != null) scoredAt = DateTime.tryParse(sa.toString());
+
+    return AiAlignmentScore(
+      overallScore: overall.clamp(0, 100),
+      rationale: (row['rationale'] ?? '').toString(),
+      perIssue: issues,
+      model: row['model']?.toString(),
+      scoredAt: scoredAt,
+    );
+  }
+}
+
 /// A single stance question inside a policy-positions grid.
 class PolicyPosition {
   final String id;
@@ -297,8 +388,15 @@ class SubmissionReviewModel {
 
   final List<ReferenceEntry> references;
 
-  /// Committee-alignment score, or null when the form has no scoring config.
+  /// Rule-based committee-alignment score, or null when the form has no scoring
+  /// config. Kept for reference / fallback; superseded by [aiAlignment] for
+  /// display when a Gemini score exists.
   final AlignmentScore? alignment;
+
+  /// Gemini-judged alignment score (from `public.endorsement_ai_scores`), or
+  /// null when the submission has not been AI-scored. When present it is the
+  /// authoritative alignment number.
+  final AiAlignmentScore? aiAlignment;
 
   const SubmissionReviewModel({
     required this.sections,
@@ -323,14 +421,24 @@ class SubmissionReviewModel {
     this.documentAnswers = const [],
     this.references = const [],
     this.alignment,
+    this.aiAlignment,
   });
 
   /// All policy positions across every section, flattened.
   List<PolicyPosition> get allPolicyPositions =>
       sections.expand((s) => s.policyPositions).toList();
 
-  /// Rounded 0..100 committee-alignment percentage (null when unscored).
-  double? get alignmentPct => alignment?.pct;
+  /// Rounded 0..100 alignment percentage shown across the endorsement hub.
+  /// Prefers the Gemini ([aiAlignment]) score; falls back to the rule-based
+  /// [AlignmentScore] when the submission has not been AI-scored yet. Null when
+  /// neither exists.
+  double? get alignmentPct => aiAlignment?.pct ?? alignment?.pct;
+
+  /// The rule-based score alone (for labeled side-by-side display), or null.
+  double? get ruleAlignmentPct => alignment?.pct;
+
+  /// True when [alignmentPct] comes from Gemini rather than the rule engine.
+  bool get isAiScored => aiAlignment != null;
 
   /// Scored questions answered with a mapped value (the [alignmentPct]
   /// denominator).
@@ -463,7 +571,11 @@ class SubmissionReviewModel {
     return Stance.neutral;
   }
 
-  static SubmissionReviewModel from(FormSchema form, FormSubmission submission) {
+  static SubmissionReviewModel from(
+    FormSchema form,
+    FormSubmission submission, {
+    AiAlignmentScore? aiAlignment,
+  }) {
     final data = submission.data;
     final fields = form.schema.fields;
 
@@ -667,6 +779,7 @@ class SubmissionReviewModel {
       documentAnswers: documentAnswers,
       references: references,
       alignment: alignment,
+      aiAlignment: aiAlignment,
     );
   }
 }

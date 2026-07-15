@@ -135,8 +135,13 @@ class CandidateEntry {
     required this.flags,
   });
 
-  factory CandidateEntry.build(FormSchema form, FormSubmission submission) {
-    final model = SubmissionReviewModel.from(form, submission);
+  factory CandidateEntry.build(
+    FormSchema form,
+    FormSubmission submission, {
+    AiAlignmentScore? aiAlignment,
+  }) {
+    final model =
+        SubmissionReviewModel.from(form, submission, aiAlignment: aiAlignment);
     final data = submission.data;
 
     final officeSoughtRaw = data['office_sought']?.toString();
@@ -165,6 +170,10 @@ class CandidateEntry {
   String get id => submission.id;
   String get name => model.candidateName;
   double? get alignmentPct => model.alignmentPct;
+
+  /// Gemini score for this candidate, or null when not yet AI-scored.
+  AiAlignmentScore? get aiAlignment => model.aiAlignment;
+  bool get isAiScored => model.isAiScored;
   bool get isYoungDem => model.track == 'Young Dem';
 
   /// "Office · District" glance line (omits empty parts).

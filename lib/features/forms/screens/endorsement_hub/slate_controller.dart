@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 
 import '../../models/form_schema.dart';
+import '../../models/submission_review_model.dart';
 import '../../services/forms_service.dart';
+import 'ai_score_repository.dart';
 import 'models/candidate_entry.dart';
 import 'models/slate_stats.dart';
 
@@ -22,9 +24,12 @@ enum SlateSort {
 /// submission, and holds the roster filter / sort / selection state shared by
 /// every tab of the Endorsement HQ.
 class SlateController extends ChangeNotifier {
-  SlateController({FormsService? service}) : _service = service ?? FormsService();
+  SlateController({FormsService? service, EndorsementAiScoreRepository? aiScores})
+      : _service = service ?? FormsService(),
+        _aiScores = aiScores ?? EndorsementAiScoreRepository();
 
   final FormsService _service;
+  final EndorsementAiScoreRepository _aiScores;
 
   /// The canonical endorsement form id. A slug fallback runs if this id 404s.
   static const String endorsementFormId =
@@ -111,8 +116,18 @@ class SlateController extends ChangeNotifier {
         );
       }
       final submissions = await _service.getSubmissions(form.id);
-      final entries =
-          submissions.map((s) => CandidateEntry.build(form, s)).toList();
+      // Gemini alignment scores (keyed by submission id). Non-fatal: an empty
+      // map falls back to the rule-based score so the roster still renders.
+      Map<String, AiAlignmentScore> aiScores = const {};
+      try {
+        aiScores = await _aiScores.loadBySubmission();
+      } catch (_) {
+        aiScores = const {};
+      }
+      final entries = submissions
+          .map((s) => CandidateEntry.build(form, s,
+              aiAlignment: aiScores[s.id]))
+          .toList();
       _form = form;
       _all = entries;
       // Drop selections that no longer exist.

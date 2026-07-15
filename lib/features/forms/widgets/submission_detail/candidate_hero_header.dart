@@ -329,10 +329,28 @@ class AtAGlanceBar extends StatelessWidget {
       tiles.add(_GlanceTile(label: label, value: value, valueColor: valueColor));
     }
 
-    // Alignment leads the strip when the form is scored.
+    // Alignment leads the strip when the form is scored. Prefer the Gemini
+    // score; fall back to the rule-based breakdown tile.
+    final ai = model.aiAlignment;
     final align = model.alignment;
-    if (align != null && align.pct != null) {
-      tiles.add(_AlignmentGlanceTile(score: align));
+    if (ai != null) {
+      tiles.add(_AlignmentGlanceTile(
+        pct: ai.pct,
+        label: 'AI ALIGNMENT',
+        tooltip: 'Gemini-judged against the MOYD platform, reading each '
+            'candidate\'s full answers and caveats.',
+        subline: align?.pct != null
+            ? 'rule-based: ${align!.pct!.round()}%'
+            : null,
+      ));
+    } else if (align != null && align.pct != null) {
+      tiles.add(_AlignmentGlanceTile(
+        pct: align.pct!,
+        label: 'ALIGNMENT',
+        tooltip: 'Draft weights — score uses tunable committee weights and '
+            'may change.',
+        subline: align.breakdownLine,
+      ));
     }
 
     if (model.office != null) add('Office', model.office!);
@@ -407,14 +425,21 @@ class AtAGlanceBar extends StatelessWidget {
 /// strong/partial/oppose subline and a "draft weights" tooltip. Self-contained
 /// badge colors keep contrast safe on both light and dark glance surfaces.
 class _AlignmentGlanceTile extends StatelessWidget {
-  final AlignmentScore score;
-  const _AlignmentGlanceTile({required this.score});
+  final double pct;
+  final String label;
+  final String tooltip;
+  final String? subline;
+  const _AlignmentGlanceTile({
+    required this.pct,
+    required this.label,
+    required this.tooltip,
+    this.subline,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final pct = score.pct!;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -423,7 +448,7 @@ class _AlignmentGlanceTile extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'ALIGNMENT',
+              label,
               style: theme.textTheme.labelSmall?.copyWith(
                 color: cs.onSurfaceVariant,
                 letterSpacing: 0.5,
@@ -432,9 +457,7 @@ class _AlignmentGlanceTile extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             Tooltip(
-              message:
-                  'Draft weights — score uses tunable committee weights and '
-                  'may change.',
+              message: tooltip,
               child: Icon(
                 Icons.info_outline,
                 size: 13,
@@ -445,14 +468,16 @@ class _AlignmentGlanceTile extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         AlignmentBadge(pct: pct, dense: true, showWord: true),
-        const SizedBox(height: 2),
-        Text(
-          score.breakdownLine,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: cs.onSurfaceVariant,
-            fontSize: 10,
+        if (subline != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            subline!,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontSize: 10,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

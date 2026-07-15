@@ -8,7 +8,9 @@ import '../widgets/submission_detail/section_card.dart';
 import '../widgets/submission_detail/policy_positions_grid.dart';
 import '../widgets/submission_detail/documents_card.dart';
 import '../widgets/submission_detail/references_card.dart';
+import '../widgets/submission_detail/ai_alignment_card.dart';
 import '../services/forms_service.dart';
+import 'endorsement_hub/ai_score_repository.dart';
 import '../../../models/crm/member.dart';
 import '../../../models/crm/subscriber.dart';
 import '../../../screens/crm/member_detail_screen.dart';
@@ -53,6 +55,10 @@ class SubmissionDetailScreen extends StatefulWidget {
 }
 
 class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
+  final EndorsementAiScoreRepository _aiScoreRepo =
+      EndorsementAiScoreRepository();
+  AiAlignmentScore? _aiAlignment;
+
   final MemberRepository _memberRepo = MemberRepository();
   final SubscriberRepository _subscriberRepo = SubscriberRepository();
   final FormsService _formsService = FormsService();
@@ -79,6 +85,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     if (widget.submission != null && widget.form != null) {
       setState(() => _isLoading = false);
       _loadLinkedPerson();
+      _loadAiScore();
       return;
     }
 
@@ -111,11 +118,25 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       });
 
       _loadLinkedPerson();
+      _loadAiScore();
     } catch (e) {
       setState(() {
         _loadError = 'Failed to load submission: $e';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadAiScore() async {
+    final s = submission;
+    if (s == null) return;
+    try {
+      final score = await _aiScoreRepo.loadOne(s.id);
+      if (mounted && score != null) {
+        setState(() => _aiAlignment = score);
+      }
+    } catch (e) {
+      debugPrint('Error loading AI alignment score: $e');
     }
   }
 
@@ -230,7 +251,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       return const Center(child: Text('No submission data available'));
     }
 
-    final model = SubmissionReviewModel.from(form!, submission!);
+    final model = SubmissionReviewModel.from(form!, submission!,
+        aiAlignment: _aiAlignment);
 
     // Linked-profile affordance for the hero contact row.
     VoidCallback? onOpenProfile;
@@ -278,6 +300,11 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (model.aiAlignment != null)
+                  AiAlignmentCard(
+                    ai: model.aiAlignment!,
+                    rulePct: model.ruleAlignmentPct,
+                  ),
                 for (final section in model.sections)
                   SectionCard(
                     section: section,
