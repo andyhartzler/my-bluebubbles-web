@@ -13,6 +13,8 @@ import 'widgets/analytics/question_breakdown.dart';
 import 'widgets/analytics/slate_scoreboard.dart';
 import 'widgets/compare/compare_tray.dart';
 import 'widgets/compare/side_by_side_compare.dart';
+import 'journey/journey_tab.dart';
+import 'journey/live_journey_controller.dart';
 import 'widgets/decisions/decision_board.dart';
 import 'widgets/decisions/decision_chip.dart';
 import 'widgets/decisions/decision_repository.dart';
@@ -39,7 +41,12 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
   final DecisionRepository _decisions = SupabaseDecisionRepository();
   // Per-member yes/no ballots, shared live via public.endorsement_votes.
   final EndorsementVoteRepository _votes = EndorsementVoteRepository();
-  late final TabController _tabs = TabController(length: 4, vsync: this);
+  // Live candidate-journey feed (in-flight submissions + realtime updates).
+  final LiveJourneyController _journey = LiveJourneyController(
+    formId: SlateController.endorsementFormId,
+    slug: SlateController.endorsementSlug,
+  );
+  late final TabController _tabs = TabController(length: 5, vsync: this);
 
   _CompareMode _compareMode = _CompareMode.matrix;
 
@@ -49,6 +56,7 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
     _controller.load();
     _decisions.load();
     _votes.load();
+    _journey.load();
   }
 
   @override
@@ -56,6 +64,7 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
     _tabs.dispose();
     _controller.dispose();
     _votes.dispose();
+    _journey.dispose();
     super.dispose();
   }
 
@@ -79,7 +88,7 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
 
   void _startCompare() {
     setState(() => _compareMode = _CompareMode.sideBySide);
-    _tabs.animateTo(1);
+    _tabs.animateTo(2);
   }
 
   void _focusRange(double lo, double hi) {
@@ -112,6 +121,10 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
                       controller: _controller,
                       onOpen: _openCandidate,
                       decisionChipBuilder: _decisionChip,
+                    )),
+                    _padded(JourneyTab(
+                      controller: _journey,
+                      onOpenSubmission: _openBySubmission,
                     )),
                     _padded(_compareTab(context)),
                     _padded(_analyticsTab(context)),
@@ -356,12 +369,48 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
       labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
       unselectedLabelStyle:
           const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
-      tabs: const [
-        Tab(icon: Icon(Icons.groups_2_outlined, size: 19), text: 'Roster'),
-        Tab(icon: Icon(Icons.compare_arrows, size: 19), text: 'Compare'),
-        Tab(icon: Icon(Icons.insights_outlined, size: 19), text: 'Analytics'),
-        Tab(icon: Icon(Icons.how_to_vote_outlined, size: 19), text: 'Decisions'),
+      tabs: [
+        const Tab(icon: Icon(Icons.groups_2_outlined, size: 19), text: 'Roster'),
+        Tab(icon: const Icon(Icons.sensors, size: 19), child: _liveTabLabel()),
+        const Tab(icon: Icon(Icons.compare_arrows, size: 19), text: 'Compare'),
+        const Tab(icon: Icon(Icons.insights_outlined, size: 19), text: 'Analytics'),
+        const Tab(
+            icon: Icon(Icons.how_to_vote_outlined, size: 19),
+            text: 'Decisions'),
       ],
+    );
+  }
+
+  /// "Live" tab label with a green count badge whenever someone is actively
+  /// filling the questionnaire right now.
+  Widget _liveTabLabel() {
+    return AnimatedBuilder(
+      animation: _journey,
+      builder: (context, _) {
+        final n = _journey.liveCount;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Live'),
+            if (n > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16A34A),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('$n',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 

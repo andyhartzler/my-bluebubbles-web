@@ -5,6 +5,8 @@ import 'package:bluebubbles/config/crm_config.dart';
 class FormSubmission {
   final String id;
   final DateTime createdAt;
+  final DateTime? updatedAt;
+  final DateTime? thankyouSentAt;
   final String formId;
   final String? memberId;
   final Map<String, dynamic> data;
@@ -24,6 +26,8 @@ class FormSubmission {
   const FormSubmission({
     required this.id,
     required this.createdAt,
+    this.updatedAt,
+    this.thankyouSentAt,
     required this.formId,
     this.memberId,
     required this.data,
@@ -45,6 +49,12 @@ class FormSubmission {
     return FormSubmission(
       id: json['id'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at'] as String)
+          : null,
+      thankyouSentAt: json['thankyou_sent_at'] != null
+          ? DateTime.tryParse(json['thankyou_sent_at'] as String)
+          : null,
       formId: json['form_id'] as String,
       memberId: json['member_id'] as String?,
       data: (json['data'] as Map<String, dynamic>?) ?? {},
@@ -88,6 +98,8 @@ class FormSubmission {
   FormSubmission copyWith({
     String? id,
     DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? thankyouSentAt,
     String? formId,
     String? memberId,
     Map<String, dynamic>? data,
@@ -107,6 +119,8 @@ class FormSubmission {
     return FormSubmission(
       id: id ?? this.id,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      thankyouSentAt: thankyouSentAt ?? this.thankyouSentAt,
       formId: formId ?? this.formId,
       memberId: memberId ?? this.memberId,
       data: data ?? this.data,

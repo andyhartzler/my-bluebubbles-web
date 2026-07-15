@@ -13,7 +13,9 @@ import '../services/forms_service.dart';
 import 'endorsement_hub/ai_score_repository.dart';
 import '../../../models/crm/member.dart';
 import '../../../models/crm/subscriber.dart';
+import '../../../screens/crm/candidate_detail_screen.dart';
 import '../../../screens/crm/member_detail_screen.dart';
+import '../../../services/crm/candidate_repository.dart';
 import '../../../services/crm/member_repository.dart';
 import '../../../services/crm/subscriber_repository.dart';
 
@@ -184,6 +186,29 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     );
   }
 
+  /// Jump from the survey review straight to the candidate's full CRM
+  /// profile (money, research, pipeline) when the submission is linked.
+  Future<void> _openCandidateProfile(BuildContext context) async {
+    final id = submission?.candidateId;
+    if (id == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      final candidate = await CandidateRepository().fetchCandidate(id);
+      if (candidate == null) {
+        messenger.showSnackBar(const SnackBar(
+            content: Text('Linked candidate record not found.')));
+        return;
+      }
+      navigator.push(MaterialPageRoute(
+        builder: (_) => CandidateDetailScreen(candidate: candidate),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(
+          SnackBar(content: Text('Could not open candidate profile: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -208,6 +233,12 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
           ),
         ),
         actions: [
+          if (!_isLoading && submission?.candidateId != null)
+            IconButton(
+              icon: const Icon(Icons.badge_outlined, color: Colors.white),
+              onPressed: () => _openCandidateProfile(context),
+              tooltip: 'Open candidate profile',
+            ),
           if (!_isLoading && submission != null && form != null)
             IconButton(
               icon: const Icon(Icons.content_copy, color: Colors.white),
