@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+
 import '../../../../theme/moyd_brand.dart';
 import '../../models/slate_stats.dart';
 
-/// A solid-navy scoreboard of headline slate metrics (white numerals, gold
-/// labels). Navy island so it reads identically in light and dark themes.
+/// A branded navy-gradient scoreboard of headline slate metrics (white
+/// numerals, gold accents). The gradient stays dark navy end to end so white
+/// text keeps AA contrast and the card reads identically in light and dark
+/// themes.
 class SlateScoreboard extends StatelessWidget {
   final SlateStats stats;
   const SlateScoreboard({super.key, required this.stats});
@@ -29,7 +33,11 @@ class SlateScoreboard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: MoydBrand.navy,
+        gradient: const LinearGradient(
+          colors: [BrandColors.unityBlue, BrandColors.royalBlue],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
       padding: const EdgeInsets.all(20),

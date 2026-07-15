@@ -9,6 +9,7 @@ import 'models/candidate_entry.dart';
 import 'slate_controller.dart';
 import 'widgets/analytics/alignment_histogram.dart';
 import 'widgets/analytics/battleground_card.dart';
+import 'widgets/analytics/question_breakdown.dart';
 import 'widgets/analytics/slate_scoreboard.dart';
 import 'widgets/compare/compare_tray.dart';
 import 'widgets/compare/side_by_side_compare.dart';
@@ -353,6 +354,14 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
             ],
           );
         }),
+        const SizedBox(height: 16),
+        // Per-question response analytics, including the "No answer" count
+        // (and drill-down to exactly who skipped each question).
+        QuestionBreakdown(
+          form: _controller.form!,
+          entries: _controller.all,
+          onOpen: _openCandidate,
+        ),
         const SizedBox(height: 16),
         PolicyStanceBars(form: _controller.form!, submissions: submissions),
       ],
