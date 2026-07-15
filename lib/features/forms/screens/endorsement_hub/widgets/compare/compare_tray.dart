@@ -47,91 +47,115 @@ class CompareTray extends StatelessWidget {
                 ],
               ),
               padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  SizedBox(
-                    height: 40,
-                    width: _stackWidth(n),
-                    child: Stack(
-                      children: [
-                        for (var i = 0; i < selected.length && i < 6; i++)
-                          Positioned(
-                            left: i * 26.0,
-                            child: Tooltip(
-                              message: selected[i].name,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: HubTheme.gold, width: 1.6),
-                                ),
-                                child: HeadshotAvatar(
-                                  file: selected[i].model.headshot,
-                                  name: selected[i].name,
-                                  size: 36,
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: LayoutBuilder(builder: (context, constraints) {
+                // Phone widths: fewer stacked faces and an icon-only Clear
+                // so the gold Compare CTA always fits without overflow.
+                final narrow = constraints.maxWidth < 480;
+                final maxFaces = narrow ? 3 : 6;
+                return Row(
+                  children: [
+                    SizedBox(
+                      height: 40,
+                      width: _stackWidth(n, maxFaces),
+                      child: Stack(
+                        children: [
+                          for (var i = 0;
+                              i < selected.length && i < maxFaces;
+                              i++)
+                            Positioned(
+                              left: i * 26.0,
+                              child: Tooltip(
+                                message: selected[i].name,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: HubTheme.gold, width: 1.6),
+                                  ),
+                                  child: HeadshotAvatar(
+                                    file: selected[i].model.headshot,
+                                    name: selected[i].name,
+                                    size: 36,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          n == 1
-                              ? '1 candidate selected'
-                              : '$n candidates selected',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (!canCompare)
-                          const Text(
-                            'Add one more to start the side-by-side',
-                            style: TextStyle(
-                              color: Color(0xE6FFFFFF),
-                              fontSize: 11,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            narrow
+                                ? '$n selected'
+                                : (n == 1
+                                    ? '1 candidate selected'
+                                    : '$n candidates selected'),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                      ],
+                          if (!canCompare)
+                            Text(
+                              narrow
+                                  ? 'Add one more'
+                                  : 'Add one more to start the side-by-side',
+                              style: const TextStyle(
+                                color: Color(0xE6FFFFFF),
+                                fontSize: 11,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  TextButton(
-                    onPressed: controller.clearSelection,
-                    style: TextButton.styleFrom(
-                        foregroundColor: Colors.white),
-                    child: const Text('Clear'),
-                  ),
-                  const SizedBox(width: 4),
-                  FilledButton.icon(
-                    onPressed: canCompare ? onCompare : null,
-                    icon: const Icon(Icons.compare_arrows, size: 18),
-                    label: Text('Compare ($n)'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: HubTheme.gold,
-                      foregroundColor: HubTheme.navy,
-                      textStyle: const TextStyle(fontWeight: FontWeight.w800),
-                      // Dark disabled fill so the label stays readable on the
-                      // gradient (white on this blend is > 7:1).
-                      disabledBackgroundColor:
-                          HubTheme.navy.withOpacity(0.55),
-                      disabledForegroundColor: Colors.white,
+                    if (narrow)
+                      IconButton(
+                        onPressed: controller.clearSelection,
+                        tooltip: 'Clear selection',
+                        icon: const Icon(Icons.close,
+                            color: Colors.white, size: 20),
+                        constraints: const BoxConstraints(
+                            minWidth: 44, minHeight: 44),
+                      )
+                    else
+                      TextButton(
+                        onPressed: controller.clearSelection,
+                        style: TextButton.styleFrom(
+                            foregroundColor: Colors.white),
+                        child: const Text('Clear'),
+                      ),
+                    const SizedBox(width: 4),
+                    FilledButton.icon(
+                      onPressed: canCompare ? onCompare : null,
+                      icon: const Icon(Icons.compare_arrows, size: 18),
+                      label: Text('Compare ($n)'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: HubTheme.gold,
+                        foregroundColor: HubTheme.navy,
+                        minimumSize: const Size(0, 44),
+                        textStyle:
+                            const TextStyle(fontWeight: FontWeight.w800),
+                        // Dark disabled fill so the label stays readable on
+                        // the gradient (white on this blend is > 7:1).
+                        disabledBackgroundColor:
+                            HubTheme.navy.withOpacity(0.55),
+                        disabledForegroundColor: Colors.white,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                );
+              }),
             ),
           ),
         );
@@ -139,8 +163,8 @@ class CompareTray extends StatelessWidget {
     );
   }
 
-  double _stackWidth(int n) {
-    final shown = n.clamp(1, 6);
+  double _stackWidth(int n, int maxFaces) {
+    final shown = n.clamp(1, maxFaces);
     return 36 + (shown - 1) * 26.0 + 4;
   }
 }

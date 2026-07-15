@@ -50,152 +50,213 @@ class CandidateHeroHeader extends StatelessWidget {
       if (model.district != null) model.district!,
     ].join('  ·  ');
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        // Verified navy -> royal -> deep-sky sweep (white >= 4.5:1 at every
-        // stop), matching the Endorsement HQ hero.
-        gradient: const LinearGradient(
-          colors: [MoydBrand.navy, Color(0xFF2B4B8C), Color(0xFF1D6FA8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF2B4B8C).withOpacity(0.30),
-            blurRadius: 16,
-            offset: const Offset(0, 5),
+    // Shared pieces ---------------------------------------------------------
+
+    Widget officePill() => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: MoydBrand.navy,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: MoydBrand.gold.withOpacity(0.45)),
           ),
-        ],
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _Headshot(url: model.headshot?.url, name: model.candidateName),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            displayName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              height: 1.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        if (model.alignmentPct != null) ...[
-                          AlignmentBadge(
-                              pct: model.alignmentPct!, showWord: true),
-                          const SizedBox(width: 8),
-                        ],
-                        SubmissionStatusBadge(status: status),
-                      ],
-                    ),
-                    if (model.pronouns != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        model.pronouns!,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                    if (officeLine.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      // Solid navy pill so the gold office line keeps its
-                      // ~5.7:1 contrast regardless of the gradient stop
-                      // beneath it.
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: MoydBrand.navy,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                              color: MoydBrand.gold.withOpacity(0.45)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.account_balance,
-                                size: 14, color: MoydBrand.gold),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                officeLine,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: MoydBrand.gold,
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        if (model.email != null)
-                          _ContactChip(
-                            icon: Icons.email_outlined,
-                            label: model.email!,
-                            onTap: () =>
-                                _copy(context, model.email!, 'Email'),
-                          ),
-                        if (model.phone != null)
-                          _ContactChip(
-                            icon: Icons.phone_outlined,
-                            label: model.phone!,
-                            onTap: () =>
-                                _copy(context, model.phone!, 'Phone'),
-                          ),
-                        if (onOpenLinkedProfile != null)
-                          _ContactChip(
-                            icon: Icons.open_in_new,
-                            label: linkedProfileLabel ?? 'View profile',
-                            onTap: onOpenLinkedProfile!,
-                          ),
-                      ],
-                    ),
-                  ],
+              const Icon(Icons.account_balance,
+                  size: 14, color: MoydBrand.gold),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  officeLine,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MoydBrand.gold,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
           ),
-        ],
-      ),
-    );
+        );
+
+    Widget contactChips() => Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (model.email != null)
+              _ContactChip(
+                icon: Icons.email_outlined,
+                label: model.email!,
+                onTap: () => _copy(context, model.email!, 'Email'),
+              ),
+            if (model.phone != null)
+              _ContactChip(
+                icon: Icons.phone_outlined,
+                label: model.phone!,
+                onTap: () => _copy(context, model.phone!, 'Phone'),
+              ),
+            if (onOpenLinkedProfile != null)
+              _ContactChip(
+                icon: Icons.open_in_new,
+                label: linkedProfileLabel ?? 'View profile',
+                onTap: onOpenLinkedProfile!,
+              ),
+          ],
+        );
+
+    return LayoutBuilder(builder: (context, constraints) {
+      final narrow = constraints.maxWidth < 520;
+      return Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          // Verified navy -> royal -> deep-sky sweep (white >= 4.5:1 at every
+          // stop), matching the Endorsement HQ hero.
+          gradient: const LinearGradient(
+            colors: [MoydBrand.navy, Color(0xFF2B4B8C), Color(0xFF1D6FA8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2B4B8C).withOpacity(0.30),
+              blurRadius: 16,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        padding: EdgeInsets.all(narrow ? 16 : 20),
+        child: narrow
+            // Phone: headshot + name row up top, then badges / office /
+            // contact chips stacked full-width so nothing gets squeezed.
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _Headshot(
+                          url: model.headshot?.url,
+                          name: model.candidateName,
+                          size: 72),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 19,
+                                fontWeight: FontWeight.w800,
+                                height: 1.2,
+                              ),
+                            ),
+                            if (model.pronouns != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                model.pronouns!,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (model.alignmentPct != null)
+                        AlignmentBadge(pct: model.alignmentPct!, showWord: true),
+                      SubmissionStatusBadge(status: status),
+                    ],
+                  ),
+                  if (officeLine.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    officePill(),
+                  ],
+                  const SizedBox(height: 12),
+                  contactChips(),
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Headshot(
+                      url: model.headshot?.url, name: model.candidateName),
+                  const SizedBox(width: 18),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                displayName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.2,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            if (model.alignmentPct != null) ...[
+                              AlignmentBadge(
+                                  pct: model.alignmentPct!, showWord: true),
+                              const SizedBox(width: 8),
+                            ],
+                            SubmissionStatusBadge(status: status),
+                          ],
+                        ),
+                        if (model.pronouns != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            model.pronouns!,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                        if (officeLine.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          // Solid navy pill so the gold office line keeps its
+                          // ~5.7:1 contrast regardless of the gradient stop
+                          // beneath it.
+                          officePill(),
+                        ],
+                        const SizedBox(height: 12),
+                        contactChips(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+      );
+    });
   }
 }
 
 class _Headshot extends StatelessWidget {
   final String? url;
   final String name;
-  const _Headshot({required this.url, required this.name});
+  final double size;
+  const _Headshot({required this.url, required this.name, this.size = 96});
 
   @override
   Widget build(BuildContext context) {
-    const size = 96.0;
     final initial =
         name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?';
 
@@ -210,9 +271,9 @@ class _Headshot extends StatelessWidget {
       ),
       child: Text(
         initial,
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white,
-          fontSize: 40,
+          fontSize: size * 0.42,
           fontWeight: FontWeight.w700,
         ),
       ),

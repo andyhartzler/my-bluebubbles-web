@@ -151,6 +151,10 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
   // ---------------- banner ----------------
 
   Widget _banner(BuildContext context) {
+    // Below ~680px the KPI cluster leaves the title row and becomes a
+    // full-width, horizontally scrollable strip so all four KPIs stay
+    // visible on a phone without squeezing the title.
+    final narrow = MediaQuery.of(context).size.width < 680;
     return Container(
       decoration: const BoxDecoration(gradient: HubTheme.hero),
       child: SafeArea(
@@ -158,7 +162,8 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              padding: EdgeInsets.fromLTRB(
+                  narrow ? 16 : 20, 14, narrow ? 16 : 20, narrow ? 6 : 12),
               child: Row(
                 children: [
                   Container(
@@ -178,10 +183,12 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Endorsement HQ 2026',
+                        Text('Endorsement HQ 2026',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 21,
+                                fontSize: narrow ? 19 : 21,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -0.2)),
                         const SizedBox(height: 3),
@@ -196,18 +203,23 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
                               ),
                             ),
                             const SizedBox(width: 8),
-                            const Text('Candidate survey intelligence',
-                                style: TextStyle(
-                                    color: Color(0xE6FFFFFF), fontSize: 12)),
+                            const Flexible(
+                              child: Text('Candidate survey intelligence',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: Color(0xE6FFFFFF), fontSize: 12)),
+                            ),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  _bannerKpis(),
+                  if (!narrow) _bannerKpis(),
                 ],
               ),
             ),
+            if (narrow) _mobileKpiStrip(),
             _tabBar(),
           ],
         ),
@@ -222,16 +234,7 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
         if (_controller.loading || _controller.error != null) {
           return const SizedBox.shrink();
         }
-        final s = _controller.stats;
-        final mean = s.meanAlignment;
-        final kpis = <(String, String)>[
-          ('${s.total}', 'Applicants'),
-          (mean == null ? '—' : '${mean.round()}%', 'Mean align'),
-          ('${s.youngDemCount}', 'Young Dems'),
-          ('${s.unscoredCount}', 'Unscored'),
-        ];
-        final narrow = MediaQuery.of(context).size.width < 680;
-        final shown = narrow ? kpis.sublist(0, 1) : kpis;
+        final kpis = _kpiData();
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
@@ -242,7 +245,7 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (var i = 0; i < shown.length; i++) ...[
+              for (var i = 0; i < kpis.length; i++) ...[
                 if (i > 0)
                   Container(
                     width: 1,
@@ -250,9 +253,66 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
                     margin: const EdgeInsets.symmetric(horizontal: 14),
                     color: Colors.white.withOpacity(0.18),
                   ),
-                _kpi(shown[i].$1, shown[i].$2),
+                _kpi(kpis[i].$1, kpis[i].$2),
               ],
             ],
+          ),
+        );
+      },
+    );
+  }
+
+  List<(String, String)> _kpiData() {
+    final s = _controller.stats;
+    final mean = s.meanAlignment;
+    return <(String, String)>[
+      ('${s.total}', 'Applicants'),
+      (mean == null ? '—' : '${mean.round()}%', 'Mean align'),
+      ('${s.youngDemCount}', 'Young Dems'),
+      ('${s.unscoredCount}', 'Unscored'),
+    ];
+  }
+
+  /// Phone-width KPI strip: all four KPIs in a contained horizontal scroll
+  /// (the strip scrolls inside itself; the page never scrolls sideways).
+  Widget _mobileKpiStrip() {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        if (_controller.loading || _controller.error != null) {
+          return const SizedBox.shrink();
+        }
+        final kpis = _kpiData();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withOpacity(0.14)),
+            ),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(width: 8),
+                  for (var i = 0; i < kpis.length; i++) ...[
+                    if (i > 0)
+                      Container(
+                        width: 1,
+                        height: 26,
+                        margin: const EdgeInsets.symmetric(horizontal: 12),
+                        color: Colors.white.withOpacity(0.18),
+                      ),
+                    _kpi(kpis[i].$1, kpis[i].$2),
+                  ],
+                  const SizedBox(width: 8),
+                ],
+              ),
+            ),
           ),
         );
       },
@@ -319,28 +379,35 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
     }
     final submissions =
         _controller.all.map((e) => e.submission).toList(growable: false);
+    final modeSwitch = _CompareModeSwitch(
+      mode: _compareMode,
+      onChanged: (m) => setState(() => _compareMode = m),
+    );
+    final countPill = _compareMode == _CompareMode.sideBySide
+        ? HubCountPill(
+            icon: Icons.person_outline,
+            text: '${_controller.selectedCount} selected',
+          )
+        : HubCountPill(
+            icon: Icons.grid_on,
+            text: '${submissions.length} candidates',
+          );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            _CompareModeSwitch(
-              mode: _compareMode,
-              onChanged: (m) => setState(() => _compareMode = m),
-            ),
-            const Spacer(),
-            if (_compareMode == _CompareMode.sideBySide)
-              HubCountPill(
-                icon: Icons.person_outline,
-                text: '${_controller.selectedCount} selected',
-              )
-            else
-              HubCountPill(
-                icon: Icons.grid_on,
-                text: '${submissions.length} candidates',
-              ),
-          ],
-        ),
+        // Phone widths: the mode switch and count pill wrap onto separate
+        // lines instead of overflowing a single fixed row.
+        LayoutBuilder(builder: (context, constraints) {
+          if (constraints.maxWidth < 520) {
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [modeSwitch, countPill],
+            );
+          }
+          return Row(children: [modeSwitch, const Spacer(), countPill]);
+        }),
         const SizedBox(height: 12),
         Expanded(
           child: _compareMode == _CompareMode.matrix

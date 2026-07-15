@@ -53,9 +53,13 @@ class _Column {
 }
 
 class _CompareMatrixState extends State<CompareMatrix> {
-  static const double _nameColWidth = 184;
-  static const double _colWidth = 128;
-  static const double _alignColWidth = 116;
+  // Column metrics. The sticky name column and stance columns narrow on
+  // phone widths (set from the LayoutBuilder in [build]) so the matrix stays
+  // usable at ~360px: the name column stays pinned and the stance columns
+  // scroll horizontally inside the matrix (the page never scrolls sideways).
+  double _nameColWidth = 184;
+  double _colWidth = 128;
+  double _alignColWidth = 116;
   static const double _rowHeight = 54;
   static const double _headerHeight = 104;
 
@@ -219,7 +223,12 @@ class _CompareMatrixState extends State<CompareMatrix> {
 
     final rows = _visibleRows;
 
-    return Column(
+    return LayoutBuilder(builder: (context, constraints) {
+      final narrow = constraints.maxWidth < 560;
+      _nameColWidth = narrow ? 138 : 184;
+      _colWidth = narrow ? 112 : 128;
+      _alignColWidth = narrow ? 104 : 116;
+      return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildToolbar(theme, colorScheme, rows.length),
@@ -269,7 +278,8 @@ class _CompareMatrixState extends State<CompareMatrix> {
           ),
         ),
       ],
-    );
+      );
+    });
   }
 
   Widget _buildToolbar(

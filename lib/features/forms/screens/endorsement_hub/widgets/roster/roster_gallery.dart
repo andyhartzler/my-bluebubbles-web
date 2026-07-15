@@ -67,63 +67,94 @@ class _RosterGalleryState extends State<RosterGallery> {
   Widget _toolbar(BuildContext context, SlateController c, int shown) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    return Row(
-      children: [
-        Expanded(
-          child: SizedBox(
-            height: 44,
-            child: TextField(
-              controller: _search,
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: 'Search name, office, district…',
-                prefixIcon: const Icon(Icons.search, size: 20),
-                suffixIcon: c.search.isEmpty
-                    ? null
-                    : IconButton(
-                        icon: const Icon(Icons.close, size: 18),
-                        onPressed: () {
-                          _search.clear();
-                          c.setSearch('');
-                        },
-                      ),
-                filled: true,
-                fillColor: cs.surfaceContainerHighest.withOpacity(0.35),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(13),
-                  borderSide: BorderSide(color: cs.outlineVariant),
+    final search = SizedBox(
+      height: 44,
+      child: TextField(
+        controller: _search,
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: 'Search name, office, district…',
+          prefixIcon: const Icon(Icons.search, size: 20),
+          suffixIcon: c.search.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () {
+                    _search.clear();
+                    c.setSearch('');
+                  },
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(13),
-                  borderSide: BorderSide(color: cs.outlineVariant),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(13),
-                  borderSide: const BorderSide(color: HubTheme.royal, width: 1.6),
-                ),
-              ),
-              onChanged: c.setSearch,
-            ),
+          filled: true,
+          fillColor: cs.surfaceContainerHighest.withOpacity(0.35),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(13),
+            borderSide: BorderSide(color: cs.outlineVariant),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(13),
+            borderSide: BorderSide(color: cs.outlineVariant),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(13),
+            borderSide: const BorderSide(color: HubTheme.royal, width: 1.6),
           ),
         ),
-        const SizedBox(width: 10),
-        _sortButton(context, c),
-        const SizedBox(width: 8),
-        _FilterToggle(
-          open: _filtersOpen,
-          active: c.hasActiveFilters,
-          onTap: () => setState(() => _filtersOpen = !_filtersOpen),
-        ),
-        const SizedBox(width: 12),
-        HubCountPill(
-          icon: Icons.person_outline,
-          text: shown == 1 ? '1 candidate' : '$shown candidates',
-        ),
-      ],
+        onChanged: c.setSearch,
+      ),
     );
+
+    return LayoutBuilder(builder: (context, constraints) {
+      final narrow = constraints.maxWidth < 620;
+      if (narrow) {
+        // Phone: search gets its own full-width row; sort / filters / count
+        // sit on a second row (sort collapses to its icon so nothing clips).
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            search,
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _sortButton(context, c, iconOnly: true),
+                const SizedBox(width: 8),
+                _FilterToggle(
+                  open: _filtersOpen,
+                  active: c.hasActiveFilters,
+                  onTap: () => setState(() => _filtersOpen = !_filtersOpen),
+                ),
+                const Spacer(),
+                HubCountPill(
+                  icon: Icons.person_outline,
+                  text: shown == 1 ? '1 candidate' : '$shown candidates',
+                ),
+              ],
+            ),
+          ],
+        );
+      }
+      return Row(
+        children: [
+          Expanded(child: search),
+          const SizedBox(width: 10),
+          _sortButton(context, c),
+          const SizedBox(width: 8),
+          _FilterToggle(
+            open: _filtersOpen,
+            active: c.hasActiveFilters,
+            onTap: () => setState(() => _filtersOpen = !_filtersOpen),
+          ),
+          const SizedBox(width: 12),
+          HubCountPill(
+            icon: Icons.person_outline,
+            text: shown == 1 ? '1 candidate' : '$shown candidates',
+          ),
+        ],
+      );
+    });
   }
 
-  Widget _sortButton(BuildContext context, SlateController c) {
+  Widget _sortButton(BuildContext context, SlateController c,
+      {bool iconOnly = false}) {
     final cs = Theme.of(context).colorScheme;
     return PopupMenuButton<SlateSort>(
       tooltip: 'Sort',
@@ -158,10 +189,12 @@ class _RosterGalleryState extends State<RosterGallery> {
         child: Row(
           children: [
             const Icon(Icons.sort, size: 18),
-            const SizedBox(width: 6),
-            Text(c.sort.label,
-                style: const TextStyle(
-                    fontSize: 12.5, fontWeight: FontWeight.w700)),
+            if (!iconOnly) ...[
+              const SizedBox(width: 6),
+              Text(c.sort.label,
+                  style: const TextStyle(
+                      fontSize: 12.5, fontWeight: FontWeight.w700)),
+            ],
             const SizedBox(width: 2),
             Icon(Icons.arrow_drop_down, size: 18, color: cs.onSurfaceVariant),
           ],
@@ -195,26 +228,48 @@ class _RosterGalleryState extends State<RosterGallery> {
             : null,
       );
     }
-    return GridView.builder(
-      padding: const EdgeInsets.only(bottom: 24, top: 4),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 236,
-        childAspectRatio: 0.66,
-        crossAxisSpacing: 14,
-        mainAxisSpacing: 14,
-      ),
-      itemCount: visible.length,
-      itemBuilder: (context, i) {
-        final e = visible[i];
-        return RosterCard(
-          entry: e,
-          selected: c.isSelected(e.id),
-          onOpen: () => widget.onOpen(e),
-          onToggleSelect: () => c.toggleSelected(e.id),
-          decisionChip: widget.decisionChipBuilder?.call(e),
+    return LayoutBuilder(builder: (context, constraints) {
+      // Phone: a single-column list of horizontal cards (face left, details
+      // right, always-visible Compare button — no hover needed on touch).
+      if (constraints.maxWidth < 480) {
+        return ListView.separated(
+          padding: const EdgeInsets.only(bottom: 24, top: 4),
+          itemCount: visible.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          itemBuilder: (context, i) {
+            final e = visible[i];
+            return RosterCard(
+              entry: e,
+              selected: c.isSelected(e.id),
+              horizontal: true,
+              onOpen: () => widget.onOpen(e),
+              onToggleSelect: () => c.toggleSelected(e.id),
+              decisionChip: widget.decisionChipBuilder?.call(e),
+            );
+          },
         );
-      },
-    );
+      }
+      return GridView.builder(
+        padding: const EdgeInsets.only(bottom: 24, top: 4),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 236,
+          childAspectRatio: 0.66,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
+        ),
+        itemCount: visible.length,
+        itemBuilder: (context, i) {
+          final e = visible[i];
+          return RosterCard(
+            entry: e,
+            selected: c.isSelected(e.id),
+            onOpen: () => widget.onOpen(e),
+            onToggleSelect: () => c.toggleSelected(e.id),
+            decisionChip: widget.decisionChipBuilder?.call(e),
+          );
+        },
+      );
+    });
   }
 }
 

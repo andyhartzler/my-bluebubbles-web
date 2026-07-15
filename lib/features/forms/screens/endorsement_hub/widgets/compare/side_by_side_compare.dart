@@ -67,8 +67,11 @@ class _PolicyRow {
 }
 
 class _SideBySideCompareState extends State<SideBySideCompare> {
-  static const double _labelW = 210;
-  static const double _colW = 168;
+  // Column metrics. The sticky label column and candidate columns narrow on
+  // phone widths (set from the LayoutBuilder in [_comparisonView]) so the
+  // sticky labels never eat most of a 360px viewport.
+  double _labelW = 210;
+  double _colW = 168;
   static const double _headerH = 152;
   static const double _vitalH = 44;
   static const double _sectionH = 34;
@@ -152,7 +155,11 @@ class _SideBySideCompareState extends State<SideBySideCompare> {
           b.distinctDecisive.length.compareTo(a.distinctDecisive.length));
     }
 
-    return Column(
+    return LayoutBuilder(builder: (context, constraints) {
+      final narrow = constraints.maxWidth < 560;
+      _labelW = narrow ? 132 : 210;
+      _colW = narrow ? 148 : 168;
+      return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _controls(theme, unanimousCount, splitCount),
@@ -202,7 +209,8 @@ class _SideBySideCompareState extends State<SideBySideCompare> {
           ),
         ),
       ],
-    );
+      );
+    });
   }
 
   // ---------------- controls ----------------

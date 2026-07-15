@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../models/submission_review_model.dart';
 import '../../../../theme/moyd_brand.dart';
 import '../../../../widgets/review/stance_visuals.dart';
 import '../../models/candidate_entry.dart';
@@ -22,6 +23,10 @@ class RosterCard extends StatefulWidget {
   /// Optional decision chip (built by the Decisions layer when present).
   final Widget? decisionChip;
 
+  /// Phone layout: face on the left, details on the right, natural height,
+  /// and an always-visible Compare button (touch has no hover state).
+  final bool horizontal;
+
   const RosterCard({
     super.key,
     required this.entry,
@@ -29,6 +34,7 @@ class RosterCard extends StatefulWidget {
     required this.onOpen,
     required this.onToggleSelect,
     this.decisionChip,
+    this.horizontal = false,
   });
 
   @override
@@ -46,6 +52,10 @@ class _RosterCardState extends State<RosterCard> {
     final entry = widget.entry;
     final model = entry.model;
     final showControls = _hover || widget.selected;
+
+    if (widget.horizontal) {
+      return _horizontalCard(theme, cs, dark, entry, model);
+    }
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -209,6 +219,123 @@ class _RosterCardState extends State<RosterCard> {
   }
 }
 
+extension on _RosterCardState {
+  /// Phone-width layout: 96px face thumb + always-visible Compare button on
+  /// the left, all text on the opaque card surface to the right. Natural
+  /// height, so long flag rows and the decision chip never clip; every label
+  /// keeps its theme-surface contrast in both light and dark themes.
+  Widget _horizontalCard(ThemeData theme, ColorScheme cs, bool dark,
+      CandidateEntry entry, SubmissionReviewModel model) {
+    return GestureDetector(
+      onTap: widget.onOpen,
+      child: Container(
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: widget.selected ? HubTheme.gold : cs.outlineVariant,
+            width: widget.selected ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(dark ? 0.25 : 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Column(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 96,
+                    height: 96,
+                    child: HeadshotAvatar(
+                      file: model.headshot,
+                      name: entry.name,
+                      circle: false,
+                      radius: 0,
+                      size: 96,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _SelectButton(
+                  selected: widget.selected,
+                  onTap: widget.onToggleSelect,
+                  large: true,
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          entry.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      if (entry.isYoungDem) ...[
+                        const SizedBox(width: 5),
+                        const Tooltip(
+                          message: 'Young Dem',
+                          child: Icon(Icons.workspace_premium,
+                              size: 15, color: HubTheme.gold),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (entry.officeLine.isNotEmpty)
+                    Text(
+                      entry.officeLine,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _StatusChip(status: entry.submission.status),
+                      if (model.alignmentPct != null)
+                        AlignmentBadge(pct: model.alignmentPct!, dense: true),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _StanceStrip(entry: entry),
+                  if (entry.flags.any) ...[
+                    const SizedBox(height: 8),
+                    _FlagChips(flags: entry.flags),
+                  ],
+                  if (widget.decisionChip != null) ...[
+                    const SizedBox(height: 8),
+                    widget.decisionChip!,
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// The three-segment support / qualified / oppose strip.
 class _StanceStrip extends StatelessWidget {
   final CandidateEntry entry;
@@ -366,7 +493,13 @@ class _Frosted extends StatelessWidget {
 class _SelectButton extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
-  const _SelectButton({required this.selected, required this.onTap});
+
+  /// Touch-friendly sizing for the phone list layout (bigger padding +
+  /// glyphs, so the tap target reaches finger size).
+  final bool large;
+
+  const _SelectButton(
+      {required this.selected, required this.onTap, this.large = false});
 
   @override
   Widget build(BuildContext context) {
@@ -376,7 +509,8 @@ class _SelectButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+          padding: EdgeInsets.symmetric(
+              horizontal: large ? 12 : 9, vertical: large ? 10 : 5),
           decoration: BoxDecoration(
             color: selected ? HubTheme.gold : HubTheme.navy.withOpacity(0.92),
             borderRadius: BorderRadius.circular(20),
@@ -389,7 +523,7 @@ class _SelectButton extends StatelessWidget {
             children: [
               Icon(
                 selected ? Icons.check_circle : Icons.add_circle_outline,
-                size: 15,
+                size: large ? 17 : 15,
                 color: selected ? HubTheme.navy : Colors.white,
               ),
               const SizedBox(width: 4),
@@ -397,7 +531,7 @@ class _SelectButton extends StatelessWidget {
                 selected ? 'Added' : 'Compare',
                 style: TextStyle(
                   color: selected ? HubTheme.navy : Colors.white,
-                  fontSize: 11,
+                  fontSize: large ? 12 : 11,
                   fontWeight: FontWeight.w800,
                 ),
               ),

@@ -130,21 +130,40 @@ class _DecisionBoardState extends State<DecisionBoard> {
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 10),
-            Row(
-              children: [
-                _FilterSwitch(
-                  filter: _filter,
-                  needsMyVoteCount:
-                      all.where((e) => widget.votes.myVote(e.id) == null).length,
-                  onChanged: (f) => setState(() => _filter = f),
-                ),
-                const Spacer(),
-                _SortMenu(
-                  sort: _sort,
-                  onChanged: (s) => setState(() => _sort = s),
-                ),
-              ],
-            ),
+            // Filter + sort controls: on phone widths the segmented filter
+            // uses compact labels and scrolls inside its own box if it still
+            // cannot fit, so this row never overflows the page.
+            LayoutBuilder(builder: (context, constraints) {
+              final narrow = constraints.maxWidth < 560;
+              final filterSwitch = _FilterSwitch(
+                filter: _filter,
+                compact: narrow,
+                needsMyVoteCount:
+                    all.where((e) => widget.votes.myVote(e.id) == null).length,
+                onChanged: (f) => setState(() => _filter = f),
+              );
+              final sortMenu = _SortMenu(
+                sort: _sort,
+                onChanged: (s) => setState(() => _sort = s),
+              );
+              if (narrow) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: filterSwitch,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    sortMenu,
+                  ],
+                );
+              }
+              return Row(
+                children: [filterSwitch, const Spacer(), sortMenu],
+              );
+            }),
             const SizedBox(height: 10),
             Expanded(
               child: visible.isEmpty
@@ -533,10 +552,16 @@ class _FilterSwitch extends StatelessWidget {
   final _VoteFilter filter;
   final int needsMyVoteCount;
   final ValueChanged<_VoteFilter> onChanged;
+
+  /// Compact (phone) mode: shorter segment labels so the switch fits a
+  /// ~360px viewport beside the sort menu.
+  final bool compact;
+
   const _FilterSwitch({
     required this.filter,
     required this.needsMyVoteCount,
     required this.onChanged,
+    this.compact = false,
   });
 
   @override
@@ -581,14 +606,17 @@ class _FilterSwitch extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          seg(_VoteFilter.all, Icons.groups_2_outlined, 'All candidates'),
+          seg(_VoteFilter.all, Icons.groups_2_outlined,
+              compact ? 'All' : 'All candidates'),
           const SizedBox(width: 2),
           seg(
             _VoteFilter.needsMyVote,
             Icons.pending_actions,
             needsMyVoteCount > 0
-                ? 'Needs my vote ($needsMyVoteCount)'
-                : 'Needs my vote',
+                ? (compact
+                    ? 'Needs vote ($needsMyVoteCount)'
+                    : 'Needs my vote ($needsMyVoteCount)')
+                : (compact ? 'Needs vote' : 'Needs my vote'),
           ),
         ],
       ),
@@ -1092,7 +1120,9 @@ class _DecisionPanelState extends State<_DecisionPanel> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final e = widget.entry;
-    return Padding(
+    // Scrollable so the panel still fits a phone screen with the keyboard
+    // open (the working-note field sits low in the sheet).
+    return SingleChildScrollView(
       padding: EdgeInsets.only(
         left: 20,
         right: 20,
