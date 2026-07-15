@@ -317,7 +317,8 @@ class FormsService {
           .eq('form_id', formId)
           // Only completed submissions — exclude in_progress/abandoned autosave
           // drafts that would otherwise show up as spurious duplicate rows.
-          .inFilter('status', const ['submitted', 'reviewed', 'processed'])
+          .inFilter('status',
+              const ['submitted', 'reviewed', 'processed', 'complete', 'completed'])
           .order('created_at', ascending: false);
 
       final data = response as List;
@@ -333,16 +334,33 @@ class FormsService {
         }
       }).toList();
 
-      // Dedupe: if the same person has multiple completed submissions, keep
-      // only the newest. Rows are ordered newest-first, so the first occurrence
-      // of each key wins. Key on candidate_id, then submitter_phone; rows with
-      // neither fall back to their unique id (never dropped).
-      final seen = <String>{};
-      final deduped = <FormSubmission>[];
+      // Dedupe: if the same person has multiple completed submissions, keep the
+      // MOST COMPLETE one (not merely the newest). Ranking by completeness first
+      // guards against a sparse/newer row shadowing a fully-answered older one
+      // (the 2026-07 incident's RC6). Tie-break on recency. Key on candidate_id,
+      // then submitter_phone; rows with neither fall back to their unique id.
+      int completeness(FormSubmission s) =>
+          s.data.entries.where((e) {
+            final v = e.value;
+            if (v == null) return false;
+            if (v is String) return v.trim().isNotEmpty;
+            if (v is Iterable) return v.isNotEmpty;
+            return true;
+          }).length;
+
+      final best = <String, FormSubmission>{};
       for (final s in submissions) {
         final key = s.candidateId ?? s.submitterPhone ?? s.id;
-        if (seen.add(key)) deduped.add(s);
+        final existing = best[key];
+        // Submissions arrive newest-first, so on a completeness tie the first
+        // (newer) row is kept; only a strictly-more-complete later row replaces it.
+        if (existing == null || completeness(s) > completeness(existing)) {
+          best[key] = s;
+        }
       }
+      // Preserve the original newest-first ordering of the surviving rows.
+      final survivors = best.values.toSet();
+      final deduped = submissions.where(survivors.contains).toList();
       return deduped;
     } catch (e) {
       debugPrint('FormsService.getSubmissions: Error fetching submissions: $e');
