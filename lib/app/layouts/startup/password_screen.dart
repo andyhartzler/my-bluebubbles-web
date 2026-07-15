@@ -70,6 +70,12 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
         _sessionExpired = true;
         _errorMessage = 'Your session has expired. Please sign in again.';
       });
+    } else if (!expired) {
+      // The user just brought the app back into view with a valid session:
+      // that is activity, so slide the idle window forward. Without this the
+      // activity timestamp was only ever written at bootstrap and the
+      // "activity-based" timeout degraded to a hard 4h-after-login sign-out.
+      await _sessionService.recordActivity();
     }
   }
 

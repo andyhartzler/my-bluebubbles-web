@@ -17,6 +17,13 @@ const DEFAULT_CALENDAR_ID = Deno.env.get("MOYD_CALENDAR_ID") || "c_6592cac54ba26
 // user JWT (mobile_calendar_view.dart + committee_calendar_widget.dart). Gate
 // on authenticated user; anyone authenticated may trigger a calendar sync.
 async function requireAuthenticatedUser(req) {
+  // Cron path: the hourly pg_cron job can't present a user JWT, so it
+  // authenticates with a shared secret instead (same pattern as
+  // send-endorsement-thankyou's x-webhook-secret).
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  if (cronSecret && req.headers.get("x-cron-secret") === cronSecret) {
+    return { userId: "cron" };
+  }
   const authHeader = req.headers.get("Authorization") ?? "";
   const jwt = authHeader.replace(/^Bearer /i, "").trim();
   if (!jwt) {
@@ -140,30 +147,30 @@ async function requireAuthenticatedUser(req) {
   const endTime = event.end?.dateTime || event.end?.date + "T00:00:00Z";
   // Parse location
   const location = event.location || null;
-  // Determine visibility (our schema uses 'public' or 'private')
-  const visibility = event.visibility === "private" ? "private" : "public";
   // Extract attendees
   const attendees = (event.attendees || []).map((a)=>({
       email: a.email,
       displayName: a.displayName || a.email,
       responseStatus: a.responseStatus || "needsAction"
     }));
+  // Column names below must match public.calendar_events exactly; the mapper
+  // previously wrote google_calendar_id/visibility/recurrence/html_link/
+  // last_synced_at, none of which exist, so every event errored on write.
   return {
     google_event_id: event.id,
-    google_calendar_id: calendarId,
+    calendar_id: calendarId,
     title: event.summary || "Untitled Event",
     description: event.description || null,
     location,
     start_time: startTime,
     end_time: endTime,
     is_all_day: isAllDay,
-    visibility,
     status: event.status || "confirmed",
     attendees: attendees.length > 0 ? attendees : null,
     organizer_email: event.organizer?.email || null,
-    recurrence: event.recurrence || null,
-    html_link: event.htmlLink || null,
-    last_synced_at: new Date().toISOString()
+    is_recurring: !!(event.recurrence && event.recurrence.length),
+    recurrence_rule: event.recurrence && event.recurrence.length ? event.recurrence.join("\n") : null,
+    synced_at: new Date().toISOString()
   };
 }
 /**

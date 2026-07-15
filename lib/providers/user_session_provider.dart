@@ -272,9 +272,14 @@ class UserSessionProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error loading committees from member record: $e');
-      // Don't create fake committee entries - we can't verify workspace_enabled
-      // User will see "no workspace access" which is safer than granting unverified access
+      // Don't create fake committee entries - we can't verify workspace_enabled.
+      // But DO distinguish "query failed" from "member has no committees": this
+      // member has committee names, so an exception here is a transient DB/
+      // network failure, not a verdict on their access. Setting _error routes
+      // the UI to the retry screen instead of _NoAccessScreen, which reads as
+      // being locked out and pushes valid users to sign out and re-OTP.
       _userCommittees = [];
+      _error = 'Could not verify committee access. Please try again.';
     }
   }
 

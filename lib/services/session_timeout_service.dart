@@ -127,22 +127,28 @@ class SessionTimeoutService {
 
     await _ensurePrefs();
 
-    final sessionStart = _prefs!.getInt(_sessionStartKey);
-    if (sessionStart == null) {
+    // Sliding window: expiry is measured from the LAST ACTIVITY, not from
+    // login. An actively-working user must never be signed out mid-task
+    // (previously this read only _sessionStartKey, hard-expiring everyone
+    // 4h after login regardless of activity). Falls back to session start
+    // for sessions recorded before activity tracking existed.
+    final lastActivity =
+        _prefs!.getInt(_lastActivityKey) ?? _prefs!.getInt(_sessionStartKey);
+    if (lastActivity == null) {
       // No session recorded - might be first login, don't expire
       // The session will be recorded after successful login
       return false;
     }
 
-    final sessionStartTime = DateTime.fromMillisecondsSinceEpoch(sessionStart);
-    final elapsed = DateTime.now().difference(sessionStartTime);
+    final lastActivityTime = DateTime.fromMillisecondsSinceEpoch(lastActivity);
+    final idle = DateTime.now().difference(lastActivityTime);
 
-    if (elapsed > sessionTimeout) {
-      debugPrint('Session expired: started ${elapsed.inHours}h ${elapsed.inMinutes % 60}m ago (limit: ${sessionTimeout.inHours}h)');
+    if (idle > sessionTimeout) {
+      debugPrint('Session expired: idle ${idle.inHours}h ${idle.inMinutes % 60}m (limit: ${sessionTimeout.inHours}h)');
       return true;
     }
 
-    debugPrint('Session valid: ${elapsed.inMinutes}m elapsed (limit: ${sessionTimeout.inHours}h)');
+    debugPrint('Session valid: idle ${idle.inMinutes}m (limit: ${sessionTimeout.inHours}h)');
     return false;
   }
 
@@ -152,12 +158,13 @@ class SessionTimeoutService {
 
     await _ensurePrefs();
 
-    final sessionStart = _prefs!.getInt(_sessionStartKey);
-    if (sessionStart == null) return null;
+    final lastActivity =
+        _prefs!.getInt(_lastActivityKey) ?? _prefs!.getInt(_sessionStartKey);
+    if (lastActivity == null) return null;
 
-    final sessionStartTime = DateTime.fromMillisecondsSinceEpoch(sessionStart);
-    final elapsed = DateTime.now().difference(sessionStartTime);
-    final remaining = sessionTimeout - elapsed;
+    final lastActivityTime = DateTime.fromMillisecondsSinceEpoch(lastActivity);
+    final idle = DateTime.now().difference(lastActivityTime);
+    final remaining = sessionTimeout - idle;
 
     return remaining.isNegative ? Duration.zero : remaining;
   }
