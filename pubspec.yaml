@@ -337,7 +337,10 @@ dependencies:
   flutter_file_dialog: ^3.0.2
   lottie_native: ^0.2.0
   flutter_custom_tab_bar: ^1.2.1
-  # sentry_flutter / sentry_dio: telemetry, not needed (will stub references)
+  # Sentry error monitoring (org: missouri-young-democrats, project: flutter).
+  # Init is release-mode-only in main.dart; source maps uploaded by
+  # sentry_dart_plugin in netlify-build.sh when SENTRY_AUTH_TOKEN is set.
+  sentry_flutter: ^9.0.0
   # riverpod 3.x reworked StateNotifier→Notifier API — tmail uses 2.x flavor.
   flutter_riverpod: ^2.6.1
   # smaller misc deps that tmail uses internally — pub.dev packages
@@ -408,6 +411,7 @@ dependency_overrides:
 
 dev_dependencies:
   build_runner: ^2.4.12
+  sentry_dart_plugin: ^3.0.0
   build_verify: ^3.1.0
   flutter_launcher_icons: ^0.14.4
   flutter_native_splash: ^2.4.0
@@ -562,3 +566,12 @@ msix_config:
   architecture: x64
   capabilities: internetClient, location, microphone, webcam
   protocol_activation: imessage
+
+# sentry_dart_plugin config — uploads Flutter web source maps after the
+# Netlify build (netlify-build.sh). Auth comes from SENTRY_AUTH_TOKEN env;
+# release comes from SENTRY_RELEASE env (bluebubbles@<pubspec version>).
+sentry:
+  project: flutter
+  org: missouri-young-democrats
+  upload_source_maps: true
+  upload_sources: true

@@ -147,6 +147,11 @@ fi
 
 echo "Building web app..."
 
+# Sentry release must match between the SDK (dart-define) and the source map
+# uploader (sentry_dart_plugin reads SENTRY_RELEASE from the environment).
+PUBSPEC_VERSION="$(grep -m1 '^version:' pubspec.yaml | awk '{print $2}')"
+export SENTRY_RELEASE="${SENTRY_RELEASE:-bluebubbles@${PUBSPEC_VERSION}}"
+
 declare -a dart_define_args=()
 for var in \
   NEXT_PUBLIC_BLUEBUBBLES_PRIVATE_API_HOST \
@@ -170,12 +175,21 @@ for var in \
   NEXT_PUBLIC_SUPABASE_URL \
   NEXT_PUBLIC_SUPABASE_ANON_KEY \
   MAPKIT_TOKEN_MOYD \
-  MAPKIT_TOKEN_NETLIFY; do
+  MAPKIT_TOKEN_NETLIFY \
+  SENTRY_DSN \
+  SENTRY_RELEASE; do
   if [[ -n "${!var:-}" ]]; then
     dart_define_args+=("--dart-define=${var}=${!var}")
   fi
 done
 
-flutter build web --release --no-tree-shake-icons "${dart_define_args[@]}"
+flutter build web --release --no-tree-shake-icons --source-maps "${dart_define_args[@]}"
+
+if [[ -n "${SENTRY_AUTH_TOKEN:-}" ]]; then
+  echo "Uploading source maps to Sentry (release: $SENTRY_RELEASE)..."
+  dart run sentry_dart_plugin
+else
+  echo "SENTRY_AUTH_TOKEN not set; skipping Sentry source map upload."
+fi
 
 echo "Build complete! Output in build/web/"

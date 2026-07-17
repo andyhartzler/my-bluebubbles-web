@@ -29,6 +29,7 @@ import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
@@ -114,6 +115,10 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
     () async {
       WidgetsFlutterBinding.ensureInitialized();
 
+      // Sentry must be initialized inside this zone (no appRunner) so the
+      // zone error handler below and captureException share the same Hub.
+      await initSentry();
+
       // Configure for fullscreen PWA experience
       SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.edgeToEdge,
@@ -153,12 +158,15 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
       dynamic exception;
       StackTrace? stacktrace;
 
+      // This assignment replaces the handler SentryFlutter.init installed,
+      // so forward to Sentry manually here.
       FlutterError.onError = (details) {
         Logger.error(
           "Rendering Error: ${details.exceptionAsString()}",
           error: details.exception,
           trace: details.stack,
         );
+        Sentry.captureException(details.exception, stackTrace: details.stack);
       };
 
       try {
@@ -302,8 +310,35 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
     },
     (dynamic error, StackTrace stackTrace) {
       Logger.error("Unhandled Exception", trace: stackTrace, error: error);
+      Sentry.captureException(error, stackTrace: stackTrace);
     },
   );
+}
+
+/// Public ingest key for missouri-young-democrats/flutter. Overridable at
+/// build time via --dart-define=SENTRY_DSN=...
+const String _sentryDsn = String.fromEnvironment(
+  'SENTRY_DSN',
+  defaultValue:
+      'https://6ef788bee25787742e7344935cbd4143@o4511748765253632.ingest.us.sentry.io/4511748770168832',
+);
+
+Future<void> initSentry() async {
+  // Release builds only — local `flutter run` sessions stay out of Sentry.
+  if (!kReleaseMode || _sentryDsn.isEmpty) return;
+  try {
+    await SentryFlutter.init((options) {
+      options.dsn = _sentryDsn;
+      options.environment = 'production';
+      const release = String.fromEnvironment('SENTRY_RELEASE');
+      if (release.isNotEmpty) options.release = release;
+      options.tracesSampleRate = 0.2;
+      options.sendDefaultPii = false;
+    });
+  } catch (e, s) {
+    // Sentry being unreachable must never block app boot.
+    Logger.warn('Sentry failed to initialize: $e', trace: s);
+  }
 }
 
 class DesktopWindowListener extends WindowListener {
