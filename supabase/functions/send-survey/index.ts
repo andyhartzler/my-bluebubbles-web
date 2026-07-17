@@ -1,4 +1,7 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve as stdServe } from "https://deno.land/std@0.168.0/http/server.ts";
+import { withSentry } from "../_shared/sentry.ts";
+// Sentry-wrapped serve: errors + 5xx responses report to supabase-edge project.
+const serve = (h: (req: Request) => Promise<Response> | Response) => stdServe(withSentry("send-survey", h));
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {

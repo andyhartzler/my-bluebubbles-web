@@ -35,7 +35,10 @@
 //   ZOOM_WEBHOOK_SECRET_TOKEN     to sign replayed events for zoom-webhook
 //   TELEGRAM_ALERT_BOT_TOKEN / TELEGRAM_ALERT_CHAT_ID
 //   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (auto-injected)
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve as stdServe } from "https://deno.land/std@0.168.0/http/server.ts";
+import { withSentry } from "../_shared/sentry.ts";
+// Sentry-wrapped serve: errors + 5xx responses report to supabase-edge project.
+const serve = (h: (req: Request) => Promise<Response> | Response) => stdServe(withSentry("zoom-reconcile", h));
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -190,26 +193,36 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    const zoomIds = [...new Set(recordings.map((m) => String(m.id)))];
+    // Diff on the per-occurrence Zoom UUID, not the numeric meeting id. Recurring
+    // meetings reuse one numeric id for every occurrence; only the uuid is unique
+    // per occurrence, and public.meetings now keys on zoom_meeting_uuid. Diffing
+    // on the numeric id would treat every occurrence after the first as "known"
+    // and never replay it.
+    const zoomUuids = [...new Set(recordings.map((m) => String(m.uuid)).filter((u) => u && u !== 'undefined'))];
     let known = new Set<string>();
-    if (zoomIds.length > 0) {
+    if (zoomUuids.length > 0) {
       const { data, error } = await supabase
         .from('meetings')
-        .select('zoom_meeting_id')
-        .in('zoom_meeting_id', zoomIds);
+        .select('zoom_meeting_uuid')
+        .in('zoom_meeting_uuid', zoomUuids);
       if (error) throw new Error(`meetings lookup failed: ${error.message}`);
-      known = new Set((data || []).map((r: any) => String(r.zoom_meeting_id)));
+      known = new Set((data || []).map((r: any) => String(r.zoom_meeting_uuid)));
     }
 
-    // A meeting can have several recording entries (multiple instances share an
-    // id only for non-recurring meetings; recurring instances have distinct
-    // uuids but the table keys on zoom_meeting_id) — replay each missing id once.
+    // Replay each missing occurrence (unique uuid) once. Distinct occurrences of
+    // a recurring meeting share a numeric id but have distinct uuids, so each is
+    // reconciled independently.
     const seen = new Set<string>();
     for (const m of recordings) {
       const id = String(m.id);
-      if (known.has(id) || seen.has(id)) continue;
-      seen.add(id);
-      console.log(`[zoom-reconcile] MISS zoom_meeting_id=${id} topic=${m.topic} start=${m.start_time}`);
+      const uuid = String(m.uuid || '');
+      if (!uuid) {
+        errors.push(`recording ${id} (${m.topic}) missing uuid — cannot reconcile`);
+        continue;
+      }
+      if (known.has(uuid) || seen.has(uuid)) continue;
+      seen.add(uuid);
+      console.log(`[zoom-reconcile] MISS zoom_meeting_uuid=${uuid} id=${id} topic=${m.topic} start=${m.start_time}`);
       if (dryRun) {
         replayed.push({ id, topic: m.topic });
         continue;

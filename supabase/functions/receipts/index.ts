@@ -11,7 +11,10 @@
 //   GMAIL_SERVICE_ACCOUNT_JSON — Google service account JSON for Gmail API
 //   AI_API_KEY — API key for ai.hartzler.app (gemma4)
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve as stdServe } from "https://deno.land/std@0.168.0/http/server.ts";
+import { withSentry } from "../_shared/sentry.ts";
+// Sentry-wrapped serve: errors + 5xx responses report to supabase-edge project.
+const serve = (h: (req: Request) => Promise<Response> | Response) => stdServe(withSentry("receipts", h));
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";

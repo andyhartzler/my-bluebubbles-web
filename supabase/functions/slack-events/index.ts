@@ -5,9 +5,94 @@
 // UPDATED: Handles user_change events to keep avatars in sync
 // UPDATED: Populates avatar URL for unmatched users
 // ============================================
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve as stdServe } from "https://deno.land/std@0.168.0/http/server.ts";
+import { withSentry } from "../_shared/sentry.ts";
+// Sentry-wrapped serve: errors + 5xx responses report to supabase-edge project.
+const serve = (h: (req: Request) => Promise<Response> | Response) => stdServe(withSentry("slack-events", h));
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
+import { groupForChannel, addMemberToGroup, removeMemberFromGroup } from "../_shared/google-groups.ts";
+
+// ============================================================================
+// Slack channel membership -> Google Group sync (replaces 8 Zapier zaps).
+// Go-forward only: on member_joined_channel add the user's email to the mapped
+// Google Group; on member_left_channel remove it. Only mapped channels act
+// (google-groups.ts CHANNEL_TO_GROUP). Idempotent (adding an existing member or
+// removing a non-member is a no-op, never an error).
+//
+// GATE: GROUP_SYNC_MODE env. "live" = real Directory writes. Anything else
+// (unset / "off" / "dry_run", the DEFAULT) = compute + audit only, NO write.
+// Andrew flips this to "live" to activate the ongoing sync. This is deliberate,
+// documented, and audited (never a silent no-op): the compute-only path records
+// exactly what it WOULD do in public.audit_log.
+// ============================================================================
+function groupSyncMode(): string {
+  return (Deno.env.get("GROUP_SYNC_MODE") || "").trim().toLowerCase();
+}
+
+// Non-blocking audit of a group-sync decision/outcome.
+function auditGroupSync(supabase: any, ctx: Record<string, unknown>): void {
+  supabase.from("audit_log").insert({
+    action: "EDGE_FN",
+    actor_id: null,
+    actor_role: "service_role",
+    schema_name: "public",
+    table_name: "edge_fn:slack-events:group-sync",
+    row_id: null,
+    context: { event: "slack-group-sync", ...ctx },
+  }).then(() => {}).catch((e: unknown) => console.error("[group-sync] audit insert failed:", e));
+}
+
+// Add/remove the Slack user's email to/from the Google Group mapped to the
+// channel. `kind` is "join" or "leave". Runs independently of committee
+// matching so unmatched Slack users still sync. No-op for unmapped channels.
+async function syncGroupMembership(
+  event: any,
+  kind: "join" | "leave",
+  supabase: any,
+  slackToken: string,
+): Promise<void> {
+  const channel = event.channel;
+  const slackUserId = event.user;
+  const group = groupForChannel(channel);
+  if (!group) return; // channel not in the map — ignore
+
+  // Resolve the member email. Prefer live Slack profile; fall back to the
+  // stored mapping (e.g. a deactivated user on leave).
+  let email: string | null = null;
+  const info = await getSlackUserInfo(slackUserId, slackToken);
+  if (info) email = info.profile?.email || null;
+  if (!email) {
+    const { data: um } = await supabase
+      .from("slack_user_mapping").select("slack_email").eq("slack_user_id", slackUserId).single();
+    email = um?.slack_email || null;
+  }
+
+  const mode = groupSyncMode();
+  if (!email) {
+    console.warn(`[group-sync] ${kind} ${channel}: no email for ${slackUserId} — skipped`);
+    auditGroupSync(supabase, { kind, channel, group, slack_user_id: slackUserId, result: "no_email", mode });
+    return;
+  }
+  if (mode !== "live") {
+    console.log(`[group-sync] ${mode || "off"} (compute-only): would ${kind === "join" ? "add" : "remove"} ${email} ${kind === "join" ? "to" : "from"} ${group}`);
+    auditGroupSync(supabase, { kind, channel, group, email, slack_user_id: slackUserId, result: "compute_only", mode: mode || "off" });
+    return;
+  }
+
+  const r = kind === "join"
+    ? await addMemberToGroup(email, group)
+    : await removeMemberFromGroup(email, group);
+  console.log(`[group-sync] LIVE ${kind} ${email} ${group}: ${r.action} (status ${r.status})${r.error ? " err=" + r.error : ""}`);
+  if (r.scopeError) {
+    console.error("[group-sync] DWD SCOPE ERROR — Andrew must authorize scope 'https://www.googleapis.com/auth/admin.directory.group.member' for client-id 114261141581576499255 in admin.google.com (Security > API controls > Domain-wide delegation)");
+  }
+  auditGroupSync(supabase, {
+    kind, channel, group, email, slack_user_id: slackUserId,
+    result: r.action, ok: r.ok, status: r.status, scope_error: r.scopeError ?? false,
+    error: r.error ?? null, mode: "live",
+  });
+}
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-slack-signature, x-slack-request-timestamp"
@@ -449,9 +534,12 @@ serve(async (req)=>{
       switch(event.type){
         case "member_joined_channel":
           await handleMemberJoined(event, supabase, slackToken);
+          // Slack channel membership -> Google Group sync (replaces 8 zaps).
+          await syncGroupMembership(event, "join", supabase, slackToken);
           break;
         case "member_left_channel":
           await handleMemberLeft(event, supabase);
+          await syncGroupMembership(event, "leave", supabase, slackToken);
           break;
         case "message":
           // Archive messages from channels

@@ -4,7 +4,10 @@
 // Environment variables are set via Supabase Dashboard → Edge Functions → Secrets:
 //   PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve as stdServe } from "https://deno.land/std@0.168.0/http/server.ts";
+import { withSentry } from "../_shared/sentry.ts";
+// Sentry-wrapped serve: errors + 5xx responses report to supabase-edge project.
+const serve = (h: (req: Request) => Promise<Response> | Response) => stdServe(withSentry("plaid", h));
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
 const PLAID_CLIENT_ID = Deno.env.get("PLAID_CLIENT_ID") ?? "";

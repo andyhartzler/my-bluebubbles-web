@@ -53,7 +53,10 @@
 // meetings never reach the production n8n workflows). Honored only after
 // x-zm-signature verification, so only holders of ZOOM_WEBHOOK_SECRET_TOKEN
 // can set it.
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve as stdServe } from "https://deno.land/std@0.168.0/http/server.ts";
+import { withSentry } from "../_shared/sentry.ts";
+// Sentry-wrapped serve: errors + 5xx responses report to supabase-edge project.
+const serve = (h: (req: Request) => Promise<Response> | Response) => stdServe(withSentry("zoom-webhook", h));
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const N8N_FORWARD_BASE = 'https://n8n.moydchat.org/webhook/zoom';
@@ -174,15 +177,29 @@ async function reportFailure(args: {
 // Synchronous skeleton write so the meeting can never be lost. Never clobbers
 // a richer row: insert is ON CONFLICT DO NOTHING; the follow-up update only
 // touches rows still in processing_status='received'.
+//
+// DEDUP KEY = the per-occurrence Zoom UUID (zoom_meeting_uuid), NOT the numeric
+// meeting id. Recurring meetings (e.g. the monthly Executive Committee Meeting)
+// reuse ONE numeric id for every occurrence; only the UUID is unique per
+// occurrence. Keying on the numeric id collapsed every occurrence onto the
+// first row. recording.completed and meeting.summary_completed for the same
+// occurrence carry the same UUID, so they still merge onto one row. The numeric
+// zoom_meeting_id is still written for display/back-compat. Fallback to the
+// numeric id only if a UUID is somehow absent (never happens for real events).
 async function upsertMinimalRow(args: {
   zoomMeetingId: string;
+  zoomMeetingUuid?: string;
   topic?: string;
   startTime?: string;
   durationMinutes?: number;
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = getServiceClient();
+  const uuidKey = (args.zoomMeetingUuid && args.zoomMeetingUuid.trim())
+    ? args.zoomMeetingUuid.trim()
+    : args.zoomMeetingId;
   const row = {
     zoom_meeting_id: args.zoomMeetingId,
+    zoom_meeting_uuid: uuidKey,
     meeting_title: args.topic || '(untitled Zoom meeting)',
     meeting_date: args.startTime && !isNaN(new Date(args.startTime).getTime())
       ? new Date(args.startTime).toISOString()
@@ -192,11 +209,11 @@ async function upsertMinimalRow(args: {
   };
   const { data, error } = await supabase
     .from('meetings')
-    .upsert(row, { onConflict: 'zoom_meeting_id', ignoreDuplicates: true })
+    .upsert(row, { onConflict: 'zoom_meeting_uuid', ignoreDuplicates: true })
     .select('id');
   if (error) return { ok: false, error: error.message };
   if (data && data.length > 0) {
-    console.log(`[zoom-webhook] minimal row inserted for zoom_meeting_id=${args.zoomMeetingId}`);
+    console.log(`[zoom-webhook] minimal row inserted for zoom_meeting_uuid=${uuidKey} (id=${args.zoomMeetingId})`);
     return { ok: true };
   }
   // Row already existed. Refresh skeleton fields only if it is still a skeleton.
@@ -207,10 +224,10 @@ async function upsertMinimalRow(args: {
       meeting_date: row.meeting_date,
       duration_minutes: row.duration_minutes
     })
-    .eq('zoom_meeting_id', args.zoomMeetingId)
+    .eq('zoom_meeting_uuid', uuidKey)
     .eq('processing_status', 'received');
   if (updError) return { ok: false, error: updError.message };
-  console.log(`[zoom-webhook] minimal row already present for zoom_meeting_id=${args.zoomMeetingId} (left intact)`);
+  console.log(`[zoom-webhook] minimal row already present for zoom_meeting_uuid=${uuidKey} (left intact)`);
   return { ok: true };
 }
 
@@ -290,7 +307,7 @@ async function invokeMeetingsZap(payload: Record<string, unknown>): Promise<Resp
 
 // Heavy leg-A work for recording.completed — runs in the background after the
 // 200 has been returned to Zoom.
-async function runLegARecording(obj: any, meetingId: string, event: string) {
+async function runLegARecording(obj: any, meetingId: string, meetingUuid: string, event: string) {
   const topic = obj.topic || '';
   try {
     let recordings: any = { recording_files: obj.recording_files || [] };
@@ -310,6 +327,7 @@ async function runLegARecording(obj: any, meetingId: string, event: string) {
     const files = recordings.recording_files || [];
     const zapPayload = {
       meeting_id: meetingId,
+      meeting_uuid: meetingUuid || obj.uuid || '',
       meeting_topic: topic || recordings.topic,
       meeting_host: obj.host_email || recordings.host_email || '',
       start_time: obj.start_time || recordings.start_time,
@@ -338,11 +356,12 @@ async function runLegARecording(obj: any, meetingId: string, event: string) {
 }
 
 // Leg-A work for meeting.summary_completed.
-async function runLegASummary(obj: any, meetingId: string, event: string) {
+async function runLegASummary(obj: any, meetingId: string, meetingUuid: string, event: string) {
   const topic = obj.meeting_topic || obj.topic || '';
   try {
     const zapPayload = {
       meeting_id: meetingId,
+      meeting_uuid: meetingUuid || obj.meeting_uuid || '',
       meeting_topic: topic,
       meeting_host: obj.meeting_host_email || '',
       start_time: obj.meeting_start_time || obj.start_time,
@@ -447,11 +466,15 @@ serve(async (req) => {
       const obj = body?.payload?.object || {};
       const meetingId = String(obj.id || '');
       if (!meetingId) throw new Error('payload.object.id missing');
+      // Per-occurrence key. Zoom sends a unique `uuid` per occurrence even when
+      // recurring meetings share one numeric id — this is the real dedup key.
+      const meetingUuid = String(obj.uuid || '');
       const topic = obj.topic || '';
 
       // STEP 1 — minimal row, synchronous, before anything else can fail.
       const minimal = await upsertMinimalRow({
         zoomMeetingId: meetingId,
+        zoomMeetingUuid: meetingUuid,
         topic,
         startTime: obj.start_time,
         durationMinutes: obj.duration
@@ -469,7 +492,7 @@ serve(async (req) => {
       }
 
       // STEP 2 — leg A (background): full payload → meetings-zap (backstop for n8n).
-      background(runLegARecording(obj, meetingId, event));
+      background(runLegARecording(obj, meetingId, meetingUuid, event));
 
       // STEP 3 — leg B: fan out original event to n8n for enrichment.
       if (!skipN8n) forwardToN8n(event, rawBody, topic, meetingId);
@@ -486,11 +509,15 @@ serve(async (req) => {
     if (event === 'meeting.summary_completed') {
       const obj = body?.payload?.object || {};
       const meetingId = String(obj.meeting_id || '');
+      // Summary events key the occurrence on meeting_uuid (same instance UUID
+      // as the recording.completed event, so both merge onto one row).
+      const meetingUuid = String(obj.meeting_uuid || '');
       const topic = obj.meeting_topic || obj.topic || '';
 
       if (meetingId) {
         const minimal = await upsertMinimalRow({
           zoomMeetingId: meetingId,
+          zoomMeetingUuid: meetingUuid,
           topic,
           startTime: obj.meeting_start_time || obj.start_time,
           durationMinutes: obj.duration
@@ -501,7 +528,7 @@ serve(async (req) => {
             status: 'db-error', detail: minimal.error
           });
         }
-        background(runLegASummary(obj, meetingId, event));
+        background(runLegASummary(obj, meetingId, meetingUuid, event));
       }
       if (!skipN8n) forwardToN8n(event, rawBody, topic, meetingId);
 

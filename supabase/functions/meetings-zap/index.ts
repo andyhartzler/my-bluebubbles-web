@@ -1,5 +1,8 @@
 // supabase/functions/process-meeting/index.ts
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve as stdServe } from "https://deno.land/std@0.168.0/http/server.ts";
+import { withSentry } from "../_shared/sentry.ts";
+// Sentry-wrapped serve: errors + 5xx responses report to supabase-edge project.
+const serve = (h: (req: Request) => Promise<Response> | Response) => stdServe(withSentry("meetings-zap", h));
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1212,14 +1215,25 @@ serve(async (req)=>{
       transcriptFilePath = await storeTranscript(supabaseClient, payload.meeting_topic, meetingStartTime, payload.transcript_text);
       console.log(`Transcript stored at: ${transcriptFilePath}`);
     }
-    // UPSERT on zoom_meeting_id so Zoom webhook retries don't produce duplicate rows.
-    // Requires UNIQUE (zoom_meeting_id) on public.meetings — added 2026-04-23.
-    // onConflict:'zoom_meeting_id' means the row updates with latest payload fields,
-    // which is correct: the most recent Zoom payload has the most complete data.
-    const { data: meeting, error: meetingError } = await supabaseClient.from('meetings').upsert({
+    // DEDUP on the per-occurrence Zoom UUID (zoom_meeting_uuid), NOT the numeric
+    // meeting id. Recurring meetings reuse ONE numeric id for every occurrence;
+    // only the UUID is unique per occurrence, so keying on the numeric id
+    // collapsed every occurrence onto the first row. Requires the UNIQUE index
+    // meetings_zoom_meeting_uuid_unique on public.meetings (added 2026-07-14,
+    // replacing the old UNIQUE(zoom_meeting_id)). The numeric zoom_meeting_id is
+    // still written for display/back-compat.
+    //
+    // payload.meeting_uuid is supplied by the zoom-webhook relay (leg A) and by
+    // zoom-reconcile. The n8n enrichment leg (leg B) currently posts only the
+    // numeric meeting_id; for that legacy path we attach to the most recently
+    // created row for this numeric id — the occurrence the relay's minimal-row
+    // upsert just created — instead of colliding recurring occurrences.
+    const zoomMeetingId = String(payload.meeting_id);
+    const zoomMeetingUuid = payload.meeting_uuid ? String(payload.meeting_uuid).trim() : '';
+    const meetingFields = {
       meeting_date: meetingStartTime,
       meeting_title: payload.meeting_topic,
-      zoom_meeting_id: payload.meeting_id,
+      zoom_meeting_id: zoomMeetingId,
       duration_minutes: meetingDuration,
       recording_url: payload.recording_url,
       recording_embed_url: payload.recording_embed_url,
@@ -1234,7 +1248,32 @@ serve(async (req)=>{
       risks_open_questions: summaryFields.risks_open_questions || null,
       attendance_count: 0,
       processing_status: 'processing'
-    }, { onConflict: 'zoom_meeting_id' }).select().single();
+    };
+    let meeting = null;
+    let meetingError = null;
+    if (zoomMeetingUuid) {
+      // Per-occurrence upsert: recording.completed / summary_completed for the
+      // same occurrence share this UUID and merge onto one row.
+      ({ data: meeting, error: meetingError } = await supabaseClient.from('meetings').upsert({
+        ...meetingFields,
+        zoom_meeting_uuid: zoomMeetingUuid
+      }, { onConflict: 'zoom_meeting_uuid' }).select().single());
+    } else {
+      // Legacy caller without a per-occurrence UUID (current n8n leg B).
+      const { data: existing } = await supabaseClient.from('meetings')
+        .select('id')
+        .eq('zoom_meeting_id', zoomMeetingId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (existing) {
+        ({ data: meeting, error: meetingError } = await supabaseClient.from('meetings')
+          .update(meetingFields).eq('id', existing.id).select().single());
+      } else {
+        ({ data: meeting, error: meetingError } = await supabaseClient.from('meetings')
+          .insert({ ...meetingFields, zoom_meeting_uuid: null }).select().single());
+      }
+    }
     if (meetingError) {
       throw new Error(`Failed to create meeting: ${meetingError.message}`);
     }
@@ -1294,10 +1333,17 @@ serve(async (req)=>{
     if (payload?.meeting_id) {
       try {
         const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-        await supabaseClient.from('meetings').update({
+        // Scope the failure flag to the specific occurrence when we have its UUID;
+        // fall back to the numeric id (marks all rows for that id) only if absent.
+        const failUpdate = supabaseClient.from('meetings').update({
           processing_status: 'failed',
           processing_error: error.message
-        }).eq('zoom_meeting_id', payload.meeting_id);
+        });
+        if (payload.meeting_uuid) {
+          await failUpdate.eq('zoom_meeting_uuid', String(payload.meeting_uuid).trim());
+        } else {
+          await failUpdate.eq('zoom_meeting_id', String(payload.meeting_id));
+        }
       } catch (updateError) {
         console.error('Failed to update meeting status:', updateError);
       }
