@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -40,6 +41,10 @@ class CRMSupabaseService {
       await Supabase.initialize(
         url: url,
         anonKey: anonKey,
+        // Every PostgREST/auth/storage request becomes a Sentry breadcrumb;
+        // failed requests become events (captureFailedRequests). No-op
+        // wrapper when Sentry is disabled (debug builds).
+        httpClient: SentryHttpClient(),
       );
 
       _client = Supabase.instance.client;

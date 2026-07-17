@@ -341,6 +341,7 @@ dependencies:
   # Init is release-mode-only in main.dart; source maps uploaded by
   # sentry_dart_plugin in netlify-build.sh when SENTRY_AUTH_TOKEN is set.
   sentry_flutter: ^9.0.0
+  sentry_dio: ^9.0.0
   # riverpod 3.x reworked StateNotifier→Notifier API — tmail uses 2.x flavor.
   flutter_riverpod: ^2.6.1
   # smaller misc deps that tmail uses internally — pub.dev packages

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:logger/logger.dart';
 import 'package:path/path.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:universal_io/io.dart';
 
 // ignore: library_prefixes
@@ -252,17 +253,58 @@ class BaseLogger extends GetxService {
     }
   }
 
-  void info(dynamic log, {String? tag, Object? error, StackTrace? trace}) =>
-      logger.i(
-          "${DateTime.now().toUtc().toIso8601String()} [INFO] [${tag ?? "BlueBubblesApp"}] $log",
-          error: error,
-          stackTrace: trace);
+  // Sentry hooks: error/fatal become events, info/warn become breadcrumbs
+  // that ride along with the next event. This is the single funnel that
+  // gives Sentry coverage of every catch block that logs instead of
+  // rethrowing. No-ops entirely when Sentry is disabled (debug builds).
+  void _sentryBreadcrumb(dynamic log, String? tag, SentryLevel level) {
+    if (!Sentry.isEnabled) return;
+    Sentry.addBreadcrumb(Breadcrumb(
+      message: log.toString(),
+      category: tag ?? 'log',
+      level: level,
+    ));
+  }
 
-  void warn(dynamic log, {String? tag, Object? error, StackTrace? trace}) =>
-      logger.w(
-          "${DateTime.now().toUtc().toIso8601String()} [WARN] [${tag ?? "BlueBubblesApp"}] $log",
-          error: error,
-          stackTrace: trace);
+  void _sentryCapture(dynamic log,
+      {String? tag,
+      Object? error,
+      StackTrace? trace,
+      SentryLevel level = SentryLevel.error}) {
+    if (!Sentry.isEnabled) return;
+    try {
+      if (error != null) {
+        Sentry.captureException(error, stackTrace: trace, withScope: (scope) {
+          scope.level = level;
+          scope.setTag('logger.tag', tag ?? 'BlueBubblesApp');
+          scope.setContexts('logger', {'message': log.toString()});
+        });
+      } else {
+        Sentry.captureMessage(log.toString(), level: level,
+            withScope: (scope) {
+          scope.setTag('logger.tag', tag ?? 'BlueBubblesApp');
+        });
+      }
+    } catch (_) {
+      // Never let telemetry break the logging path itself.
+    }
+  }
+
+  void info(dynamic log, {String? tag, Object? error, StackTrace? trace}) {
+    logger.i(
+        "${DateTime.now().toUtc().toIso8601String()} [INFO] [${tag ?? "BlueBubblesApp"}] $log",
+        error: error,
+        stackTrace: trace);
+    _sentryBreadcrumb(log, tag, SentryLevel.info);
+  }
+
+  void warn(dynamic log, {String? tag, Object? error, StackTrace? trace}) {
+    logger.w(
+        "${DateTime.now().toUtc().toIso8601String()} [WARN] [${tag ?? "BlueBubblesApp"}] $log",
+        error: error,
+        stackTrace: trace);
+    _sentryBreadcrumb(log, tag, SentryLevel.warning);
+  }
 
   void debug(dynamic log, {String? tag, Object? error, StackTrace? trace}) =>
       logger.d(
@@ -270,11 +312,13 @@ class BaseLogger extends GetxService {
           error: error,
           stackTrace: trace);
 
-  void error(dynamic log, {String? tag, Object? error, StackTrace? trace}) =>
-      logger.e(
-          "${DateTime.now().toUtc().toIso8601String()} [ERROR] [${tag ?? "BlueBubblesApp"}] $log",
-          error: error,
-          stackTrace: trace);
+  void error(dynamic log, {String? tag, Object? error, StackTrace? trace}) {
+    logger.e(
+        "${DateTime.now().toUtc().toIso8601String()} [ERROR] [${tag ?? "BlueBubblesApp"}] $log",
+        error: error,
+        stackTrace: trace);
+    _sentryCapture(log, tag: tag, error: error, trace: trace);
+  }
 
   void trace(dynamic log, {String? tag, Object? error, StackTrace? trace}) =>
       logger.t(
@@ -282,11 +326,14 @@ class BaseLogger extends GetxService {
           error: error ?? Traceback(),
           stackTrace: trace);
 
-  void fatal(dynamic log, {String? tag, Object? error, StackTrace? trace}) =>
-      logger.f(
-          "${DateTime.now().toUtc().toIso8601String()} [FATAL] [${tag ?? "BlueBubblesApp"}] $log",
-          error: error,
-          stackTrace: trace);
+  void fatal(dynamic log, {String? tag, Object? error, StackTrace? trace}) {
+    logger.f(
+        "${DateTime.now().toUtc().toIso8601String()} [FATAL] [${tag ?? "BlueBubblesApp"}] $log",
+        error: error,
+        stackTrace: trace);
+    _sentryCapture(log,
+        tag: tag, error: error, trace: trace, level: SentryLevel.fatal);
+  }
 }
 
 class Traceback implements Exception {

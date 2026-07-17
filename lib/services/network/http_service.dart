@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart' hide Response, FormData, MultipartFile;
+import 'package:sentry_dio/sentry_dio.dart';
 
 /// Get an instance of our [HttpService]
 HttpService http = Get.isRegistered<HttpService>() ? Get.find<HttpService>() : Get.put(HttpService());
@@ -81,6 +82,8 @@ class HttpService extends GetxService {
       headers: headers,
     ));
     dio.interceptors.add(ApiInterceptor());
+    // Breadcrumbs + failed-request capture for all BlueBubbles API traffic.
+    dio.addSentry();
     // Uncomment to run tests on most API requests
     // testAPI();
     super.onInit();

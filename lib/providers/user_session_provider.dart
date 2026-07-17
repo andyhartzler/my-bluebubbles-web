@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/models/crm/member.dart';
@@ -211,6 +212,25 @@ class UserSessionProvider extends ChangeNotifier {
       _isLoading = false;
       _error = null;
       debugPrint('Session load complete - isExecutive: $isExecutive, isCommitteeMember: $isCommitteeMember, userCommittees: ${_userCommittees.length}');
+
+      // Identify the user on every Sentry event (internal exec tool, so
+      // attaching the email is intentional despite sendDefaultPii: false).
+      if (Sentry.isEnabled) {
+        Sentry.configureScope((scope) {
+          scope.setUser(SentryUser(
+            id: _currentMember?.id,
+            email: _currentMember?.email,
+            name: _currentMember?.name,
+          ));
+          scope.setTag(
+            'user.role',
+            isExecutive
+                ? 'executive'
+                : (isCommitteeMember ? 'committee' : 'member'),
+          );
+          scope.setTag('user.superadmin', _isSuperadmin.toString());
+        });
+      }
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
@@ -342,6 +362,9 @@ class UserSessionProvider extends ChangeNotifier {
   /// that is the caller's responsibility (existing behavior preserved).
   void clearSession() {
     debugPrint('UserSessionProvider.clearSession called - clearing all session data');
+    if (Sentry.isEnabled) {
+      Sentry.configureScope((scope) => scope.setUser(null));
+    }
     _currentMember = null;
     _userCommittees = [];
     _isLoading = false;

@@ -158,15 +158,14 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
       dynamic exception;
       StackTrace? stacktrace;
 
-      // This assignment replaces the handler SentryFlutter.init installed,
-      // so forward to Sentry manually here.
+      // This assignment replaces the handler SentryFlutter.init installed;
+      // Logger.error forwards to Sentry, so coverage is preserved.
       FlutterError.onError = (details) {
         Logger.error(
           "Rendering Error: ${details.exceptionAsString()}",
           error: details.exception,
           trace: details.stack,
         );
-        Sentry.captureException(details.exception, stackTrace: details.stack);
       };
 
       try {
@@ -309,8 +308,8 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
       }
     },
     (dynamic error, StackTrace stackTrace) {
+      // Logger.error forwards to Sentry.
       Logger.error("Unhandled Exception", trace: stackTrace, error: error);
-      Sentry.captureException(error, stackTrace: stackTrace);
     },
   );
 }
@@ -334,6 +333,8 @@ Future<void> initSentry() async {
       if (release.isNotEmpty) options.release = release;
       options.tracesSampleRate = 0.2;
       options.sendDefaultPii = false;
+      // Failed HTTP requests (Supabase, BlueBubbles, edge fns) become events.
+      options.captureFailedRequests = true;
     });
   } catch (e, s) {
     // Sentry being unreachable must never block app boot.
@@ -432,6 +433,7 @@ class Main extends StatelessWidget {
             appBarTheme: darkTheme.appBarTheme.copyWith(elevation: 0.0),
           ),
           navigatorKey: ns.key,
+          navigatorObservers: [SentryNavigatorObserver()],
           scrollBehavior: const MaterialScrollBehavior().copyWith(
             // Specifically for GNU/Linux & Android-x86 family, where touch isn't interpreted as a drag device by Flutter apparently.
             dragDevices: Platform.isLinux || Platform.isAndroid
@@ -2133,6 +2135,16 @@ class _HomeState extends OptimizedState<Home>
 
   void _setSection(_HomeSection section) {
     if (_currentSection == section) return;
+    if (Sentry.isEnabled) {
+      // IndexedStack switches aren't Navigator routes, so breadcrumb them
+      // here — this is the "what screen were they on" signal for every event.
+      Sentry.addBreadcrumb(Breadcrumb(
+        category: 'navigation',
+        message: 'CRM section: ${section.name}',
+        level: SentryLevel.info,
+      ));
+      Sentry.configureScope((scope) => scope.setTag('crm.section', section.name));
+    }
     setState(() => _currentSection = section);
   }
 
