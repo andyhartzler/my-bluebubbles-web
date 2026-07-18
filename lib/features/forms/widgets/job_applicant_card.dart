@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/job_application.dart';
 import '../../../models/crm/member.dart';
 
@@ -128,7 +129,7 @@ class JobApplicantCard extends StatelessWidget {
                   children: [
                     if (application.resumeUrl != null)
                       TextButton.icon(
-                        onPressed: () => _openUrl(application.resumeUrl!),
+                        onPressed: () => _openStorageDoc(application.resumeUrl!),
                         icon: const Icon(Icons.description_outlined, size: 16),
                         label: const Text('Resume'),
                         style: TextButton.styleFrom(
@@ -141,7 +142,7 @@ class JobApplicantCard extends StatelessWidget {
                         onPressed: () {
                           final path = application.coverLetterFilePath;
                           if (path != null) {
-                            _openUrl('https://faajpcarasilbfndzkmd.supabase.co/storage/v1/object/public/job-applications/$path');
+                            _openStorageDoc(path);
                           }
                         },
                         icon: const Icon(Icons.article_outlined, size: 16),
@@ -328,6 +329,29 @@ class JobApplicantCard extends StatelessWidget {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  /// Reduce a stored value to a bucket-relative object path. New rows store the
+  /// bare path; legacy rows may hold a full /object/public/ URL, so strip
+  /// everything up to and including the bucket segment.
+  String _storagePath(String value) {
+    const marker = '/job-applications/';
+    final idx = value.indexOf(marker);
+    return idx >= 0 ? value.substring(idx + marker.length) : value;
+  }
+
+  /// The job-applications bucket is private. Staff (is_staff() true) can read it
+  /// under the storage SELECT policy, so mint a short-lived signed URL from the
+  /// stored path instead of building a dead /object/public/ link.
+  Future<void> _openStorageDoc(String pathOrUrl) async {
+    try {
+      final signedUrl = await Supabase.instance.client.storage
+          .from('job-applications')
+          .createSignedUrl(_storagePath(pathOrUrl), 3600);
+      await _openUrl(signedUrl);
+    } catch (_) {
+      // Signing failed (missing object or transient error); nothing to open.
     }
   }
 }
