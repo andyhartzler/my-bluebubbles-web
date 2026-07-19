@@ -265,9 +265,14 @@
 
       var events = loadLocal();
       var hudEl = null;
+      // On-screen HUD is OFF: the visible debug box is gone for users. The tap
+      // telemetry below still records to the DB for ONE more round so we can
+      // confirm from real device data that the stale-inset hamburger fix took;
+      // all of this instrumentation is removed in a follow-up once confirmed.
+      var HUD_ENABLED = false;
 
       function ensureHud() {
-        if (hudEl || !isStandalone()) return; // only show in PWA mode
+        if (!HUD_ENABLED || hudEl || !isStandalone()) return; // only show in PWA mode
         hudEl = document.createElement('div');
         hudEl.id = 'pwa-tap-diag-hud';
         hudEl.style.cssText = [
@@ -535,25 +540,15 @@
         return;
       }
 
-      // Even on cold relaunch (the force-close-relaunch case Andrew
-      // hits), iOS WebKit's gesture arena can hold a phantom pointer
-      // that prevents the Flutter pointer router from dispatching new
-      // taps to non-button semantic nodes. The fix is to drain the
-      // arena synthetically: dispatch a `pointercancel` and trigger
-      // a passive `touchstart` listener attach so Safari's
-      // SafariPointerEventWorkaround re-arms its synthesized
-      // pointer-event chain (see flutter/flutter#70858, #149001).
-      try {
-        document.addEventListener('touchstart', function () {}, {
-          passive: true,
-          once: true,
-        });
-        document.dispatchEvent(
-          new PointerEvent('pointercancel', { bubbles: true, pointerId: 1 })
-        );
-      } catch (_) {
-        // PointerEvent constructor missing on very old WebKit — ignore.
-      }
+      // Cold relaunch: the real root cause of the dead-hamburger-on-first-open
+      // bug is stale safe-area/viewport metrics, not a phantom pointer arena.
+      // That is now handled by re-reading the viewport after runApp (see the
+      // standalone resize nudge in the entrypoint) plus the Dart-side
+      // didChangeMetrics/relayout burst. The previous synthetic-pointercancel
+      // hack (predicated on the phantom-pointer theory) was refuted by the tap
+      // telemetry and is removed — it never helped and dispatching a synthetic
+      // pointercancel at the document root on every relaunch is a needless risk
+      // to real gesture routing.
     });
 
     window.addEventListener('load', function () {
@@ -594,6 +589,30 @@
               .then(function (appRunner) {
                 removeSplashFromWeb();
                 appRunner.runApp();
+                // iOS standalone PWA cold launch finalizes the viewport /
+                // safe-area insets lazily and may not emit the resize that
+                // makes Flutter re-read them. Nudge WebKit to recompute the
+                // viewport a few times so the engine fires metricschanged and
+                // the app relays out the top bar against correct insets before
+                // the first tap — fixes the "hamburger dead until I tap a card"
+                // bug. Timed AFTER runApp so the engine's metrics listener is
+                // attached. Only in standalone; a normal Safari tab is fine.
+                try {
+                  var __standalone =
+                    (window.matchMedia &&
+                      window.matchMedia('(display-mode: standalone)').matches) ||
+                    window.navigator.standalone === true;
+                  if (__standalone) {
+                    [100, 400, 900].forEach(function (ms) {
+                      setTimeout(function () {
+                        try {
+                          window.scrollTo(0, 0);
+                          window.dispatchEvent(new Event('resize'));
+                        } catch (_) {}
+                      }, ms);
+                    });
+                  }
+                } catch (_) {}
               })
               .catch(function (err) {
                 console.error('Failed to initialize Flutter engine', err);

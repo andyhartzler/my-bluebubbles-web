@@ -771,6 +771,20 @@ class _HomeState extends OptimizedState<Home>
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       StartupTasks.uiReady.complete();
 
+      if (kIsWeb) {
+        // Belt-and-suspenders for the iOS standalone cold-launch stale-inset
+        // bug (see didChangeMetrics): if the engine never delivers a
+        // metricschanged after the viewport settles, force a few relayouts
+        // over the first ~750ms so the top bar re-reads MediaQuery against
+        // settled insets and the hamburger's hit rect aligns with its paint
+        // WITHOUT the user needing to tap a card first. No-op cost elsewhere.
+        for (final ms in const [0, 250, 750]) {
+          Future.delayed(Duration(milliseconds: ms), () {
+            if (mounted) setState(() {});
+          });
+        }
+      }
+
       if (!ls.isBubble && !kIsWeb && !kIsDesktop) {
         ls.createFakePort();
       }
@@ -977,6 +991,23 @@ class _HomeState extends OptimizedState<Home>
         await windowManager.close();
         break;
     }
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    // iOS standalone PWA cold launch: WebKit finalizes the viewport /
+    // safe-area insets a frame or two AFTER first paint and does not
+    // reliably trigger a relayout of the app chrome. The mobile top bar
+    // wraps its own SafeArea (see _buildMobileTopBar), so if it is first
+    // laid out against stale (zero) insets its hit rectangle ends up
+    // offset from where the hamburger paints — the tap lands on empty
+    // space until some unrelated setState (the user's first card tap)
+    // rebuilds the shell. Rebuilding here, the moment the engine reports
+    // settled metrics, realigns the hamburger's hit rect with its paint
+    // before the user touches anything. Root cause of the long-standing
+    // "hamburger dead on first open, works after navigating" bug.
+    if (mounted) setState(() {});
   }
 
   @override
@@ -1574,6 +1605,13 @@ class _HomeState extends OptimizedState<Home>
     bool crmReady,
   ) {
     final session = context.watch<UserSessionProvider>();
+    // TEMP probe (one verification round): record the top safe-area inset this
+    // build sees. Confirms the stale-inset fix — a first build at ~0 followed
+    // by settled builds at ~47-59 is the signature we're correcting.
+    _pwaDiagPush(
+      'topbar_build_inset',
+      extra: MediaQuery.of(context).viewPadding.top.toStringAsFixed(1),
+    );
     return Material(
       elevation: 4,
       color: theme.colorScheme.surface,
