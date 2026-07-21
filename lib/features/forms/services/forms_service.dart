@@ -10,6 +10,47 @@ class FormsService {
   /// Client for reading submissions (RLS enforced via user JWT on anon client)
   SupabaseClient get _readClient => _supabase;
 
+  /// Map of endorsement `form_submissions.id` -> the candidate's saved profile
+  /// photo (candidates.photo_url), for use as a headshot fallback when the
+  /// candidate did not upload one on their questionnaire.
+  ///
+  /// Resolved in two small steps because there is no FK between
+  /// candidate_endorsement_responses and candidates for PostgREST to embed:
+  /// first the (submission_id, candidate_id) links, then those candidates'
+  /// photos. Non-fatal for the caller: on any error it should treat the map as
+  /// empty and simply render initials.
+  Future<Map<String, String>> getEndorsementPhotoFallback() async {
+    final links = await _supabase
+        .from('candidate_endorsement_responses')
+        .select('submission_id, candidate_id');
+
+    final submissionsByCandidate = <String, List<String>>{};
+    for (final row in (links as List)) {
+      final submissionId = row['submission_id']?.toString();
+      final candidateId = row['candidate_id']?.toString();
+      if (submissionId == null || candidateId == null) continue;
+      (submissionsByCandidate[candidateId] ??= []).add(submissionId);
+    }
+    if (submissionsByCandidate.isEmpty) return const {};
+
+    final candidates = await _supabase
+        .from('candidates')
+        .select('id, photo_url')
+        .inFilter('id', submissionsByCandidate.keys.toList())
+        .not('photo_url', 'is', null);
+
+    final bySubmission = <String, String>{};
+    for (final row in (candidates as List)) {
+      final candidateId = row['id']?.toString();
+      final url = row['photo_url']?.toString();
+      if (candidateId == null || url == null || url.trim().isEmpty) continue;
+      for (final submissionId in submissionsByCandidate[candidateId] ?? const []) {
+        bySubmission[submissionId] = url;
+      }
+    }
+    return bySubmission;
+  }
+
   /// Watch forms with realtime updates, with fallback to one-time fetch on error
   Stream<List<FormSchema>> watchForms(String typeFilter) async* {
     try {

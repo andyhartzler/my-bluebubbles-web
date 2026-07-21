@@ -723,7 +723,7 @@ class _VoteCard extends StatelessWidget {
           Row(
             children: [
               HeadshotAvatar(
-                  file: entry.model.headshot, name: entry.name, size: 44),
+                  file: entry.headshot, name: entry.name, size: 44),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -1143,7 +1143,7 @@ class _DecisionPanelState extends State<_DecisionPanel> {
               Row(
                 children: [
                   HeadshotAvatar(
-                      file: e.model.headshot, name: e.name, size: 50),
+                      file: e.headshot, name: e.name, size: 50),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

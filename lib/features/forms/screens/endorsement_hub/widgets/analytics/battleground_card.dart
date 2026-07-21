@@ -209,7 +209,7 @@ class _MinorityChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             HeadshotAvatar(
-                file: entry.model.headshot, name: entry.name, size: 26),
+                file: entry.headshot, name: entry.name, size: 26),
             const SizedBox(width: 6),
             Text(entry.name,
                 style:
@@ -242,7 +242,7 @@ class _MinorityChip extends StatelessWidget {
           title: Row(
             children: [
               HeadshotAvatar(
-                  file: entry.model.headshot, name: entry.name, size: 38),
+                  file: entry.headshot, name: entry.name, size: 38),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(

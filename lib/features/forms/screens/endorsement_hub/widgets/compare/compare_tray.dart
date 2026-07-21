@@ -74,7 +74,7 @@ class CompareTray extends StatelessWidget {
                                         color: HubTheme.gold, width: 1.6),
                                   ),
                                   child: HeadshotAvatar(
-                                    file: selected[i].model.headshot,
+                                    file: selected[i].headshot,
                                     name: selected[i].name,
                                     size: 36,
                                   ),

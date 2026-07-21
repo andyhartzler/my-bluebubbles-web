@@ -280,7 +280,7 @@ class _FaceStrip extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       HeadshotAvatar(
-                          file: e.model.headshot, name: e.name, size: 34),
+                          file: e.headshot, name: e.name, size: 34),
                       const SizedBox(width: 8),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

@@ -568,7 +568,7 @@ class _SideBySideCompareState extends State<SideBySideCompare> {
                         ),
                         padding: const EdgeInsets.all(2),
                         child: HeadshotAvatar(
-                            file: e.model.headshot, name: e.name, size: 52),
+                            file: e.headshot, name: e.name, size: 52),
                       ),
                       const SizedBox(height: 7),
                       Text(e.name,
@@ -841,7 +841,7 @@ class _PickChip extends StatelessWidget {
         ),
         child: Row(
           children: [
-            HeadshotAvatar(file: entry.model.headshot, name: entry.name, size: 40),
+            HeadshotAvatar(file: entry.headshot, name: entry.name, size: 40),
             const SizedBox(width: 10),
             Expanded(
               child: Column(

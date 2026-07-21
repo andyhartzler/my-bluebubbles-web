@@ -128,17 +128,27 @@ class CandidateEntry {
   final OfficeLevel officeLevel;
   final CandidateFlags flags;
 
+  /// Fallback headshot sourced from the candidate's saved profile photo
+  /// (candidates.photo_url), used when they did not upload one on the form.
+  final ReviewFile? headshotFallback;
+
   const CandidateEntry({
     required this.submission,
     required this.model,
     required this.officeLevel,
     required this.flags,
+    this.headshotFallback,
   });
+
+  /// The headshot to render: the uploaded one if present, otherwise the
+  /// candidate-profile fallback, otherwise null (initials avatar).
+  ReviewFile? get headshot => model.headshot ?? headshotFallback;
 
   factory CandidateEntry.build(
     FormSchema form,
     FormSubmission submission, {
     AiAlignmentScore? aiAlignment,
+    String? fallbackPhotoUrl,
   }) {
     final model =
         SubmissionReviewModel.from(form, submission, aiAlignment: aiAlignment);
@@ -147,11 +157,23 @@ class CandidateEntry {
     final officeSoughtRaw = data['office_sought']?.toString();
     final officeLevel = OfficeLevel.fromRaw(officeSoughtRaw, model.office);
 
+    final trimmedFallback = fallbackPhotoUrl?.trim();
+    final headshotFallback =
+        (trimmedFallback != null && trimmedFallback.isNotEmpty)
+            ? ReviewFile(
+                url: trimmedFallback,
+                name: 'profile.jpg',
+                mimeType: 'image/jpeg',
+              )
+            : null;
+
     final selfPct = model.selfFundedPct;
     final flags = CandidateFlags(
       nonDemHistory: model.nonDemHistory,
       selfFundedMajority: selfPct != null && selfPct > 50,
-      missingHeadshot: model.headshot == null,
+      // A candidate only counts as missing a headshot when there is neither an
+      // uploaded one nor a profile-photo fallback.
+      missingHeadshot: model.headshot == null && headshotFallback == null,
       missingBudget: model.budgetFile == null,
       missingSignature:
           model.signatureUrl == null || model.signatureUrl!.trim().isEmpty,
@@ -164,6 +186,7 @@ class CandidateEntry {
       model: model,
       officeLevel: officeLevel,
       flags: flags,
+      headshotFallback: headshotFallback,
     );
   }
 

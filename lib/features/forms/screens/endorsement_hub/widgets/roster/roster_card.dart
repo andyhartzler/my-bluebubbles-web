@@ -97,7 +97,7 @@ class _RosterCardState extends State<RosterCard> {
                   fit: StackFit.expand,
                   children: [
                     HeadshotAvatar(
-                      file: model.headshot,
+                      file: entry.headshot,
                       name: entry.name,
                       circle: false,
                       radius: 0,
@@ -256,7 +256,7 @@ extension on _RosterCardState {
                     width: 96,
                     height: 96,
                     child: HeadshotAvatar(
-                      file: model.headshot,
+                      file: entry.headshot,
                       name: entry.name,
                       circle: false,
                       radius: 0,

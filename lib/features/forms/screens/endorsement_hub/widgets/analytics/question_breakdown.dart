@@ -297,7 +297,7 @@ class _QuestionBreakdownState extends State<QuestionBreakdown> {
                             final e = r.entry;
                             return ListTile(
                               leading: HeadshotAvatar(
-                                  file: e.model.headshot,
+                                  file: e.headshot,
                                   name: e.name,
                                   size: 40),
                               title: Text(e.name,

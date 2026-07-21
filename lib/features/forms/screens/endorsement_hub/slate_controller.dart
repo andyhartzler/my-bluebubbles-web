@@ -124,9 +124,19 @@ class SlateController extends ChangeNotifier {
       } catch (_) {
         aiScores = const {};
       }
+      // Candidate-profile photo fallback (keyed by submission id). Non-fatal:
+      // an empty map just means candidates without an uploaded headshot show
+      // their initials, as before.
+      Map<String, String> photoFallback = const {};
+      try {
+        photoFallback = await _service.getEndorsementPhotoFallback();
+      } catch (_) {
+        photoFallback = const {};
+      }
       final entries = submissions
           .map((s) => CandidateEntry.build(form, s,
-              aiAlignment: aiScores[s.id]))
+              aiAlignment: aiScores[s.id],
+              fallbackPhotoUrl: photoFallback[s.id]))
           .toList();
       _form = form;
       _all = entries;
