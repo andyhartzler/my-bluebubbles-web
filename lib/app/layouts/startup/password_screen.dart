@@ -24,8 +24,10 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
   static const String _redirectUrl = 'https://moyd.app/auth/callback';
 
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _codeController = TextEditingController();
   final FocusNode _emailFocusNode = FocusNode();
+  final FocusNode _phoneFocusNode = FocusNode();
   final FocusNode _codeFocusNode = FocusNode();
   final SessionTimeoutService _sessionService = SessionTimeoutService();
 
@@ -42,6 +44,13 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
   String? _successMessage;
   String? _errorMessage;
   String? _emailForCode;
+
+  // Phone sign-in (the default/preferred method for the exec team; email stays
+  // available as a fallback so no one is ever locked out). When true the entry
+  // form asks for a phone number and texts a code via Twilio Verify.
+  bool _phoneMode = true;
+  String? _phoneForCode; // E.164 number the SMS code was sent to
+  bool _phoneCodeFlow = false; // the pending code is an SMS code, not an email one
 
   @override
   void initState() {
@@ -195,7 +204,7 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
     if (!hasSession) {
       await Future<void>.delayed(const Duration(milliseconds: 300));
       if (mounted) {
-        _emailFocusNode.requestFocus();
+        (_phoneMode ? _phoneFocusNode : _emailFocusNode).requestFocus();
         _stripErrorQuery();
       }
     }
@@ -207,8 +216,10 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
     _authSubscription?.cancel();
     _visibilitySubscription?.cancel();
     _emailController.dispose();
+    _phoneController.dispose();
     _codeController.dispose();
     _emailFocusNode.dispose();
+    _phoneFocusNode.dispose();
     _codeFocusNode.dispose();
     super.dispose();
   }
@@ -421,6 +432,198 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
     }
   }
 
+  /// Normalize a US phone to E.164 (+1XXXXXXXXXX). Returns null if not a
+  /// plausible number. Mirrors the edge functions' own normalization so the
+  /// exact-match phone lookup lines up.
+  String? _toE164(String raw) {
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 10) return '+1$digits';
+    if (digits.length == 11 && digits.startsWith('1')) return '+$digits';
+    if (raw.trim().startsWith('+') && digits.length >= 8) return '+$digits';
+    return null;
+  }
+
+  String _cleanError(Object e) {
+    var s = e.toString();
+    if (s.startsWith('Exception: ')) s = s.substring('Exception: '.length);
+    s = s.trim();
+    return s.isEmpty ? 'Something went wrong. Please try again.' : s;
+  }
+
+  /// The exec/committee workspace-access gate, shared by both sign-in methods.
+  /// Returns null when the email is allowed into the CRM, otherwise a
+  /// user-facing denial message. Keeping phone sign-in behind the exact same
+  /// check as email is what stops a non-exec member who happens to have a phone
+  /// on file from getting a broken, half-signed-in session.
+  Future<String?> _checkWorkspaceAccess(SupabaseClient client, String email) async {
+    try {
+      final validCommittees =
+          (await client.rpc('get_user_valid_committees', params: {'user_email': email}))
+                  as List<dynamic>? ??
+              [];
+      final memberCheck = await client
+          .rpc('members_preauth_check', params: {'p_email': email})
+          .maybeSingle();
+
+      if (memberCheck == null || memberCheck['found'] != true) {
+        return 'This account is not associated with a Missouri Young Democrats member. If you believe this is an error, please contact info@moyoungdemocrats.org';
+      }
+      final isExecutive = memberCheck['executive_committee'] == true;
+      if (!isExecutive && validCommittees.isEmpty) {
+        return 'Your committee(s) do not have workspace access enabled. If you believe this is an error, please ask your committee leaders in Slack.';
+      }
+      return null;
+    } catch (_) {
+      return 'Unable to verify access. Please try again or contact info@moyoungdemocrats.org';
+    }
+  }
+
+  /// Text a 6-digit code to the entered phone via the verify-phone edge
+  /// function (Twilio Verify). We do NOT reveal whether an account exists yet;
+  /// the phone -> member match happens after the code checks out.
+  Future<void> _sendPhoneCode() async {
+    final client = _client;
+    if (client == null) {
+      setState(() {
+        _errorMessage = 'Authentication service is unavailable. Please try again later.';
+      });
+      return;
+    }
+
+    final phone = _toE164(_phoneController.text);
+    if (phone == null) {
+      setState(() {
+        _errorMessage = 'Enter your mobile number (10 digits).';
+        _successMessage = null;
+      });
+      _phoneFocusNode.requestFocus();
+      return;
+    }
+
+    setState(() {
+      _isSending = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    try {
+      final res = await client.functions.invoke('verify-phone', body: {
+        'action': 'start',
+        'phone': phone,
+      });
+      final data = res.data;
+      final err = (data is Map) ? data['error'] : null;
+      if (err != null) throw Exception(err.toString());
+
+      if (!mounted) return;
+      setState(() {
+        _successMessage = 'We texted a code to your phone';
+        _showCodeInput = true;
+        _phoneCodeFlow = true;
+        _phoneForCode = phone;
+        _codeController.clear();
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _showCodeInput) _codeFocusNode.requestFocus();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = _cleanError(e);
+        _showCodeInput = false;
+        _phoneForCode = null;
+      });
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  /// Verify the SMS code, map the phone to the member's existing account, run
+  /// the workspace-access gate, then complete sign-in on that same account.
+  Future<void> _verifyPhoneCode() async {
+    final client = _client;
+    if (client == null) {
+      setState(() {
+        _errorMessage = 'Authentication service is unavailable. Please try again later.';
+      });
+      return;
+    }
+
+    final code = _codeController.text.trim();
+    final phone = _phoneForCode;
+    if (phone == null) {
+      setState(() => _errorMessage = 'Please request a code first.');
+      return;
+    }
+    if (code.length != 6) {
+      setState(() {
+        _errorMessage = 'The code must be 6 digits.';
+        _successMessage = null;
+      });
+      _codeFocusNode.requestFocus();
+      return;
+    }
+
+    setState(() {
+      _isVerifyingCode = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    try {
+      // 1. Prove phone ownership + map to the member's email (exact e164 match,
+      // server-side in the phone-signin edge function).
+      final res = await client.functions.invoke('phone-signin', body: {
+        'phone': phone,
+        'code': code,
+      });
+      final data = res.data as Map?;
+      if (data == null) {
+        throw Exception('Could not verify the code. Please try again.');
+      }
+      if (data['verified'] != true) {
+        throw Exception((data['error'] ?? 'That code is incorrect or expired.').toString());
+      }
+      if (data['matched'] != true || data['email'] == null || data['otp'] == null) {
+        throw Exception((data['error'] ??
+                'That number is not on file for a Missouri Young Democrats account. Sign in with email instead.')
+            .toString());
+      }
+      final email = data['email'].toString();
+      final otp = data['otp'].toString();
+
+      // 2. Same exec/committee gate as email sign-in.
+      final denial = await _checkWorkspaceAccess(client, email);
+      if (denial != null) throw Exception(denial);
+
+      // 3. Complete sign-in on the existing account.
+      await client.auth.verifyOTP(email: email, token: otp, type: OtpType.email);
+      if (!mounted) return;
+      setState(() => _successMessage = 'Code verified! Signing you in...');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = _cleanError(e));
+    } finally {
+      if (mounted) setState(() => _isVerifyingCode = false);
+    }
+  }
+
+  void _switchMode(bool toPhone) {
+    setState(() {
+      _phoneMode = toPhone;
+      _showCodeInput = false;
+      _phoneCodeFlow = false;
+      _phoneForCode = null;
+      _emailForCode = null;
+      _codeController.clear();
+      _errorMessage = null;
+      _successMessage = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) (toPhone ? _phoneFocusNode : _emailFocusNode).requestFocus();
+    });
+  }
+
   String _mapErrorMessage(String raw) {
     final decoded = Uri.decodeComponent(raw).trim();
     final normalized = decoded.toLowerCase();
@@ -466,7 +669,9 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
     return [
       const SizedBox(height: 16),
       Text(
-        'Enter the 6-digit code from your email:',
+        _phoneCodeFlow
+            ? 'Enter the 6-digit code we texted you:'
+            : 'Enter the 6-digit code from your email:',
         style: theme.textTheme.bodyMedium?.copyWith(
           fontWeight: FontWeight.w600,
         ),
@@ -504,7 +709,11 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
             ? null
             : () {
                 FocusScope.of(context).unfocus();
-                _verifyCode();
+                if (_phoneCodeFlow) {
+                  _verifyPhoneCode();
+                } else {
+                  _verifyCode();
+                }
               },
         icon: _isVerifyingCode
             ? const SizedBox(
@@ -525,14 +734,16 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
         onPressed: () {
           setState(() {
             _showCodeInput = false;
+            _phoneCodeFlow = false;
             _codeController.clear();
             _emailForCode = null;
+            _phoneForCode = null;
             _errorMessage = null;
             _successMessage = null;
           });
-          _emailFocusNode.requestFocus();
+          (_phoneMode ? _phoneFocusNode : _emailFocusNode).requestFocus();
         },
-        child: const Text('← Back to email entry'),
+        child: Text(_phoneMode ? '← Back to phone entry' : '← Back to email entry'),
       ),
     ];
   }
@@ -620,27 +831,49 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 20),
-                                  TextField(
-                                    controller: _emailController,
-                                    focusNode: _emailFocusNode,
-                                    decoration: InputDecoration(
-                                      labelText: 'Email address',
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                      prefixIcon: const Icon(Icons.mail_outline),
+                                  if (_phoneMode)
+                                    TextField(
+                                      controller: _phoneController,
+                                      focusNode: _phoneFocusNode,
+                                      decoration: InputDecoration(
+                                        labelText: 'Mobile number',
+                                        hintText: '(555) 123-4567',
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                        prefixIcon: const Icon(Icons.smartphone_outlined),
+                                      ),
+                                      autofillHints: const [AutofillHints.telephoneNumber],
+                                      keyboardType: TextInputType.phone,
+                                      textInputAction: TextInputAction.send,
+                                      enabled: !_showCodeInput,
+                                      onSubmitted: (_) => _sendPhoneCode(),
+                                      onChanged: (_) {
+                                        if (_errorMessage != null) {
+                                          setState(() => _errorMessage = null);
+                                        }
+                                      },
+                                    )
+                                  else
+                                    TextField(
+                                      controller: _emailController,
+                                      focusNode: _emailFocusNode,
+                                      decoration: InputDecoration(
+                                        labelText: 'Email address',
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                        prefixIcon: const Icon(Icons.mail_outline),
+                                      ),
+                                      autofillHints: const [AutofillHints.email],
+                                      keyboardType: TextInputType.emailAddress,
+                                      textInputAction: TextInputAction.send,
+                                      enabled: !_showCodeInput,
+                                      onSubmitted: (_) => _sendMagicLink(),
+                                      onChanged: (_) {
+                                        if (_errorMessage != null) {
+                                          setState(() {
+                                            _errorMessage = null;
+                                          });
+                                        }
+                                      },
                                     ),
-                                    autofillHints: const [AutofillHints.email],
-                                    keyboardType: TextInputType.emailAddress,
-                                    textInputAction: TextInputAction.send,
-                                    enabled: !_showCodeInput,
-                                    onSubmitted: (_) => _sendMagicLink(),
-                                    onChanged: (_) {
-                                      if (_errorMessage != null) {
-                                        setState(() {
-                                          _errorMessage = null;
-                                        });
-                                      }
-                                    },
-                                  ),
                                   if (_showCodeInput) ..._buildCodeEntrySection(theme),
                                   const SizedBox(height: 16),
                                   if (_errorMessage != null)
@@ -694,7 +927,11 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
                                           ? null
                                           : () {
                                               FocusScope.of(context).unfocus();
-                                              _sendMagicLink();
+                                              if (_phoneMode) {
+                                                _sendPhoneCode();
+                                              } else {
+                                                _sendMagicLink();
+                                              }
                                             },
                                       icon: _isSending
                                           ? const SizedBox(
@@ -702,18 +939,29 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
                                               height: 18,
                                               child: CircularProgressIndicator(strokeWidth: 2.5),
                                             )
-                                          : const Icon(Icons.arrow_forward),
-                                      label: Text(_isSending ? 'Sending...' : 'Send magic link'),
+                                          : Icon(_phoneMode ? Icons.sms_outlined : Icons.arrow_forward),
+                                      label: Text(_isSending
+                                          ? 'Sending...'
+                                          : (_phoneMode ? 'Text me a code' : 'Send magic link')),
                                       style: FilledButton.styleFrom(
                                         backgroundColor: const Color(0xFF32A6DE),
                                         padding: const EdgeInsets.symmetric(vertical: 16),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                       ),
                                     ),
+                                    const SizedBox(height: 8),
+                                    TextButton(
+                                      onPressed: _isSending ? null : () => _switchMode(!_phoneMode),
+                                      child: Text(_phoneMode
+                                          ? 'Sign in with email instead'
+                                          : 'Sign in with phone instead'),
+                                    ),
                                   ],
                                   const SizedBox(height: 12),
                                   Text(
-                                    'We\'ll email you a secure sign-in link. Access is limited to the executive leadership team.',
+                                    _phoneMode
+                                        ? 'We\'ll text you a secure code. Access is limited to the executive leadership team.'
+                                        : 'We\'ll email you a secure sign-in link. Access is limited to the executive leadership team.',
                                     textAlign: TextAlign.center,
                                     style: textTheme.bodySmall
                                         ?.copyWith(color: textTheme.bodySmall?.color?.withOpacity(0.7)),
