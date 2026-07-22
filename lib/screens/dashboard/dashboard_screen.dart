@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -514,7 +515,11 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Future<void> _loadConfig() async {
     try {
-      debugPrint('[DashboardScreen] Loading configs from database...');
+      // kDebugMode gates below: debugPrint is not stripped in release and
+      // every line becomes a Sentry breadcrumb — keep the login path quiet.
+      if (kDebugMode) {
+        debugPrint('[DashboardScreen] Loading configs from database...');
+      }
 
       // Load both desktop and mobile layouts in parallel
       final results = await Future.wait([
@@ -527,14 +532,18 @@ class _DashboardScreenState extends State<DashboardScreen>
 
       // Parse desktop layout
       if (desktopLayoutJson != null) {
-        debugPrint(
-          '[DashboardScreen] Parsing desktop layout JSON with ${desktopLayoutJson['widgets']?.length ?? 0} widgets',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[DashboardScreen] Parsing desktop layout JSON with ${desktopLayoutJson['widgets']?.length ?? 0} widgets',
+          );
+        }
         try {
           final config = DashboardConfig.fromJson(desktopLayoutJson);
-          debugPrint(
-            '[DashboardScreen] Successfully parsed desktop config: ${config.widgets.length} widgets',
-          );
+          if (kDebugMode) {
+            debugPrint(
+              '[DashboardScreen] Successfully parsed desktop config: ${config.widgets.length} widgets',
+            );
+          }
           _desktopConfig = config;
         } catch (parseError, stackTrace) {
           _logDetailedParseError(
@@ -547,17 +556,21 @@ class _DashboardScreenState extends State<DashboardScreen>
         }
       } else {
         // Fallback to local storage for backwards compatibility
-        debugPrint(
-          '[DashboardScreen] No desktop database layout, checking SharedPreferences...',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[DashboardScreen] No desktop database layout, checking SharedPreferences...',
+          );
+        }
         final prefs = await SharedPreferences.getInstance();
         final configJson = prefs.getString(_prefsKey);
         if (configJson != null) {
           try {
             final config = DashboardConfig.fromJsonString(configJson);
-            debugPrint(
-              '[DashboardScreen] Loaded desktop from SharedPreferences: ${config.widgets.length} widgets',
-            );
+            if (kDebugMode) {
+              debugPrint(
+                '[DashboardScreen] Loaded desktop from SharedPreferences: ${config.widgets.length} widgets',
+              );
+            }
             _desktopConfig = config;
             // Migrate to database
             _metricsService.saveDashboardLayout(_desktopConfig.toJson());
@@ -574,14 +587,18 @@ class _DashboardScreenState extends State<DashboardScreen>
 
       // Parse mobile layout
       if (mobileLayoutJson != null) {
-        debugPrint(
-          '[DashboardScreen] Parsing mobile layout JSON with ${mobileLayoutJson['widgets']?.length ?? 0} widgets',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[DashboardScreen] Parsing mobile layout JSON with ${mobileLayoutJson['widgets']?.length ?? 0} widgets',
+          );
+        }
         try {
           final config = DashboardConfig.fromJson(mobileLayoutJson);
-          debugPrint(
-            '[DashboardScreen] Successfully parsed mobile config: ${config.widgets.length} widgets',
-          );
+          if (kDebugMode) {
+            debugPrint(
+              '[DashboardScreen] Successfully parsed mobile config: ${config.widgets.length} widgets',
+            );
+          }
           _mobileConfig = config;
         } catch (parseError, stackTrace) {
           _logDetailedParseError(
@@ -594,17 +611,21 @@ class _DashboardScreenState extends State<DashboardScreen>
         }
       } else {
         // Fallback to local storage for backwards compatibility
-        debugPrint(
-          '[DashboardScreen] No mobile database layout, checking SharedPreferences...',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[DashboardScreen] No mobile database layout, checking SharedPreferences...',
+          );
+        }
         final prefs = await SharedPreferences.getInstance();
         final configJson = prefs.getString(_prefsKeyMobile);
         if (configJson != null) {
           try {
             final config = DashboardConfig.fromJsonString(configJson);
-            debugPrint(
-              '[DashboardScreen] Loaded mobile from SharedPreferences: ${config.widgets.length} widgets',
-            );
+            if (kDebugMode) {
+              debugPrint(
+                '[DashboardScreen] Loaded mobile from SharedPreferences: ${config.widgets.length} widgets',
+              );
+            }
             _mobileConfig = config;
             // Migrate to database
             _metricsService.saveDashboardLayoutMobile(_mobileConfig.toJson());
@@ -618,9 +639,11 @@ class _DashboardScreenState extends State<DashboardScreen>
             _mobileConfig = _getDefaultMobileConfig();
           }
         } else {
-          debugPrint(
-            '[DashboardScreen] No mobile layout in database or local storage, using default',
-          );
+          if (kDebugMode) {
+            debugPrint(
+              '[DashboardScreen] No mobile layout in database or local storage, using default',
+            );
+          }
           _mobileConfig = _getDefaultMobileConfig();
         }
       }
@@ -857,37 +880,47 @@ class _DashboardScreenState extends State<DashboardScreen>
       final quickLinksCount = (results[5] as int?) ?? 0;
 
       // Enrich top slack members with profile photos from member records
+      // (kDebugMode gates: these per-load lines were flooding the Sentry
+      // breadcrumb buffer in release builds — debugPrint is not stripped).
       if (metrics != null && metrics.top50SlackMembers.isNotEmpty) {
-        debugPrint(
-          '[DashboardScreen] Enriching ${metrics.top50SlackMembers.length} slack members with photos...',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[DashboardScreen] Enriching ${metrics.top50SlackMembers.length} slack members with photos...',
+          );
+        }
 
         final slackEmails = metrics.top50SlackMembers
             .where((m) => m.email != null && m.email!.isNotEmpty)
             .map((m) => m.email!)
             .toList();
 
-        debugPrint(
-          '[DashboardScreen] Found ${slackEmails.length} slack members with emails',
-        );
-        if (slackEmails.isNotEmpty) {
+        if (kDebugMode) {
           debugPrint(
-            '[DashboardScreen] Sample emails: ${slackEmails.take(3).join(', ')}',
+            '[DashboardScreen] Found ${slackEmails.length} slack members with emails',
           );
+          if (slackEmails.isNotEmpty) {
+            debugPrint(
+              '[DashboardScreen] Sample emails: ${slackEmails.take(3).join(', ')}',
+            );
+          }
         }
 
         if (slackEmails.isNotEmpty) {
           final photoMap = await _memberRepo.getMemberPhotosByEmails(
             slackEmails,
           );
-          debugPrint(
-            '[DashboardScreen] Photo map returned ${photoMap.length} matches',
-          );
+          if (kDebugMode) {
+            debugPrint(
+              '[DashboardScreen] Photo map returned ${photoMap.length} matches',
+            );
+          }
 
           if (photoMap.isNotEmpty) {
-            debugPrint(
-              '[DashboardScreen] Sample photo matches: ${photoMap.keys.take(3).join(', ')}',
-            );
+            if (kDebugMode) {
+              debugPrint(
+                '[DashboardScreen] Sample photo matches: ${photoMap.keys.take(3).join(', ')}',
+              );
+            }
             final enrichedSlackMembers = metrics.top50SlackMembers.map((
               member,
             ) {
@@ -900,37 +933,43 @@ class _DashboardScreenState extends State<DashboardScreen>
             }).toList();
 
             // Count how many got enriched
-            final enrichedCount = enrichedSlackMembers
-                .where((m) => m.profilePhotoUrl != null)
-                .length;
-            debugPrint(
-              '[DashboardScreen] Enriched $enrichedCount slack members with photos',
-            );
+            if (kDebugMode) {
+              final enrichedCount = enrichedSlackMembers
+                  .where((m) => m.profilePhotoUrl != null)
+                  .length;
+              debugPrint(
+                '[DashboardScreen] Enriched $enrichedCount slack members with photos',
+              );
+            }
 
             // Create new metrics with enriched slack members using copyWith
             metrics = metrics.copyWith(top50SlackMembers: enrichedSlackMembers);
           }
         } else {
-          debugPrint('[DashboardScreen] No slack members have email addresses');
+          if (kDebugMode) {
+            debugPrint('[DashboardScreen] No slack members have email addresses');
+          }
         }
       }
 
       if (!mounted) return;
 
       // Debug logging for dashboard data
-      debugPrint('[DashboardScreen] _load completed:');
-      debugPrint('[DashboardScreen]   metrics is null: ${metrics == null}');
-      if (metrics != null) {
-        debugPrint('[DashboardScreen]   totalMembers: ${metrics.totalMembers}');
-        debugPrint(
-          '[DashboardScreen]   top5Donors: ${metrics.top5Donors.length}',
-        );
-        debugPrint(
-          '[DashboardScreen]   top50SlackMembers: ${metrics.top50SlackMembers.length}',
-        );
-        debugPrint(
-          '[DashboardScreen]   membersByCounty: ${metrics.membersByCounty.length}',
-        );
+      if (kDebugMode) {
+        debugPrint('[DashboardScreen] _load completed:');
+        debugPrint('[DashboardScreen]   metrics is null: ${metrics == null}');
+        if (metrics != null) {
+          debugPrint('[DashboardScreen]   totalMembers: ${metrics.totalMembers}');
+          debugPrint(
+            '[DashboardScreen]   top5Donors: ${metrics.top5Donors.length}',
+          );
+          debugPrint(
+            '[DashboardScreen]   top50SlackMembers: ${metrics.top50SlackMembers.length}',
+          );
+          debugPrint(
+            '[DashboardScreen]   membersByCounty: ${metrics.membersByCounty.length}',
+          );
+        }
       }
 
       setState(() {

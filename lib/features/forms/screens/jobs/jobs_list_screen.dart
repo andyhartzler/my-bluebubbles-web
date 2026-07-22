@@ -26,6 +26,7 @@ class _JobsListScreenState extends State<JobsListScreen>
   // Cache application counts to avoid multiple fetches
   Map<String, int> _applicationCounts = {};
   Timer? _countRefreshTimer;
+  bool _refreshingCounts = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -48,20 +49,30 @@ class _JobsListScreenState extends State<JobsListScreen>
   }
 
   Future<void> _refreshApplicationCounts() async {
+    // Skip while a previous refresh is still in flight, or while the Forms
+    // section isn't visible (same gate as the jobs pollers).
+    if (_refreshingCounts || !JobsService.shouldPoll) return;
     // Refresh counts for visible jobs
     if (_applicationCounts.isNotEmpty) {
-      final newCounts = <String, int>{};
-      for (final jobId in _applicationCounts.keys) {
-        try {
-          newCounts[jobId] = await _jobsService.getApplicationCount(jobId);
-        } catch (_) {
-          newCounts[jobId] = _applicationCounts[jobId] ?? 0;
+      _refreshingCounts = true;
+      try {
+        final newCounts = <String, int>{};
+        // .toList(): job cards register counts into _applicationCounts while
+        // we await, which threw ConcurrentModificationError (FLUTTER-7).
+        for (final jobId in _applicationCounts.keys.toList()) {
+          try {
+            newCounts[jobId] = await _jobsService.getApplicationCount(jobId);
+          } catch (_) {
+            newCounts[jobId] = _applicationCounts[jobId] ?? 0;
+          }
         }
-      }
-      if (mounted) {
-        setState(() {
-          _applicationCounts = newCounts;
-        });
+        if (mounted) {
+          setState(() {
+            _applicationCounts = newCounts;
+          });
+        }
+      } finally {
+        _refreshingCounts = false;
       }
     }
   }

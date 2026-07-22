@@ -456,22 +456,33 @@ class MemberRepository {
         final profilePictures = row['profile_pictures'];
         if (profilePictures == null) continue;
 
-        debugPrint('[MemberRepository] Raw profile_pictures for $email: $profilePictures');
+        // kDebugMode: debugPrint is NOT stripped in release builds, and each
+        // per-email line becomes a Sentry breadcrumb — this loop was filling
+        // ~90% of the 100-breadcrumb buffer.
+        if (kDebugMode) {
+          debugPrint('[MemberRepository] Raw profile_pictures for $email: $profilePictures');
+        }
 
         // Parse the profile pictures to get the primary photo URL
         final photos = MemberProfilePhoto.parseList(profilePictures);
-        debugPrint('[MemberRepository] Parsed ${photos.length} photos for $email');
+        if (kDebugMode) {
+          debugPrint('[MemberRepository] Parsed ${photos.length} photos for $email');
+        }
 
         if (photos.isEmpty) continue;
 
         // Try to find primary photo, otherwise use first one
         final primaryPhoto = photos.firstWhereOrNull((p) => p.isPrimary) ?? photos.first;
         final url = primaryPhoto.publicUrl;
-        debugPrint('[MemberRepository] Photo URL for $email: $url');
+        if (kDebugMode) {
+          debugPrint('[MemberRepository] Photo URL for $email: $url');
+        }
 
         if (url != null && url.isNotEmpty) {
           result[email] = url;
-          debugPrint('[MemberRepository] ✓ Added photo for $email');
+          if (kDebugMode) {
+            debugPrint('[MemberRepository] ✓ Added photo for $email');
+          }
         }
       }
 

@@ -51,11 +51,14 @@
   <!-- Google auth details -->
   <meta name="google-signin-client_id" content="500464701389-8trcdkcj7ni5l4dn6n7l795rhb1asnh3.apps.googleusercontent.com">
 
-  <!-- Apple MapKit JS Library -->
+  <!-- Apple MapKit JS Library — deferred so it never blocks first paint;
+       the app polls window.mapkit readiness (checkMapKit below), so late
+       arrival is already handled. -->
   <script
     src="https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.core.js"
     crossorigin="anonymous"
-    data-libraries="map,annotations,services">
+    data-libraries="map,annotations,services"
+    defer>
   </script>
 
   <!-- MapKit Initialization Helper -->
@@ -101,8 +104,9 @@
     // so it must NOT be wrapped in quotes (the comment contains an apostrophe).
     const serviceWorkerVersion = {{flutter_service_worker_version}};
   </script>
-  <!-- Plaid Link JS SDK (required for plaid_flutter on web) -->
-  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  <!-- Plaid Link JS SDK (required for plaid_flutter on web) — deferred so
+       it never blocks first paint; only used long after boot. -->
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js" defer></script>
 
   <!-- This script adds the flutter initialization JS code -->
   <script src="flutter.js" defer=""></script>
@@ -185,279 +189,6 @@
       <source srcset="splash/img/dark-1x.png 1x, splash/img/dark-2x.png 2x, splash/img/dark-3x.png 3x, splash/img/dark-4x.png 4x" media="(prefers-color-scheme: dark)">
       <img class="center" aria-hidden="true" src="splash/img/light-1x.png" alt="">
   </picture>
-
-  <script id="pwa-tap-diag">
-    // ============================================================
-    // DIAGNOSTIC INSTRUMENTATION (temporary) — DIAG-PWA-TOPBAR
-    // ============================================================
-    // Captures pointer events at the document root BEFORE Flutter's
-    // listeners so we can answer the iOS PWA dead-tap question:
-    // "did the event reach the page at all?" Will be removed once
-    // root cause of hamburger/search broken-after-force-close-relaunch
-    // is identified.
-    //
-    // Three sinks:
-    //   1. localStorage rolling buffer (last 50 events)         — survives reload
-    //   2. window.__pwaTapDiag.events live array                — DevTools poke
-    //   3. Supabase edge fn pwa-debug-log (best-effort POST)    — server side
-    // Plus an on-screen HUD installed lazily on first event so Andrew
-    // can SEE whether anything is firing.
-    (function () {
-      var SUPABASE_URL = 'https://faajpcarasilbfndzkmd.supabase.co';
-      var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYWpwY2FyYXNpbGJmbmR6a21kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyMTcxOTksImV4cCI6MjA3NTc5MzE5OX0.KsOsdwE8Bl4CcHIdYzNmOrDOs_ajle9s7DY4lfXzWFA';
-      var EDGE_URL = SUPABASE_URL + '/functions/v1/pwa-debug-log';
-      var LS_KEY = 'pwa_tap_diag_v1';
-      var SESSION_ID =
-        (Math.random().toString(36).slice(2) + Date.now().toString(36)).slice(0, 16);
-
-      function displayMode() {
-        try {
-          if (window.matchMedia('(display-mode: standalone)').matches) return 'standalone';
-          if (window.matchMedia('(display-mode: fullscreen)').matches) return 'fullscreen';
-          if (window.matchMedia('(display-mode: minimal-ui)').matches) return 'minimal-ui';
-        } catch (_) {}
-        return 'browser';
-      }
-      function isStandalone() {
-        try {
-          return (
-            window.navigator.standalone === true ||
-            window.matchMedia('(display-mode: standalone)').matches === true
-          );
-        } catch (_) { return false; }
-      }
-      function selectorPath(node) {
-        if (!node) return '(null)';
-        if (node === document) return 'document';
-        if (node === document.body) return 'body';
-        try {
-          var parts = [];
-          var cur = node;
-          var depth = 0;
-          while (cur && cur.nodeType === 1 && depth < 6) {
-            var name = (cur.tagName || '').toLowerCase();
-            if (cur.id) { parts.unshift(name + '#' + cur.id); break; }
-            var cls = cur.getAttribute && cur.getAttribute('class');
-            if (cls) name += '.' + cls.split(/\s+/).slice(0, 2).join('.');
-            var flt = cur.tagName && cur.tagName.toLowerCase().indexOf('flt-') === 0;
-            if (flt) name = cur.tagName.toLowerCase();
-            parts.unshift(name);
-            cur = cur.parentNode;
-            depth++;
-          }
-          return parts.join(' > ');
-        } catch (_) {
-          return '(selector-error)';
-        }
-      }
-      function loadLocal() {
-        try {
-          var raw = localStorage.getItem(LS_KEY);
-          if (!raw) return [];
-          var arr = JSON.parse(raw);
-          return Array.isArray(arr) ? arr : [];
-        } catch (_) { return []; }
-      }
-      function saveLocal(arr) {
-        try { localStorage.setItem(LS_KEY, JSON.stringify(arr.slice(-50))); }
-        catch (_) {}
-      }
-
-      var events = loadLocal();
-      var hudEl = null;
-      // On-screen HUD is OFF: the visible debug box is gone for users. The tap
-      // telemetry below still records to the DB for ONE more round so we can
-      // confirm from real device data that the stale-inset hamburger fix took;
-      // all of this instrumentation is removed in a follow-up once confirmed.
-      var HUD_ENABLED = false;
-
-      function ensureHud() {
-        if (!HUD_ENABLED || hudEl || !isStandalone()) return; // only show in PWA mode
-        hudEl = document.createElement('div');
-        hudEl.id = 'pwa-tap-diag-hud';
-        hudEl.style.cssText = [
-          'position:fixed',
-          'right:6px',
-          'bottom:6px',
-          'z-index:2147483647',
-          'max-width:46vw',
-          'max-height:30vh',
-          'overflow:auto',
-          'background:rgba(0,0,0,0.78)',
-          'color:#9ef',
-          'font:10px/1.25 -apple-system,monospace',
-          'padding:6px 8px',
-          'border-radius:8px',
-          'pointer-events:none',
-          'white-space:pre',
-        ].join(';');
-        if (document.body) document.body.appendChild(hudEl);
-        else document.addEventListener('DOMContentLoaded', function () {
-          if (document.body) document.body.appendChild(hudEl);
-        });
-      }
-      function paintHud() {
-        if (!hudEl) return;
-        var last = events.slice(-5);
-        var lines = last.map(function (e) {
-          return (
-            (e.event_type || '?') +
-            ' (' + (e.x | 0) + ',' + (e.y | 0) + ') ' +
-            (e.target_path ? e.target_path.slice(0, 36) : '')
-          );
-        });
-        hudEl.textContent =
-          'PWA-DIAG ' + SESSION_ID + ' (' + displayMode() + ')\n' +
-          lines.join('\n');
-      }
-
-      var pending = [];
-      var flushTimer = null;
-      function scheduleFlush() {
-        if (flushTimer) return;
-        flushTimer = setTimeout(function () {
-          flushTimer = null;
-          var batch = pending.splice(0, pending.length);
-          if (!batch.length) return;
-          try {
-            var payload = JSON.stringify({ events: batch });
-            var blob = new Blob([payload], { type: 'application/json' });
-            // sendBeacon survives page transitions but doesn't carry headers,
-            // so the edge function accepts both anon-key header and unauth.
-            // Try beacon first; fall back to fetch with apikey header.
-            var sent = false;
-            try { sent = navigator.sendBeacon && navigator.sendBeacon(EDGE_URL, blob); }
-            catch (_) {}
-            if (!sent) {
-              fetch(EDGE_URL, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-                },
-                body: payload,
-                keepalive: true,
-              }).catch(function () {});
-            }
-          } catch (_) {}
-        }, 600);
-      }
-
-      function record(layer, type, ev, extra) {
-        try {
-          var t = ev && ev.target;
-          var x = (ev && (ev.clientX != null ? ev.clientX : (ev.touches && ev.touches[0] && ev.touches[0].clientX))) || 0;
-          var y = (ev && (ev.clientY != null ? ev.clientY : (ev.touches && ev.touches[0] && ev.touches[0].clientY))) || 0;
-          var entry = {
-            ts_client: new Date().toISOString(),
-            layer: layer,
-            event_type: type,
-            x: x,
-            y: y,
-            target_path: selectorPath(t),
-            user_agent: (navigator.userAgent || '').slice(0, 256),
-            display_mode: displayMode(),
-            standalone: isStandalone(),
-            session_id: SESSION_ID,
-            metadata: extra || null,
-          };
-          events.push(entry);
-          if (events.length > 50) events.splice(0, events.length - 50);
-          saveLocal(events);
-          pending.push(entry);
-          scheduleFlush();
-          ensureHud();
-          paintHud();
-          // Mirror to console so Safari Web Inspector picks it up too.
-          if (window.console && console.debug) {
-            console.debug('[PWA-DIAG]', type, x, y, entry.target_path);
-          }
-        } catch (_) {}
-      }
-
-      // Capture EVERY tap-relevant event at the document root, capture-phase,
-      // BEFORE Flutter's listeners run. passive:true so we never alter
-      // gesture behaviour while diagnosing it.
-      var TYPES = ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click'];
-      TYPES.forEach(function (t) {
-        document.addEventListener(t, function (ev) { record('js', t, ev); },
-          { capture: true, passive: true });
-      });
-
-      // Page-lifecycle markers — helps tell cold-relaunch from bfcache.
-      window.addEventListener('pageshow', function (e) {
-        record('meta', 'pageshow', null, { persisted: !!e.persisted });
-      });
-      window.addEventListener('pagehide', function (e) {
-        record('meta', 'pagehide', null, { persisted: !!e.persisted });
-      });
-      document.addEventListener('visibilitychange', function () {
-        record('meta', 'visibilitychange', null, { state: document.visibilityState });
-      });
-
-      // Boot marker.
-      record('meta', 'boot', null, {
-        persisted_pageshow: false,
-        ua: (navigator.userAgent || '').slice(0, 256),
-      });
-
-      // Flutter-originated event: bypasses record()'s DOM-event extraction
-      // and writes a properly-shaped row through the same pending/flush
-      // pipeline. Without this, Flutter Listener probes were silently
-      // accumulating in localStorage but never POSTing to Supabase, which
-      // is why pwa_debug_log had 900+ js rows and 0 flutter rows.
-      function recordFromFlutter(type, x, y, extraJson) {
-        try {
-          var extra = null;
-          if (extraJson) {
-            try { extra = JSON.parse(extraJson); } catch (_) {}
-          }
-          var entry = {
-            ts_client: new Date().toISOString(),
-            layer: 'flutter',
-            event_type: type,
-            x: x || 0,
-            y: y || 0,
-            target_path: 'flutter:_buildMobileTopBar',
-            user_agent: (navigator.userAgent || '').slice(0, 256),
-            display_mode: displayMode(),
-            standalone: isStandalone(),
-            session_id: SESSION_ID,
-            metadata: extra,
-          };
-          events.push(entry);
-          if (events.length > 50) events.splice(0, events.length - 50);
-          saveLocal(events);
-          pending.push(entry);
-          scheduleFlush();
-          ensureHud();
-          paintHud();
-          if (window.console && console.debug) {
-            console.debug('[PWA-DIAG-FLT]', type, x, y);
-          }
-        } catch (_) {}
-      }
-
-      // Public hooks for Flutter to push its own events through the same pipe,
-      // and for manual inspection in DevTools.
-      window.__pwaTapDiag = {
-        events: events,
-        sessionId: SESSION_ID,
-        record: record,
-        recordFromFlutter: recordFromFlutter,
-        flush: scheduleFlush,
-        clearLocal: function () { try { localStorage.removeItem(LS_KEY); } catch (_) {} },
-      };
-
-      // Show HUD if already in standalone — even without a tap yet.
-      if (isStandalone()) {
-        if (document.body) ensureHud();
-        else document.addEventListener('DOMContentLoaded', ensureHud);
-        paintHud();
-      }
-    })();
-  </script>
 
   <script>
     function showInitializationError(message) {

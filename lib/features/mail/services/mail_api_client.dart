@@ -38,6 +38,21 @@ class MailIdentitiesResponse {
   });
 }
 
+/// Thrown when the inbox still can't be loaded after bounded retries.
+/// `toString()` is intentionally user-friendly: MailInboxProvider stores the
+/// raw error and the UI renders it directly, so this doubles as the empty
+/// state copy instead of a raw 'Load failed'/'Failed to fetch'.
+class MailListUnavailableException implements Exception {
+  const MailListUnavailableException(this.cause);
+
+  /// The final underlying error, kept for logging/debugging.
+  final Object cause;
+
+  @override
+  String toString() =>
+      'Your inbox is taking a moment to load. Please try again shortly.';
+}
+
 class MailApiClient {
   MailApiClient({CRMSupabaseService? supabase})
     : _supabase = supabase ?? CRMSupabaseService();
@@ -70,22 +85,46 @@ class MailApiClient {
     String? pageToken,
     String? q,
   }) async {
-    final resp = await _supabase.client.functions.invoke(
-      'mail-list',
-      body: {
-        'maxResults': maxResults,
-        if (pageToken != null) 'pageToken': pageToken,
-        if (q != null && q.isNotEmpty) 'q': q,
-      },
-    );
-    final data = (resp.data as Map?)?.cast<String, dynamic>() ?? {};
-    final messages = ((data['messages'] as List?) ?? const [])
-        .map((m) => MailMessage.fromJson(Map<String, dynamic>.from(m as Map)))
-        .toList();
-    return MailListPage(
-      messages: messages,
-      nextPageToken: data['nextPageToken'] as String?,
-    );
+    // Bounded retry with backoff: transient iOS PWA fetch aborts surface as
+    // 'Load failed'/'Failed to fetch' (FLUTTER-1/5) even though the
+    // mail-list edge fn is healthy server-side — retry briefly before
+    // giving up with a user-friendly error.
+    const retryDelays = [Duration(seconds: 1), Duration(seconds: 3)];
+    for (var attempt = 0; ; attempt++) {
+      try {
+        final resp = await _supabase.client.functions.invoke(
+          'mail-list',
+          body: {
+            'maxResults': maxResults,
+            if (pageToken != null) 'pageToken': pageToken,
+            if (q != null && q.isNotEmpty) 'q': q,
+          },
+        );
+        final data = (resp.data as Map?)?.cast<String, dynamic>() ?? {};
+        final messages = ((data['messages'] as List?) ?? const [])
+            .map((m) =>
+                MailMessage.fromJson(Map<String, dynamic>.from(m as Map)))
+            .toList();
+        return MailListPage(
+          messages: messages,
+          nextPageToken: data['nextPageToken'] as String?,
+        );
+      } catch (e) {
+        // Only network-transient failures are worth retrying; auth/4xx-style
+        // failures surface immediately with their real cause.
+        final msg = e.toString();
+        final transient = msg.contains('Load failed') ||
+            msg.contains('Failed to fetch') ||
+            msg.contains('ClientException') ||
+            msg.contains('SocketException') ||
+            msg.contains('Connection closed');
+        if (!transient) rethrow;
+        if (attempt >= retryDelays.length) {
+          throw MailListUnavailableException(e);
+        }
+        await Future.delayed(retryDelays[attempt]);
+      }
+    }
   }
 
   /// Searches the inbox via the `mail-search` edge function. The query string

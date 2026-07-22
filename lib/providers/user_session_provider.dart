@@ -151,12 +151,14 @@ class UserSessionProvider extends ChangeNotifier {
         throw Exception('User email not available');
       }
 
-      // Fetch member record by email
-      final memberResponse = await client
-          .from('members')
-          .select()
-          .eq('email', email)
-          .maybeSingle();
+      // Fetch the member record and superadmin status in parallel — they're
+      // independent round-trips, so serializing them just adds spinner time.
+      final parallelResults = await Future.wait<dynamic>([
+        client.from('members').select().eq('email', email).maybeSingle(),
+        _fetchSuperadminFlag(),
+      ]);
+      final memberResponse = parallelResults[0] as Map<String, dynamic>?;
+      _isSuperadmin = parallelResults[1] as bool;
 
       if (memberResponse == null) {
         debugPrint('No member found by primary email, trying school_email');
@@ -180,23 +182,6 @@ class UserSessionProvider extends ChangeNotifier {
       // reference `auth.users.id` (for audit writes, RLS checks that compare
       // to auth.uid(), etc.) without another round-trip to Supabase.
       _authUserId = Supabase.instance.client.auth.currentUser?.id;
-
-      // Resolve superadmin status via the security-definer RPC. Wrapped in
-      // try/catch so the app tolerates the pre-migration state during the
-      // Phase 0 rollout (plan §3) — if the RPC doesn't exist yet we simply
-      // fall back to the default of `_isSuperadmin = false`. The RPC is a
-      // scalar `boolean` under the hood, but supabase-dart's rpc() returns
-      // `dynamic` so we defensively handle bool/Map/List shapes.
-      try {
-        // ignore: avoid_dynamic_calls
-        final dynamic superadminResponse =
-            await Supabase.instance.client.rpc('current_user_is_superadmin');
-        _isSuperadmin = _coerceSuperadminResult(superadminResponse);
-      } catch (e) {
-        debugPrint('UserSessionProvider: current_user_is_superadmin RPC failed '
-            '(defaulting to false — migration may not be applied yet): $e');
-        _isSuperadmin = false;
-      }
 
       debugPrint('Member loaded: ${_currentMember?.name}, executiveCommittee: ${_currentMember?.executiveCommittee}, isExecutive: $isExecutive, isSuperadmin: $_isSuperadmin');
 
@@ -241,9 +226,60 @@ class UserSessionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Resolve superadmin status via the security-definer RPC. Wrapped in
+  /// try/catch so the app tolerates the pre-migration state during the
+  /// Phase 0 rollout (plan §3) — if the RPC doesn't exist yet we simply
+  /// fall back to the default of `false`. The RPC is a scalar `boolean`
+  /// under the hood, but supabase-dart's rpc() returns `dynamic` so we
+  /// defensively handle bool/Map/List shapes.
+  Future<bool> _fetchSuperadminFlag() async {
+    try {
+      // ignore: avoid_dynamic_calls
+      final dynamic superadminResponse =
+          await Supabase.instance.client.rpc('current_user_is_superadmin');
+      return _coerceSuperadminResult(superadminResponse);
+    } catch (e) {
+      debugPrint('UserSessionProvider: current_user_is_superadmin RPC failed '
+          '(defaulting to false — migration may not be applied yet): $e');
+      return false;
+    }
+  }
+
+  // Committees the auth gate (password screen) already fetched via
+  // get_user_valid_committees while validating the sign-in. One-shot: consumed
+  // by the next loadUserSession so refreshSession() still hits the RPC fresh.
+  static String? _preauthCommitteesEmail;
+  static List<dynamic>? _preauthCommitteesRows;
+
+  /// Called by the auth gate after its pre-auth get_user_valid_committees
+  /// call so [loadUserSession] can skip the duplicate RPC on the login path.
+  static void cachePreauthCommittees(String email, List<dynamic> rows) {
+    _preauthCommitteesEmail = email.toLowerCase().trim();
+    _preauthCommitteesRows = rows;
+  }
+
+  static List<dynamic>? _takePreauthCommittees(String email) {
+    final rows = _preauthCommitteesRows;
+    final cachedEmail = _preauthCommitteesEmail;
+    _preauthCommitteesRows = null;
+    _preauthCommitteesEmail = null;
+    if (rows == null || cachedEmail != email.toLowerCase().trim()) return null;
+    return rows;
+  }
+
   /// Load the user's valid committees via RPC
   Future<void> _loadUserCommittees(String email) async {
     try {
+      // Reuse the committees the auth gate fetched moments ago this session —
+      // skips a duplicate get_user_valid_committees round-trip at login.
+      final preauth = _takePreauthCommittees(email);
+      if (preauth != null) {
+        _userCommittees = preauth
+            .map((item) => UserCommitteeInfo.fromJson(item as Map<String, dynamic>))
+            .toList();
+        return;
+      }
+
       final supabase = CRMSupabaseService();
       final client = supabase.client;
 
@@ -372,6 +408,8 @@ class UserSessionProvider extends ChangeNotifier {
     _isInitialized = false;
     _authUserId = null;
     _isSuperadmin = false;
+    _preauthCommitteesEmail = null;
+    _preauthCommitteesRows = null;
 
     // Flush cross-user static caches.
     try {

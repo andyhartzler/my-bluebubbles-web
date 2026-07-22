@@ -69,3 +69,6 @@ pubspec.lock
 .env.local
 .env.*.local
 supabase/.temp/
+
+# Local Netlify folder
+.netlify

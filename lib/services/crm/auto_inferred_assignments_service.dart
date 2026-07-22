@@ -218,16 +218,19 @@ class AutoInferredAssignmentsService {
 
     // 4. Bill notes that mention me
     await safe(() async {
+      // Live schema check 2026-07: legislation_bill_notes has `content`
+      // (see LegislationService.addNote) — the previous select referenced
+      // `committee_id` and `body`, neither of which exist, so this query
+      // threw a PostgrestException on every load (FLUTTER-3).
       final rows = await client
           .from('legislation_bill_notes')
-          .select('id, bill_id, committee_id, body, created_at, mentioned_member_ids')
+          .select('id, bill_id, content, created_at, mentioned_member_ids')
           .contains('mentioned_member_ids', [memberId])
           .order('created_at', ascending: false)
           .limit(20);
       for (final r in (rows as List).whereType<Map>()) {
-        final body = (r['body'] as String?) ?? '';
+        final body = (r['content'] as String?) ?? '';
         final billId = r['bill_id']?.toString() ?? '';
-        final committeeId = r['committee_id']?.toString();
         results.add(AutoInferredAssignment(
           key: 'bill_mention:${r['id']}',
           source: 'bill_mention',
@@ -237,7 +240,6 @@ class AutoInferredAssignmentsService {
           at: DateTime.tryParse(r['created_at']?.toString() ?? ''),
           entityKind: 'bill',
           entityId: billId,
-          committeeId: committeeId,
         ));
       }
     });

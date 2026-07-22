@@ -128,6 +128,7 @@ class ConversationTile extends CustomStateful<ConversationTileController> {
 
 class _ConversationTileState extends CustomState<ConversationTile, void, ConversationTileController> with AutomaticKeepAliveClientMixin {
   ConversationListController get listController => controller.listController;
+  StreamSubscription? _highlightSub;
 
   @override
   bool get wantKeepAlive => true;
@@ -145,8 +146,9 @@ class _ConversationTileState extends CustomState<ConversationTile, void, Convers
           cm.activeChat?.chat.guid == controller.chat.guid;
     }
 
-    eventDispatcher.stream.listen((event) {
-      if (event.item1 == 'update-highlight' && mounted) {
+    _highlightSub = eventDispatcher.stream.listen((event) {
+      if (!mounted) return;
+      if (event.item1 == 'update-highlight') {
         if ((kIsDesktop || kIsWeb) && event.item2 == controller.chat.guid) {
           controller.shouldHighlight.value = true;
         } else if (controller.shouldHighlight.value) {
@@ -154,6 +156,12 @@ class _ConversationTileState extends CustomState<ConversationTile, void, Convers
         }
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _highlightSub?.cancel();
+    super.dispose();
   }
 
   @override
@@ -190,6 +198,7 @@ class ChatTitle extends CustomStateful<ConversationTileController> {
 class _ChatTitleState extends CustomState<ChatTitle, void, ConversationTileController> {
   String title = "Unknown";
   StreamSubscription? sub;
+  StreamSubscription? _contactsSub;
   String? cachedDisplayName = "";
   List<Handle> cachedParticipants = [];
   Member? _crmMember;
@@ -232,7 +241,8 @@ class _ChatTitleState extends CustomState<ChatTitle, void, ConversationTileContr
         });
       });
       // listen for contacts update (if tile is active, we can update it)
-      eventDispatcher.stream.listen((event) {
+      _contactsSub = eventDispatcher.stream.listen((event) {
+        if (!mounted) return;
         if (event.item1 != 'update-contacts') return;
         if (event.item2.isNotEmpty) {
           bool changed = false;
@@ -258,6 +268,7 @@ class _ChatTitleState extends CustomState<ChatTitle, void, ConversationTileContr
       });
     } else {
       sub = WebListeners.chatUpdate.listen((chat) {
+        if (!mounted) return;
         if (chat.guid == controller.chat.guid) {
           // check if we really need to update this widget
           if (chat.displayName != cachedDisplayName
@@ -280,7 +291,10 @@ class _ChatTitleState extends CustomState<ChatTitle, void, ConversationTileContr
 
   @override
   void dispose() {
-    if (!kIsWeb) sub?.cancel();
+    // The web chatUpdate subscription leaked here for years behind a !kIsWeb
+    // guard — cancel unconditionally (FLUTTER-4 setState-after-dispose storm).
+    sub?.cancel();
+    _contactsSub?.cancel();
     super.dispose();
   }
 
@@ -375,6 +389,7 @@ class _ChatSubtitleState extends CustomState<ChatSubtitle, void, ConversationTil
   String subtitle = "Unknown";
   String fakeText = faker.lorem.words(1).join(" ");
   StreamSubscription? sub;
+  StreamSubscription? _contactsSub;
   String? cachedLatestMessageGuid = "";
   DateTime? cachedDateCreated;
   DateTime? cachedDateEdited;
@@ -432,10 +447,18 @@ class _ChatSubtitleState extends CustomState<ChatSubtitle, void, ConversationTil
       });
     } else {
       // listen for contacts update (if tile is active, we can update it)
-      eventDispatcher.stream.listen((event) {
+      _contactsSub = eventDispatcher.stream.listen((event) {
+        if (!mounted) return;
         if (event.item1 != 'update-contacts') return;
         if (event.item2.isNotEmpty) {
-          String newSubtitle = MessageHelper.getNotificationText(controller.chat.latestMessage);
+          // Null-guard: a chat with no hydrated latest message must not hit
+          // getNotificationText (FLUTTER-4 crash storm). The getter is typed
+          // non-nullable today, but placeholder chats have violated that in
+          // practice — keep the defensive check.
+          // ignore: unnecessary_nullable_for_final_variable_declarations
+          final Message? latest = controller.chat.latestMessage;
+          if (latest == null) return;
+          String newSubtitle = MessageHelper.getNotificationText(latest);
           if (newSubtitle != subtitle) {
             setState(() {
               subtitle = newSubtitle;
@@ -445,6 +468,7 @@ class _ChatSubtitleState extends CustomState<ChatSubtitle, void, ConversationTil
         }
       });
       sub = WebListeners.newMessage.listen((tuple) {
+        if (!mounted) return;
         final message = tuple.item1;
         if (tuple.item2?.guid == controller.chat.guid && (cachedDateCreated == null || message.dateCreated!.isAfter(cachedDateCreated!))) {
           isFromMe = message.isFromMe ?? false;
@@ -474,6 +498,7 @@ class _ChatSubtitleState extends CustomState<ChatSubtitle, void, ConversationTil
   @override
   void dispose() {
     sub?.cancel();
+    _contactsSub?.cancel();
     super.dispose();
   }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:universal_html/html.dart' as html;
 import '../models/job.dart';
 import '../models/job_application.dart';
 import '../models/job_notification_template.dart';
@@ -13,6 +14,32 @@ import '../../../services/crm/crm_email_service.dart';
 class JobsService {
   final _supabase = Supabase.instance.client;
   final _crmService = CRMSupabaseService();
+
+  /// Whether the Forms section is currently the active CRM section. The 5s
+  /// pollers in [watchJobs]/[watchPendingCount] skip their tick while this is
+  /// false (or while the browser tab is hidden), so an idle session stops
+  /// hammering Supabase; on re-entry every live poller refetches immediately.
+  /// Driven by `_HomeState._setSection` in main.dart.
+  static bool _formsSectionActive = false;
+
+  static final Set<VoidCallback> _pollWakeCallbacks = {};
+
+  static void setFormsSectionActive(bool active) {
+    if (_formsSectionActive == active) return;
+    _formsSectionActive = active;
+    if (active) {
+      for (final wake in Set<VoidCallback>.of(_pollWakeCallbacks)) {
+        wake();
+      }
+    }
+  }
+
+  /// True when a periodic poll should actually hit the network.
+  static bool get shouldPoll {
+    if (!_formsSectionActive) return false;
+    if (kIsWeb && html.document.hidden == true) return false;
+    return true;
+  }
 
   /// Sanitize JSON from Supabase to handle integer booleans (0/1 -> false/true)
   /// This is needed because Supabase sometimes returns integers for boolean fields
@@ -104,11 +131,18 @@ class JobsService {
     // Initial fetch
     fetchJobs();
 
-    // Poll every 5 seconds for updates
-    timer = Timer.periodic(const Duration(seconds: 5), (_) => fetchJobs());
+    // Poll every 5 seconds for updates — skipped while the Forms section
+    // isn't active (or the tab is hidden); refetches on section re-entry.
+    timer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (shouldPoll) fetchJobs();
+    });
+
+    void wake() => fetchJobs();
+    _pollWakeCallbacks.add(wake);
 
     controller.onCancel = () {
       timer?.cancel();
+      _pollWakeCallbacks.remove(wake);
     };
 
     return controller.stream;
@@ -145,11 +179,18 @@ class JobsService {
     // Initial fetch
     fetchCount();
 
-    // Poll every 5 seconds for updates
-    timer = Timer.periodic(const Duration(seconds: 5), (_) => fetchCount());
+    // Poll every 5 seconds for updates — skipped while the Forms section
+    // isn't active (or the tab is hidden); refetches on section re-entry.
+    timer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (shouldPoll) fetchCount();
+    });
+
+    void wake() => fetchCount();
+    _pollWakeCallbacks.add(wake);
 
     controller.onCancel = () {
       timer?.cancel();
+      _pollWakeCallbacks.remove(wake);
     };
 
     return controller.stream;

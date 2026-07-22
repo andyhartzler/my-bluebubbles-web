@@ -47,6 +47,7 @@ import 'package:bluebubbles/screens/crm/dashboard_shell/dashboard_shell_screen.d
 import 'package:bluebubbles/features/campaigns/screens/mautic_embed_screen.dart';
 import 'package:bluebubbles/features/forms/screens/forms_main_screen.dart';
 import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
+import 'package:bluebubbles/features/forms/services/jobs_service.dart';
 import 'package:bluebubbles/features/mail/screens/mail_screen_lazy.dart';
 import 'package:bluebubbles/features/mail/services/mail_api_client.dart';
 import 'package:bluebubbles/screens/crm/surveys_screen.dart';
@@ -184,7 +185,9 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
             });
 
         /* ----- DATE FORMATTING INITIALIZATION ----- */
-        await initializeDateFormatting();
+        // Locale-scoped: the no-arg form initializes date symbols for EVERY
+        // locale in the bundle before first paint.
+        await initializeDateFormatting('en_US');
 
         /* ----- MEDIAKIT INITIALIZATION ----- */
         MediaKit.ensureInitialized();
@@ -335,6 +338,24 @@ Future<void> initSentry() async {
       options.sendDefaultPii = false;
       // Failed HTTP requests (Supabase, BlueBubbles, edge fns) become events.
       options.captureFailedRequests = true;
+      // Transient iOS PWA fetch aborts against the mail-list edge fn surface
+      // as 'Load failed'/'Failed to fetch' SentryHttpClient events
+      // (FLUTTER-1/5) and mask real regressions — the edge fn itself is
+      // healthy. Drop just those; everything else passes through.
+      options.beforeSend = (event, hint) {
+        final url = event.request?.url ?? '';
+        if (url.contains('/functions/v1/mail-list')) {
+          final message = [
+            event.throwable?.toString() ?? '',
+            ...?event.exceptions?.map((e) => '${e.type} ${e.value}'),
+          ].join(' ');
+          if (message.contains('Load failed') ||
+              message.contains('Failed to fetch')) {
+            return null;
+          }
+        }
+        return event;
+      };
     });
   } catch (e, s) {
     // Sentry being unreachable must never block app boot.
@@ -739,6 +760,11 @@ class _HomeState extends OptimizedState<Home>
   bool fullyLoaded = false;
   bool _mailEnabled = false; // gated by a provisioned mail_aliases row
   _HomeSection _currentSection = _HomeSection.home;
+  // Sections the user has opened this session. Every non-home IndexedStack
+  // child stays a SizedBox.shrink() until first visited (so login doesn't
+  // boot every section's queries/pollers at once), then stays mounted so
+  // PageStorage/keep-alive state survives section switches.
+  final Set<_HomeSection> _visitedSections = {_HomeSection.home};
   final PageStorageBucket _bucket = PageStorageBucket();
 
   Future<void> _checkMailAlias() async {
@@ -859,7 +885,10 @@ class _HomeState extends OptimizedState<Home>
       };
       /* ----- SERVER VERSION CHECK ----- */
       if (kIsWeb && ss.settings.finishedSetup.value) {
-        int version = (await ss.getServerDetails()).item4;
+        // StartupTasks.onStartup() already calls getServerDetails(refresh:
+        // true); read the cached value synchronously so a slow BlueBubbles
+        // server can't block the listener setup below.
+        int version = ss.serverDetailsSync().item4;
         if (version < 42) {
           setState(() {
             serverCompatible = false;
@@ -1151,78 +1180,141 @@ class _HomeState extends OptimizedState<Home>
                       const PersonalizedHomeScreen(
                         key: PageStorageKey('home-view'),
                       ),
-                      const DashboardShellScreen(
-                        key: PageStorageKey('dashboard-view'),
+                      _lazySection(
+                        _HomeSection.dashboard,
+                        () => const DashboardShellScreen(
+                          key: PageStorageKey('dashboard-view'),
+                        ),
                       ),
-                      const MembersListScreen(
-                        key: PageStorageKey('members-view'),
-                        embed: true,
+                      _lazySection(
+                        _HomeSection.members,
+                        () => const MembersListScreen(
+                          key: PageStorageKey('members-view'),
+                          embed: true,
+                        ),
                       ),
-                      const DonorCommandCenter(
-                        key: PageStorageKey('donors-view'),
-                        embed: true,
+                      _lazySection(
+                        _HomeSection.donors,
+                        () => const DonorCommandCenter(
+                          key: PageStorageKey('donors-view'),
+                          embed: true,
+                        ),
                       ),
-                      const SubscribersScreen(
-                        key: PageStorageKey('subscribers-view'),
+                      _lazySection(
+                        _HomeSection.subscribers,
+                        () => const SubscribersScreen(
+                          key: PageStorageKey('subscribers-view'),
+                        ),
                       ),
-                      const MembersListScreen(
-                        key: PageStorageKey('chapters-view'),
-                        embed: true,
-                        showChaptersOnly: true,
+                      _lazySection(
+                        _HomeSection.chapters,
+                        () => const MembersListScreen(
+                          key: PageStorageKey('chapters-view'),
+                          embed: true,
+                          showChaptersOnly: true,
+                        ),
                       ),
-                      const CommitteesDashboardScreen(
-                        key: PageStorageKey('committees-view'),
-                        embed: true,
+                      _lazySection(
+                        _HomeSection.committees,
+                        () => const CommitteesDashboardScreen(
+                          key: PageStorageKey('committees-view'),
+                          embed: true,
+                        ),
                       ),
-                      const MeetingsScreen(
-                        key: PageStorageKey('meetings-view'),
+                      _lazySection(
+                        _HomeSection.meetings,
+                        () => const MeetingsScreen(
+                          key: PageStorageKey('meetings-view'),
+                        ),
                       ),
-                      const EventsScreen(key: PageStorageKey('events-view')),
-                      const MemberPortalManagementScreen(
-                        key: PageStorageKey('member-portal-view'),
+                      _lazySection(
+                        _HomeSection.events,
+                        () => const EventsScreen(
+                          key: PageStorageKey('events-view'),
+                        ),
                       ),
-                      const WalletNotificationComposer(
-                        key: PageStorageKey('wallet-notification-view'),
-                        embedded: true,
+                      _lazySection(
+                        _HomeSection.memberPortal,
+                        () => const MemberPortalManagementScreen(
+                          key: PageStorageKey('member-portal-view'),
+                        ),
                       ),
-                      const SlackManagementScreen(
-                        key: PageStorageKey('slack-management-view'),
-                        embed: true,
+                      _lazySection(
+                        _HomeSection.walletNotifications,
+                        () => const WalletNotificationComposer(
+                          key: PageStorageKey('wallet-notification-view'),
+                          embedded: true,
+                        ),
+                      ),
+                      _lazySection(
+                        _HomeSection.slackManagement,
+                        () => const SlackManagementScreen(
+                          key: PageStorageKey('slack-management-view'),
+                          embed: true,
+                        ),
                       ),
                       // Mail uses deferred-loading: the tmail-flutter fork
                       // (~2,500 .dart files) ships as a separate JS chunk
                       // that only downloads when this widget mounts. We
-                      // gate the mount on `_mailEnabled`, so non-execs
-                      // (no provisioned alias) never trigger the download.
-                      _mailEnabled
-                          ? const MailScreenLazy(
-                              key: PageStorageKey('mail-view'),
-                            )
-                          : const SizedBox.shrink(
-                              key: PageStorageKey('mail-view-placeholder'),
-                            ),
-                      const MauticEmbedScreen(
-                        key: PageStorageKey('campaigns-view'),
+                      // gate the mount on the section being visited AND
+                      // `_mailEnabled`, so non-execs (no provisioned alias)
+                      // never trigger the download and execs don't pay the
+                      // tmail boot + mail-labels-get/mail-list calls at login.
+                      _lazySection(
+                        _HomeSection.mail,
+                        () => _mailEnabled
+                            ? const MailScreenLazy(
+                                key: PageStorageKey('mail-view'),
+                              )
+                            : const SizedBox.shrink(
+                                key: PageStorageKey('mail-view-placeholder'),
+                              ),
                       ),
-                      const FormsMainScreen(key: PageStorageKey('forms-view')),
-                      ConversationList(
-                        key: const PageStorageKey('conversations-view'),
-                        showArchivedChats: false,
-                        showUnknownSenders: false,
+                      _lazySection(
+                        _HomeSection.campaigns,
+                        () => const MauticEmbedScreen(
+                          key: PageStorageKey('campaigns-view'),
+                        ),
                       ),
-                      const SurveysScreen(key: PageStorageKey('surveys-view')),
-                      const CandidatesPage(key: PageStorageKey('candidates-view')),
-                      const FinancesPage(key: PageStorageKey('finances-view')),
-                      // Superadmin Activity dashboard — wrapped in a Builder so
-                      // the realtime subscriptions only start when the section
-                      // is active (IndexedStack still keeps all children in
-                      // the tree, but the Builder defers child construction).
-                      Builder(
-                        key: const PageStorageKey('activity-view'),
-                        builder: (context) =>
-                            _currentSection == _HomeSection.activity
-                                ? const ActivityScreen()
-                                : const SizedBox.shrink(),
+                      _lazySection(
+                        _HomeSection.forms,
+                        () => const FormsMainScreen(
+                          key: PageStorageKey('forms-view'),
+                        ),
+                      ),
+                      _lazySection(
+                        _HomeSection.conversations,
+                        () => ConversationList(
+                          key: const PageStorageKey('conversations-view'),
+                          showArchivedChats: false,
+                          showUnknownSenders: false,
+                        ),
+                      ),
+                      _lazySection(
+                        _HomeSection.surveys,
+                        () => const SurveysScreen(
+                          key: PageStorageKey('surveys-view'),
+                        ),
+                      ),
+                      _lazySection(
+                        _HomeSection.candidates,
+                        () => const CandidatesPage(
+                          key: PageStorageKey('candidates-view'),
+                        ),
+                      ),
+                      _lazySection(
+                        _HomeSection.finances,
+                        () => const FinancesPage(
+                          key: PageStorageKey('finances-view'),
+                        ),
+                      ),
+                      // Superadmin Activity dashboard — realtime subscriptions
+                      // only start once the section is first visited.
+                      _lazySection(
+                        _HomeSection.activity,
+                        () => const ActivityScreen(
+                          key: PageStorageKey('activity-view'),
+                        ),
                       ),
                     ],
                   ),
@@ -2171,6 +2263,24 @@ class _HomeState extends OptimizedState<Home>
     );
   }
 
+  /// Lazy-mount gate for IndexedStack sections: builds a placeholder until
+  /// the section is first visited, then keeps the real widget mounted so
+  /// PageStorage/keep-alive behavior is preserved. (Same Builder pattern
+  /// previously used for ActivityScreen, extended to every section.)
+  /// Once mounted, TickerMode disables the section's tickers while it isn't
+  /// the active section (IndexedStack alone keeps hidden children animating —
+  /// e.g. the Finances pulse was an invisible 60fps rebuild).
+  Widget _lazySection(_HomeSection section, Widget Function() builder) {
+    return Builder(
+      builder: (context) => _visitedSections.contains(section)
+          ? TickerMode(
+              enabled: _currentSection == section,
+              child: builder(),
+            )
+          : const SizedBox.shrink(),
+    );
+  }
+
   void _setSection(_HomeSection section) {
     if (_currentSection == section) return;
     if (Sentry.isEnabled) {
@@ -2183,7 +2293,13 @@ class _HomeState extends OptimizedState<Home>
       ));
       Sentry.configureScope((scope) => scope.setTag('crm.section', section.name));
     }
-    setState(() => _currentSection = section);
+    // Pause the jobs pollers whenever Forms isn't the active section (they
+    // resume + refetch on re-entry).
+    JobsService.setFormsSectionActive(section == _HomeSection.forms);
+    setState(() {
+      _visitedSections.add(section);
+      _currentSection = section;
+    });
   }
 
   void _openNewMessage(BuildContext context) {

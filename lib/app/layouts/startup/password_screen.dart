@@ -259,6 +259,10 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
 
       final validCommittees = validationResponse as List<dynamic>? ?? [];
 
+      // Hand the result to UserSessionProvider so loadUserSession can skip
+      // the duplicate get_user_valid_committees RPC after auth completes.
+      UserSessionProvider.cachePreauthCommittees(email, validCommittees);
+
       // Check if user exists in members table (either as executive or committee member).
       // Routed through SECURITY DEFINER RPC so it survives the Phase 2 RLS
       // revocation of anon SELECT on `members`. Returns only 3 booleans — no PII.
@@ -461,6 +465,9 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
           (await client.rpc('get_user_valid_committees', params: {'user_email': email}))
                   as List<dynamic>? ??
               [];
+      // Hand the result to UserSessionProvider so loadUserSession can skip
+      // the duplicate get_user_valid_committees RPC after auth completes.
+      UserSessionProvider.cachePreauthCommittees(email, validCommittees);
       final memberCheck = await client
           .rpc('members_preauth_check', params: {'p_email': email})
           .maybeSingle();

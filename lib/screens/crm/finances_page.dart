@@ -114,10 +114,14 @@ class _FinancesPageState extends State<FinancesPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    // NOTE: no ..repeat(reverse: true) here — the pulse is started/stopped
+    // from didChangeDependencies based on TickerMode, so it only runs while
+    // this section is actually visible (otherwise it's an invisible 60fps
+    // rebuild for the whole session).
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
-    )..repeat(reverse: true);
+    );
     _staggerController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -132,6 +136,21 @@ class _FinancesPageState extends State<FinancesPage>
     _plaidExitSub = PlaidLink.onExit.listen(_onPlaidExit);
 
     _loadAll();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Run the pulse only while this section is visible: main.dart wraps each
+    // IndexedStack section in TickerMode(enabled: isCurrentSection), and
+    // TickerMode.of registers a dependency, so this re-fires on every
+    // section switch and stops the controller when the user navigates away.
+    final tickersEnabled = TickerMode.valuesOf(context).enabled;
+    if (tickersEnabled && !_pulseController.isAnimating) {
+      _pulseController.repeat(reverse: true);
+    } else if (!tickersEnabled && _pulseController.isAnimating) {
+      _pulseController.stop();
+    }
   }
 
   @override
