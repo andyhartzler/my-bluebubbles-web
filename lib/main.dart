@@ -192,6 +192,11 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
         /* ----- MEDIAKIT INITIALIZATION ----- */
         MediaKit.ensureInitialized();
 
+        /* ----- TIME ZONE INITIALIZATION ----- */
+        // Must run on every platform: web/desktop widgets (e.g. the Meetings
+        // panels) call tz.getLocation() during render.
+        tz.initializeTimeZones();
+
         /* ----- SPLASH SCREEN INITIALIZATION ----- */
         if (!ss.settings.finishedSetup.value && !kIsWeb && !kIsDesktop) {
           runApp(
@@ -212,8 +217,7 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
 
         /* ----- ANDROID SPECIFIC INITIALIZATION ----- */
         if (!kIsWeb && !kIsDesktop) {
-          /* ----- TIME ZONE INITIALIZATION ----- */
-          tz.initializeTimeZones();
+          /* ----- LOCAL TIME ZONE DETECTION ----- */
           try {
             tz.setLocalLocation(
               tz.getLocation(await FlutterTimezone.getLocalTimezone()),
