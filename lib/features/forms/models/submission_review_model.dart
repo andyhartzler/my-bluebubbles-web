@@ -242,10 +242,38 @@ class AiIssueScore {
   }
 }
 
+/// One core-value break inside an [AiAlignmentScore]: the issue, the position
+/// the candidate took, their own words, and why it disqualifies.
+class AiDisqualifier {
+  final String issueId;
+  final String position;
+  final String quote;
+  final String whyDisqualifying;
+
+  const AiDisqualifier({
+    required this.issueId,
+    required this.position,
+    required this.quote,
+    required this.whyDisqualifying,
+  });
+
+  static AiDisqualifier? fromJson(dynamic j) {
+    if (j is! Map) return null;
+    return AiDisqualifier(
+      issueId: (j['issue_id'] ?? '').toString(),
+      position: (j['position'] ?? '').toString(),
+      quote: (j['quote'] ?? '').toString(),
+      whyDisqualifying: (j['why_disqualifying'] ?? '').toString(),
+    );
+  }
+}
+
 /// A Gemini-judged alignment score for one submission, loaded from
 /// `public.endorsement_ai_scores`. Gemini reads the candidate's FULL answers
-/// (selected option AND written explanation) against the MOYD platform, reading
-/// caveats and nuance fairly. When present it supersedes the rigid rule-based
+/// (selected option AND written explanation) against the MOYD platform through
+/// MOYD's progressive lens; positions that break core platform values mark the
+/// submission [disqualified] (score capped at 25) with each break itemized in
+/// [disqualifiers]. When present it supersedes the rigid rule-based
 /// [AlignmentScore] as the alignment number shown across the endorsement hub.
 class AiAlignmentScore {
   /// Overall 0..100 holistic alignment.
@@ -257,6 +285,13 @@ class AiAlignmentScore {
   /// Per-issue breakdown.
   final List<AiIssueScore> perIssue;
 
+  /// True when any answer broke a core MOYD value; the overall score is
+  /// hard-capped at 25 by the scoring pipeline.
+  final bool disqualified;
+
+  /// The itemized core-value breaks (empty when [disqualified] is false).
+  final List<AiDisqualifier> disqualifiers;
+
   final String? model;
   final DateTime? scoredAt;
 
@@ -264,6 +299,8 @@ class AiAlignmentScore {
     required this.overallScore,
     required this.rationale,
     required this.perIssue,
+    this.disqualified = false,
+    this.disqualifiers = const [],
     this.model,
     this.scoredAt,
   });
@@ -290,10 +327,21 @@ class AiAlignmentScore {
     final sa = row['scored_at'];
     if (sa != null) scoredAt = DateTime.tryParse(sa.toString());
 
+    final dqs = <AiDisqualifier>[];
+    final rawDqs = row['disqualifiers'];
+    if (rawDqs is List) {
+      for (final e in rawDqs) {
+        final parsed = AiDisqualifier.fromJson(e);
+        if (parsed != null) dqs.add(parsed);
+      }
+    }
+
     return AiAlignmentScore(
       overallScore: overall.clamp(0, 100),
       rationale: (row['rationale'] ?? '').toString(),
       perIssue: issues,
+      disqualified: row['disqualified'] == true || dqs.isNotEmpty,
+      disqualifiers: dqs,
       model: row['model']?.toString(),
       scoredAt: scoredAt,
     );

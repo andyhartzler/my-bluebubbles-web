@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 
 import '../../models/form_submission.dart';
+import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
+import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import '../../widgets/review/compare_matrix.dart';
 import '../../widgets/review/policy_stance_bars.dart';
 import '../submission_detail_screen.dart';
@@ -75,23 +77,42 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
     super.dispose();
   }
 
-  void _openCandidate(CandidateEntry e) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => SubmissionDetailScreen(
-        submission: e.submission,
-        form: _controller.form,
-      ),
-    ));
-  }
+  void _openCandidate(CandidateEntry e) => _openBySubmission(e.submission);
 
-  void _openBySubmission(FormSubmission s) {
-    Navigator.of(context).push(MaterialPageRoute(
+  /// Open a candidate from the hub. Linked candidates get their FULL CRM
+  /// profile (Money / District / Intel / Socials plus the inline review),
+  /// landing on the Questionnaire tab; unlinked submissions fall back to the
+  /// standalone review screen.
+  Future<void> _openBySubmission(FormSubmission s) async {
+    final navigator = Navigator.of(context);
+    final candidateId = s.candidateId;
+    if (candidateId != null && candidateId.isNotEmpty) {
+      try {
+        final candidate =
+            await CandidateRepository().fetchCandidate(candidateId);
+        if (candidate != null) {
+          navigator.push(MaterialPageRoute(
+            builder: (_) => CandidateDetailScreen(
+              candidate: candidate,
+              initialTab: _kQuestionnaireTab,
+            ),
+          ));
+          return;
+        }
+      } catch (e) {
+        debugPrint('EndorsementHub: candidate profile open failed: $e');
+      }
+    }
+    navigator.push(MaterialPageRoute(
       builder: (_) => SubmissionDetailScreen(
         submission: s,
         form: _controller.form,
       ),
     ));
   }
+
+  /// Index of the Questionnaire tab on [CandidateDetailScreen].
+  static const int _kQuestionnaireTab = 4;
 
   void _startCompare() {
     setState(() => _compareMode = _CompareMode.sideBySide);

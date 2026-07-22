@@ -14,6 +14,7 @@ import 'package:bluebubbles/widgets/crm/candidate_rubric_card.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_painters.dart';
 import 'package:bluebubbles/screens/crm/voter_file/voter_file_card.dart';
 import 'package:bluebubbles/screens/crm/widgets/candidate_questionnaire_panel.dart';
+import 'package:bluebubbles/screens/crm/widgets/socials/candidate_socials_panel.dart';
 import 'package:bluebubbles/screens/crm/candidate_edit_dialog.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/mec_committee_picker.dart';
@@ -141,9 +142,9 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       curve: const Interval(0.2, 1.0, curve: Curves.easeOut),
     ));
     _tabController = TabController(
-      length: 5,
+      length: 6,
       vsync: this,
-      initialIndex: widget.initialTab.clamp(0, 4),
+      initialIndex: widget.initialTab.clamp(0, 5),
     );
     _tabController.addListener(_onTabChanged);
     _notesController.text = c.notes ?? '';
@@ -902,9 +903,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         await _loadIntelData();
         break;
       case 4:
-        // Questionnaire panel owns its own fetch; nothing to do at this
-        // level. Pull-to-refresh still resolves after ~250ms so the user
-        // gets a visible completion.
+      case 5:
+        // Questionnaire and Socials panels own their own content; nothing to
+        // do at this level. Pull-to-refresh still resolves after ~250ms so
+        // the user gets a visible completion.
         await Future.delayed(const Duration(milliseconds: 250));
         break;
     }
@@ -981,6 +983,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                         _refreshable(_buildRaceTab()),
                         _refreshable(_buildIntelTab()),
                         _refreshable(CandidateQuestionnairePanel(candidateId: c.id)),
+                        _refreshable(CandidateSocialsPanel(candidate: c)),
                       ],
                     ),
                   ),
@@ -1065,6 +1068,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         Tab(text: 'District'),
         Tab(text: 'Intel'),
         Tab(text: 'Questionnaire'),
+        Tab(text: 'Socials'),
       ],
     );
   }
@@ -1078,13 +1082,14 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   // via the surrounding SizedBox in the delegate). Each tab wraps its
   // label in a padded InkWell to guarantee ≥48×48 tap area.
   TabBar _buildMobileTabChips() {
-    const tabLabels = ['Profile', 'Money', 'District', 'Intel', 'Q&A'];
+    const tabLabels = ['Profile', 'Money', 'District', 'Intel', 'Q&A', 'Socials'];
     const tabIcons = [
       Icons.person_outline,
       Icons.attach_money,
       Icons.map_outlined,
       Icons.insights,
       Icons.fact_check_outlined,
+      Icons.tag,
     ];
     return TabBar(
       controller: _tabController,

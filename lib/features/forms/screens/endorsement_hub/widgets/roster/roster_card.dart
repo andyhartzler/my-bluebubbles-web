@@ -125,8 +125,15 @@ class _RosterCardState extends State<RosterCard> {
                       left: 8,
                       child: _StatusChip(status: entry.submission.status),
                     ),
-                    // alignment badge (top-right)
-                    if (model.alignmentPct != null)
+                    // alignment badge (top-right); disqualified candidates
+                    // get the stamp instead of a bare number.
+                    if (model.aiAlignment?.disqualified == true)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: _Frosted(child: _DisqualifiedBadge()),
+                      )
+                    else if (model.alignmentPct != null)
                       Positioned(
                         top: 8,
                         right: 8,
@@ -312,7 +319,9 @@ extension on _RosterCardState {
                     runSpacing: 6,
                     children: [
                       _StatusChip(status: entry.submission.status),
-                      if (model.alignmentPct != null)
+                      if (model.aiAlignment?.disqualified == true)
+                        _DisqualifiedBadge()
+                      else if (model.alignmentPct != null)
                         AlignmentBadge(pct: model.alignmentPct!, dense: true),
                     ],
                   ),
@@ -337,6 +346,38 @@ extension on _RosterCardState {
 }
 
 /// The three-segment support / qualified / oppose strip.
+/// Crimson DISQUALIFIED stamp for candidates the Gemini judge flagged for a
+/// core-value break. Self-contained colors: legible on the photo overlay in
+/// both themes.
+class _DisqualifiedBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFB91C1C),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.gavel_rounded, size: 12, color: Colors.white),
+          SizedBox(width: 4),
+          Text(
+            'DQ',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _StanceStrip extends StatelessWidget {
   final CandidateEntry entry;
   const _StanceStrip({required this.entry});

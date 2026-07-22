@@ -17,8 +17,8 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/forms/models/form_schema.dart';
 import 'package:bluebubbles/features/forms/models/form_submission.dart';
 import 'package:bluebubbles/features/forms/models/submission_review_model.dart';
-import 'package:bluebubbles/features/forms/screens/submission_detail_screen.dart';
-import 'package:bluebubbles/features/forms/theme/moyd_brand.dart';
+import 'package:bluebubbles/features/forms/screens/endorsement_hub/ai_score_repository.dart';
+import 'package:bluebubbles/features/forms/widgets/submission_detail/submission_review_body.dart';
 
 class EndorsementQuestionnaireSection extends StatefulWidget {
   final String candidateId;
@@ -35,10 +35,9 @@ class EndorsementQuestionnaireSection extends StatefulWidget {
 
 class _EndorsementQuestionnaireSectionState
     extends State<EndorsementQuestionnaireSection> {
-  SubmissionReviewModel? _model;
   FormSchema? _form;
   FormSubmission? _submission;
-  DateTime? _submittedAt;
+  AiAlignmentScore? _ai;
   bool _loading = true;
   bool _hasResponse = false;
   String? _error;
@@ -96,14 +95,17 @@ class _EndorsementQuestionnaireSectionState
         status: row['status']?.toString() ?? 'submitted',
       );
 
+      // Gemini verdict for the inline review; degrades to null gracefully.
+      AiAlignmentScore? ai;
+      if (submission.id.isNotEmpty) {
+        ai = await EndorsementAiScoreRepository().loadOne(submission.id);
+      }
+
       setState(() {
         _hasResponse = true;
         _form = form;
         _submission = submission;
-        _submittedAt = submittedAt;
-        _model = form != null
-            ? SubmissionReviewModel.from(form, submission)
-            : null;
+        _ai = ai;
         _loading = false;
       });
     } catch (e) {
@@ -130,11 +132,19 @@ class _EndorsementQuestionnaireSectionState
       );
     }
 
-    if (!_hasResponse || _model == null) {
+    if (!_hasResponse || _form == null || _submission == null) {
       return _emptyCard();
     }
 
-    return _card(child: _reviewSummary(_model!));
+    // The full redesigned review, inline: verdict block (with disqualifiers)
+    // plus every questionnaire section. Same widget as the standalone
+    // Candidate Review screen so the two surfaces never drift.
+    return SubmissionReviewBody(
+      form: _form!,
+      submission: _submission!,
+      aiAlignment: _ai,
+      showHero: false,
+    );
   }
 
   Widget _emptyCard() {
@@ -180,165 +190,6 @@ class _EndorsementQuestionnaireSectionState
     );
   }
 
-  Widget _reviewSummary(SubmissionReviewModel m) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Icon(Icons.check_circle, color: Color(0xFF4ADE80), size: 22),
-            const SizedBox(width: 10),
-            const Text('Endorsement Questionnaire',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                )),
-            const Spacer(),
-            if (_submittedAt != null)
-              Text(_formatDate(_submittedAt!),
-                  style: const TextStyle(color: Colors.white60, fontSize: 12)),
-          ],
-        ),
-        const SizedBox(height: 14),
-        _chips(m),
-        if (m.allPolicyPositions.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          _stanceStrip(m),
-        ],
-        if (m.topPriority != null && m.topPriority!.trim().isNotEmpty) ...[
-          const SizedBox(height: 14),
-          _topPriorityQuote(m.topPriority!.trim()),
-        ],
-        const SizedBox(height: 14),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: MoydBrand.gold,
-              foregroundColor: const Color(0xFF1A1200),
-            ),
-            onPressed: (_form != null && _submission != null)
-                ? () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => SubmissionDetailScreen(
-                          submission: _submission,
-                          form: _form,
-                        ),
-                      ),
-                    );
-                  }
-                : null,
-            icon: const Icon(Icons.open_in_full, size: 16),
-            label: const Text('Open full review'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _chips(SubmissionReviewModel m) {
-    final chips = <Widget>[];
-    void add(String label, String? value, {bool amber = false}) {
-      if (value == null || value.isEmpty) return;
-      final base = amber ? MoydBrand.amber : BrandColors.sunriseGold;
-      chips.add(Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: base.withOpacity(0.18),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: base.withOpacity(0.45)),
-        ),
-        child: Text('$label: $value',
-            style: const TextStyle(color: Colors.white, fontSize: 12)),
-      ));
-    }
-
-    final officeDistrict = [
-      if (m.office != null) m.office,
-      if (m.district != null) m.district,
-    ].whereType<String>().join(' · ');
-
-    add('Office', officeDistrict.isEmpty ? null : officeDistrict);
-    add('Ideology', m.ideology);
-    if (m.nonDemHistory) add('Party history', m.partyHistory, amber: true);
-    add('Raised', m.raisedToDate == null ? null : _currency(m.raisedToDate!));
-    add('Track', m.track);
-
-    if (chips.isEmpty) return const SizedBox.shrink();
-    return Wrap(spacing: 8, runSpacing: 8, children: chips);
-  }
-
-  Widget _stanceStrip(SubmissionReviewModel m) {
-    final t = m.stanceTally;
-    final segs = <Widget>[];
-    void seg(String label, int count, Color fg, Color bg) {
-      if (count <= 0) return;
-      segs.add(Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text('$count $label',
-            style: TextStyle(
-                color: fg, fontSize: 12, fontWeight: FontWeight.w700)),
-      ));
-    }
-
-    seg('support', t.support, MoydBrand.supportFg, MoydBrand.supportBg);
-    seg('oppose', t.oppose, MoydBrand.opposeFg, MoydBrand.opposeBg);
-    seg('qualified', t.qualified, MoydBrand.qualifiedFg, MoydBrand.qualifiedBg);
-    if (t.other > 0) {
-      seg('other', t.other, MoydBrand.neutralFg, MoydBrand.neutralBg);
-    }
-
-    if (segs.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Positions',
-            style: TextStyle(
-                color: Colors.white60,
-                fontSize: 11,
-                letterSpacing: 0.4,
-                fontWeight: FontWeight.w600)),
-        const SizedBox(height: 6),
-        Wrap(spacing: 8, runSpacing: 8, children: segs),
-      ],
-    );
-  }
-
-  Widget _topPriorityQuote(String text) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(10),
-        border: const Border(
-          left: BorderSide(color: MoydBrand.gold, width: 3),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Would fight hardest for',
-              style: TextStyle(
-                  color: Colors.white60,
-                  fontSize: 11,
-                  letterSpacing: 0.4,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          Text('“$text”',
-              style: const TextStyle(
-                  color: Colors.white, fontSize: 14, height: 1.4)),
-        ],
-      ),
-    );
-  }
-
   Widget _card({required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -351,7 +202,4 @@ class _EndorsementQuestionnaireSectionState
     );
   }
 
-  String _currency(num v) => '\$${v.toStringAsFixed(0)}';
-
-  String _formatDate(DateTime d) => '${d.month}/${d.day}/${d.year}';
 }

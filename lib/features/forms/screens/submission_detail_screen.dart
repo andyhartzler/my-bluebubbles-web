@@ -4,11 +4,7 @@ import '../models/form_schema.dart';
 import '../models/form_submission.dart';
 import '../models/submission_review_model.dart';
 import '../widgets/submission_detail/candidate_hero_header.dart';
-import '../widgets/submission_detail/section_card.dart';
-import '../widgets/submission_detail/policy_positions_grid.dart';
-import '../widgets/submission_detail/documents_card.dart';
-import '../widgets/submission_detail/references_card.dart';
-import '../widgets/submission_detail/ai_alignment_card.dart';
+import '../widgets/submission_detail/submission_review_body.dart';
 import '../services/forms_service.dart';
 import 'endorsement_hub/ai_score_repository.dart';
 import '../../../models/crm/member.dart';
@@ -298,8 +294,9 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
 
     final glance = AtAGlanceBar(model: model);
 
-    // Readable measure on ultrawide monitors: cap the content column.
-    const maxContentWidth = 1040.0;
+    // Readable measure on ultrawide monitors: cap the content column. Wide
+    // enough that the review body's two-column section flow engages.
+    const maxContentWidth = 1360.0;
     Widget constrain(Widget child) => Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: maxContentWidth),
@@ -328,27 +325,11 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
         SliverToBoxAdapter(
           child: constrain(Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (model.aiAlignment != null)
-                  AiAlignmentCard(
-                    ai: model.aiAlignment!,
-                    rulePct: model.ruleAlignmentPct,
-                  ),
-                for (final section in model.sections)
-                  SectionCard(
-                    section: section,
-                    leading: section.isPolicyGrid
-                        ? PolicyPositionsGrid(
-                            positions: section.policyPositions)
-                        : null,
-                  ),
-                if (model.hasDocuments) DocumentsCard(model: model),
-                if (model.references.isNotEmpty)
-                  ReferencesCard(references: model.references),
-                _MetadataTile(submission: submission!, form: form!),
-              ],
+            child: SubmissionReviewBody(
+              form: form!,
+              submission: submission!,
+              aiAlignment: _aiAlignment,
+              showHero: false,
             ),
           )),
         ),
@@ -430,74 +411,6 @@ class _PinnedBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _PinnedBarDelegate oldDelegate) =>
       oldDelegate.child != child || oldDelegate.height != height;
-}
-
-/// Collapsed submission-metadata tile (demoted from a prominent card).
-class _MetadataTile extends StatelessWidget {
-  final FormSubmission submission;
-  final FormSchema form;
-
-  const _MetadataTile({required this.submission, required this.form});
-
-  String _fmt(DateTime d) =>
-      '${d.month}/${d.day}/${d.year} at ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    Widget row(String label, String value) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 120,
-                child: Text(label,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: cs.onSurfaceVariant)),
-              ),
-              Expanded(
-                child: SelectableText(value,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(fontWeight: FontWeight.w500)),
-              ),
-            ],
-          ),
-        );
-
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Theme(
-        data: theme.copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          leading: Icon(Icons.info_outline, color: cs.onSurfaceVariant),
-          title: Text('Submission info',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w600)),
-          childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          expandedCrossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            row('Submission ID', submission.id),
-            row('Form ID', submission.formId),
-            if (submission.memberId != null)
-              row('Member ID', submission.memberId!),
-            if (submission.candidateId != null)
-              row('Candidate ID', submission.candidateId!),
-            row('Submitted at', _fmt(submission.createdAt)),
-            row('Status', submission.status),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// Bottom sheet for displaying subscriber details
