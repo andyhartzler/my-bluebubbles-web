@@ -45,3 +45,29 @@ commit;
 --   select count(*) from public.endorsement_votes where reason_codes <> '{}'; -- 0
 --   select attnames from pg_publication_tables where tablename = 'endorsement_votes';
 --     -- {candidate_id,voter_id,voter_name,vote,updated_at,reason_codes,other_text}
+
+-- ---------------------------------------------------------------------------
+-- Addendum, applied 2026-07-21 (Andrew-approved): close the read gap.
+-- endorsement_votes_staff_read let ANY committee member (is_staff) read all
+-- ballots + reason text. Replaced with exec-only read via the pre-existing
+-- public.is_executive() (STABLE SECURITY DEFINER, search_path pinned),
+-- wrapped (SELECT ...) form per the RLS InitPlan rule.
+--
+-- begin;
+-- drop policy endorsement_votes_staff_read on public.endorsement_votes;
+-- create policy endorsement_votes_exec_read on public.endorsement_votes
+--   for select to authenticated
+--   using ((select public.is_executive()));
+-- commit;
+--
+-- JWT-simulation verified post-apply (all rolled back):
+--   * exec (chair uid) reads all 58 ballots: OK
+--   * non-exec staff (is_staff=t, is_executive=f) reads 0 rows: OK
+--   * exec insert of own undecided+reason ballot: OK (own_write unchanged)
+-- Rollback (if ever needed): recreate the old policy as
+--   create policy endorsement_votes_staff_read on public.endorsement_votes
+--     for select to authenticated using ((select is_staff()));
+-- Note: endorsement_votes_own_write still uses is_staff(), so non-exec staff
+-- can technically write (and read, via the ALL policy) their OWN vote row.
+-- The hub UI is exec-gated so no one legitimately hits this; tighten to
+-- is_executive() as a follow-up if desired.
