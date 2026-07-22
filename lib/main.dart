@@ -2300,6 +2300,12 @@ class _HomeState extends OptimizedState<Home>
     // Pause the jobs pollers whenever Forms isn't the active section (they
     // resume + refetch on re-entry).
     JobsService.setFormsSectionActive(section == _HomeSection.forms);
+    // On web the messaging stack (chats/socket/server-details/FCM) is booted
+    // lazily the first time Conversations is opened rather than at login.
+    // Idempotent + web-gated, so native and repeat visits are unaffected.
+    if (section == _HomeSection.conversations) {
+      StartupTasks.ensureWebMessagingStarted();
+    }
     setState(() {
       _visitedSections.add(section);
       _currentSection = section;

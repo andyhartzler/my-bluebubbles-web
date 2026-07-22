@@ -13,6 +13,7 @@ import 'package:bluebubbles/app/layouts/conversation_view/pages/conversation_vie
 import 'package:bluebubbles/app/wrappers/stateful_boilerplate.dart';
 import 'package:bluebubbles/app/wrappers/tablet_mode_wrapper.dart';
 import 'package:bluebubbles/database/models.dart';
+import 'package:bluebubbles/helpers/backend/startup_tasks.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -137,6 +138,13 @@ class _ConversationListState extends CustomState<ConversationList, void, Convers
   @override
   void initState() {
     super.initState();
+
+    // On web the messaging stack (chats/socket/server-details/FCM) is booted
+    // lazily the first time a conversation list mounts (the Conversations
+    // section or an embedded dashboard message widget) rather than at login.
+    // Idempotent + web-gated, so native behavior is unchanged.
+    StartupTasks.ensureWebMessagingStarted();
+
     tag = controller.filterPhoneNumbers != null
         ? "Committee-${controller.filterPhoneNumbers.hashCode}"
         : controller.showArchivedChats

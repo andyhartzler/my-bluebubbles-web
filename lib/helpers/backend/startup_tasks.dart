@@ -93,8 +93,39 @@ class StartupTasks {
 
   static final Completer<void> uiReady = Completer<void>();
 
+  // On web, the BlueBubbles messaging stack (chats, socket, server details,
+  // FCM registration) is booted lazily out of [onStartup] the first time the
+  // user opens the Conversations section or a dashboard message widget (see
+  // [ensureWebMessagingStarted]). This flag keeps that deferred boot
+  // idempotent so repeated section/widget mounts don't re-trigger it.
+  static bool _webMessagingStarted = false;
+
   static Future<void> waitForUI() async {
     await uiReady.future;
+  }
+
+  /// Web-only lazy boot of the BlueBubbles messaging stack.
+  ///
+  /// On web this is called the first time the messaging UI is opened (the
+  /// Conversations section or a dashboard message widget) so login doesn't
+  /// block on a slow/unreachable BlueBubbles server. On native platforms this
+  /// work still happens eagerly in [onStartup], so this is a no-op there and
+  /// native behavior is unchanged.
+  static Future<void> ensureWebMessagingStarted() async {
+    if (!kIsWeb) return;
+    if (_webMessagingStarted) return;
+    if (!ss.settings.finishedSetup.value) return;
+    _webMessagingStarted = true;
+
+    chats.init();
+    socket;
+
+    // Fetch server details for the rest of the app.
+    // We only need to fetch it once since the metadata shouldn't change.
+    await ss.getServerDetails(refresh: true);
+
+    // Register the FCM device.
+    await fcm.registerDevice();
   }
 
   static Future<void> initStartupServices({bool isBubble = false}) async {
@@ -237,17 +268,23 @@ class StartupTasks {
   static Future<void> onStartup() async {
     if (!ss.settings.finishedSetup.value) return;
 
-    if (!kIsDesktop) {
-      chats.init();
-      socket;
+    // On web, defer the messaging stack (chats, socket, server details, FCM)
+    // until the user first opens the Conversations section or a dashboard
+    // message widget (see [ensureWebMessagingStarted]) so login isn't blocked
+    // on the BlueBubbles server. Native platforms keep booting it eagerly.
+    if (!kIsWeb) {
+      if (!kIsDesktop) {
+        chats.init();
+        socket;
+      }
+
+      // Fetch server details for the rest of the app.
+      // We only need to fetch it on startup since the metadata shouldn't change.
+      await ss.getServerDetails(refresh: true);
+
+      // Only register FCM device on startup
+      await fcm.registerDevice();
     }
-
-    // Fetch server details for the rest of the app.
-    // We only need to fetch it on startup since the metadata shouldn't change.
-    await ss.getServerDetails(refresh: true);
-
-    // Only register FCM device on startup
-    await fcm.registerDevice();
 
     // We don't need to check for updates immediately, so delay it so other
     // code has a chance to run and we don't block the UI thread.

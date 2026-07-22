@@ -28,7 +28,17 @@ class SocketService extends GetxService {
   SocketState _lastState = SocketState.disconnected;
   RxString lastError = "".obs;
   Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
   late Socket socket;
+
+  // Exponential backoff for the reconnect loop: the retry delay doubles on
+  // each consecutive failure (5s, 10s, 20s ...) capped at [_maxReconnectDelay].
+  // After [_maxReconnectAttempts] consecutive failures we stop retrying and
+  // surface a persistent socket error instead of hammering an unreachable
+  // server forever. A successful connect resets the counter.
+  static const Duration _baseReconnectDelay = Duration(seconds: 5);
+  static const Duration _maxReconnectDelay = Duration(minutes: 5);
+  static const int _maxReconnectAttempts = 10;
 
   String get serverAddress => http.origin;
   String get password => ss.settings.guidAuthKey.value;
@@ -177,8 +187,26 @@ class SocketService extends GetxService {
         }
 
         state.value = SocketState.error;
-        // After 5 seconds of an error, we should retry the connection
-        _reconnectTimer = Timer(const Duration(seconds: 5), () async {
+
+        // Exponential backoff with a hard failure cap. Each consecutive error
+        // schedules the next retry after a doubling delay (5s, 10s, 20s ...
+        // capped at [_maxReconnectDelay]). Once [_maxReconnectAttempts]
+        // consecutive failures are reached we stop retrying and surface a
+        // persistent error rather than looping on an unreachable server
+        // forever. A successful connect resets the counter (see
+        // [_resetErrorTracking]).
+        if (_reconnectAttempts >= _maxReconnectAttempts) {
+          Logger.warn("Giving up socket reconnect after $_reconnectAttempts attempts");
+          if (!ss.settings.keepAppAlive.value) {
+            notif.createSocketError();
+          }
+          return;
+        }
+
+        final Duration delay = _nextReconnectDelay(_reconnectAttempts);
+        _reconnectAttempts++;
+        _reconnectTimer?.cancel();
+        _reconnectTimer = Timer(delay, () async {
           if (state.value == SocketState.connected) return;
 
           await fdb.fetchNewUrl();
@@ -210,8 +238,22 @@ class SocketService extends GetxService {
     _resetErrorTracking();
   }
 
+  /// Doubling backoff delay for the [attempt]-th consecutive reconnect
+  /// failure (0-indexed), capped at [_maxReconnectDelay].
+  Duration _nextReconnectDelay(int attempt) {
+    int seconds = _baseReconnectDelay.inSeconds;
+    for (int i = 0; i < attempt; i++) {
+      seconds *= 2;
+      if (seconds >= _maxReconnectDelay.inSeconds) {
+        return _maxReconnectDelay;
+      }
+    }
+    return Duration(seconds: seconds);
+  }
+
   void _resetErrorTracking() {
     lastError.value = "";
+    _reconnectAttempts = 0;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
   }
