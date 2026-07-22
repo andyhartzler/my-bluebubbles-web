@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:bluebubbles/services/crm/supabase_service.dart';
+
 import '../../models/form_submission.dart';
 import '../../widgets/review/compare_matrix.dart';
 import '../../widgets/review/policy_stance_bars.dart';
@@ -47,6 +49,10 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
     slug: SlateController.endorsementSlug,
   );
   late final TabController _tabs = TabController(length: 5, vsync: this);
+  // Chair gating for Confirm / final call / the Splits view (uid primary,
+  // email fallback — see kChairUserId in decision_board.dart).
+  late final bool _isChair =
+      isChairUser(CRMSupabaseService().client.auth.currentUser);
 
   _CompareMode _compareMode = _CompareMode.matrix;
 
@@ -63,6 +69,7 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
   void dispose() {
     _tabs.dispose();
     _controller.dispose();
+    _decisions.dispose();
     _votes.dispose();
     _journey.dispose();
     super.dispose();
@@ -132,6 +139,7 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
                       controller: _controller,
                       repository: _decisions,
                       votes: _votes,
+                      isChair: _isChair,
                       onOpen: _openCandidate,
                     )),
                   ],

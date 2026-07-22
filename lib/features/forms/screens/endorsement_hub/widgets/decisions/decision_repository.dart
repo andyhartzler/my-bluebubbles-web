@@ -25,6 +25,12 @@ enum DecisionState {
   }
 }
 
+/// Whether the decisions load has completed. The board MUST NOT render any
+/// vote controls until this is [ready]: `stateFor` defaults missing entries to
+/// undecided, so a failed/empty load would silently put every already-decided
+/// candidate back on the ballot.
+enum DecisionLoadState { loading, ready, failed }
+
 /// A stored decision: a state plus an optional working note.
 @immutable
 class DecisionRecord {
@@ -51,6 +57,17 @@ abstract class DecisionRepository extends ChangeNotifier {
   Future<void> setState(String candidateId, DecisionState state);
   Future<void> setNote(String candidateId, String note);
   Map<String, DecisionRecord> get all;
+
+  /// Load gate for the board: no vote controls render until [DecisionLoadState.ready].
+  DecisionLoadState get loadState;
+
+  /// Re-run the initial load (Retry button on the failed state).
+  Future<void> reload();
+
+  /// CHECKED state write: optimistic local update, awaited persist, rollback
+  /// + `false` on failure instead of the fire-and-forget [setState]. The
+  /// chair's Confirm button and the final-call pills call ONLY this.
+  Future<bool> trySetState(String candidateId, DecisionState state);
 }
 
 /// A [shared_preferences]-backed decision store. Keys everything under a single
@@ -63,6 +80,19 @@ class LocalDecisionRepository extends DecisionRepository {
 
   @override
   Map<String, DecisionRecord> get all => Map.unmodifiable(_records);
+
+  /// Local storage cannot fail in a way that would fake an empty board.
+  @override
+  DecisionLoadState get loadState => DecisionLoadState.ready;
+
+  @override
+  Future<void> reload() => load();
+
+  @override
+  Future<bool> trySetState(String candidateId, DecisionState state) async {
+    await setState(candidateId, state);
+    return true;
+  }
 
   @override
   Future<void> load() async {
@@ -135,6 +165,7 @@ class SupabaseDecisionRepository extends DecisionRepository {
   final Map<String, DecisionRecord> _records = {};
   bool _loaded = false;
   RealtimeChannel? _channel;
+  DecisionLoadState _loadState = DecisionLoadState.loading;
 
   SupabaseClient get _client => _supabase.client;
 
@@ -142,20 +173,40 @@ class SupabaseDecisionRepository extends DecisionRepository {
   Map<String, DecisionRecord> get all => Map.unmodifiable(_records);
 
   @override
+  DecisionLoadState get loadState => _loadState;
+
+  @override
   Future<void> load() async {
     if (_loaded) return;
+    _loaded = true;
+    await _fetch();
+    _subscribe();
+  }
+
+  /// Retry after a failed initial load (the board's error-state button).
+  @override
+  Future<void> reload() async {
+    _loadState = DecisionLoadState.loading;
+    notifyListeners();
+    await _fetch();
+    _subscribe();
+  }
+
+  Future<void> _fetch() async {
     try {
       final rows = await _client.from(_table).select();
       _records.clear();
       for (final row in (rows as List)) {
         _applyRow(Map<String, dynamic>.from(row as Map));
       }
+      // An empty-but-successful result set is still ready; the gate guards
+      // against FAILED loads, not small ones.
+      _loadState = DecisionLoadState.ready;
     } catch (e) {
       debugPrint('SupabaseDecisionRepository.load error: $e');
+      _loadState = DecisionLoadState.failed;
     }
-    _loaded = true;
     notifyListeners();
-    _subscribe();
   }
 
   void _applyRow(Map<String, dynamic> m) {
@@ -207,6 +258,30 @@ class SupabaseDecisionRepository extends DecisionRepository {
     await _upsert(candidateId);
   }
 
+  /// The checked write for the chair's Confirm and the final-call pills:
+  /// optimistic local update, AWAITED upsert, rollback + false on failure so
+  /// a flaky network never shows a locally-green decision nobody received.
+  @override
+  Future<bool> trySetState(String candidateId, DecisionState state) async {
+    final DecisionRecord? snapshot = _records[candidateId];
+    final existing = recordFor(candidateId);
+    _records[candidateId] = DecisionRecord(state: state, note: existing.note);
+    notifyListeners();
+    try {
+      await _upsertChecked(candidateId);
+      return true;
+    } catch (e) {
+      debugPrint('SupabaseDecisionRepository.trySetState error: $e');
+      if (snapshot == null) {
+        _records.remove(candidateId);
+      } else {
+        _records[candidateId] = snapshot;
+      }
+      notifyListeners();
+      return false;
+    }
+  }
+
   @override
   Future<void> setNote(String candidateId, String note) async {
     final existing = recordFor(candidateId);
@@ -216,18 +291,23 @@ class SupabaseDecisionRepository extends DecisionRepository {
   }
 
   Future<void> _upsert(String candidateId) async {
-    final rec = recordFor(candidateId);
     try {
-      await _client.from(_table).upsert({
-        'candidate_id': candidateId,
-        'state': rec.state.name,
-        'note': rec.note,
-        'updated_by': _client.auth.currentUser?.id,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      });
+      await _upsertChecked(candidateId);
     } catch (e) {
       debugPrint('SupabaseDecisionRepository.upsert error: $e');
     }
+  }
+
+  /// Same upsert as [_upsert] but RETHROWS so [trySetState] can roll back.
+  Future<void> _upsertChecked(String candidateId) async {
+    final rec = recordFor(candidateId);
+    await _client.from(_table).upsert({
+      'candidate_id': candidateId,
+      'state': rec.state.name,
+      'note': rec.note,
+      'updated_by': _client.auth.currentUser?.id,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    });
   }
 
   @override
