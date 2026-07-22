@@ -465,12 +465,24 @@ class CandidateRepository {
     if (!isReady) return const CandidateStats();
 
     try {
-      final all = await _client
-
-          .from('candidates')
-          .select('party, is_young_dem, estimated_age, district, office_level, moyd_endorsed, moyd_contacted, campaign_website, mec_committee_ids, fec_candidate_id');
-
-      final rows = (all as List<dynamic>).cast<Map<String, dynamic>>();
+      // PostgREST caps a single request at 1000 rows; the candidates table is
+      // ~2800 rows and growing. Paginate to exhaustion (same pattern as
+      // fetchCandidatesForAnalytics) or every stat on the hero card silently
+      // aggregates an arbitrary 1000-row subset.
+      final rows = <Map<String, dynamic>>[];
+      const pageSize = 1000;
+      var pageOffset = 0;
+      while (true) {
+        final page = await _client
+            .from('candidates')
+            .select(
+                'party, is_young_dem, estimated_age, district, office_level, moyd_endorsed, moyd_contacted, campaign_website, mec_committee_ids, fec_candidate_id')
+            .range(pageOffset, pageOffset + pageSize - 1);
+        final pageRows = (page as List<dynamic>).cast<Map<String, dynamic>>();
+        rows.addAll(pageRows);
+        if (pageRows.length < pageSize) break;
+        pageOffset += pageSize;
+      }
 
       int total = rows.length;
       int democrats = 0;
