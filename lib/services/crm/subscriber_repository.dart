@@ -69,8 +69,15 @@ class SubscriberRepository {
       query = query.range(offset, offset + limit - 1);
     }
 
+    // Use an estimated count for the list total: subscribers is a large table
+    // (~73k rows) and an exact count forces a second full RLS-filtered scan per
+    // request. This total only gates infinite-scroll ("has more"); the exact
+    // headline figure comes from fetchStats(). PostgREST returns an exact count
+    // for narrow (filtered/searched) result sets and the planner estimate only
+    // for the broad unfiltered scan, where the freshly-ANALYZEd reltuples is
+    // effectively exact.
     final postgrest.PostgrestResponse response = fetchTotalCount
-        ? await query.count(postgrest.CountOption.exact)
+        ? await query.count(postgrest.CountOption.estimated)
         : postgrest.PostgrestResponse(
             data: await query,
             count: 0,
@@ -97,6 +104,75 @@ class SubscriberRepository {
       return const SubscriberStats();
     }
 
+    // Preferred path: a single grouped RPC (public.get_subscriber_stats) that
+    // computes all seven overview stats in one server-side scan instead of the
+    // seven parallel exact-count / full-column round-trips the legacy path
+    // fired. Mirrors fetchStats()'s shape and both status fallbacks exactly.
+    try {
+      final result = await _readClient.rpc('get_subscriber_stats');
+      return _statsFromRpc(result);
+    } on postgrest.PostgrestException catch (e) {
+      // Only fall back when the function is genuinely missing (e.g. app deployed
+      // ahead of the DB migration). Any other DB error (permissions, timeout)
+      // should surface as empty stats rather than silently re-running the slow
+      // legacy scan, matching the previous catch-all behaviour.
+      if (_isFunctionNotFound(e)) {
+        debugPrint(
+            'ℹ️ get_subscriber_stats() unavailable, using legacy stats path: ${e.message}');
+        return _fetchStatsLegacy();
+      }
+      debugPrint('❌ Error fetching subscriber stats: ${e.message}');
+      return const SubscriberStats();
+    } catch (e) {
+      debugPrint('❌ Error fetching subscriber stats: $e');
+      return const SubscriberStats();
+    }
+  }
+
+  /// Maps the jsonb payload returned by public.get_subscriber_stats() onto the
+  /// widget-facing [SubscriberStats] model.
+  SubscriberStats _statsFromRpc(dynamic payload) {
+    if (payload is! Map) {
+      return const SubscriberStats();
+    }
+    int asInt(dynamic value) => (value as num?)?.toInt() ?? 0;
+
+    final bySource = <String, int>{};
+    final rawSource = payload['by_source'];
+    if (rawSource is Map) {
+      rawSource.forEach((key, value) {
+        bySource[key.toString()] = (value as num?)?.toInt() ?? 0;
+      });
+    }
+
+    return SubscriberStats(
+      totalSubscribers: asInt(payload['total_subscribers']),
+      activeSubscribers: asInt(payload['active_subscribers']),
+      unsubscribed: asInt(payload['unsubscribed']),
+      donorCount: asInt(payload['donor_count']),
+      contactInfoCount: asInt(payload['contact_info_count']),
+      recentOptIns: asInt(payload['recent_opt_ins']),
+      bySource: bySource,
+    );
+  }
+
+  /// True when [e] indicates the RPC does not exist yet (stale deploy): PostgREST
+  /// reports PGRST202 when a function is absent from its schema cache; Postgres
+  /// raises 42883 (undefined_function).
+  bool _isFunctionNotFound(postgrest.PostgrestException e) {
+    final code = e.code ?? '';
+    if (code == 'PGRST202' || code == '42883') {
+      return true;
+    }
+    final message = e.message.toLowerCase();
+    return message.contains('could not find the function') ||
+        message.contains('does not exist');
+  }
+
+  /// Legacy seven-round-trip stats path. Retained only as a fallback for when
+  /// get_subscriber_stats() is not yet deployed, so the stats screen never
+  /// blanks out against an older database.
+  Future<SubscriberStats> _fetchStatsLegacy() async {
     try {
       final results = await Future.wait([
         _countWhere(const {}),
@@ -131,7 +207,7 @@ class SubscriberRepository {
         bySource: results[6] as Map<String, int>,
       );
     } catch (e) {
-      debugPrint('❌ Error fetching subscriber stats: $e');
+      debugPrint('❌ Error fetching subscriber stats (legacy): $e');
       return const SubscriberStats();
     }
   }
