@@ -40,19 +40,19 @@ import 'package:bluebubbles/screens/crm/donor_command_center.dart';
 import 'package:bluebubbles/screens/crm/member_portal/member_portal_management_screen.dart';
 import 'package:bluebubbles/screens/crm/subscribers_screen.dart';
 import 'package:bluebubbles/screens/crm/wallet_notification_composer.dart';
-import 'package:bluebubbles/features/committees/screens/committees_dashboard_screen.dart';
+import 'package:bluebubbles/features/committees/screens/committees_dashboard_screen_lazy.dart';
 import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
 import 'package:bluebubbles/screens/crm/personalized_home/personalized_home_screen.dart';
 import 'package:bluebubbles/screens/crm/dashboard_shell/dashboard_shell_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/mautic_embed_screen.dart';
-import 'package:bluebubbles/features/forms/screens/forms_main_screen.dart';
+import 'package:bluebubbles/features/forms/screens/forms_main_screen_lazy.dart';
 import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
 import 'package:bluebubbles/features/forms/services/jobs_service.dart';
 import 'package:bluebubbles/features/mail/screens/mail_screen_lazy.dart';
 import 'package:bluebubbles/features/mail/services/mail_api_client.dart';
 import 'package:bluebubbles/screens/crm/surveys_screen.dart';
-import 'package:bluebubbles/screens/crm/candidates_page.dart';
-import 'package:bluebubbles/screens/crm/finances_page.dart';
+import 'package:bluebubbles/screens/crm/candidates_page_lazy.dart';
+import 'package:bluebubbles/screens/crm/finances_page_lazy.dart';
 import 'package:bluebubbles/screens/crm/superadmin/activity_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:collection/collection.dart';
@@ -1220,7 +1220,7 @@ class _HomeState extends OptimizedState<Home>
                       ),
                       _lazySection(
                         _HomeSection.committees,
-                        () => const CommitteesDashboardScreen(
+                        () => const CommitteesDashboardScreenLazy(
                           key: PageStorageKey('committees-view'),
                           embed: true,
                         ),
@@ -1282,7 +1282,7 @@ class _HomeState extends OptimizedState<Home>
                       ),
                       _lazySection(
                         _HomeSection.forms,
-                        () => const FormsMainScreen(
+                        () => const FormsMainScreenLazy(
                           key: PageStorageKey('forms-view'),
                         ),
                       ),
@@ -1302,13 +1302,13 @@ class _HomeState extends OptimizedState<Home>
                       ),
                       _lazySection(
                         _HomeSection.candidates,
-                        () => const CandidatesPage(
+                        () => const CandidatesPageLazy(
                           key: PageStorageKey('candidates-view'),
                         ),
                       ),
                       _lazySection(
                         _HomeSection.finances,
-                        () => const FinancesPage(
+                        () => const FinancesPageLazy(
                           key: PageStorageKey('finances-view'),
                         ),
                       ),
