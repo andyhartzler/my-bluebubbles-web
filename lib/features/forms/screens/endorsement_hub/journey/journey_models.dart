@@ -10,7 +10,10 @@ enum JourneyStatus {
   /// Started, real answers saved, activity within the last day.
   inProgress('In progress', Color(0xFF2563EB)),
 
-  /// Started with real answers but no activity for over a day.
+  /// No longer produced by [JourneyEntry.statusAt]: long-idle journeys now
+  /// count as completed (the mobile false-abandon bug ended sessions through
+  /// no fault of the candidate). Kept only for the abandoned-event color on
+  /// the timeline.
   stalled('Stalled', Color(0xFFD97706)),
 
   /// Certified and signed: a finished questionnaire.
@@ -70,7 +73,9 @@ class JourneyEntry {
     final idle = now.difference(lastActivity);
     if (idle <= kLiveWindow) return JourneyStatus.liveNow;
     if (idle <= const Duration(hours: 24)) return JourneyStatus.inProgress;
-    return JourneyStatus.stalled;
+    // Idle for over a day: treat as completed rather than stalled. Sessions
+    // were ended by our mobile visibilitychange bug, not the candidates.
+    return JourneyStatus.completed;
   }
 }
 

@@ -86,7 +86,6 @@ class _JourneyTabState extends State<JourneyTab> {
         const order = [
           JourneyStatus.liveNow,
           JourneyStatus.inProgress,
-          JourneyStatus.stalled,
           JourneyStatus.completed,
           JourneyStatus.openedOnly,
         ];
