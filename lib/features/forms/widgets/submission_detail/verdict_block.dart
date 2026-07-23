@@ -120,60 +120,70 @@ class _VerdictBlockState extends State<VerdictBlock> {
         ),
       ),
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      child: Row(
-        children: [
-          _scoreDial(),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'GEMINI VERDICT',
-                  style: TextStyle(
-                    color: dq ? Colors.white.withValues(alpha: 0.85) : _gold,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2.2,
+      child: LayoutBuilder(builder: (context, c) {
+        // Phone-width banner: smaller dial, tighter verdict type, so
+        // DISQUALIFIED never wraps on a 375pt screen.
+        final narrow = c.maxWidth < 420;
+        return Row(
+          children: [
+            _scoreDial(narrow ? 56.0 : 72.0),
+            SizedBox(width: narrow ? 14 : 18),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'GEMINI VERDICT',
+                    style: TextStyle(
+                      color: dq ? Colors.white.withValues(alpha: 0.85) : _gold,
+                      fontSize: narrow ? 10 : 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 2.2,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _verdictWord,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.2,
-                    height: 1.05,
+                  const SizedBox(height: 4),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _verdictWord,
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: narrow ? 22 : 26,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                        height: 1.05,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  _verdictLine,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 12.5,
+                  const SizedBox(height: 3),
+                  Text(
+                    _verdictLine,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 12.5,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        );
+      }),
     );
   }
 
-  Widget _scoreDial() {
+  Widget _scoreDial(double size) {
     return SizedBox(
-      width: 72,
-      height: 72,
+      width: size,
+      height: size,
       child: Stack(
         alignment: Alignment.center,
         children: [
           SizedBox(
-            width: 72,
-            height: 72,
+            width: size,
+            height: size,
             child: CircularProgressIndicator(
               value: ai.overallScore / 100,
               strokeWidth: 5,
@@ -187,9 +197,9 @@ class _VerdictBlockState extends State<VerdictBlock> {
             children: [
               Text(
                 '${ai.overallScore}',
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
-                  fontSize: 26,
+                  fontSize: size < 64 ? 20 : 26,
                   fontWeight: FontWeight.w900,
                   height: 1,
                 ),
@@ -198,7 +208,7 @@ class _VerdictBlockState extends State<VerdictBlock> {
                 '/100',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.8),
-                  fontSize: 10.5,
+                  fontSize: size < 64 ? 9 : 10.5,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -285,26 +295,44 @@ class _VerdictBlockState extends State<VerdictBlock> {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'ISSUE LEDGER',
-            style: TextStyle(
-              color: cs.onSurfaceVariant,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.8,
+      child: LayoutBuilder(builder: (context, c) {
+        // Phone width: the score bar moves to its own full-width line under
+        // the label instead of squeezing beside it.
+        final narrow = c.maxWidth < 480;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'ISSUE LEDGER',
+              style: TextStyle(
+                color: cs.onSurfaceVariant,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.8,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          for (final issue in ai.perIssue) _ledgerRow(context, issue),
-        ],
+            const SizedBox(height: 6),
+            for (final issue in ai.perIssue)
+              _ledgerRow(context, issue, narrow),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget _bar(ColorScheme cs, Color fg, int score) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(3),
+      child: LinearProgressIndicator(
+        value: score / 100,
+        minHeight: 5,
+        backgroundColor: cs.outlineVariant.withValues(alpha: 0.35),
+        valueColor: AlwaysStoppedAnimation(fg),
       ),
     );
   }
 
-  Widget _ledgerRow(BuildContext context, AiIssueScore issue) {
+  Widget _ledgerRow(BuildContext context, AiIssueScore issue, bool narrow) {
     final cs = Theme.of(context).colorScheme;
     final fg = AlignmentVisuals.fg(issue.score.toDouble());
     final open = _expanded.contains(issue.id);
@@ -316,7 +344,9 @@ class _VerdictBlockState extends State<VerdictBlock> {
           : null,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 7),
+        // A hair more vertical room on touch screens: rows stay comfortably
+        // tappable without a visible size jump.
+        padding: EdgeInsets.symmetric(vertical: narrow ? 9 : 7),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -333,7 +363,7 @@ class _VerdictBlockState extends State<VerdictBlock> {
                   flex: 5,
                   child: Text(
                     issue.label.isNotEmpty ? issue.label : issue.id,
-                    maxLines: 1,
+                    maxLines: narrow ? 2 : 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 13.5,
@@ -342,19 +372,10 @@ class _VerdictBlockState extends State<VerdictBlock> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 3,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: issue.score / 100,
-                      minHeight: 5,
-                      backgroundColor: cs.outlineVariant.withValues(alpha: 0.35),
-                      valueColor: AlwaysStoppedAnimation(fg),
-                    ),
-                  ),
-                ),
+                if (!narrow) ...[
+                  const SizedBox(width: 12),
+                  Expanded(flex: 3, child: _bar(cs, fg, issue.score)),
+                ],
                 const SizedBox(width: 10),
                 SizedBox(
                   width: 30,
@@ -379,9 +400,14 @@ class _VerdictBlockState extends State<VerdictBlock> {
                   ),
               ],
             ),
+            if (narrow)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 6, 0, 0),
+                child: _bar(cs, fg, issue.score),
+              ),
             if (open && hasRationale)
               Padding(
-                padding: const EdgeInsets.fromLTRB(18, 4, 44, 2),
+                padding: EdgeInsets.fromLTRB(18, 4, narrow ? 0 : 44, 2),
                 child: Text(
                   issue.rationale.trim(),
                   style: TextStyle(

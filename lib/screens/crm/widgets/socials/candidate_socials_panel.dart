@@ -60,9 +60,12 @@ class CandidateSocialsPanel extends StatelessWidget {
 
     if (feeds.isEmpty) return _EmptyState(candidate: candidate);
 
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+      // Extra bottom padding on mobile so the profile FAB speed-dial never
+      // covers the tail of the last embed.
+      padding: EdgeInsets.fromLTRB(16, 16, 16, isMobile ? 96 : 40),
       children: [
         Text(
           'VIBE CHECK',
