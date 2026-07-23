@@ -1695,6 +1695,25 @@ class CandidateRepository {
     }
   }
 
+  /// Fetch FEC outside spending (independent expenditures for/against a
+  /// federal candidate) for a cycle. Returns a summary map with support_total,
+  /// oppose_total and a per-spender breakdown (by_spender). Empty map is a
+  /// valid result — most candidates have no outside money spent on their race.
+  Future<Map<String, dynamic>> getFECOutsideSpending(String fecCandId, {int cycle = 2026}) async {
+    if (!isReady) return const {};
+    try {
+      final response = await _client.rpc('get_fec_outside_spending', params: {
+        'p_fec_cand_id': fecCandId,
+        'p_cycle': cycle,
+      });
+      if (response is Map) return Map<String, dynamic>.from(response);
+      return const {};
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getFECOutsideSpending error: $e');
+      return const {};
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   //  DISTRICT CANDIDATES — same race lookup
   // ═══════════════════════════════════════════════════════════════

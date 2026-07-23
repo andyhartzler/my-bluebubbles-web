@@ -99,6 +99,8 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   List<Map<String, dynamic>> _fecTopPayees = [];
   List<Map<String, dynamic>> _fecSpendingByPurpose = [];
   List<Map<String, dynamic>> _fecRecentExpenditures = [];
+  // FEC outside spending (independent expenditures for/against the candidate)
+  Map<String, dynamic> _fecOutsideSpending = {};
 
   // ── State: Race Tab (history + district merged) ──
   bool _raceLoading = true;
@@ -316,6 +318,8 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         hasFec ? _repo.getFECTopPayees(fecId) : Future.value(const <Map<String, dynamic>>[]),
         hasFec ? _repo.getFECSpendingByPurpose(fecId) : Future.value(const <Map<String, dynamic>>[]),
         hasFec ? _repo.getFECRecentExpenditures(fecId) : Future.value(const <Map<String, dynamic>>[]),
+        // FEC outside spending (independent expenditures for/against the candidate)
+        hasFec ? _repo.getFECOutsideSpending(fecId) : Future.value(const <String, dynamic>{}),
       ];
 
       bool batchTimedOut = false;
@@ -349,6 +353,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       _fecTopPayees = (results[13] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       _fecSpendingByPurpose = (results[14] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       _fecRecentExpenditures = (results[15] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      _fecOutsideSpending = (results[16] as Map<String, dynamic>?) ?? const {};
     } catch (e) {
       debugPrint('❌ Error loading finance data: $e');
       _financeError = e.toString();
@@ -1801,6 +1806,8 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           _buildFECSummarySection(),
           const SizedBox(height: 16),
           _buildFECSpendingSection(),
+          const SizedBox(height: 16),
+          _buildFECOutsideSpendingSection(),
           const SizedBox(height: 24),
         ],
 
@@ -2641,6 +2648,114 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                       const SizedBox(width: 8),
                       Text('\$${_formatMoney(amount)}',
                           style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 13, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── Outside Spending (independent expenditures for/against the candidate) ──
+  Widget _buildFECOutsideSpendingSection() {
+    final supportTotal = (_fecOutsideSpending['support_total'] as num?)?.toDouble() ?? 0;
+    final opposeTotal = (_fecOutsideSpending['oppose_total'] as num?)?.toDouble() ?? 0;
+    final bySpender = (_fecOutsideSpending['by_spender'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+
+    final hasOutside = supportTotal > 0 || opposeTotal > 0 || bySpender.isNotEmpty;
+
+    return _card(
+      'Outside Spending',
+      Icons.campaign,
+      BrandColors.federalBlue,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 12),
+          if (!hasOutside) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.white.withOpacity(0.5), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'No outside spending reported',
+                      style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            // Support vs oppose totals — shown prominently.
+            // Green = money supporting this candidate, red = money opposing them.
+            Row(
+              children: [
+                Expanded(child: _financeStatCard('Supporting', '\$${_formatMoney(supportTotal)}', Icons.thumb_up, BrandColors.success)),
+                const SizedBox(width: 8),
+                Expanded(child: _financeStatCard('Opposing', '\$${_formatMoney(opposeTotal)}', Icons.thumb_down, BrandColors.error)),
+              ],
+            ),
+
+            // Per-spender breakdown
+            if (bySpender.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('By Spender', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              ...bySpender.map((s) {
+                final name = (s['spender_name'] as String?)?.trim();
+                final displayName = (name != null && name.isNotEmpty) ? name : 'Unknown';
+                final amount = (s['amount'] as num?)?.toDouble() ?? 0;
+                final code = (s['support_oppose'] as String? ?? '').trim().toUpperCase();
+                final supporting = code == 'S';
+                final chipColor = supporting ? BrandColors.success : BrandColors.error;
+                final chipLabel = supporting ? 'FOR' : 'AGAINST';
+                final latestDate = (s['latest_date'] as String? ?? '').trim();
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      // FOR / AGAINST chip
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: chipColor.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: chipColor.withOpacity(0.5), width: 0.5),
+                        ),
+                        child: Text(
+                          chipLabel,
+                          style: TextStyle(color: chipColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(displayName,
+                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                                maxLines: 2, overflow: TextOverflow.ellipsis),
+                            if (latestDate.isNotEmpty)
+                              Text('Latest: $latestDate',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('\$${_formatMoney(amount)}',
+                          style: TextStyle(color: chipColor, fontSize: 14, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 );
