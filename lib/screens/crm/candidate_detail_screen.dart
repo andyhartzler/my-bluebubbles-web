@@ -94,6 +94,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   List<Map<String, dynamic>> _fecTimeline = [];
   List<Map<String, dynamic>> _fecRecentContributions = [];
   List<Map<String, dynamic>> _fecCommittees = [];
+  // FEC federal spending (who the candidate pays)
+  List<Map<String, dynamic>> _fecTopPayees = [];
+  List<Map<String, dynamic>> _fecSpendingByPurpose = [];
+  List<Map<String, dynamic>> _fecRecentExpenditures = [];
 
   // ── State: Race Tab (history + district merged) ──
   bool _raceLoading = true;
@@ -307,6 +311,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         hasFec ? _repo.getFECContributionTimeline(fecId) : Future.value(const <Map<String, dynamic>>[]),
         hasFec ? _repo.getFECRecentContributions(fecId) : Future.value(const <Map<String, dynamic>>[]),
         hasFec ? _repo.getFECCommittees(fecId) : Future.value(const <Map<String, dynamic>>[]),
+        // FEC spending (who the candidate pays)
+        hasFec ? _repo.getFECTopPayees(fecId) : Future.value(const <Map<String, dynamic>>[]),
+        hasFec ? _repo.getFECSpendingByPurpose(fecId) : Future.value(const <Map<String, dynamic>>[]),
+        hasFec ? _repo.getFECRecentExpenditures(fecId) : Future.value(const <Map<String, dynamic>>[]),
       ];
 
       bool batchTimedOut = false;
@@ -337,6 +345,9 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       _fecTimeline = (results[10] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       _fecRecentContributions = (results[11] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       _fecCommittees = (results[12] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      _fecTopPayees = (results[13] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      _fecSpendingByPurpose = (results[14] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      _fecRecentExpenditures = (results[15] as List?)?.cast<Map<String, dynamic>>() ?? const [];
     } catch (e) {
       debugPrint('❌ Error loading finance data: $e');
       _financeError = e.toString();
@@ -1750,6 +1761,8 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         // ── FEC Federal Finance Summary (for federal candidates) ──
         if (hasFecData) ...[
           _buildFECSummarySection(),
+          const SizedBox(height: 16),
+          _buildFECSpendingSection(),
           const SizedBox(height: 24),
         ],
 
@@ -2375,6 +2388,226 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 ),
               );
             }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── FEC Federal Spending (who the candidate pays) ──
+  Widget _buildFECSpendingSection() {
+    // Derive accurate totals from the by-purpose aggregation (covers every
+    // itemized disbursement, not just the top slice).
+    double totalSpent = 0;
+    int paymentCount = 0;
+    for (final p in _fecSpendingByPurpose) {
+      totalSpent += (p['total_spent'] as num?)?.toDouble() ?? 0;
+      paymentCount += (p['payment_count'] as num?)?.toInt() ?? 0;
+    }
+    final avgSpend = paymentCount > 0 ? totalSpent / paymentCount : 0.0;
+
+    final hasSpending = _fecSpendingByPurpose.isNotEmpty ||
+        _fecTopPayees.isNotEmpty ||
+        _fecRecentExpenditures.isNotEmpty;
+
+    return _card(
+      'FEC Federal Spending',
+      Icons.payments,
+      BrandColors.federalBlue,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 12),
+          if (!hasSpending) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.white.withOpacity(0.5), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'No itemized spending reported',
+                      style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            // Summary stat cards
+            Row(
+              children: [
+                Expanded(child: _financeStatCard('Total Spent', '\$${_formatMoney(totalSpent)}', Icons.payment, Colors.redAccent)),
+                const SizedBox(width: 8),
+                Expanded(child: _financeStatCard('Payments', '$paymentCount', Icons.receipt, Colors.orange)),
+                const SizedBox(width: 8),
+                Expanded(child: _financeStatCard('Avg Spend', '\$${_formatMoney(avgSpend)}', Icons.show_chart, Colors.deepOrange)),
+              ],
+            ),
+
+            // Spending by purpose
+            if (_fecSpendingByPurpose.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('Spending by Purpose', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              ..._fecSpendingByPurpose.take(8).map((item) {
+                final purpose = (item['purpose'] as String?)?.trim();
+                final category = (item['category_desc'] as String?)?.trim();
+                final label = (purpose != null && purpose.isNotEmpty)
+                    ? purpose
+                    : (category != null && category.isNotEmpty ? category : 'Unspecified');
+                final total = (item['total_spent'] as num?)?.toDouble() ?? 0;
+                final count = (item['payment_count'] as num?)?.toInt() ?? 0;
+                final pct = totalSpent > 0 ? total / totalSpent : 0.0;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: const TextStyle(color: Colors.white70, fontSize: 13),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Text(
+                            '\$${_formatMoney(total)} ($count)',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: pct,
+                          minHeight: 6,
+                          backgroundColor: Colors.white.withOpacity(0.08),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.deepOrange.withOpacity(0.7),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+
+            // Top payees
+            if (_fecTopPayees.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('Top Payees', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              ...List.generate(_fecTopPayees.length.clamp(0, 15), (i) {
+                final payee = _fecTopPayees[i];
+                final name = (payee['payee_name'] as String?)?.trim();
+                final displayName = (name != null && name.isNotEmpty) ? name : 'Unknown';
+                final amount = (payee['total_spent'] as num?)?.toDouble() ?? 0;
+                final count = (payee['payment_count'] as num?)?.toInt() ?? 0;
+                final city = (payee['city'] as String? ?? '').trim();
+                final state = (payee['state'] as String? ?? '').trim();
+                final location = [city, state].where((s) => s.isNotEmpty).join(', ');
+                final purpose = (payee['top_purpose'] as String? ?? '').trim();
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '#${i + 1}',
+                            style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(displayName, style: const TextStyle(color: Colors.white, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            if (location.isNotEmpty || purpose.isNotEmpty)
+                              Text(
+                                [location, purpose].where((s) => s.isNotEmpty).join(' · '),
+                                style: const TextStyle(color: Colors.white70, fontSize: 10),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('\$${_formatMoney(amount)}', style: const TextStyle(color: Colors.amber, fontSize: 14, fontWeight: FontWeight.bold)),
+                          Text('$count payment${count == 1 ? '' : 's'}', style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+
+            // Recent payments
+            if (_fecRecentExpenditures.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('Recent Payments', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              ..._fecRecentExpenditures.take(12).map((e) {
+                final name = (e['payee_name'] as String?)?.trim();
+                final displayName = (name != null && name.isNotEmpty) ? name : 'Unknown';
+                final amount = (e['transaction_amt'] as num?)?.toDouble() ?? 0;
+                final date = (e['transaction_dt'] as String? ?? '').trim();
+                final purpose = (e['purpose'] as String? ?? '').trim();
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(displayName,
+                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                            Text(
+                              [date, if (purpose.isNotEmpty) purpose].join(' · '),
+                              style: const TextStyle(color: Colors.white70, fontSize: 10),
+                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('\$${_formatMoney(amount)}',
+                          style: const TextStyle(color: BrandColors.sunriseGold, fontSize: 13, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                );
+              }),
+            ],
           ],
         ],
       ),

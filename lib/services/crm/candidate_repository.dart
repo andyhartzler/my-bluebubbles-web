@@ -1646,6 +1646,55 @@ class CandidateRepository {
     }
   }
 
+  /// Fetch top FEC payees (who a federal candidate pays) for a committee.
+  /// Empty list is a valid result — many small committees report no
+  /// itemized disbursements.
+  Future<List<Map<String, dynamic>>> getFECTopPayees(String fecCandId, {int limit = 25}) async {
+    if (!isReady) return [];
+    try {
+      final response = await _client.rpc('get_fec_top_payees', params: {
+        'p_fec_cand_id': fecCandId,
+        'p_limit': limit,
+      });
+      if (response is List) return response.cast<Map<String, dynamic>>();
+      return [];
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getFECTopPayees error: $e');
+      return [];
+    }
+  }
+
+  /// Fetch FEC spending broken down by purpose for a federal candidate.
+  Future<List<Map<String, dynamic>>> getFECSpendingByPurpose(String fecCandId) async {
+    if (!isReady) return [];
+    try {
+      final response = await _client.rpc('get_fec_spending_by_purpose', params: {
+        'p_fec_cand_id': fecCandId,
+      });
+      if (response is List) return response.cast<Map<String, dynamic>>();
+      return [];
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getFECSpendingByPurpose error: $e');
+      return [];
+    }
+  }
+
+  /// Fetch recent FEC expenditures (individual payments) for a federal candidate.
+  Future<List<Map<String, dynamic>>> getFECRecentExpenditures(String fecCandId, {int limit = 25}) async {
+    if (!isReady) return [];
+    try {
+      final response = await _client.rpc('get_fec_recent_expenditures', params: {
+        'p_fec_cand_id': fecCandId,
+        'p_limit': limit,
+      });
+      if (response is List) return response.cast<Map<String, dynamic>>();
+      return [];
+    } catch (e) {
+      debugPrint('❌ CandidateRepository.getFECRecentExpenditures error: $e');
+      return [];
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════
   //  DISTRICT CANDIDATES — same race lookup
   // ═══════════════════════════════════════════════════════════════
