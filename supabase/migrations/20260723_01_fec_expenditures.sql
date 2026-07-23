@@ -1,3 +1,7 @@
+-- NOTE (2026-07-23): the anon write grants and FOR ALL policy originally in this
+-- file were SUPERSEDED the same day by migrations_manual/20260723_tighten_new_table_grants.sql
+-- (anon is SELECT-only; writes via service_role/postgres). Kept here unmodified below
+-- as the historical record of what was first applied.
 -- 20260723_01_fec_expenditures.sql
 -- FEC operating-expenditures (oppexp) mirror table.
 -- Modeled on the FEC bulk oppexp layout + our public.fec_contributions conventions.
