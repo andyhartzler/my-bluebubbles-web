@@ -6,6 +6,7 @@ import 'package:bluebubbles/models/crm/donor_enrichment_record.dart';
 import 'package:bluebubbles/models/crm/voter_file_record.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
+import 'package:bluebubbles/screens/crm/intelligence_profile_section.dart';
 import 'package:bluebubbles/screens/crm/mec_committee_screen.dart';
 import 'package:bluebubbles/screens/crm/voter_file/donor_enrichment_card.dart';
 import 'package:bluebubbles/screens/crm/voter_file/voter_file_card.dart';
@@ -367,6 +368,14 @@ class _MECDonorScreenState extends State<MECDonorScreen> {
               ]),
             ],
           ),
+        ),
+        const SizedBox(height: 16),
+
+        // ── Intelligence Profile (researched money-intel knowledge base) ──
+        IntelligenceProfileSection(
+          entityType: 'donor',
+          entityKey: widget.donorId?.toString(),
+          accentColor: BrandColors.sunriseGold,
         ),
         const SizedBox(height: 16),
 

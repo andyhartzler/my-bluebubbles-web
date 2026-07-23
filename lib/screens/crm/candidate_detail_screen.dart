@@ -17,6 +17,7 @@ import 'package:bluebubbles/screens/crm/widgets/candidate_questionnaire_panel.da
 import 'package:bluebubbles/screens/crm/widgets/socials/candidate_socials_panel.dart';
 import 'package:bluebubbles/screens/crm/candidate_edit_dialog.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
+import 'package:bluebubbles/screens/crm/intelligence_profile_section.dart';
 import 'package:bluebubbles/screens/crm/mec_committee_picker.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/screens/crm/mec_donor_screen.dart';
@@ -1699,6 +1700,39 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   Widget _buildShimmerSkeleton({int cardCount = 3}) =>
       CandidateUI.shimmerSkeleton(cardCount: cardCount);
 
+  /// Researched money-intelligence profiles for the candidate's linked
+  /// committees — MEC (entity_type 'committee', key = mec_id) and FEC
+  /// (entity_type 'fec_committee', key = cmte_id). Sections with no profile
+  /// hide themselves so this collapses to nothing when nothing is researched.
+  List<Widget> _buildCommitteeIntelligence() {
+    final sections = <Widget>[];
+    for (final c in _mecCommittees) {
+      final mecId = c['mec_id']?.toString() ?? '';
+      if (mecId.isEmpty) continue;
+      sections.add(IntelligenceProfileSection(
+        entityType: 'committee',
+        entityKey: mecId,
+        accentColor: BrandColors.momentumBlue,
+        subtitle: c['committee_name'] as String? ?? 'MEC $mecId',
+        hideWhenEmpty: true,
+      ));
+      sections.add(const SizedBox(height: 12));
+    }
+    for (final c in _fecCommittees) {
+      final cmteId = c['cmte_id']?.toString() ?? '';
+      if (cmteId.isEmpty) continue;
+      sections.add(IntelligenceProfileSection(
+        entityType: 'fec_committee',
+        entityKey: cmteId,
+        accentColor: BrandColors.federalBlue,
+        subtitle: c['cmte_name'] as String? ?? 'FEC $cmteId',
+        hideWhenEmpty: true,
+      ));
+      sections.add(const SizedBox(height: 12));
+    }
+    return sections;
+  }
+
   Widget _buildMoneyTab() {
     if (_financeLoading) {
       return _buildShimmerSkeleton(cardCount: 4);
@@ -1758,6 +1792,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
           errorBanner,
           const SizedBox(height: 16),
         ],
+
+        // ── Intelligence Profiles for linked committees (MEC + FEC) ──
+        ..._buildCommitteeIntelligence(),
+
         // ── FEC Federal Finance Summary (for federal candidates) ──
         if (hasFecData) ...[
           _buildFECSummarySection(),

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/intelligence_profile_section.dart';
 import 'package:bluebubbles/screens/crm/mec_donor_screen.dart';
 import 'package:bluebubbles/screens/crm/mec_payee_screen.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
@@ -225,6 +226,12 @@ class _MECCommitteeScreenState extends State<MECCommitteeScreen> {
           const SizedBox(height: 16),
           _candidateCard(candidate),
         ],
+        const SizedBox(height: 16),
+        IntelligenceProfileSection(
+          entityType: 'committee',
+          entityKey: widget.mecId,
+          accentColor: BrandColors.momentumBlue,
+        ),
         const SizedBox(height: 16),
         if (topDonors.isNotEmpty) ...[
           CandidateUI.card('Top Donors (${topDonors.length})',

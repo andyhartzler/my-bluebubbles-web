@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/intelligence_profile_section.dart';
 import 'package:bluebubbles/screens/crm/mec_committee_screen.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
@@ -313,6 +314,17 @@ class _MECPayeeScreenState extends State<MECPayeeScreen> {
               ]),
             ],
           ),
+        ),
+        const SizedBox(height: 16),
+
+        // ── Intelligence Profile — payee entity_key is the normalized payee
+        // name, which equals the raw payee_company value in the aggregate. ──
+        IntelligenceProfileSection(
+          entityType: 'payee',
+          entityKey: widget.company,
+          accentColor: _isCompany
+              ? BrandColors.sunriseGold
+              : BrandColors.momentumBlue,
         ),
         const SizedBox(height: 16),
 
