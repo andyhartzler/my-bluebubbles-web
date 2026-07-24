@@ -6,7 +6,16 @@
 // role=service_role would have been accepted. jwtVerify enforces signature.
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.43.0';
-import * as jose from 'npm:jose@^5.2.0';
+
+// Constant-time compare so the service-role gate does not leak the key via
+// response timing.
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return mismatch === 0;
+}
+
 serve(async (req)=>{
   // CORS headers
   if (req.method === 'OPTIONS') {
@@ -24,9 +33,14 @@ serve(async (req)=>{
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    // Wave 2 access-audit 2026-04-24: REQUIRE authenticated exec user.
-    // Previously auth was optional and service_role was honored; since the
-    // browser JWT is going away, we now require a real user JWT + staff gate.
+    // Access-audit 2026-04-24, corrected 2026-07-23: require a trusted caller.
+    // The prior Wave-4 version verified the JWT with SUPABASE_JWT_SECRET, but
+    // Supabase reserves the SUPABASE_ env prefix so that secret can never be
+    // set on a function — it was always absent, and this endpoint returned
+    // 500 "Server misconfigured" on every call. Corrected to match the
+    // service-role key (this project's is the sb_secret_* format, auto-injected
+    // as SUPABASE_SERVICE_ROLE_KEY) for internal callers, or validate an
+    // executive_committee user via getUser (server-side, no local secret).
     const authHeader = req.headers.get('Authorization') ?? '';
     const token = authHeader.replace(/^Bearer /i, '').trim();
     let actorId = null;
@@ -36,33 +50,10 @@ serve(async (req)=>{
         headers: { 'Content-Type': 'application/json' }
       });
     }
-    // Wave 4 access-audit: signature-verify the JWT using SUPABASE_JWT_SECRET before
-    // trusting any claims. If role=service_role in a SIGNED token, treat as cron/internal
-    // caller. Otherwise verify as user JWT and enforce executive_committee.
-    const jwtSecretRaw = Deno.env.get('SUPABASE_JWT_SECRET');
-    if (!jwtSecretRaw) {
-      console.error('Missing SUPABASE_JWT_SECRET env');
-      return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    const jwtSecret = new TextEncoder().encode(jwtSecretRaw);
-    let verifiedPayload;
     try {
-      const { payload } = await jose.jwtVerify(token, jwtSecret);
-      verifiedPayload = payload;
-    } catch (error) {
-      console.error('JWT signature verification failed:', error);
-      return new Response(JSON.stringify({ error: 'Invalid token' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    try {
-      if (verifiedPayload.role === 'service_role') {
-        // Signature-verified service_role token — cron/internal caller.
-        console.log('Request authorized with signature-verified service_role token');
+      if (timingSafeEqual(token, supabaseServiceKey)) {
+        // Service-role key — cron / internal caller.
+        console.log('Request authorized with service-role key (internal caller)');
         actorId = null;
       } else {
         const userClient = createClient(supabaseUrl, supabaseAnonKey, {
