@@ -315,10 +315,11 @@ class _FakeMemberRepository extends MemberRepository {
   @override
   Future<MemberFetchResult> getAllMembers({
     String? county,
-    String? congressionalDistrict,
+    List<String>? congressionalDistricts,
     List<String>? committees,
-    String? highSchool,
-    String? college,
+    List<String>? highSchools,
+    List<String>? colleges,
+    bool anyHighSchool = false,
     String? chapterName,
     String? chapterStatus,
     int? minAge,
@@ -329,7 +330,11 @@ class _FakeMemberRepository extends MemberRepository {
     int? limit,
     int? offset,
     bool fetchTotalCount = false,
+    bool fetchAll = false,
     List<String>? columns,
+    String? congressionalDistrict,
+    String? highSchool,
+    String? college,
   }) async {
     final start = offset ?? 0;
     final effectiveLimit = limit ?? members.length;
@@ -413,5 +418,5 @@ class _FakeChapterRepository extends ChapterRepository {
   final List<Chapter> chapters;
 
   @override
-  Future<List<Chapter>> getAllChapters() async => chapters;
+  Future<List<Chapter>> getAllChapters({String? chapterType}) async => chapters;
 }

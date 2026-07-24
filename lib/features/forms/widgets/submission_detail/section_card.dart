@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../models/submission_review_model.dart';
+import '../../theme/moyd_brand.dart';
+import 'answer_display.dart';
 
-/// One card per form section: a titled, elevation-0 container whose answers
-/// render as label/value rows separated by dividers. Responsive — the row
-/// stacks (label above value) under 700px, otherwise a fixed 220px label
-/// column with a flexible value.
+/// One card per form section: a full-bleed navy-tinted header band (gold rule
+/// + title + answer count), then the answers rendered as content via
+/// [AnswerDisplay]. On wide cards (>= 560px inner width) consecutive short
+/// answers flow two-up so a run of one-word answers reads as a tidy grid
+/// instead of a wall.
 class SectionCard extends StatelessWidget {
   final ReviewSection section;
 
@@ -13,13 +16,16 @@ class SectionCard extends StatelessWidget {
 
   const SectionCard({super.key, required this.section, this.leading});
 
-  static const double _stackBreakpoint = 700;
-  static const double _labelWidth = 220;
+  /// Card inner width at which consecutive short answers flow two-up.
+  static const double _twoUpMin = 560;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final answerCount =
+        section.answers.length + section.policyPositions.length;
 
     return Card(
       elevation: 0,
@@ -28,179 +34,116 @@ class SectionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: cs.outlineVariant),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (section.title.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 4,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFD4A039), Color(0xFFB8860B)],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        section.title,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            if (leading != null) ...[
-              const SizedBox(height: 8),
-              leading!,
-            ],
-            for (int i = 0; i < section.answers.length; i++) ...[
-              if (i > 0 || leading != null || section.title.isNotEmpty)
-                Divider(height: 1, color: cs.outlineVariant.withOpacity(0.6)),
-              AnswerRow(answer: section.answers[i]),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// A single label/value row. Long free text gets a "Show more" toggle.
-class AnswerRow extends StatelessWidget {
-  final ReviewAnswer answer;
-
-  const AnswerRow({super.key, required this.answer});
-
-  bool get _isLong => answer.type == 'long_answer' || answer.type == 'textarea';
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    final label = Text(
-      answer.label,
-      style: theme.textTheme.bodyMedium?.copyWith(
-        color: cs.onSurfaceVariant,
-        fontWeight: FontWeight.w500,
-        height: 1.3,
-      ),
-    );
-
-    final value = _ValueText(text: answer.displayValue, long: _isLong);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final stack = constraints.maxWidth < SectionCard._stackBreakpoint;
-          if (stack) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                label,
-                const SizedBox(height: 6),
-                value,
-              ],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(width: SectionCard._labelWidth, child: label),
-              const SizedBox(width: 16),
-              Expanded(child: value),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _ValueText extends StatefulWidget {
-  final String text;
-  final bool long;
-  const _ValueText({required this.text, required this.long});
-
-  @override
-  State<_ValueText> createState() => _ValueTextState();
-}
-
-class _ValueTextState extends State<_ValueText> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    if (!widget.long) {
-      return Text(
-        widget.text,
-        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
-      );
-    }
-
-    // Long free text: gold left-rule block, collapsed to 4 lines with toggle.
-    final isTruncatable = widget.text.length > 240;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withOpacity(0.4),
-        borderRadius: BorderRadius.circular(8),
-        border: Border(
-          left: BorderSide(color: cs.primary, width: 3),
-        ),
-      ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AnimatedSize(
-            duration: const Duration(milliseconds: 160),
-            alignment: Alignment.topLeft,
-            child: Text(
-              widget.text,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
-              maxLines: _expanded ? null : 4,
-              overflow:
-                  _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+          if (section.title.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              // Navy TINT of the ambient surface — the title stays
+              // cs.onSurface, so contrast holds in both themes (~15:1 in
+              // light over the 7% navy wash, >= 4.5:1 in dark over the
+              // navySoft wash). The brightness branch exists only because
+              // the tint direction flips per theme.
+              color: isDark
+                  ? MoydBrand.navySoft.withOpacity(0.45)
+                  : MoydBrand.navy.withOpacity(0.07),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 4,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFD4A039), Color(0xFFB8860B)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      section.title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    answerCount == 1 ? '1 answer' : '$answerCount answers',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final blocks =
+                    _contentBlocks(constraints.maxWidth);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (int i = 0; i < blocks.length; i++) ...[
+                      if (i > 0)
+                        Divider(
+                            height: 1,
+                            color: cs.outlineVariant.withOpacity(0.6)),
+                      blocks[i],
+                    ],
+                  ],
+                );
+              },
             ),
           ),
-          if (isTruncatable) ...[
-            const SizedBox(height: 4),
-            InkWell(
-              onTap: () => setState(() => _expanded = !_expanded),
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                child: Text(
-                  _expanded ? 'Show less' : 'Show more',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: cs.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
+  }
+
+  /// Leading widget + answer rows, with consecutive short answers grouped
+  /// into a two-up wrap when the card body is wide enough.
+  List<Widget> _contentBlocks(double width) {
+    final twoUp = width >= _twoUpMin;
+    final blocks = <Widget>[];
+    if (leading != null) blocks.add(leading!);
+
+    final answers = section.answers;
+    var i = 0;
+    while (i < answers.length) {
+      if (twoUp && AnswerDisplay.flowsTwoUp(answers[i])) {
+        final group = <ReviewAnswer>[];
+        while (i < answers.length && AnswerDisplay.flowsTwoUp(answers[i])) {
+          group.add(answers[i]);
+          i++;
+        }
+        if (group.length == 1) {
+          blocks.add(AnswerDisplay(answer: group.first));
+        } else {
+          final itemWidth = (width - 16) / 2;
+          blocks.add(Wrap(
+            spacing: 16,
+            children: [
+              for (final a in group)
+                SizedBox(width: itemWidth, child: AnswerDisplay(answer: a)),
+            ],
+          ));
+        }
+      } else {
+        blocks.add(AnswerDisplay(answer: answers[i]));
+        i++;
+      }
+    }
+    return blocks;
   }
 }

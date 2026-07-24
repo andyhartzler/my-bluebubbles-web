@@ -4,12 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bluebubbles/services/crm/storage_uri_resolver.dart';
 
 void main() {
-  setUp(() async {
-    await dotenv.testLoad(fileInput: 'SUPABASE_URL=https://example.supabase.co');
+  setUp(() {
+    dotenv.loadFromString(envString: 'SUPABASE_URL=https://example.supabase.co');
   });
 
   tearDown(() {
-    dotenv.reset();
+    dotenv.clean();
   });
 
   test('relative storage path resolves to https link', () async {

@@ -268,6 +268,39 @@ class AiDisqualifier {
   }
 }
 
+/// One itemized deduction inside an [AiAlignmentScore]: which issue cost
+/// points, how many, and the candidate's own words that cost them.
+class AiDeduction {
+  final String issueId;
+  final String label;
+  final int pointsLost;
+  final String quote;
+  final String explanation;
+
+  const AiDeduction({
+    required this.issueId,
+    required this.label,
+    required this.pointsLost,
+    required this.quote,
+    required this.explanation,
+  });
+
+  static AiDeduction? fromJson(dynamic j) {
+    if (j is! Map) return null;
+    final rawPoints = j['points_lost'];
+    final p = rawPoints is num
+        ? rawPoints.round()
+        : int.tryParse('${rawPoints ?? ''}') ?? 0;
+    return AiDeduction(
+      issueId: (j['issue_id'] ?? '').toString(),
+      label: (j['label'] ?? '').toString(),
+      pointsLost: p.clamp(0, 100),
+      quote: (j['quote'] ?? '').toString(),
+      explanation: (j['explanation'] ?? '').toString(),
+    );
+  }
+}
+
 /// A Gemini-judged alignment score for one submission, loaded from
 /// `public.endorsement_ai_scores`. Gemini reads the candidate's FULL answers
 /// (selected option AND written explanation) against the MOYD platform through
@@ -292,6 +325,11 @@ class AiAlignmentScore {
   /// The itemized core-value breaks (empty when [disqualified] is false).
   final List<AiDisqualifier> disqualifiers;
 
+  /// Itemized "where the points went" deductions for sub-100 scores. Empty
+  /// for 100-scorers and for rows scored before the deductions column
+  /// existed — every consumer keys off [deductions.isNotEmpty].
+  final List<AiDeduction> deductions;
+
   final String? model;
   final DateTime? scoredAt;
 
@@ -301,6 +339,7 @@ class AiAlignmentScore {
     required this.perIssue,
     this.disqualified = false,
     this.disqualifiers = const [],
+    this.deductions = const [],
     this.model,
     this.scoredAt,
   });
@@ -336,12 +375,22 @@ class AiAlignmentScore {
       }
     }
 
+    final deds = <AiDeduction>[];
+    final rawDeds = row['deductions'];
+    if (rawDeds is List) {
+      for (final e in rawDeds) {
+        final parsed = AiDeduction.fromJson(e);
+        if (parsed != null) deds.add(parsed);
+      }
+    }
+
     return AiAlignmentScore(
       overallScore: overall.clamp(0, 100),
       rationale: (row['rationale'] ?? '').toString(),
       perIssue: issues,
       disqualified: row['disqualified'] == true || dqs.isNotEmpty,
       disqualifiers: dqs,
+      deductions: deds,
       model: row['model']?.toString(),
       scoredAt: scoredAt,
     );

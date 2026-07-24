@@ -9,8 +9,9 @@ import '../review/stance_visuals.dart';
 /// This is the review screen's signature element and the first thing a
 /// committee member reads. Two faces:
 ///  - Clean candidate: navy->royal->sky banner, a large score numeral with a
-///    ring gauge, the verdict word, then the rationale and an always-visible
-///    per-issue ledger (no hidden expansion: the breakdown IS the content).
+///    graded ring gauge, the verdict word, then the rationale, the itemized
+///    "where the points went" deductions (sub-100 scores) and a per-issue
+///    ledger whose rows open by default on wide screens.
 ///  - Disqualified candidate: crimson banner stamped DISQUALIFIED, then one
 ///    indictment row per core-value break leading with the candidate's own
 ///    words: the quote is the evidence, so the design gives it the floor.
@@ -27,13 +28,30 @@ class VerdictBlock extends StatefulWidget {
 }
 
 class _VerdictBlockState extends State<VerdictBlock> {
-  final Set<String> _expanded = {};
+  /// Ledger rows the user has flipped away from the width-based default.
+  final Set<String> _userToggled = {};
+
+  /// Latched on the ledger's first layout: rows open by default on wide
+  /// screens (the verdict renders full-width above the two-column flow, so
+  /// this engages on desktop), tap-to-expand on phones.
+  bool? _defaultOpen;
 
   AiAlignmentScore get ai => widget.ai;
 
   static const _crimson = [Color(0xFFB91C1C), Color(0xFF7F1D1D)];
   static const _hero = [Color(0xFF263351), Color(0xFF2B4B8C), Color(0xFF1D6FA8)];
   static const _gold = Color(0xFFE8B54A);
+
+  /// Graded ring color. Bright-on-navy values: non-text UI graphics need 3:1
+  /// against the banner and all three clear it by a wide margin at every
+  /// gradient stop; the numeral stays white (> 8:1).
+  Color get _ringColor {
+    if (ai.disqualified) return Colors.white; // crimson banner keeps white
+    final s = ai.overallScore;
+    if (s >= 85) return const Color(0xFF4ADE80); // green
+    if (s >= 50) return const Color(0xFFFBBF24); // amber
+    return const Color(0xFFF87171); // red
+  }
 
   String get _verdictWord {
     if (ai.disqualified) return 'DISQUALIFIED';
@@ -100,6 +118,8 @@ class _VerdictBlockState extends State<VerdictBlock> {
                     ?.copyWith(height: 1.5),
               ),
             ),
+          if (ai.overallScore < 100 && ai.deductions.isNotEmpty)
+            _deductions(context),
           if (ai.perIssue.isNotEmpty) _ledger(context),
           _footer(context),
         ],
@@ -126,7 +146,7 @@ class _VerdictBlockState extends State<VerdictBlock> {
         final narrow = c.maxWidth < 420;
         return Row(
           children: [
-            _scoreDial(narrow ? 56.0 : 72.0),
+            _scoreDial(narrow ? 64.0 : 84.0),
             SizedBox(width: narrow ? 14 : 18),
             Expanded(
               child: Column(
@@ -175,6 +195,7 @@ class _VerdictBlockState extends State<VerdictBlock> {
   }
 
   Widget _scoreDial(double size) {
+    final narrow = size < 70;
     return SizedBox(
       width: size,
       height: size,
@@ -184,12 +205,17 @@ class _VerdictBlockState extends State<VerdictBlock> {
           SizedBox(
             width: size,
             height: size,
-            child: CircularProgressIndicator(
-              value: ai.overallScore / 100,
-              strokeWidth: 5,
-              backgroundColor: Colors.white.withValues(alpha: 0.25),
-              valueColor: AlwaysStoppedAnimation(
-                  ai.disqualified ? Colors.white : _gold),
+            // Sweep-in on load: the one hero motion on the page.
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: ai.overallScore / 100),
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, _) => CircularProgressIndicator(
+                value: value,
+                strokeWidth: narrow ? 5 : 6,
+                backgroundColor: Colors.white.withValues(alpha: 0.25),
+                valueColor: AlwaysStoppedAnimation(_ringColor),
+              ),
             ),
           ),
           Column(
@@ -199,7 +225,7 @@ class _VerdictBlockState extends State<VerdictBlock> {
                 '${ai.overallScore}',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: size < 64 ? 20 : 26,
+                  fontSize: narrow ? 22 : 30,
                   fontWeight: FontWeight.w900,
                   height: 1,
                 ),
@@ -208,7 +234,7 @@ class _VerdictBlockState extends State<VerdictBlock> {
                 '/100',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.8),
-                  fontSize: size < 64 ? 9 : 10.5,
+                  fontSize: narrow ? 9 : 10.5,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -289,6 +315,97 @@ class _VerdictBlockState extends State<VerdictBlock> {
     );
   }
 
+  // ── where the points went ────────────────────────────────────────────────
+
+  /// Itemized deductions for sub-100 scores: how many points each issue cost
+  /// and the candidate's own words that cost them. Disqualified candidates
+  /// render these below their indictments. Absent/empty deductions (older
+  /// rows, 100-scorers) skip the block entirely.
+  Widget _deductions(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'WHERE THE POINTS WENT',
+            style: TextStyle(
+              color: cs.onSurfaceVariant,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.8,
+            ),
+          ),
+          const SizedBox(height: 6),
+          for (final d in ai.deductions)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Self-contained oppose pair (shipped AA: dark red on the
+                  // light red fill in both themes).
+                  Container(
+                    width: 56,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: MoydBrand.opposeBg,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '-${d.pointsLost} pts',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        color: MoydBrand.opposeFg,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          d.label,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        if (d.quote.trim().isNotEmpty)
+                          Text(
+                            '“${d.quote.trim()}”',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontStyle: FontStyle.italic,
+                              color: cs.onSurfaceVariant,
+                              height: 1.4,
+                            ),
+                          ),
+                        Text(
+                          d.explanation,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: cs.onSurfaceVariant,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   // ── per-issue ledger ─────────────────────────────────────────────────────
 
   Widget _ledger(BuildContext context) {
@@ -299,6 +416,15 @@ class _VerdictBlockState extends State<VerdictBlock> {
         // Phone width: the score bar moves to its own full-width line under
         // the label instead of squeezing beside it.
         final narrow = c.maxWidth < 480;
+        // Latch the default-open ruling on first layout.
+        if (_defaultOpen == null) {
+          final wide = c.maxWidth >= 700;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _defaultOpen == null) {
+              setState(() => _defaultOpen = wide);
+            }
+          });
+        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -334,13 +460,21 @@ class _VerdictBlockState extends State<VerdictBlock> {
 
   Widget _ledgerRow(BuildContext context, AiIssueScore issue, bool narrow) {
     final cs = Theme.of(context).colorScheme;
+    // fg colors are safe only on their matching light bg, never bare on the
+    // ambient surface (opposeFg lands ~2.8:1 on a dark card), so the dot and
+    // the score numeral each carry their own bg like the deductions chip.
     final fg = AlignmentVisuals.fg(issue.score.toDouble());
-    final open = _expanded.contains(issue.id);
+    final bg = AlignmentVisuals.bg(issue.score.toDouble());
+    // Open = the width default XOR a user toggle away from it.
+    final open = (_defaultOpen ?? false)
+        ? !_userToggled.contains(issue.id)
+        : _userToggled.contains(issue.id);
     final hasRationale = issue.rationale.trim().isNotEmpty;
     return InkWell(
       onTap: hasRationale
-          ? () => setState(() =>
-              open ? _expanded.remove(issue.id) : _expanded.add(issue.id))
+          ? () => setState(() => _userToggled.contains(issue.id)
+              ? _userToggled.remove(issue.id)
+              : _userToggled.add(issue.id))
           : null,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
@@ -353,10 +487,17 @@ class _VerdictBlockState extends State<VerdictBlock> {
             Row(
               children: [
                 Container(
-                  width: 8,
-                  height: 8,
+                  width: 12,
+                  height: 12,
+                  alignment: Alignment.center,
                   decoration:
-                      BoxDecoration(color: fg, shape: BoxShape.circle),
+                      BoxDecoration(color: bg, shape: BoxShape.circle),
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration:
+                        BoxDecoration(color: fg, shape: BoxShape.circle),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -377,13 +518,18 @@ class _VerdictBlockState extends State<VerdictBlock> {
                   Expanded(flex: 3, child: _bar(cs, fg, issue.score)),
                 ],
                 const SizedBox(width: 10),
-                SizedBox(
-                  width: 30,
+                Container(
+                  width: 38,
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  decoration: BoxDecoration(
+                    color: bg,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
                   child: Text(
                     '${issue.score}',
-                    textAlign: TextAlign.right,
+                    textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w800,
                       color: fg,
                     ),
@@ -402,12 +548,12 @@ class _VerdictBlockState extends State<VerdictBlock> {
             ),
             if (narrow)
               Padding(
-                padding: const EdgeInsets.fromLTRB(18, 6, 0, 0),
+                padding: const EdgeInsets.fromLTRB(22, 6, 0, 0),
                 child: _bar(cs, fg, issue.score),
               ),
             if (open && hasRationale)
               Padding(
-                padding: EdgeInsets.fromLTRB(18, 4, narrow ? 0 : 44, 2),
+                padding: EdgeInsets.fromLTRB(22, 4, narrow ? 0 : 52, 2),
                 child: Text(
                   issue.rationale.trim(),
                   style: TextStyle(
@@ -429,17 +575,34 @@ class _VerdictBlockState extends State<VerdictBlock> {
     final cs = Theme.of(context).colorScheme;
     final bits = <String>[
       if (ai.model != null && ai.model!.isNotEmpty) ai.model!,
-      if (widget.rulePct != null)
-        'old rule-based score ${widget.rulePct!.round()}%',
+      if (widget.rulePct != null) 'Rule-based: ${widget.rulePct!.round()}%',
       if (ai.scoredAt != null)
-        'scored ${ai.scoredAt!.toLocal().month}/${ai.scoredAt!.toLocal().day}',
+        'Scored ${ai.scoredAt!.toLocal().month}/${ai.scoredAt!.toLocal().day}',
     ];
     if (bits.isEmpty) return const SizedBox(height: 10);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
-      child: Text(
-        bits.join('  ·  '),
-        style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final bit in bits)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: cs.outlineVariant),
+              ),
+              child: Text(
+                bit,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

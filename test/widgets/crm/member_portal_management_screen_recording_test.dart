@@ -24,7 +24,7 @@ void main() {
 
     final state = tester.state(find.byType(MemberPortalManagementScreen)) as dynamic;
 
-    const meeting = MemberPortalMeeting(
+    final meeting = MemberPortalMeeting(
       id: '1',
       meetingId: 'meeting-1',
       createdAt: DateTime(2024, 1, 1),
@@ -42,7 +42,7 @@ void main() {
     );
 
     state.setState(() {
-      state._meetingsFuture = Future<List<MemberPortalMeeting>>.value(const [meeting]);
+      state._meetingsFuture = Future<List<MemberPortalMeeting>>.value([meeting]);
       state._editingMeetingId = meeting.id;
       state._selectedMeetingId = meeting.id;
       state._currentMeeting = meeting;

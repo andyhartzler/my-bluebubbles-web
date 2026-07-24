@@ -1,13 +1,10 @@
-// Integration tests for EdgeFnIdentityDataSource. Mocks CRMSupabaseService
-// + the SupabaseClient/Postgrest chain so we can assert that the alias
-// row is read and translated into a JMAP Identity, without hitting a
-// live Supabase.
-
-import 'dart:async';
+// Integration tests for EdgeFnIdentityDataSource. Mocks MailApiClient
+// (the `mail-identities-get` edge fn wrapper) so we can assert that the
+// caller's verified sendAs identities are translated into JMAP
+// Identities, without hitting a live Supabase.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 import 'package:jmap_dart_client/jmap/account_id.dart';
 import 'package:jmap_dart_client/jmap/core/id.dart';
@@ -20,60 +17,9 @@ import 'package:bluebubbles/features/mail/_tmail/model/identity/identity_request
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/model/create_new_identity_request.dart';
 import 'package:bluebubbles/features/mail/_tmail/tmail_ui_user/features/manage_account/domain/model/edit_identity_request.dart';
 import 'package:bluebubbles/features/mail/services/edge_fn/edge_fn_identity_datasource.dart';
-import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/features/mail/services/mail_api_client.dart';
 
-class _MockCRMSupabaseService extends Mock implements CRMSupabaseService {}
-
-class _MockSupabaseClient extends Mock implements supabase.SupabaseClient {}
-
-class _MockGoTrue extends Mock implements supabase.GoTrueClient {}
-
-class _MockUser extends Mock implements supabase.User {}
-
-class _MockQueryBuilder extends Mock
-    implements supabase.SupabaseQueryBuilder {}
-
-class _MockSelectFilterBuilder extends Mock
-    implements supabase.PostgrestFilterBuilder<List<Map<String, dynamic>>> {}
-
-/// `maybeSingle()` returns a `PostgrestTransformBuilder<Map<String, dynamic>?>`,
-/// which itself implements `Future<Map<String, dynamic>?>`. Mocking the Future
-/// implementation directly is messy, so we redirect every Future-shape method
-/// the awaiter actually exercises (`then`, `catchError`, `whenComplete`,
-/// `timeout`, `asStream`) onto a real Future provided by the test setup.
-class _AwaitableTransformBuilder extends Mock
-    implements supabase.PostgrestTransformBuilder<Map<String, dynamic>?> {
-  _AwaitableTransformBuilder(this._future);
-  final Future<Map<String, dynamic>?> _future;
-
-  @override
-  Future<R> then<R>(
-    FutureOr<R> Function(Map<String, dynamic>?) onValue, {
-    Function? onError,
-  }) =>
-      _future.then(onValue, onError: onError);
-
-  @override
-  Future<Map<String, dynamic>?> catchError(
-    Function onError, {
-    bool Function(Object error)? test,
-  }) =>
-      _future.catchError(onError, test: test);
-
-  @override
-  Future<Map<String, dynamic>?> whenComplete(FutureOr<void> Function() action) =>
-      _future.whenComplete(action);
-
-  @override
-  Stream<Map<String, dynamic>?> asStream() => _future.asStream();
-
-  @override
-  Future<Map<String, dynamic>?> timeout(
-    Duration timeLimit, {
-    FutureOr<Map<String, dynamic>?> Function()? onTimeout,
-  }) =>
-      _future.timeout(timeLimit, onTimeout: onTimeout);
-}
+class _MockMailApiClient extends Mock implements MailApiClient {}
 
 Session _emptySession() => Session(
       const {},
@@ -90,65 +36,39 @@ Session _emptySession() => Session(
 AccountId _accountId() => AccountId(Id('acct-1'));
 
 void main() {
-  late _MockCRMSupabaseService crm;
-  late _MockSupabaseClient client;
-  late _MockGoTrue auth;
-  late _MockUser user;
-  late _MockQueryBuilder fromBuilder;
-  late _MockSelectFilterBuilder selectBuilder;
-  late _MockSelectFilterBuilder eqBuilder;
-
-  setUpAll(() {
-    registerFallbackValue('');
-  });
+  late _MockMailApiClient api;
 
   setUp(() {
-    crm = _MockCRMSupabaseService();
-    client = _MockSupabaseClient();
-    auth = _MockGoTrue();
-    user = _MockUser();
-    fromBuilder = _MockQueryBuilder();
-    selectBuilder = _MockSelectFilterBuilder();
-    eqBuilder = _MockSelectFilterBuilder();
-
-    when(() => crm.isInitialized).thenReturn(true);
-    when(() => crm.client).thenReturn(client);
-    when(() => client.auth).thenReturn(auth);
-    when(() => auth.currentUser).thenReturn(user);
-    when(() => user.id).thenReturn('user-uuid-1');
-
-    // Every PostgrestBuilder in the chain implements Future<T>. mocktail
-    // rejects `thenReturn` for Future-typed values, so each link uses
-    // `thenAnswer` to hand the next mock back.
-    when(() => client.from(any())).thenAnswer((_) => fromBuilder);
-    when(() => fromBuilder.select(any())).thenAnswer((_) => selectBuilder);
-    when(() => selectBuilder.eq(any(), any())).thenAnswer((_) => eqBuilder);
+    api = _MockMailApiClient();
   });
 
-  /// Convenience wrapper: stub `eqBuilder.maybeSingle()` to surface `row`
-  /// when awaited. The runtime-typed return is a Future-implementing
-  /// PostgrestTransformBuilder, so we wrap a real Future and forward
-  /// `then` / `catchError` / `whenComplete` to it.
-  void stubMaybeSingle(Map<String, dynamic>? row) {
-    // mocktail forbids `thenReturn` for Future-typed values (the helper
-    // implements Future), so we hand it back via `thenAnswer` instead.
-    when(() => eqBuilder.maybeSingle())
-        .thenAnswer((_) => _AwaitableTransformBuilder(Future.value(row)));
-  }
-
   group('getAllIdentities', () {
-    test('returns one Identity built from the mail_aliases row', () async {
-      // The eq() chain ends in maybeSingle() returning the row map.
-      stubMaybeSingle({
-        'alias_email': 'andrew@moyd.org',
-        'display_name': 'Andrew Moyd',
-        'revoked_at': null,
-      });
+    test('returns Identities built from the sendAs list, primary first', () async {
+      when(() => api.getIdentities()).thenAnswer(
+        (_) async => const MailIdentitiesResponse(
+          identities: [
+            MailSendAsIdentity(
+              email: 'alias@moyd.org',
+              displayName: 'MOYD Alias',
+              isDefault: false,
+              verified: true,
+            ),
+            MailSendAsIdentity(
+              email: 'andrew@moyd.org',
+              displayName: 'Andrew Moyd',
+              isDefault: true,
+              verified: true,
+            ),
+          ],
+          primary: 'andrew@moyd.org',
+        ),
+      );
 
-      final ds = EdgeFnIdentityDataSource(supabase: crm);
+      final ds = EdgeFnIdentityDataSource(api: api);
       final response = await ds.getAllIdentities(_emptySession(), _accountId());
 
-      expect(response.identities?.length, 1);
+      expect(response.identities?.length, 2);
+      // Primary sorts to the front.
       final identity = response.identities!.first;
       expect(identity.email, 'andrew@moyd.org');
       expect(identity.name, 'Andrew Moyd');
@@ -159,30 +79,54 @@ void main() {
       expect(identity.textSignature, isNull);
       expect(identity.htmlSignature, isNull);
 
-      verify(() => client.from('mail_aliases')).called(1);
-      verify(() => selectBuilder.eq('user_id', 'user-uuid-1')).called(1);
+      expect(response.identities!.last.email, 'alias@moyd.org');
+
+      verify(() => api.getIdentities()).called(1);
     });
 
-    test('returns an empty list when no alias row exists', () async {
-      stubMaybeSingle(null);
+    test('returns an empty list when no sendAs identities exist', () async {
+      when(() => api.getIdentities()).thenAnswer(
+        (_) async => const MailIdentitiesResponse(
+          identities: [],
+          primary: 'andrew@moyd.org',
+        ),
+      );
 
-      final ds = EdgeFnIdentityDataSource(supabase: crm);
+      final ds = EdgeFnIdentityDataSource(api: api);
       final response = await ds.getAllIdentities(_emptySession(), _accountId());
 
       expect(response.identities, isEmpty);
     });
 
-    test('returns empty when the row exists but is revoked', () async {
-      stubMaybeSingle({
-        'alias_email': 'andrew@moyd.org',
-        'display_name': 'Andrew',
-        'revoked_at': '2026-01-01T00:00:00Z',
-      });
+    test('fails closed to an empty list when the edge fn errors', () async {
+      when(() => api.getIdentities()).thenThrow(Exception('edge fn down'));
 
-      final ds = EdgeFnIdentityDataSource(supabase: crm);
+      final ds = EdgeFnIdentityDataSource(api: api);
       final response = await ds.getAllIdentities(_emptySession(), _accountId());
 
       expect(response.identities, isEmpty);
+    });
+
+    test('caches the identity list for the session', () async {
+      when(() => api.getIdentities()).thenAnswer(
+        (_) async => const MailIdentitiesResponse(
+          identities: [
+            MailSendAsIdentity(
+              email: 'andrew@moyd.org',
+              displayName: 'Andrew Moyd',
+              isDefault: true,
+              verified: true,
+            ),
+          ],
+          primary: 'andrew@moyd.org',
+        ),
+      );
+
+      final ds = EdgeFnIdentityDataSource(api: api);
+      await ds.getAllIdentities(_emptySession(), _accountId());
+      await ds.getAllIdentities(_emptySession(), _accountId());
+
+      verify(() => api.getIdentities()).called(1);
     });
   });
 
@@ -190,7 +134,7 @@ void main() {
     late EdgeFnIdentityDataSource ds;
 
     setUp(() {
-      ds = EdgeFnIdentityDataSource(supabase: crm);
+      ds = EdgeFnIdentityDataSource(api: api);
     });
 
     test('createNewIdentity throws', () async {

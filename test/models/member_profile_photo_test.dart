@@ -3,8 +3,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:test/test.dart';
 
 void main() {
-  setUp(() async {
-    await dotenv.testLoad(fileInput: 'SUPABASE_URL=https://example.supabase.co');
+  setUp(() {
+    dotenv.loadFromString(envString: 'SUPABASE_URL=https://example.supabase.co');
   });
 
   test('parseList normalizes Supabase public_url payloads', () {
@@ -68,8 +68,8 @@ void main() {
   });
 
   test('publicUrl ignores rest path in Supabase URL origin', () async {
-    await dotenv.testLoad(
-      fileInput: 'SUPABASE_URL=https://example.supabase.co/rest/v1',
+    dotenv.loadFromString(
+      envString: 'SUPABASE_URL=https://example.supabase.co/rest/v1',
     );
 
     final payload = [

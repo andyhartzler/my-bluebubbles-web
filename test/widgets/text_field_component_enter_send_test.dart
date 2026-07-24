@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:bluebubbles/app/components/custom_text_editing_controllers.dart';
 import 'package:bluebubbles/app/layouts/conversation_view/widgets/text_field/conversation_text_field.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,7 +40,7 @@ void main() {
     expect(
       state.handleKey(
         focusNode,
-        const KeyDownEvent(physicalKey: enterPhysical, logicalKey: enterLogical),
+        const KeyDownEvent(physicalKey: enterPhysical, logicalKey: enterLogical, timeStamp: Duration.zero),
         capturedContext,
         true,
       ),
@@ -51,7 +51,7 @@ void main() {
     expect(
       state.handleKey(
         focusNode,
-        const KeyDownEvent(physicalKey: enterPhysical, logicalKey: enterLogical),
+        const KeyDownEvent(physicalKey: enterPhysical, logicalKey: enterLogical, timeStamp: Duration.zero),
         capturedContext,
         true,
       ),
@@ -62,7 +62,7 @@ void main() {
     expect(
       state.handleKey(
         focusNode,
-        const KeyUpEvent(physicalKey: enterPhysical, logicalKey: enterLogical),
+        const KeyUpEvent(physicalKey: enterPhysical, logicalKey: enterLogical, timeStamp: Duration.zero),
         capturedContext,
         true,
       ),
@@ -73,7 +73,7 @@ void main() {
     expect(
       state.handleKey(
         focusNode,
-        const KeyDownEvent(physicalKey: enterPhysical, logicalKey: enterLogical),
+        const KeyDownEvent(physicalKey: enterPhysical, logicalKey: enterLogical, timeStamp: Duration.zero),
         capturedContext,
         true,
       ),
@@ -87,7 +87,7 @@ void main() {
     expect(
       state.handleKey(
         focusNode,
-        const KeyDownEvent(physicalKey: enterPhysical, logicalKey: enterLogical),
+        const KeyDownEvent(physicalKey: enterPhysical, logicalKey: enterLogical, timeStamp: Duration.zero),
         capturedContext,
         true,
       ),
@@ -98,7 +98,7 @@ void main() {
     expect(
       state.handleKey(
         focusNode,
-        const KeyUpEvent(physicalKey: enterPhysical, logicalKey: enterLogical),
+        const KeyUpEvent(physicalKey: enterPhysical, logicalKey: enterLogical, timeStamp: Duration.zero),
         capturedContext,
         true,
       ),

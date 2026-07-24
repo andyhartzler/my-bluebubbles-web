@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import '../models/form_schema.dart';
 import '../models/form_submission.dart';
 import '../models/submission_review_model.dart';
-import '../widgets/submission_detail/candidate_hero_header.dart';
 import '../widgets/submission_detail/submission_review_body.dart';
 import '../services/forms_service.dart';
 import 'endorsement_hub/ai_score_repository.dart';
@@ -16,9 +15,9 @@ import '../../../services/crm/member_repository.dart';
 import '../../../services/crm/subscriber_repository.dart';
 
 /// Endorsement submission review screen. Renders a MOYD-branded candidate
-/// hero, a pinned at-a-glance bar, one card per form section (with policy
-/// grids where detected), documents and references, plus a collapsed
-/// submission-metadata tile at the bottom.
+/// hero, a navy stat band, a sticky section navigator, one card per form
+/// section (with policy grids where detected), documents and references,
+/// plus a collapsed submission-metadata tile at the bottom.
 class SubmissionDetailScreen extends StatefulWidget {
   /// Constructor with pre-loaded data
   final FormSubmission? submission;
@@ -278,9 +277,6 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       return const Center(child: Text('No submission data available'));
     }
 
-    final model = SubmissionReviewModel.from(form!, submission!,
-        aiAlignment: _aiAlignment);
-
     // Linked-profile affordance for the hero contact row.
     VoidCallback? onOpenProfile;
     String? linkedLabel;
@@ -291,8 +287,6 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       onOpenProfile = () => _showSubscriberDetailSheet(_linkedSubscriber!);
       linkedLabel = 'Subscriber';
     }
-
-    final glance = AtAGlanceBar(model: model);
 
     // Readable measure on ultrawide monitors: cap the content column. Wide
     // enough that the review body's two-column section flow engages.
@@ -308,28 +302,14 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       slivers: [
         SliverToBoxAdapter(
           child: constrain(Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: CandidateHeroHeader(
-              model: model,
-              status: submission!.status,
-              onOpenLinkedProfile: onOpenProfile,
-              linkedProfileLabel: linkedLabel,
-            ),
-          )),
-        ),
-        if (glance.hasContent)
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _PinnedBarDelegate(child: glance, height: AtAGlanceBar.height),
-          ),
-        SliverToBoxAdapter(
-          child: constrain(Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             child: SubmissionReviewBody(
               form: form!,
               submission: submission!,
               aiAlignment: _aiAlignment,
-              showHero: false,
+              showHero: true,
+              onOpenLinkedProfile: onOpenProfile,
+              linkedProfileLabel: linkedLabel,
             ),
           )),
         ),
@@ -358,7 +338,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
       for (final p in section.policyPositions) {
         buffer.write('${p.question}: ${p.answerLabel}');
         if (p.explanation != null && p.explanation!.trim().isNotEmpty) {
-          buffer.write('  — ${p.explanation!.trim()}');
+          buffer.write(': ${p.explanation!.trim()}');
         }
         buffer.writeln();
       }
@@ -388,29 +368,6 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   String _formatDateTime(DateTime date) {
     return '${date.month}/${date.day}/${date.year} at ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
-}
-
-/// Pinned delegate wrapper for the at-a-glance bar.
-class _PinnedBarDelegate extends SliverPersistentHeaderDelegate {
-  final Widget child;
-  final double height;
-
-  _PinnedBarDelegate({required this.child, required this.height});
-
-  @override
-  double get minExtent => height;
-
-  @override
-  double get maxExtent => height;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return SizedBox.expand(child: child);
-  }
-
-  @override
-  bool shouldRebuild(covariant _PinnedBarDelegate oldDelegate) =>
-      oldDelegate.child != child || oldDelegate.height != height;
 }
 
 /// Bottom sheet for displaying subscriber details
