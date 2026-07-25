@@ -31,18 +31,40 @@ enum DecisionState {
 /// candidate back on the ballot.
 enum DecisionLoadState { loading, ready, failed }
 
-/// A stored decision: a state plus an optional working note.
+/// A stored decision: a state plus an optional working note, and the write
+/// metadata the table already carries.
+///
+/// [updatedBy] is the auth uid the app LAST stamped on the row, and nothing
+/// more: 18 of the 23 locked rows are NULL because the Jul 15 recovery ran
+/// outside the app, and audit_log holds zero rows for endorsement_decisions,
+/// so this can never be presented as "who authored the decision". The
+/// attribution sheet is the only consumer and it hedges accordingly.
 @immutable
 class DecisionRecord {
   final DecisionState state;
   final String note;
-  const DecisionRecord({required this.state, this.note = ''});
+  final String? updatedBy;
+  final DateTime? updatedAt;
+  const DecisionRecord({
+    required this.state,
+    this.note = '',
+    this.updatedBy,
+    this.updatedAt,
+  });
 
-  Map<String, dynamic> toJson() => {'state': state.name, 'note': note};
+  Map<String, dynamic> toJson() => {
+        'state': state.name,
+        'note': note,
+        if (updatedBy != null) 'updated_by': updatedBy,
+        if (updatedAt != null)
+          'updated_at': updatedAt!.toUtc().toIso8601String(),
+      };
 
   static DecisionRecord fromJson(Map<String, dynamic> j) => DecisionRecord(
         state: DecisionState.fromName(j['state'] as String?),
         note: (j['note'] as String?) ?? '',
+        updatedBy: j['updated_by']?.toString(),
+        updatedAt: DateTime.tryParse(j['updated_at']?.toString() ?? ''),
       );
 }
 
@@ -212,9 +234,14 @@ class SupabaseDecisionRepository extends DecisionRepository {
   void _applyRow(Map<String, dynamic> m) {
     final id = m['candidate_id']?.toString();
     if (id == null || id.isEmpty) return;
+    // updated_by / updated_at used to be discarded here even though the
+    // upsert writes them; the attribution sheet needs both (hedged typist
+    // line + the recovery date), so they are kept now.
     _records[id] = DecisionRecord(
       state: DecisionState.fromName(m['state'] as String?),
       note: (m['note'] as String?) ?? '',
+      updatedBy: m['updated_by']?.toString(),
+      updatedAt: DateTime.tryParse(m['updated_at']?.toString() ?? ''),
     );
   }
 
@@ -250,10 +277,20 @@ class SupabaseDecisionRepository extends DecisionRepository {
   DecisionRecord recordFor(String candidateId) =>
       _records[candidateId] ?? const DecisionRecord(state: DecisionState.undecided);
 
+  /// Optimistic local record mirroring exactly what [_upsertChecked] is about
+  /// to write, so updatedBy/updatedAt never go stale between the local update
+  /// and the realtime echo.
+  DecisionRecord _stamped(DecisionState state, String note) => DecisionRecord(
+        state: state,
+        note: note,
+        updatedBy: _client.auth.currentUser?.id,
+        updatedAt: DateTime.now().toUtc(),
+      );
+
   @override
   Future<void> setState(String candidateId, DecisionState state) async {
     final existing = recordFor(candidateId);
-    _records[candidateId] = DecisionRecord(state: state, note: existing.note);
+    _records[candidateId] = _stamped(state, existing.note);
     notifyListeners();
     await _upsert(candidateId);
   }
@@ -265,7 +302,7 @@ class SupabaseDecisionRepository extends DecisionRepository {
   Future<bool> trySetState(String candidateId, DecisionState state) async {
     final DecisionRecord? snapshot = _records[candidateId];
     final existing = recordFor(candidateId);
-    _records[candidateId] = DecisionRecord(state: state, note: existing.note);
+    _records[candidateId] = _stamped(state, existing.note);
     notifyListeners();
     try {
       await _upsertChecked(candidateId);
@@ -285,7 +322,7 @@ class SupabaseDecisionRepository extends DecisionRepository {
   @override
   Future<void> setNote(String candidateId, String note) async {
     final existing = recordFor(candidateId);
-    _records[candidateId] = DecisionRecord(state: existing.state, note: note);
+    _records[candidateId] = _stamped(existing.state, note);
     notifyListeners();
     await _upsert(candidateId);
   }

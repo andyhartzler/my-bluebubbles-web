@@ -12,15 +12,46 @@ class CRMStorageUriResolver {
 
   static const Duration _defaultSignedUrlTtl = Duration(hours: 1);
 
+  /// Buckets that are NOT world readable and must never be linked through
+  /// `/storage/v1/object/public/...`.
+  ///
+  /// `meetings` holds the verbatim transcripts of executive committee and
+  /// all-members meetings. It was a public bucket until
+  /// moyd-ops/endorsement-round-2/sql/050_meetings_transcript_access.sql took
+  /// it private and gated reads on `public.is_executive()`. For anything in
+  /// here a failure to sign resolves to null, which the callers already render
+  /// as "Unable to open transcript link", rather than falling back to a public
+  /// URL. A dead link is the correct outcome; a working unauthenticated one is
+  /// not.
+  ///
+  /// Two consequences worth knowing before debugging a "broken" link:
+  ///  * Signing works against a bucket that is still public, so this file is
+  ///    safe to ship BEFORE 050 is applied and must be, since the build it
+  ///    replaces cannot read a private bucket at all.
+  ///  * After 050, a signed-URL request from a non-executive account is
+  ///    refused by the storage RLS policy and lands here as a null. That is the
+  ///    designed outcome for the 28 Policy & Advocacy CRM accounts, not a bug.
+  static const Set<String> _privateBuckets = <String>{'meetings'};
+
+  /// Relative path prefixes that belong to the `meetings` bucket.
+  static const List<String> _meetingsPrefixes = <String>[
+    'transcripts/',
+    'recordings/',
+    'documents/',
+  ];
+
   /// Resolve a raw storage path to a fully-qualified [Uri]. The resolver
   /// understands a few formats:
   ///
-  /// * Plain HTTP(S) URLs – returned as-is.
-  /// * Relative paths (e.g. `storage/v1/object/public/...`) – prefixed with the
+  /// * Plain HTTP(S) URLs, returned as-is.
+  /// * Relative paths (e.g. `storage/v1/object/public/...`), prefixed with the
   ///   Supabase project URL from [CRMConfig.supabaseUrl].
-  /// * `storage://bucket/path` style URIs – a signed download URL is requested
-  ///   from Supabase Storage when possible. If signing fails, the helper falls
-  ///   back to constructing a relative path from the project URL.
+  /// * Relative `transcripts/`, `recordings/` and `documents/` paths, which are
+  ///   the `meetings` bucket and are always signed.
+  /// * `storage://bucket/path` style URIs, for which a signed download URL is
+  ///   requested from Supabase Storage. If signing fails the helper falls back
+  ///   to a public URL, except for the buckets in [_privateBuckets], where it
+  ///   returns null instead.
   static Future<Uri?> resolve(
     String? rawPath, {
     CRMSupabaseService? supabaseService,
@@ -88,12 +119,14 @@ class CRMStorageUriResolver {
             '⚠️ Failed to create signed URL for $bucket/$objectPath: $error',
           );
           debugPrint('$stackTrace');
+          if (_privateBuckets.contains(bucket)) return null;
           // If signing fails, the bucket might be public, try public URL
           final publicPath = 'storage/v1/object/public/$bucket/$objectPath';
           return baseUri.resolve(publicPath);
         }
       }
 
+      if (_privateBuckets.contains(bucket)) return null;
       // Default to public bucket URL as fallback
       final fallbackPath = 'storage/v1/object/public/$bucket/$objectPath';
       return baseUri.resolve(fallbackPath);
@@ -104,13 +137,23 @@ class CRMStorageUriResolver {
         ? trimmed.substring(1)
         : trimmed;
 
-    // If the path starts with a bucket-like pattern (e.g., "transcripts/", "documents/"),
-    // assume it's from the "meetings" bucket and construct the full storage URL
-    if (relativePath.startsWith('transcripts/') ||
-        relativePath.startsWith('recordings/') ||
-        relativePath.startsWith('documents/')) {
-      final storagePath = 'storage/v1/object/public/meetings/$relativePath';
-      return baseUri.resolve(storagePath);
+    // If the path starts with a bucket-like pattern (e.g., "transcripts/",
+    // "documents/"), it is from the "meetings" bucket. meetings.transcript_file_path
+    // stores exactly this shape. The bucket is private, so this is a signed URL
+    // and not /object/public.
+    if (_meetingsPrefixes.any((prefix) => relativePath.startsWith(prefix))) {
+      final service = supabaseService ?? CRMSupabaseService();
+      if (!service.isInitialized) return null;
+      try {
+        final signedUrl = await service.client.storage
+            .from('meetings')
+            .createSignedUrl(relativePath, signedUrlTtl.inSeconds);
+        return Uri.tryParse(signedUrl);
+      } catch (error, stackTrace) {
+        debugPrint('⚠️ Failed to sign meetings/$relativePath: $error');
+        debugPrint('$stackTrace');
+        return null;
+      }
     }
 
     // If it already starts with storage/v1/object, use as-is

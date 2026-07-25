@@ -256,6 +256,7 @@ class _RosterGalleryState extends State<RosterGallery> {
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (context, i) {
             final e = visible[i];
+            final race = c.raceInfoFor(e.id);
             return RosterCard(
               entry: e,
               selected: c.isSelected(e.id),
@@ -263,6 +264,11 @@ class _RosterGalleryState extends State<RosterGallery> {
               onOpen: () => widget.onOpen(e),
               onToggleSelect: () => c.toggleSelected(e.id),
               decisionChip: widget.decisionChipBuilder?.call(e),
+              displayName: c.displayNameFor(e),
+              raceLine: race?.raceLabel,
+              raceApplicantCount: race?.raceKey == null
+                  ? 0
+                  : c.applicantsInRace(race!.raceKey!),
             );
           },
         );
@@ -271,19 +277,28 @@ class _RosterGalleryState extends State<RosterGallery> {
         padding: const EdgeInsets.only(bottom: 24, top: 4),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: 236,
-          childAspectRatio: 0.66,
+          // 0.66 before the race line landed; the taller tile absorbs the
+          // extra labelSmall row so busy cards (flags + decision chip +
+          // race pill) never overflow the fixed grid extent.
+          childAspectRatio: 0.62,
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
         ),
         itemCount: visible.length,
         itemBuilder: (context, i) {
           final e = visible[i];
+          final race = c.raceInfoFor(e.id);
           return RosterCard(
             entry: e,
             selected: c.isSelected(e.id),
             onOpen: () => widget.onOpen(e),
             onToggleSelect: () => c.toggleSelected(e.id),
             decisionChip: widget.decisionChipBuilder?.call(e),
+            displayName: c.displayNameFor(e),
+            raceLine: race?.raceLabel,
+            raceApplicantCount: race?.raceKey == null
+                ? 0
+                : c.applicantsInRace(race!.raceKey!),
           );
         },
       );

@@ -37,6 +37,23 @@ class BallotRow extends StatefulWidget {
   /// everything above it as occluded.
   final double toolbarExtent;
 
+  /// Display name override (SlateController.displayNameFor): covers the one
+  /// submission whose data carries no name at all, where the race view's
+  /// coalesced candidates.name is the only name we hold. Null falls back to
+  /// [entry].name unchanged.
+  final String? displayName;
+
+  /// Visible office-conflict pill text ("Filed: Senate 34 · Said: House 34"),
+  /// non-null only where the SoS filing contradicts the candidate's own
+  /// office answer. A pill, not a tooltip: hover does not exist on the phones
+  /// the committee uses mid-meeting, and hiding the conflict would silently
+  /// reassign the candidate's race.
+  final String? conflictLabel;
+
+  /// "Other Democrats in this race" disclosure, rendered inside the
+  /// expansion; null keeps the row exactly as before.
+  final Widget? raceDisclosure;
+
   const BallotRow({
     super.key,
     required this.entry,
@@ -52,6 +69,9 @@ class BallotRow extends StatefulWidget {
     required this.districtRef,
     required this.narrow,
     required this.toolbarExtent,
+    this.displayName,
+    this.conflictLabel,
+    this.raceDisclosure,
   });
 
   @override
@@ -126,6 +146,9 @@ class _BallotRowState extends State<BallotRow> {
   CandidateEntry get entry => widget.entry;
   EndorsementVoteRepository get votes => widget.votes;
 
+  /// Name actually rendered (override wins; see [BallotRow.displayName]).
+  String get _name => widget.displayName ?? entry.name;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -192,6 +215,7 @@ class _BallotRowState extends State<BallotRow> {
                             suggestion: widget.suggestion,
                             onOpen: widget.onOpen,
                             onFinalCall: widget.onFinalCall,
+                            raceDisclosure: widget.raceDisclosure,
                           )
                         : const SizedBox(width: double.infinity),
                   ),
@@ -209,16 +233,25 @@ class _BallotRowState extends State<BallotRow> {
     final cs = theme.colorScheme;
     return Row(
       children: [
-        HeadshotAvatar(file: entry.headshot, name: entry.name, size: 36),
+        HeadshotAvatar(file: entry.headshot, name: _name, size: 36),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(entry.name,
+          child: Text(_name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.titleSmall
                   ?.copyWith(fontWeight: FontWeight.w800)),
         ),
         const SizedBox(width: 8),
+        if (widget.conflictLabel != null) ...[
+          // Bounded: the pill's inner Flexible needs finite width inside
+          // this unbounded header Row.
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 240),
+            child: _ConflictPill(label: widget.conflictLabel!),
+          ),
+          const SizedBox(width: 8),
+        ],
         _districtSlot(theme, maxOfficeWidth: 150),
         const SizedBox(width: 8),
         // Fixed slot so the score column stays vertically aligned while
@@ -257,10 +290,10 @@ class _BallotRowState extends State<BallotRow> {
       children: [
         Row(
           children: [
-            HeadshotAvatar(file: entry.headshot, name: entry.name, size: 36),
+            HeadshotAvatar(file: entry.headshot, name: _name, size: 36),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(entry.name,
+              child: Text(_name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleSmall
@@ -274,6 +307,17 @@ class _BallotRowState extends State<BallotRow> {
             _chevron(cs),
           ],
         ),
+        // The conflict pill gets its own chip line on narrow rather than
+        // competing with the name row or squeezing the fixed-size vote
+        // control below: "Filed: Senate 34 · Said: House 34" plus the
+        // segmented control cannot share 360px without an overflow.
+        if (widget.conflictLabel != null) ...[
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _ConflictPill(label: widget.conflictLabel!),
+          ),
+        ],
         const SizedBox(height: 4),
         Row(
           children: [
@@ -408,6 +452,48 @@ class _DistrictChip extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Visible amber office-conflict pill ("Filed: Senate 34 · Said: House 34").
+/// qualifiedFg on qualifiedBg is a verified self-contained AA pair on both
+/// themes, and reads as distinct from the neutral district chip beside it and
+/// the amber baseline header, so a conflict chip is never confused with
+/// either. Deliberately not a tooltip: the phones the committee uses during a
+/// meeting have no hover, and a hidden conflict is a silent race
+/// reassignment.
+class _ConflictPill extends StatelessWidget {
+  final String label;
+  const _ConflictPill({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: MoydBrand.qualifiedBg,
+        borderRadius: BorderRadius.circular(999),
+        border:
+            Border.all(color: MoydBrand.qualifiedFg.withOpacity(0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline,
+              size: 12, color: MoydBrand.qualifiedFg),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: MoydBrand.qualifiedFg,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700)),
+          ),
+        ],
       ),
     );
   }

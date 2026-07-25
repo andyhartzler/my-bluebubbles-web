@@ -6,12 +6,15 @@ import '../../services/forms_service.dart';
 import 'ai_score_repository.dart';
 import 'models/candidate_entry.dart';
 import 'models/slate_stats.dart';
+import 'race_field_repository.dart';
+import 'widgets/decisions/district_ref.dart';
 
 /// How the roster is sorted.
 enum SlateSort {
   alignmentDesc('Alignment (high → low)'),
   name('Name (A → Z)'),
   office('Office level'),
+  race('Race (district)'),
   newest('Newest first'),
   selfFunded('Self-funded %'),
   supportCount('Most support');
@@ -24,12 +27,17 @@ enum SlateSort {
 /// submission, and holds the roster filter / sort / selection state shared by
 /// every tab of the Endorsement HQ.
 class SlateController extends ChangeNotifier {
-  SlateController({FormsService? service, EndorsementAiScoreRepository? aiScores})
+  SlateController(
+      {FormsService? service,
+      EndorsementAiScoreRepository? aiScores,
+      EndorsementRaceRepository? races})
       : _service = service ?? FormsService(),
-        _aiScores = aiScores ?? EndorsementAiScoreRepository();
+        _aiScores = aiScores ?? EndorsementAiScoreRepository(),
+        _races = races ?? EndorsementRaceRepository();
 
   final FormsService _service;
   final EndorsementAiScoreRepository _aiScores;
+  final EndorsementRaceRepository _races;
 
   /// The canonical endorsement form id. A slug fallback runs if this id 404s.
   static const String endorsementFormId =
@@ -46,6 +54,58 @@ class SlateController extends ChangeNotifier {
   FormSchema? get form => _form;
   List<CandidateEntry> get all => _all;
   bool get hasSubmissions => _all.isNotEmpty;
+
+  // ----- race identity (side maps keyed by submission id / race key) -----
+  //
+  // Race identity is a fourth non-fatal fetch, the same pattern as aiScores
+  // and photoFallback, but with one deliberate difference: a failure here
+  // must degrade to "no clusters and no opponent field", never to a wrong
+  // cluster, so the maps simply stay empty and _raceLoadFailed flips true.
+  // The board reads that flag to distinguish "this race is uncontested"
+  // from "we could not find out", which are different statements and only
+  // one of them is safe to imply.
+  Map<String, RaceInfo> _raceInfo = const {};
+  Map<String, List<RaceFieldCandidate>> _raceField = const {};
+  Map<String, int> _raceApplicantCounts = const {};
+  bool _raceLoadFailed = false;
+  bool _raceDataLoaded = false;
+
+  /// Resolved race identity for one submission, or null when the view does
+  /// not cover it (or the fetch failed).
+  RaceInfo? raceInfoFor(String submissionId) => _raceInfo[submissionId];
+
+  /// True once the race fetch has settled either way. The disclosure renders
+  /// nothing before this (transient, part of load()).
+  bool get raceDataLoaded => _raceDataLoaded;
+  bool get raceLoadFailed => _raceLoadFailed;
+
+  /// Non-applicant Democrats sharing [raceKey], alphabetized. Empty is the
+  /// common case (43 of 59 races have no other filed Democrat).
+  List<RaceFieldCandidate> raceFieldFor(String? raceKey) =>
+      raceKey == null ? const [] : (_raceField[raceKey] ?? const []);
+
+  /// How many of OUR applicants (post-dedupe board entries) share [raceKey].
+  /// >= 2 means the race is contested and drives both the ballot clusters and
+  /// the Browse "N applied" pill.
+  int applicantsInRace(String raceKey) => _raceApplicantCounts[raceKey] ?? 0;
+
+  /// Display name with the race view's coalesced fallback.
+  ///
+  /// One submission (Hope Tinker, 587c32d7) has neither data->>'name' nor
+  /// data->>'full_name', so SubmissionReviewModel.candidateName is empty and
+  /// the row would render nameless. v_endorsement_applicant_race coalesces
+  /// the linked candidates.name; this is the only place that fallback is
+  /// consulted, so every surface that needs the fallback goes through it.
+  /// 'Name not provided' is a statement of fact, not a placeholder: it is
+  /// what the data says when both the submission and the linked candidate
+  /// row are silent.
+  String displayNameFor(CandidateEntry e) {
+    final n = e.name.trim();
+    if (n.isNotEmpty) return n;
+    final fallback = _raceInfo[e.id]?.displayName?.trim();
+    if (fallback != null && fallback.isNotEmpty) return fallback;
+    return 'Name not provided';
+  }
 
   // ----- filter / sort state -----
   String _search = '';
@@ -138,6 +198,30 @@ class SlateController extends ChangeNotifier {
               aiAlignment: aiScores[s.id],
               fallbackPhotoUrl: photoFallback[s.id]))
           .toList();
+      // Race identity + the unvetted-Democrat field, non-fatal (see the
+      // field comments above). Until 010/011 are applied in Postgres this
+      // throws, the flag flips, and the board renders exactly as before
+      // plus an honest "Race field unavailable" line per expansion.
+      _raceLoadFailed = false;
+      try {
+        _raceInfo = await _races.loadApplicantRaces();
+        _raceField = await _races.loadRaceField();
+      } catch (e) {
+        debugPrint('SlateController race views load failed: $e');
+        _raceInfo = const {};
+        _raceField = const {};
+        _raceLoadFailed = true;
+      }
+      _raceDataLoaded = true;
+      // Applicant counts per race, over the DEDUPED board entries (not the
+      // raw view rows): the Arellanes duplicate submission must not turn
+      // House 121 into a fake contest.
+      final counts = <String, int>{};
+      for (final e in entries) {
+        final k = _raceInfo[e.id]?.raceKey;
+        if (k != null) counts[k] = (counts[k] ?? 0) + 1;
+      }
+      _raceApplicantCounts = counts;
       _form = form;
       _all = entries;
       // Drop selections that no longer exist.
@@ -161,8 +245,11 @@ class SlateController extends ChangeNotifier {
 
     if (_search.trim().isNotEmpty) {
       final q = _search.toLowerCase();
+      // displayNameFor, not e.name: it falls back through the race view's
+      // coalesced name, so the one nameless submission (Hope Tinker,
+      // 587c32d7) is findable by the name the board actually renders.
       xs = xs.where((e) =>
-          e.name.toLowerCase().contains(q) ||
+          displayNameFor(e).toLowerCase().contains(q) ||
           (e.model.office?.toLowerCase().contains(q) ?? false) ||
           (e.model.district?.toLowerCase().contains(q) ?? false));
     }
@@ -219,6 +306,26 @@ class SlateController extends ChangeNotifier {
           return cmp != 0 ? cmp : byName(a, b);
         });
         break;
+      case SlateSort.race:
+        // Same ordering as the ballot's VoteSort.race: office rank (US
+        // House, State Senate, State House, keyless rows last), then numeric
+        // district, then name. View-resolved race identity first; the
+        // client-side parseDistrictRef fallback covers rows the view does
+        // not (it is presentation-only, so a fallback mismatch can at worst
+        // misplace a row in a sort, never mis-cluster it).
+        int rank(CandidateEntry e) => switch (_officeCodeFor(e)) {
+              'US_HOUSE' => 0,
+              'MO_SEN' => 1,
+              'MO_HOUSE' => 2,
+              _ => 3,
+            };
+        list.sort((a, b) {
+          final r = rank(a).compareTo(rank(b));
+          if (r != 0) return r;
+          final d = _districtNumFor(a).compareTo(_districtNumFor(b));
+          return d != 0 ? d : byName(a, b);
+        });
+        break;
       case SlateSort.newest:
         list.sort((a, b) =>
             b.submission.createdAt.compareTo(a.submission.createdAt));
@@ -238,6 +345,29 @@ class SlateController extends ChangeNotifier {
         });
         break;
     }
+  }
+
+  /// Office code for the race sort: the view's resolved code, falling back
+  /// to the client district parse for rows the view does not cover.
+  String? _officeCodeFor(CandidateEntry e) {
+    final code = _raceInfo[e.id]?.officeCode;
+    if (code != null) return code;
+    final ref =
+        parseDistrictRef(office: e.model.office, district: e.model.district);
+    return switch (ref?.mapOffice) {
+      'US Congress' => 'US_HOUSE',
+      'State Senate' => 'MO_SEN',
+      'State House' => 'MO_HOUSE',
+      _ => null,
+    };
+  }
+
+  int _districtNumFor(CandidateEntry e) {
+    final n = _raceInfo[e.id]?.districtNum;
+    if (n != null) return n;
+    final ref =
+        parseDistrictRef(office: e.model.office, district: e.model.district);
+    return int.tryParse(ref?.districtNum ?? '') ?? 1 << 20;
   }
 
   // ==================== mutators ====================

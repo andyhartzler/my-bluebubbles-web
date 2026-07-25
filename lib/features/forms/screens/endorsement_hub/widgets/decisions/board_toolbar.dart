@@ -6,7 +6,14 @@ import '../../theme/hub_theme.dart';
 enum VoteFilter { all, needsMyVote, splits }
 
 /// Ballot list sort (promoted from the board's private enum; same values).
-enum VoteSort { yesShare, name, alignment }
+///
+/// [race] orders by office rank (US House, State Senate, State House, then
+/// keyless rows last), then numeric district, then name. It is deliberately
+/// NOT the default: a district run-through is a real way to chair a meeting,
+/// but reordering all ~46 solo races to serve 7 contested ones would displace
+/// the yesShare consensus-readiness order the committee actually used. The
+/// race clusters render under every sort, so this composes for free.
+enum VoteSort { yesShare, name, alignment, race }
 
 /// Pin-only [SliverPersistentHeaderDelegate] for the sticky toolbar: the
 /// board computes the extent from its single LayoutBuilder breakpoint and the
@@ -389,6 +396,7 @@ class _SortMenu extends StatelessWidget {
         VoteSort.yesShare => 'Yes share',
         VoteSort.name => 'Name',
         VoteSort.alignment => 'Alignment',
+        VoteSort.race => 'Race',
       };
 
   @override

@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../theme/moyd_brand.dart';
+import '../../decision_attribution_repository.dart';
 import '../../models/candidate_entry.dart';
 import '../../slate_controller.dart';
 import '../../theme/hub_theme.dart';
 import '../decisions/ballot_row.dart';
+import '../decisions/race_field_disclosure.dart';
 import '../decisions/baseline_row.dart';
 import '../decisions/board_toolbar.dart';
 import '../decisions/decision_activity.dart';
@@ -229,10 +231,52 @@ class RosterBoardState extends State<RosterBoard>
       () => parseDistrictRef(
           office: e.model.office, district: e.model.district));
 
+  /// Race key for clustering: the VIEW-resolved key only, never the client
+  /// parse. parseDistrictRef reads the self-reported answers, which is
+  /// exactly the data the view exists to outrank (a self-reported "House 34"
+  /// would falsely cluster a filed Senate 34 candidate with the House 34
+  /// field). A row the view does not cover renders solo, as today.
+  String? _raceKeyOf(CandidateEntry e) =>
+      widget.controller.raceInfoFor(e.id)?.raceKey;
+
+  /// The two halves of an office self-report conflict as one pill string
+  /// ("Filed: Senate 34 · Said: House 34"), or null when filing and answer
+  /// agree (the overwhelmingly common case).
+  String? _conflictLabelFor(CandidateEntry e) {
+    final info = widget.controller.raceInfoFor(e.id);
+    if (info == null || !info.officeSelfReportConflict) return null;
+    final filed = info.filedOfficeLabel;
+    final said = info.selfReportedOfficeLabel;
+    if (filed == null || said == null) return null;
+    final filedNum = info.districtNum?.toString() ?? '';
+    // The self-reported district is free text; keep it compact by taking the
+    // first digit run, falling back to the raw string.
+    final rawSaid = info.selfReportedDistrictLabel ?? '';
+    final saidNum =
+        RegExp(r'\d{1,3}').firstMatch(rawSaid)?.group(0) ?? rawSaid;
+    final filedPart = filedNum.isEmpty ? filed : '$filed $filedNum';
+    final saidPart = saidNum.isEmpty ? said : '$said $saidNum';
+    return 'Filed: $filedPart · Said: $saidPart';
+  }
+
+  /// Per-row "other Democrats in this race" disclosure for the expansion.
+  Widget _raceDisclosureFor(CandidateEntry e) {
+    final info = widget.controller.raceInfoFor(e.id);
+    return RaceFieldDisclosure(
+      raceInfo: info,
+      others: widget.controller.raceFieldFor(info?.raceKey),
+      loaded: widget.controller.raceDataLoaded,
+      failed: widget.controller.raceLoadFailed,
+    );
+  }
+
   bool _matches(CandidateEntry e) {
     final q = widget.controller.search.trim().toLowerCase();
+    // displayNameFor, not e.name: the one nameless submission (Hope Tinker,
+    // 587c32d7) renders everywhere under the race view's coalesced name, so
+    // the name the search must match is the name the board shows.
     return q.isEmpty ||
-        e.name.toLowerCase().contains(q) ||
+        widget.controller.displayNameFor(e).toLowerCase().contains(q) ||
         e.officeLine.toLowerCase().contains(q);
   }
 
@@ -280,8 +324,99 @@ class RosterBoardState extends State<RosterBoard>
           final d = tb.cast.compareTo(ta.cast);
           return d != 0 ? d : byName(a, b);
         });
+      case VoteSort.race:
+        // District run-through: office rank (US House, State Senate, State
+        // House, keyless rows last), then numeric district, then name.
+        // View-resolved identity first; the memoized client parse covers
+        // rows the view does not. Presentation-only, and the cluster pass
+        // runs under this sort exactly as under every other.
+        int rank(CandidateEntry e) {
+          final code = widget.controller.raceInfoFor(e.id)?.officeCode ??
+              switch (_districtRefFor(e)?.mapOffice) {
+                'US Congress' => 'US_HOUSE',
+                'State Senate' => 'MO_SEN',
+                'State House' => 'MO_HOUSE',
+                _ => null,
+              };
+          return switch (code) {
+            'US_HOUSE' => 0,
+            'MO_SEN' => 1,
+            'MO_HOUSE' => 2,
+            _ => 3,
+          };
+        }
+        int dist(CandidateEntry e) {
+          final n = widget.controller.raceInfoFor(e.id)?.districtNum;
+          if (n != null) return n;
+          return int.tryParse(_districtRefFor(e)?.districtNum ?? '') ??
+              1 << 20;
+        }
+        entries.sort((a, b) {
+          final r = rank(a).compareTo(rank(b));
+          if (r != 0) return r;
+          final d = dist(a).compareTo(dist(b));
+          return d != 0 ? d : byName(a, b);
+        });
     }
     return entries;
+  }
+
+  /// The cluster pass: groups the contested races' still-visible members
+  /// behind a race cap, leaving every solo row in its exact position.
+  ///
+  /// Pure presentation over the already filtered + sorted + searched
+  /// [visible] list; the unfiltered [ballot] / [baseline] partitions are read
+  /// only to compute the cap's honest counts and its decided-mates suffix.
+  ///
+  /// KNOWN, DELIBERATE SORT PERTURBATION. Do not "fix" this: race mates are
+  /// spliced up to their best-sorted member (the anchor), so a
+  /// yesShare-sorted list is no longer strictly monotonic across cluster
+  /// boundaries. That trade is the point: the 7 contested races read as
+  /// contests, it touches at most ~8 of ~50 rows, the cap explains why the
+  /// rows sit together, and anchoring at the best-sorted member keeps the
+  /// list stable under re-sorts. Restoring strict sort order would scatter
+  /// race mates again, which is the exact failure this pass exists to end.
+  List<_BallotItem> _clusterContested(
+    List<CandidateEntry> visible,
+    List<CandidateEntry> ballot,
+    List<CandidateEntry> baseline,
+    Map<String, int> unfilteredRaceCounts,
+  ) {
+    final items = <_BallotItem>[];
+    final splicedRaces = <String>{};
+    for (final e in visible) {
+      final k = _raceKeyOf(e);
+      // Solo (or keyless, or view-uncovered) rows pass through untouched:
+      // same order, same wrapper, byte-identical rendering.
+      if (k == null || (unfilteredRaceCounts[k] ?? 0) < 2) {
+        items.add(_BallotRowItem(e, inCluster: false, lastInCluster: false));
+        continue;
+      }
+      if (splicedRaces.contains(k)) continue; // already spliced upward
+      splicedRaces.add(k);
+      final mates = [
+        for (final v in visible)
+          if (_raceKeyOf(v) == k) v // preserves their relative sort order
+      ];
+      items.add(_RaceCapItem(
+        raceKey: k,
+        raceLabel:
+            widget.controller.raceInfoFor(e.id)?.shortLabel ?? k,
+        applicantCount: unfilteredRaceCounts[k]!,
+        visibleCount: mates.length,
+        unfilteredBallotCount:
+            ballot.where((b) => _raceKeyOf(b) == k).length,
+        decidedMates: [
+          for (final b in baseline)
+            if (_raceKeyOf(b) == k) b
+        ],
+      ));
+      for (var i = 0; i < mates.length; i++) {
+        items.add(_BallotRowItem(mates[i],
+            inCluster: true, lastInCluster: i == mates.length - 1));
+      }
+    }
+    return items;
   }
 
   @override
@@ -479,6 +614,23 @@ class RosterBoardState extends State<RosterBoard>
         final filteredBaseline = baseline.where(_matches).toList();
         final needsMyVoteCount =
             ballot.where((e) => widget.votes.myVote(e.id) == null).length;
+        // Applicants per race across the UNION of the ballot and baseline
+        // partitions, because a race can straddle the partition (House 39
+        // does today: Lakins declined, Lloyd still open). This is the number
+        // the race cap shows and the anchor of its self-defense; contested
+        // detection (>= 2) keys on it too.
+        final unfilteredRaceCounts = <String, int>{};
+        for (final e in all) {
+          final k = _raceKeyOf(e);
+          if (k != null) {
+            unfilteredRaceCounts[k] = (unfilteredRaceCounts[k] ?? 0) + 1;
+          }
+        }
+        // The cluster pass: presentation-only regrouping of the already
+        // filtered + sorted + searched `visible` list. Every aggregate above
+        // and below keeps reading the unfiltered partitions.
+        final items =
+            _clusterContested(visible, ballot, baseline, unfilteredRaceCounts);
 
         return RefreshIndicator(
           onRefresh: widget.votes.refresh,
@@ -563,13 +715,27 @@ class RosterBoardState extends State<RosterBoard>
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                 sliver: SliverList.builder(
-                  itemCount: visible.length,
+                  itemCount: items.length,
                   itemBuilder: (context, i) {
-                    final e = visible[i];
-                    return _constrain(
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: RepaintBoundary(
+                    final cs = Theme.of(context).colorScheme;
+                    switch (items[i]) {
+                      case final _RaceCapItem cap:
+                        return _constrain(
+                          _RaceCap(
+                            key: ValueKey('race-cap-${cap.raceKey}'),
+                            item: cap,
+                            narrow: narrow,
+                            query: query,
+                            filter: _filter,
+                            displayNameFor:
+                                widget.controller.displayNameFor,
+                            stateFor: widget.repository.stateFor,
+                            onOpen: widget.onOpen,
+                          ),
+                        );
+                      case final _BallotRowItem it:
+                        final e = it.entry;
+                        final row = RepaintBoundary(
                           child: BallotRow(
                             key: ValueKey(e.id),
                             entry: e,
@@ -589,10 +755,53 @@ class RosterBoardState extends State<RosterBoard>
                             districtRef: _districtRefFor(e),
                             narrow: narrow,
                             toolbarExtent: toolbarExtent,
+                            displayName: widget.controller.displayNameFor(e),
+                            conflictLabel: _conflictLabelFor(e),
+                            raceDisclosure: _raceDisclosureFor(e),
                           ),
-                        ),
-                      ),
-                    );
+                        );
+                        if (!it.inCluster) {
+                          // Solo row: byte-identical wrapper to the
+                          // pre-cluster board (8px gap, no rail, no indent).
+                          return _constrain(
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: row,
+                            ),
+                          );
+                        }
+                        // Cluster member: 2px connector rail + 4px gutter in
+                        // the left margin OUTSIDE the card (the card's own
+                        // 3px consensus accent strip is inside its border and
+                        // untouched), inter-row gap tightened 8 -> 4. The
+                        // rail is decorative reinforcement only; the race cap
+                        // text above is the accessible signal.
+                        final railed = Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                                width: 2,
+                                color: cs.primary.withOpacity(0.35)),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Padding(
+                                padding: EdgeInsets.only(
+                                    bottom: it.lastInCluster ? 0 : 4),
+                                child: row,
+                              ),
+                            ),
+                          ],
+                        );
+                        return _constrain(
+                          it.lastInCluster
+                              ? Padding(
+                                  padding:
+                                      const EdgeInsets.only(bottom: 8),
+                                  child: railed,
+                                )
+                              : railed,
+                        );
+                    }
                   },
                 ),
               ),
@@ -623,6 +832,9 @@ class RosterBoardState extends State<RosterBoard>
                       onToggle: () => setState(
                           () => _baselineExpanded = !_baselineExpanded),
                       stateFor: widget.repository.stateFor,
+                      recordFor: widget.repository.recordFor,
+                      attribution: DecisionAttributionRepository.instance,
+                      displayNameFor: widget.controller.displayNameFor,
                       onOpen: widget.onOpen,
                     ),
                   ),
@@ -858,7 +1070,7 @@ class RosterBoardState extends State<RosterBoard>
       });
     for (final e in sorted) {
       final t = widget.votes.tallyFor(e.id);
-      buf.writeln('| ${e.name} '
+      buf.writeln('| ${widget.controller.displayNameFor(e)} '
           '| ${e.officeLine.isEmpty ? '-' : e.officeLine} '
           '| ${t.yes} | ${t.no} | ${t.undecided} | ${bucketLabel(e.id)} |');
     }
@@ -869,7 +1081,7 @@ class RosterBoardState extends State<RosterBoard>
       buf.writeln('| Candidate | Office | Final call |');
       buf.writeln('| --- | --- | --- |');
       for (final e in baseline) {
-        buf.writeln('| ${e.name} '
+        buf.writeln('| ${widget.controller.displayNameFor(e)} '
             '| ${e.officeLine.isEmpty ? '-' : e.officeLine} '
             '| ${widget.repository.stateFor(e.id).label} |');
       }
@@ -888,6 +1100,201 @@ class RosterBoardState extends State<RosterBoard>
       message: 'Once submissions arrive, every exec casts Yes, No or '
           'Undecided on each candidate. Ballots sync live to the whole '
           'committee.',
+    );
+  }
+}
+
+/// Item model for the ballot sliver once the cluster pass has run: a small
+/// sealed union so the single SliverList can interleave race caps with
+/// [BallotRow]s. Rows keep `ValueKey(e.id)`, so `_expanded` (keyed by id) and
+/// the reveal-on-expand scroll survive regrouping for free.
+sealed class _BallotItem {
+  const _BallotItem();
+}
+
+class _RaceCapItem extends _BallotItem {
+  final String raceKey;
+
+  /// Compact race label ("Missouri House 39").
+  final String raceLabel;
+
+  /// Applicants in this race across the unfiltered ballot + baseline union.
+  final int applicantCount;
+
+  /// Still-visible ballot members under the current filter + search.
+  final int visibleCount;
+
+  /// Ballot-partition members regardless of filter/search: the number
+  /// [visibleCount] is compared against for the cap's self-defense.
+  final int unfilteredBallotCount;
+
+  /// Race mates already decided (locked baseline): surfaced as a tappable
+  /// suffix because that context must sit next to the live opponent.
+  final List<CandidateEntry> decidedMates;
+
+  const _RaceCapItem({
+    required this.raceKey,
+    required this.raceLabel,
+    required this.applicantCount,
+    required this.visibleCount,
+    required this.unfilteredBallotCount,
+    required this.decidedMates,
+  });
+}
+
+class _BallotRowItem extends _BallotItem {
+  final CandidateEntry entry;
+  final bool inCluster;
+  final bool lastInCluster;
+  const _BallotRowItem(this.entry,
+      {required this.inCluster, required this.lastInCluster});
+}
+
+/// The one-line race cap above a contested cluster: gradient icon tile,
+/// "Same race · Missouri House 39", applicant-count pill, an honest
+/// "1 of 2 shown" whenever filtering or search hides a race mate, and the
+/// decided-mates suffix.
+///
+/// SELF-DEFENSE IS KEYED ON THE COUNT MISMATCH ITSELF, not on
+/// query.isNotEmpty: the needsMyVote filter and the chair-only splits filter
+/// also hide race mates, and a filtered cluster must never masquerade as a
+/// solo race. The cause is appended only when it is known.
+class _RaceCap extends StatelessWidget {
+  final _RaceCapItem item;
+  final bool narrow;
+  final String query;
+  final VoteFilter filter;
+  final String Function(CandidateEntry) displayNameFor;
+  final DecisionState Function(String candidateId) stateFor;
+  final void Function(CandidateEntry) onOpen;
+
+  const _RaceCap({
+    super.key,
+    required this.item,
+    required this.narrow,
+    required this.query,
+    required this.filter,
+    required this.displayNameFor,
+    required this.stateFor,
+    required this.onOpen,
+  });
+
+  String _pastTense(DecisionState s) => switch (s) {
+        DecisionState.endorse => 'Endorsed',
+        DecisionState.decline => 'Declined',
+        DecisionState.undecided => 'Undecided',
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final muted = theme.textTheme.labelSmall
+        ?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w700);
+
+    final hidden = item.visibleCount < item.unfilteredBallotCount;
+    String? cause;
+    if (hidden) {
+      cause = query.isNotEmpty
+          ? 'search active'
+          : (filter != VoteFilter.all ? 'filtered' : null);
+    }
+
+    final children = <Widget>[
+      Container(
+        width: 20,
+        height: 20,
+        decoration: BoxDecoration(
+          gradient: HubTheme.chip,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child:
+            const Icon(Icons.compare_arrows, size: 14, color: Colors.white),
+      ),
+      const SizedBox(width: 8),
+      Flexible(
+        child: Text('Same race · ${item.raceLabel}',
+            maxLines: 1, overflow: TextOverflow.ellipsis, style: muted),
+      ),
+      const SizedBox(width: 6),
+      // Always plural: caps only exist for races with 2+ applicants (the
+      // cluster pass passes solo rows through without a cap).
+      HubCountPill(text: '${item.applicantCount} applicants'),
+      if (hidden) ...[
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            '${item.visibleCount} of ${item.unfilteredBallotCount} shown'
+            '${cause != null ? ' · $cause' : ''}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall
+                ?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+      ],
+    ];
+
+    if (item.decidedMates.isNotEmpty) {
+      if (narrow) {
+        // The suffix collapses to one compact pill so the cap never wraps
+        // and never pushes a BallotRow below the fold mid-meeting. Opens the
+        // first decided mate (there is one in the real data: Tanya Lakins).
+        final n = item.decidedMates.length;
+        children.addAll([
+          const SizedBox(width: 6),
+          InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: () => onOpen(item.decidedMates.first),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: MoydBrand.neutralBg,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text('+$n decided',
+                  style: const TextStyle(
+                      color: MoydBrand.neutralFg,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ]);
+      } else {
+        for (final mate in item.decidedMates) {
+          children.addAll([
+            const SizedBox(width: 8),
+            Flexible(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(6),
+                onTap: () => onOpen(mate),
+                child: Text(
+                  '${displayNameFor(mate)} · '
+                  '${_pastTense(stateFor(mate.id))}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      decoration: TextDecoration.underline,
+                      decorationColor: cs.outlineVariant),
+                ),
+              ),
+            ),
+          ]);
+        }
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 6),
+      child: SizedBox(
+        // 28, not 24: HubCountPill's intrinsic height is ~27px (10px of
+        // vertical padding plus a 12px-font text line), and 24 vertically
+        // compresses the pill so descenders clip in both themes.
+        height: 28,
+        child: Row(children: children),
+      ),
     );
   }
 }

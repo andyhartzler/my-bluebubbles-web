@@ -27,6 +27,21 @@ class RosterCard extends StatefulWidget {
   /// and an always-visible Compare button (touch has no hover state).
   final bool horizontal;
 
+  /// Display name override (SlateController.displayNameFor): covers the one
+  /// submission with no name in its data, where the linked candidates.name
+  /// is the only name held. Null falls back to entry.name unchanged.
+  final String? displayName;
+
+  /// Resolved race label from v_endorsement_applicant_race
+  /// ("Missouri House, District 39"), rendered under the office line. Null
+  /// (view not applied / fetch failed / row not covered) renders nothing:
+  /// the card stays exactly as before.
+  final String? raceLine;
+
+  /// Our applicants in this race; >= 2 shows the "N applied" pill at the end
+  /// of the race line. Not contested = nothing extra.
+  final int raceApplicantCount;
+
   const RosterCard({
     super.key,
     required this.entry,
@@ -35,6 +50,9 @@ class RosterCard extends StatefulWidget {
     required this.onToggleSelect,
     this.decisionChip,
     this.horizontal = false,
+    this.displayName,
+    this.raceLine,
+    this.raceApplicantCount = 0,
   });
 
   @override
@@ -43,6 +61,35 @@ class RosterCard extends StatefulWidget {
 
 class _RosterCardState extends State<RosterCard> {
   bool _hover = false;
+
+  String get _name => widget.displayName ?? widget.entry.name;
+
+  bool get _hasRaceLine => widget.raceLine?.isNotEmpty == true;
+
+  /// Race identity line: race label + (contested only) the "N applied" pill.
+  /// Only built when [_hasRaceLine], so a card without race data renders
+  /// exactly as before.
+  Widget _raceLineWidget(ThemeData theme, ColorScheme cs) {
+    final line = widget.raceLine!;
+    final contested = widget.raceApplicantCount >= 2;
+    return Row(
+      children: [
+        Flexible(
+          child: Text(
+            line,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall
+                ?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+        if (contested) ...[
+          const SizedBox(width: 6),
+          HubCountPill(text: '${widget.raceApplicantCount} applied'),
+        ],
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +145,7 @@ class _RosterCardState extends State<RosterCard> {
                   children: [
                     HeadshotAvatar(
                       file: entry.headshot,
-                      name: entry.name,
+                      name: _name,
                       circle: false,
                       radius: 0,
                       size: 220,
@@ -172,7 +219,7 @@ class _RosterCardState extends State<RosterCard> {
                                 children: [
                                   Flexible(
                                     child: Text(
-                                      entry.name,
+                                      _name,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: theme.textTheme.titleSmall
@@ -200,6 +247,7 @@ class _RosterCardState extends State<RosterCard> {
                                     color: cs.onSurfaceVariant,
                                   ),
                                 ),
+                              if (_hasRaceLine) _raceLineWidget(theme, cs),
                             ],
                           ),
                         ),
@@ -264,7 +312,7 @@ extension on _RosterCardState {
                     height: 96,
                     child: HeadshotAvatar(
                       file: entry.headshot,
-                      name: entry.name,
+                      name: widget.displayName ?? entry.name,
                       circle: false,
                       radius: 0,
                       size: 96,
@@ -288,7 +336,7 @@ extension on _RosterCardState {
                     children: [
                       Flexible(
                         child: Text(
-                          entry.name,
+                          widget.displayName ?? entry.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleSmall
@@ -313,6 +361,7 @@ extension on _RosterCardState {
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: cs.onSurfaceVariant),
                     ),
+                  if (_hasRaceLine) _raceLineWidget(theme, cs),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 6,
