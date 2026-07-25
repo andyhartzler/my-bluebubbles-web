@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/features/committees/legislation_tracker/screens/bill_detail_screen.dart';
+import 'package:bluebubbles/features/forms/screens/endorsement_hub/endorsement_hub_screen.dart';
 import 'package:bluebubbles/features/forms/screens/jobs/job_detail_screen.dart';
 import 'package:bluebubbles/models/crm/assignment.dart';
 import 'package:bluebubbles/models/crm/event.dart';
@@ -22,7 +23,8 @@ import 'branded_panel.dart';
 /// Panel that surfaces both explicit assignments (rows in
 /// `public.assignments`) and auto-inferred items (pending profile
 /// changes, candidate ownership, mentioned bill notes, pending events
-/// or jobs) in a single unified, category-tabbed list.
+/// or jobs, and the exec's open endorsement ballot) in a single unified,
+/// category-tabbed list.
 ///
 /// Tabs are dynamic: `All` is always present (and default); each entity
 /// kind only shows up as a tab if at least one item lands in that
@@ -220,6 +222,21 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
     if (a.source == 'profile_change') {
       navigator.push(MaterialPageRoute(
         builder: (_) => const MemberPortalManagementScreen(initialTabIndex: 4),
+      ));
+      return;
+    }
+    // Endorsement ballot items open the Endorsement HQ directly. The CRM has
+    // no named routes, and the hub normally lives behind CandidatesPage's
+    // private Field/Endorsement HQ area switcher, so pushing the hub screen
+    // standalone is the only deep link. The hub carries no AppBar of its own
+    // (the Candidates page hosts it inline), so wrap one around it here for
+    // a way back to the dashboard.
+    if (a.source == 'endorsement_vote') {
+      navigator.push(MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Endorsement HQ')),
+          body: const EndorsementHubScreen(),
+        ),
       ));
       return;
     }
@@ -444,6 +461,10 @@ class _Item {
       memberAvatarUrl: a.memberAvatarUrl,
       at: a.at,
       onTap: () => state._openAuto(a),
+      // Auto items historically carry no priority; deadline-driven sources
+      // (the endorsement ballot) set 'urgent' inside 48 hours of close so
+      // the chip reads with the same visual language as explicit items.
+      priority: a.priority,
     );
   }
 
@@ -544,6 +565,10 @@ class _Item {
     Color bg;
     switch (p) {
       case 'high':
+      // 'urgent' marks deadline-driven auto items (endorsement ballot inside
+      // 48h of close, or closed). Same red as 'high': white-on-red on the
+      // fixed dark branded panel surface, identical in both app themes.
+      case 'urgent':
         bg = const Color(0xFFEF4444);
         break;
       case 'medium':
@@ -583,6 +608,7 @@ class _Item {
       case 'profile_change':
         return _HomeCategory.profileChanges;
       case 'candidate':
+      case 'endorsement_vote': // ballot work is candidate work
         return _HomeCategory.candidates;
       case 'bill_mention':
         return _HomeCategory.bills;
@@ -616,6 +642,8 @@ class _Item {
     switch (source) {
       case 'candidate':
         return Icons.how_to_vote;
+      case 'endorsement_vote':
+        return Icons.ballot;
       case 'profile_change':
         return Icons.person_search;
       case 'event_pending':

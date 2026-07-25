@@ -213,12 +213,19 @@ class BoardToolbar extends StatelessWidget {
               ]
             : const [],
       ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1040),
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: narrow ? 14 : 12),
-            child: content,
+      // The board hosts this header full-bleed (the opaque surface runs edge
+      // to edge under the status-bar-adjacent chrome), so the toolbar owns
+      // its own 16px content inset to stay aligned with the padded slivers
+      // scrolling beneath it.
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1040),
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: narrow ? 14 : 12),
+              child: content,
+            ),
           ),
         ),
       ),

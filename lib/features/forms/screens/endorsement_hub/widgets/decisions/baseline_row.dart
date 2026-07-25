@@ -76,7 +76,10 @@ class BaselineSection extends StatelessWidget {
             crossFadeState: expanded
                 ? CrossFadeState.showSecond
                 : CrossFadeState.showFirst,
-            firstChild: const SizedBox(width: double.infinity),
+            // Collapsed: an overlapping face strip keeps the tab's
+            // faces-first identity visible at near-zero vertical cost while
+            // the baseline is locked shut; expansion swaps it for the rows.
+            firstChild: _FaceStrip(entries: entries, totalCount: totalCount),
             secondChild: Padding(
               padding: const EdgeInsets.only(top: 10),
               child: Column(
@@ -93,6 +96,60 @@ class BaselineSection extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Collapsed-state face strip: the first few decided candidates as small
+/// overlapping headshots plus a "+K" pill for the rest. Purely decorative
+/// recognition; opening the section is still the only way to read names.
+class _FaceStrip extends StatelessWidget {
+  final List<CandidateEntry> entries;
+  final int totalCount;
+  const _FaceStrip({required this.entries, required this.totalCount});
+
+  // 28px avatars overlapped by 10px.
+  static const double _face = 28;
+  static const double _step = 18;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) return const SizedBox(width: double.infinity);
+    return SizedBox(
+      width: double.infinity,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: LayoutBuilder(builder: (context, constraints) {
+          final maxFaces = constraints.maxWidth < 720 ? 6 : 8;
+          final shown = entries.take(maxFaces).toList();
+          final extra = totalCount - shown.length;
+          return Row(
+            children: [
+              SizedBox(
+                width: _face + (shown.length - 1) * _step,
+                height: _face,
+                child: Stack(
+                  children: [
+                    for (var i = 0; i < shown.length; i++)
+                      Positioned(
+                        left: i * _step,
+                        child: HeadshotAvatar(
+                          file: shown[i].headshot,
+                          name: shown[i].name,
+                          size: _face,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (extra > 0) ...[
+                const SizedBox(width: 8),
+                HubCountPill(text: '+$extra'),
+              ],
+            ],
+          );
+        }),
       ),
     );
   }

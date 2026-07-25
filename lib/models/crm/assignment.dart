@@ -127,13 +127,27 @@ class Assignment {
 @immutable
 class AutoInferredAssignment {
   final String key;          // stable identifier (e.g. 'candidate:<uuid>')
-  final String source;       // 'candidate' | 'profile_change' | 'event_pending' | 'bill_mention' | 'job_pending'
+  final String source;       // 'candidate' | 'profile_change' | 'event_pending' | 'bill_mention' | 'job_pending' | 'endorsement_vote'
   final String title;
   final String? subtitle;
   final String entityUrl;    // legacy in-app deep link (web-style path)
   final DateTime? at;        // when the underlying row was last updated
   final String? memberName;       // optional — name of the related member (e.g. profile-change subject)
   final String? memberAvatarUrl;  // optional — already-resolved public URL (NOT a bare filename)
+
+  /// Hard deadline for time-boxed items (currently only the endorsement
+  /// ballot, which closes Sunday at midnight US Central). Distinct from
+  /// [at], which is only a recency sort stamp: `dueAt` is the instant a
+  /// future notification/alert pass should alarm on. The service renders it
+  /// into [subtitle] in plain language, so the panel never re-formats it.
+  final DateTime? dueAt;
+
+  /// Optional urgency marker rendered with the panel's existing priority
+  /// chip. Uses the explicit-assignment vocabulary ('low' | 'medium' |
+  /// 'high') plus 'urgent' for deadline-driven items. Auto items carry no
+  /// priority by default; the endorsement ballot sets 'urgent' once its
+  /// deadline is inside 48 hours or has passed.
+  final String? priority;
 
   /// Concrete entity reference for click-to-open. The native CRM
   /// navigates by pushing detail-screen widgets directly (no named
@@ -155,6 +169,8 @@ class AutoInferredAssignment {
     this.at,
     this.memberName,
     this.memberAvatarUrl,
+    this.dueAt,
+    this.priority,
     this.entityKind,
     this.entityId,
     this.committeeId,

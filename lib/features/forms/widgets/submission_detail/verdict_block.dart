@@ -573,8 +573,10 @@ class _VerdictBlockState extends State<VerdictBlock> {
 
   Widget _footer(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // The raw model id is deliberately absent: it is an internal detail execs
+    // kept asking about. Recency and the rule-based cross-check are the facts
+    // that inform trust in the verdict. (ai.model stays on the data model.)
     final bits = <String>[
-      if (ai.model != null && ai.model!.isNotEmpty) ai.model!,
       if (widget.rulePct != null) 'Rule-based: ${widget.rulePct!.round()}%',
       if (ai.scoredAt != null)
         'Scored ${ai.scoredAt!.toLocal().month}/${ai.scoredAt!.toLocal().day}',

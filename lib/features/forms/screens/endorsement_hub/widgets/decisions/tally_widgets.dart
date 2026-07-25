@@ -71,6 +71,83 @@ class TallyBar extends StatelessWidget {
   }
 }
 
+/// Collapsed-by-default wrapper around [VoterRoster]. The full pill roll is
+/// 3 to 4 lines of a phone screen per expanded ballot row, so the roll hides
+/// behind a one-line summary until deliberately opened. Team mandate:
+/// every current and future VoterRoster call site goes through this widget.
+///
+/// State is local and the widget is recreated whenever its ballot row
+/// collapses, so the roll re-collapses with the row. That is the desired
+/// behavior: an open roll never lingers into the next expansion.
+class VoterRollDisclosure extends StatefulWidget {
+  final EndorsementVoteRepository votes;
+  final String candidateId;
+  const VoterRollDisclosure(
+      {super.key, required this.votes, required this.candidateId});
+
+  @override
+  State<VoterRollDisclosure> createState() => _VoterRollDisclosureState();
+}
+
+class _VoterRollDisclosureState extends State<VoterRollDisclosure> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tally = widget.votes.tallyFor(widget.candidateId);
+    final summary = tally.pending == 0
+        ? ' · all in'
+        : ' · ${tally.cast} in · ${tally.pending} waiting';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _open = !_open),
+          borderRadius: BorderRadius.circular(8),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 36),
+            child: Row(
+              children: [
+                Icon(Icons.groups_outlined,
+                    size: 14, color: cs.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text('Exec roll',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w700, color: cs.onSurface)),
+                Expanded(
+                  child: Text(summary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: cs.onSurfaceVariant)),
+                ),
+                AnimatedRotation(
+                  turns: _open ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 160),
+                  child: Icon(Icons.expand_more,
+                      size: 18, color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedCrossFade(
+          duration: const Duration(milliseconds: 160),
+          sizeCurve: Curves.easeOut,
+          crossFadeState:
+              _open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          firstChild: const SizedBox(width: double.infinity),
+          secondChild: VoterRoster(
+              votes: widget.votes, candidateId: widget.candidateId),
+        ),
+      ],
+    );
+  }
+}
+
 /// Compact roster of who voted what: one pill per known committee voter with
 /// a check (yes) / x (no) / question mark (undecided) / hourglass (not yet)
 /// marker plus their name, so the ballot never reads by color alone.

@@ -32,9 +32,27 @@ class _RosterGalleryState extends State<RosterGallery> {
   bool _filtersOpen = false;
 
   @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_syncFromController);
+  }
+
+  @override
   void dispose() {
+    widget.controller.removeListener(_syncFromController);
     _search.dispose();
     super.dispose();
+  }
+
+  // Search is shared with the ballot toolbar through SlateController: keep
+  // this field in sync when the query changes externally (typed in Ballot
+  // mode, or clearFilters). Only rewrite when the text differs to avoid
+  // cursor jumps and notify loops.
+  void _syncFromController() {
+    if (!mounted) return;
+    if (_search.text != widget.controller.search) {
+      _search.text = widget.controller.search;
+    }
   }
 
   @override

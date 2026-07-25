@@ -161,8 +161,17 @@ class EndorsementVoteRepository extends ChangeNotifier {
 
   SupabaseClient get _client => _supabase.client;
 
-  /// The signed-in member's auth uid (null when signed out).
+  /// The signed-in member's auth uid (null when signed out). Set as the FIRST
+  /// statement of [load], so a non-null uid says nothing about whether the
+  /// ballots have arrived. Anything that needs "the votes are in" must read
+  /// [loaded] instead.
   String? get currentUserId => _currentUserId;
+
+  /// True once [load] has finished its select and notified, success or
+  /// failure. The one honest "votes are in" signal on this repository: the
+  /// board's landing decision reads it so an exec who has already voted on
+  /// everything is never mis-landed by a slow ballot fetch.
+  bool get loaded => _loaded;
 
   /// Display name stored alongside the signed-in member's votes.
   String get currentUserName => _currentUserName;

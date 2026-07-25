@@ -19,15 +19,14 @@ import 'widgets/compare/compare_tray.dart';
 import 'widgets/compare/side_by_side_compare.dart';
 import 'journey/journey_tab.dart';
 import 'journey/live_journey_controller.dart';
-import 'widgets/decisions/decision_board.dart';
-import 'widgets/decisions/decision_chip.dart';
+import 'widgets/decisions/chair.dart';
 import 'widgets/decisions/decision_repository.dart';
 import 'widgets/decisions/endorsement_vote_repository.dart';
-import 'widgets/roster/roster_gallery.dart';
+import 'widgets/roster/roster_board.dart';
 
-/// "Endorsement HQ 2026" — the candidate survey intelligence hub. A gradient
-/// hero banner with live KPIs sits over four tabs: Roster, Compare, Analytics,
-/// Decisions.
+/// "Endorsement HQ 2026": the candidate survey intelligence hub. A gradient
+/// hero banner with live KPIs sits over four tabs: Roster (ballot + browse),
+/// Live, Compare, Analytics.
 class EndorsementHubScreen extends StatefulWidget {
   const EndorsementHubScreen({super.key});
 
@@ -50,11 +49,14 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
     formId: SlateController.endorsementFormId,
     slug: SlateController.endorsementSlug,
   );
-  late final TabController _tabs = TabController(length: 5, vsync: this);
+  late final TabController _tabs = TabController(length: 4, vsync: this);
   // Chair gating for Confirm / final call / the Splits view (uid primary,
-  // email fallback — see kChairUserId in decision_board.dart).
+  // email fallback, see kChairUserId in chair.dart).
   late final bool _isChair =
       isChairUser(CRMSupabaseService().client.auth.currentUser);
+  // Hub-to-board hook: lets the histogram drill-in flip the merged Roster
+  // tab into Browse mode before landing on it.
+  final GlobalKey<RosterBoardState> _rosterKey = GlobalKey<RosterBoardState>();
 
   _CompareMode _compareMode = _CompareMode.matrix;
 
@@ -121,6 +123,10 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
 
   void _focusRange(double lo, double hi) {
     _controller.focusAlignmentRange(lo, hi);
+    // A narrowed alignment range is a browsing intent, so flip the merged
+    // Roster tab to Browse first (null-aware: degrades gracefully when the
+    // board is not mounted).
+    _rosterKey.currentState?.focusBrowse();
     _tabs.animateTo(0);
   }
 
@@ -145,24 +151,22 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
                 return TabBarView(
                   controller: _tabs,
                   children: [
-                    _padded(RosterGallery(
+                    // No _padded wrapper: RosterBoard manages its own insets
+                    // so the pinned ballot toolbar can run edge to edge.
+                    RosterBoard(
+                      key: _rosterKey,
                       controller: _controller,
+                      repository: _decisions,
+                      votes: _votes,
+                      isChair: _isChair,
                       onOpen: _openCandidate,
-                      decisionChipBuilder: _decisionChip,
-                    )),
+                    ),
                     _padded(JourneyTab(
                       controller: _journey,
                       onOpenSubmission: _openBySubmission,
                     )),
                     _padded(_compareTab(context)),
                     _padded(_analyticsTab(context)),
-                    _padded(DecisionBoard(
-                      controller: _controller,
-                      repository: _decisions,
-                      votes: _votes,
-                      isChair: _isChair,
-                      onOpen: _openCandidate,
-                    )),
                   ],
                 );
               },
@@ -181,14 +185,6 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         child: child,
       );
-
-  Widget _decisionChip(CandidateEntry e) {
-    return AnimatedBuilder(
-      animation: _decisions,
-      builder: (context, _) =>
-          DecisionChip(state: _decisions.stateFor(e.id), compact: true),
-    );
-  }
 
   // ---------------- banner ----------------
 
@@ -399,14 +395,60 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
       unselectedLabelStyle:
           const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
       tabs: [
-        const Tab(icon: Icon(Icons.groups_2_outlined, size: 19), text: 'Roster'),
+        Tab(
+            icon: const Icon(Icons.groups_2_outlined, size: 19),
+            child: _rosterTabLabel()),
         Tab(icon: const Icon(Icons.sensors, size: 19), child: _liveTabLabel()),
         const Tab(icon: Icon(Icons.compare_arrows, size: 19), text: 'Compare'),
         const Tab(icon: Icon(Icons.insights_outlined, size: 19), text: 'Analytics'),
-        const Tab(
-            icon: Icon(Icons.how_to_vote_outlined, size: 19),
-            text: 'Decisions'),
       ],
+    );
+  }
+
+  /// "Roster" tab label with a gold needs-my-vote count badge. This badge
+  /// replaces the urgency signal the dedicated Decisions tab used to carry;
+  /// the Roster tab now IS the ballot. Hidden while the decisions load is
+  /// loading or failed: never show a count computed against an unverified
+  /// baseline (a failed load defaults every candidate to undecided).
+  Widget _rosterTabLabel() {
+    return AnimatedBuilder(
+      // The controller is merged in so the badge appears once the slate
+      // itself finishes loading, not just on the next vote/decision notify.
+      animation: Listenable.merge([_votes, _decisions, _controller]),
+      builder: (context, _) {
+        var n = 0;
+        if (_decisions.loadState == DecisionLoadState.ready) {
+          n = _controller.all
+              .where((e) =>
+                  _decisions.stateFor(e.id) == DecisionState.undecided &&
+                  _votes.myVote(e.id) == null)
+              .length;
+        }
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Roster'),
+            if (n > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                decoration: BoxDecoration(
+                  // Gold pill with navy text (~6.5:1): AA on the hero
+                  // gradient in both themes.
+                  color: HubTheme.gold,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('$n',
+                    style: const TextStyle(
+                        color: HubTheme.navy,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 

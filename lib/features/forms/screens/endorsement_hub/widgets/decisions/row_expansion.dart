@@ -5,6 +5,7 @@ import '../../../../theme/moyd_brand.dart';
 import '../../../../widgets/review/stance_visuals.dart';
 import '../../models/candidate_entry.dart';
 import '../../theme/hub_theme.dart';
+import 'decision_activity.dart';
 import 'decision_repository.dart';
 import 'endorsement_vote_repository.dart';
 import 'tally_widgets.dart';
@@ -115,7 +116,9 @@ class _RowExpansionState extends State<RowExpansion> {
               style: theme.textTheme.labelSmall?.copyWith(
                   color: cs.onSurfaceVariant, fontWeight: FontWeight.w700)),
           const SizedBox(height: 10),
-          VoterRoster(votes: votes, candidateId: entry.id),
+          // Collapsed by default: the headline numbers above stay visible
+          // without opening the full pill roll.
+          VoterRollDisclosure(votes: votes, candidateId: entry.id),
           if (myBallot != null && myBallot.hasReason) ...[
             const SizedBox(height: 8),
             Row(
@@ -346,8 +349,10 @@ class _RowExpansionState extends State<RowExpansion> {
   }
 }
 
-/// The full Gemini rationale in a quiet framed block: badge + optional model
-/// chip in the header, then the untruncated narrative.
+/// The full Gemini rationale in a quiet framed block: badge + scoring
+/// recency in the header, then the untruncated narrative. The raw model id
+/// chip was retired: it is an internal detail execs kept asking about, and
+/// recency is the fact that actually informs trust in the rationale.
 class _AiRationaleBlock extends StatelessWidget {
   final AiAlignmentScore score;
   const _AiRationaleBlock({required this.score});
@@ -356,7 +361,6 @@ class _AiRationaleBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final model = score.model;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -382,21 +386,11 @@ class _AiRationaleBlock extends StatelessWidget {
                       color: cs.onSurfaceVariant)),
               const Spacer(),
               AlignmentBadge(pct: score.pct, dense: true),
-              if (model != null && model.isNotEmpty) ...[
+              if (score.scoredAt != null) ...[
                 const SizedBox(width: 6),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: MoydBrand.neutralBg,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(model,
-                      style: const TextStyle(
-                          color: MoydBrand.neutralFg,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700)),
-                ),
+                Text('Scored ${DecisionActivity.timeAgo(score.scoredAt!)}',
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: cs.onSurfaceVariant)),
               ],
             ],
           ),

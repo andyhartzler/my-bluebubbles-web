@@ -1,8 +1,68 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:timezone/data/latest.dart' as tzdata;
+import 'package:timezone/timezone.dart' as tz;
 
 import 'package:bluebubbles/models/crm/assignment.dart';
 import 'supabase_service.dart';
+
+// ---- Endorsement ballot deadline rule --------------------------------------
+// "Ballots close Sunday at midnight, US Central." Kept in ONE named constant
+// plus two small helpers so a later pass (an actual alert/notification job)
+// can lift the rule wholesale. America/Chicago is DST-aware through the
+// `timezone` package, so no UTC offset is hardcoded anywhere.
+const String kEndorsementVoteDeadlineZone = 'America/Chicago';
+
+/// Resolve the Central [tz.Location]. main.dart runs tz.initializeTimeZones()
+/// on EVERY platform (web included) before runApp, so the catch branch only
+/// fires when this service is exercised outside the normal boot path (tests,
+/// tooling). latest.dart carries full DST rules for America/Chicago, so no
+/// fixed-offset fallback is ever needed.
+tz.Location endorsementDeadlineLocation() {
+  try {
+    return tz.getLocation(kEndorsementVoteDeadlineZone);
+  } on tz.LocationNotFoundException {
+    tzdata.initializeTimeZones();
+    return tz.getLocation(kEndorsementVoteDeadlineZone);
+  }
+}
+
+/// The instant voting closes: midnight at the END of the next upcoming
+/// Sunday, which is Monday 00:00 local. Expressed as the real boundary rather
+/// than 11:59 PM so the promised cutoff and the stored [dueAt] a later alert
+/// pass will alarm on are the same instant, with no silent one-minute buffer.
+///
+/// On a Sunday the deadline is TONIGHT and stays tonight right up to
+/// midnight, then rolls to next week: past the boundary the weekday is Monday
+/// and the next Sunday is six days out.
+tz.TZDateTime nextEndorsementVoteDeadline(tz.TZDateTime centralNow) {
+  final daysUntilSunday = (DateTime.sunday - centralNow.weekday) % 7;
+  // TZDateTime normalizes the day overflow AND resolves the resulting wall
+  // clock against DST, so this stays correct across spring-forward/fall-back
+  // weeks where naive `now + Duration(days: n)` math drifts an hour.
+  return tz.TZDateTime(centralNow.location, centralNow.year, centralNow.month,
+      centralNow.day + daysUntilSunday + 1);
+}
+
+/// Plain-language deadline for the panel subtitle: "Due Sunday at midnight
+/// Central", sharpening to tomorrow/tonight as it approaches and flipping to
+/// "closed" once passed.
+String endorsementDeadlinePhrase(tz.TZDateTime deadline, tz.TZDateTime now) {
+  if (!now.isBefore(deadline)) {
+    return 'Voting closed Sunday at midnight Central';
+  }
+  final today = tz.TZDateTime(now.location, now.year, now.month, now.day);
+  // The deadline INSTANT lands on Monday 00:00; the day people vote on is the
+  // Sunday it closes, so step back one day for the plain-language phrasing.
+  final dueDay = tz.TZDateTime(
+      now.location, deadline.year, deadline.month, deadline.day - 1);
+  // Round rather than truncate: a spring-forward week makes the
+  // midnight-to-midnight span 23 hours, which would otherwise floor to 0.
+  final days = (dueDay.difference(today).inHours / 24).round();
+  if (days <= 0) return 'Due tonight at midnight Central';
+  if (days == 1) return 'Due tomorrow at midnight Central';
+  return 'Due Sunday at midnight Central';
+}
 
 /// Synthesizes the "things waiting on me" panel from existing tables.
 /// Read-only; each item deep-links to its source row in the CRM.
@@ -16,6 +76,15 @@ class AutoInferredAssignmentsService {
   final CRMSupabaseService _supabase;
 
   static const Duration _cacheTtl = Duration(seconds: 30);
+
+  /// Canonical endorsement questionnaire form. Keep in sync with
+  /// `SlateController.endorsementFormId` / `endorsementSlug`
+  /// (lib/features/forms/screens/endorsement_hub/slate_controller.dart, the
+  /// source of truth); restated here so the home dashboard does not import
+  /// the hub's controller stack.
+  static const String _endorsementFormId =
+      '945738f0-ff66-420f-8707-afb4a23ca58b';
+  static const String _endorsementSlug = 'endorsement-questionnaire-2026';
   DateTime? _cacheStamp;
   List<AutoInferredAssignment> _cache = const [];
   String? _cacheKey;
@@ -106,7 +175,9 @@ class AutoInferredAssignmentsService {
 
   /// Returns merged auto-inferred items for [authUserId] / [memberId].
   /// `isStaff` controls whether staff-only inferences (pending profile
-  /// changes, pending event approvals, pending job approvals) appear.
+  /// changes, pending event approvals, pending job approvals, the open
+  /// endorsement ballot) appear. The endorsement ballot additionally gates
+  /// on members.executive_committee because only execs can cast ballots.
   Future<List<AutoInferredAssignment>> fetch({
     required String authUserId,
     required String memberId,
@@ -266,6 +337,169 @@ class AutoInferredAssignmentsService {
             entityId: id,
           ));
         }
+      });
+    }
+
+    // 6. Endorsement ballot awaiting my vote (executive committee only).
+    //
+    // Reproduces the Endorsement HQ roster board's "needs my vote" count
+    // (widgets/roster/roster_board.dart): the denominator is completed
+    // questionnaire submissions, deduped exactly the way
+    // FormsService.getSubmissions dedupes them, MINUS candidates decided in
+    // endorsement_decisions; the numerator is how many of those have no
+    // endorsement_votes row for the signed-in exec. Table and column names
+    // verified against SupabaseDecisionRepository and
+    // EndorsementVoteRepository under
+    // lib/features/forms/screens/endorsement_hub/widgets/decisions/ (the
+    // source of truth; never edited from here). Runs inside safe() so any
+    // query failure degrades to "no item" rather than breaking the panel.
+    if (isStaff) {
+      await safe(() async {
+        // Gate on the same signal the vote roster is seeded from
+        // (EndorsementVoteRepository._seedExecRoster):
+        // members.executive_committee. isStaff also admits non-exec committee
+        // members, who cannot cast ballots, so the broader flag alone would
+        // show them a to-do they cannot act on.
+        final memberRow = await client
+            .from('members')
+            .select('executive_committee')
+            .eq('id', memberId)
+            .maybeSingle();
+        if (memberRow == null || memberRow['executive_committee'] != true) {
+          return;
+        }
+
+        // Completed questionnaire submissions for the endorsement form. The
+        // status filter mirrors FormsService.getSubmissions: in_progress and
+        // abandoned autosave drafts must never inflate the ballot.
+        Future<List<Map<String, dynamic>>> submissionsFor(String formId) async {
+          final rows = await client
+              .from('form_submissions')
+              .select('id, candidate_id, submitter_phone, data')
+              .eq('form_id', formId)
+              .inFilter('status', const [
+                'submitted',
+                'reviewed',
+                'processed',
+                'complete',
+                'completed',
+              ])
+              .order('created_at', ascending: false);
+          return (rows as List)
+              .whereType<Map>()
+              .map((r) => Map<String, dynamic>.from(r))
+              .toList();
+        }
+
+        var submissions = await submissionsFor(_endorsementFormId);
+        if (submissions.isEmpty) {
+          // Slug fallback, same as SlateController.load(): the canonical id
+          // constant can go stale if the form is ever recreated.
+          final form = await client
+              .from('form_schemas')
+              .select('id')
+              .eq('slug', _endorsementSlug)
+              .maybeSingle();
+          final fallbackId = form?['id']?.toString();
+          if (fallbackId != null &&
+              fallbackId.isNotEmpty &&
+              fallbackId != _endorsementFormId) {
+            submissions = await submissionsFor(fallbackId);
+          }
+        }
+        if (submissions.isEmpty) return;
+
+        // Dedup mirror of FormsService.getSubmissions: one person's duplicate
+        // completed rows collapse to the MOST COMPLETE one (key on
+        // candidate_id, then submitter_phone, then the row's own id), so this
+        // count matches what the board actually lists. A raw SQL count would
+        // over-count.
+        int completeness(Map<String, dynamic> row) {
+          final data = row['data'];
+          if (data is! Map) return 0;
+          return data.entries.where((e) {
+            final v = e.value;
+            if (v == null) return false;
+            if (v is String) return v.trim().isNotEmpty;
+            if (v is Iterable) return v.isNotEmpty;
+            return true;
+          }).length;
+        }
+
+        final best = <String, Map<String, dynamic>>{};
+        for (final s in submissions) {
+          final dedupKey =
+              (s['candidate_id'] ?? s['submitter_phone'] ?? s['id']).toString();
+          final existing = best[dedupKey];
+          // Rows arrive newest-first, so on a completeness tie the newer row
+          // wins; only a strictly-more-complete older row replaces it.
+          if (existing == null || completeness(s) > completeness(existing)) {
+            best[dedupKey] = s;
+          }
+        }
+        final candidateIds =
+            best.values.map((s) => s['id'].toString()).toSet();
+
+        // Decided candidates leave the ballot. Partition by decision STATE,
+        // not row existence (an 'undecided' row is still on the ballot),
+        // mirroring widgets/roster/roster_board.dart. Deliberately NOT
+        // wrapped in its own
+        // try: if the decisions read fails, the throw aborts this whole
+        // block via safe() and no item shows, because treating a failed read
+        // as "nothing decided" would put every settled candidate back on the
+        // ballot (the decision board guards against the same failure mode
+        // with DecisionLoadState).
+        final decisionRows = await client
+            .from('endorsement_decisions')
+            .select('candidate_id, state');
+        for (final r in (decisionRows as List).whereType<Map>()) {
+          final state = r['state']?.toString().trim().toLowerCase();
+          if (state == 'endorse' || state == 'decline') {
+            candidateIds.remove(r['candidate_id']?.toString());
+          }
+        }
+        if (candidateIds.isEmpty) return;
+
+        // My ballots: endorsement_votes keys voter_id on the auth uid, NOT
+        // the members row id (EndorsementVoteRepository.load), and
+        // candidate_id is the form_submissions.id uuid.
+        final voteRows = await client
+            .from('endorsement_votes')
+            .select('candidate_id')
+            .eq('voter_id', authUserId);
+        final voted = <String>{
+          for (final r in (voteRows as List).whereType<Map>())
+            if (r['candidate_id'] != null) r['candidate_id'].toString(),
+        };
+        final awaiting =
+            candidateIds.where((id) => !voted.contains(id)).length;
+        // All caught up: the item disappears rather than read "0 of N".
+        if (awaiting == 0) return;
+
+        final central = endorsementDeadlineLocation();
+        final centralNow = tz.TZDateTime.from(now.toUtc(), central);
+        final deadline = nextEndorsementVoteDeadline(centralNow);
+        final urgent =
+            !centralNow.isBefore(deadline.subtract(const Duration(hours: 48)));
+
+        results.add(AutoInferredAssignment(
+          key: 'endorsement_vote:ballot',
+          source: 'endorsement_vote',
+          title: 'Vote on candidates',
+          subtitle: '$awaiting of ${candidateIds.length} awaiting your vote'
+              ' · ${endorsementDeadlinePhrase(deadline, centralNow)}',
+          entityUrl: '/candidates?area=endorsement-hq',
+          // Sort stamp, not a data timestamp: an open ballot is the most
+          // actionable item on the board, so pin it to "now" and let the
+          // newest-first sort keep it at the top.
+          at: now,
+          dueAt: deadline.toUtc(),
+          priority: urgent ? 'urgent' : null,
+          // No entityKind/entityId: the hub is opened by a source
+          // special-case in the panel. There are no named routes, and the
+          // Candidates page's Field/Endorsement HQ switcher is private local
+          // state, so the panel pushes EndorsementHubScreen directly.
+        ));
       });
     }
 
