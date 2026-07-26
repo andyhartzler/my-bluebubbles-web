@@ -836,6 +836,7 @@ class RosterBoardState extends State<RosterBoard>
                       attribution: DecisionAttributionRepository.instance,
                       displayNameFor: widget.controller.displayNameFor,
                       onOpen: widget.onOpen,
+                      onChangeState: _changeDecision,
                     ),
                   ),
                 ),
@@ -1012,6 +1013,40 @@ class RosterBoardState extends State<RosterBoard>
     );
   }
 
+  /// Change or reopen an already decided candidate.
+  ///
+  /// The baseline used to be frozen, on the theory that a recorded decision
+  /// should not move. The chair's ruling on 2026-07-26 is the opposite: "it
+  /// shouldn't be locked, if they want to go in and change those decisions
+  /// that's fine". Choosing Undecided here drops the candidate back onto
+  /// tonight's ballot on every device.
+  ///
+  /// Uses the CHECKED write path, so a failed write leaves the row exactly
+  /// where it was on every device rather than showing a change that did not
+  /// persist. endorsement_decisions records updated_by and updated_at, so who
+  /// moved it stays on the record either way.
+  Future<void> _changeDecision(CandidateEntry e, DecisionState next) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await widget.repository.trySetState(e.id, next);
+    if (!mounted) return;
+    if (!ok) {
+      messenger.showSnackBar(SnackBar(
+        content: const Text("That didn't save. Nothing was changed."),
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+            label: 'Retry', onPressed: () => _changeDecision(e, next)),
+      ));
+      return;
+    }
+    if (next == DecisionState.undecided) {
+      messenger.showSnackBar(SnackBar(
+        content: Text('${widget.controller.displayNameFor(e)} is back on the '
+            'ballot.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
   /// Every sliver child reads best at a bounded width: single full-width
   /// column, centered past 1040.
   Widget _constrain(Widget child) => Center(
@@ -1055,8 +1090,8 @@ class RosterBoardState extends State<RosterBoard>
     final buf = StringBuffer();
     buf.writeln('# Endorsement committee vote');
     buf.writeln();
-    buf.writeln('Quorum tonight: ${buckets.effectiveQuorum} of '
-        '${buckets.participants} voting');
+    buf.writeln(
+        quorumSentence(buckets.effectiveQuorum, buckets.participants));
     buf.writeln();
     buf.writeln('## On the ballot (${ballot.length})');
     buf.writeln();
@@ -1076,7 +1111,7 @@ class RosterBoardState extends State<RosterBoard>
     }
     if (baseline.isNotEmpty) {
       buf.writeln();
-      buf.writeln('## Locked baseline (${baseline.length})');
+      buf.writeln('## Already decided (${baseline.length})');
       buf.writeln();
       buf.writeln('| Candidate | Office | Final call |');
       buf.writeln('| --- | --- | --- |');

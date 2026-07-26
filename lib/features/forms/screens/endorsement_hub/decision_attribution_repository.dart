@@ -14,7 +14,7 @@ import 'package:bluebubbles/services/crm/supabase_service.dart';
 ///  * `public.v_endorsement_decision_meeting`: one row per source meeting with
 ///    the header counts (attendees present, exec roster size, and how many of
 ///    the decisions have a record running against them), so the client never
-///    hardcodes "8 of 16" or "4 need review".
+///    hardcodes "8 of 16" or "4 with a countervailing record".
 ///
 /// WHY THIS FILE IS SHAPED THE WAY IT IS. An earlier version of the migration
 /// stamped one uniform basis on all 23 decisions and this client rendered it as
@@ -789,15 +789,25 @@ class MeetingAttribution {
     return '$present of $roster execs present';
   }
 
-  /// '4 need review' for the section header, or null when nothing is contested
-  /// or the count is unavailable. Deliberately does not say "disputed": on two
-  /// of the four the recording simply does not back the stored decision, and on
-  /// the other two the disagreement is a later individual ballot, not a dispute
-  /// anyone has raised.
+  /// Provenance, not a to-do list.
+  ///
+  /// This used to read "4 need review". The chair ruled on 2026-07-26 that all
+  /// 23 decisions stand: the room had personal knowledge of these candidates
+  /// that the recording does not carry, and the AI scores of that week only
+  /// read the multiple choice answers and ignored everything candidates wrote.
+  /// So "review" was asserting the decisions are open, which is not true and
+  /// was never the committee's position.
+  ///
+  /// What stays true, and is worth a reader knowing, is that some rows have a
+  /// record running the other way: on two the recording does not back the
+  /// stored outcome, and on two a later individual ballot went the other way.
+  /// That is a fact about the paper trail, not a verdict on the decision.
   String? get contestedLine {
     final n = decisionsContested;
     if (n == null || n <= 0) return null;
-    return n == 1 ? '1 needs review' : '$n need review';
+    return n == 1
+        ? '1 with a countervailing record'
+        : '$n with a countervailing record';
   }
 
   /// Minutes between an attendee's last leave and the scheduled meeting end,
@@ -950,31 +960,24 @@ class CandidateAttribution {
       .where((a) => presenceFor(a.memberId).state == p)
       .toList(growable: false);
 
-  /// Attendees the sheet may list under a POSITIVE presence heading.
+  /// EVERYONE who was on the call, attributed to this decision.
   ///
-  /// [DecisionPresence.unknown] used to be folded in here on the grounds that
-  /// "we could not compute it" is not evidence of absence. That is true, but it
-  /// is not evidence of PRESENCE either, and the sheet heads this list "IN THE
-  /// ROOM WHEN THIS CAME UP" as soon as ANY attendee resolved. One person with
-  /// a missing join or leave time would have been listed under a claim the data
-  /// cannot support while the heading stayed strong because the other seven
-  /// resolved. Unknowns now go to [attendeesPresenceNotEstablished] and get
-  /// their own neutral heading.
+  /// COMMITTEE RULE, set by the chair on 2026-07-26: being on the call at any
+  /// point counts, "even if they were only on for a min or two". The decisions
+  /// were reached with personal knowledge of the candidates that the recording
+  /// does not capture, so who happened to be speaking when a given name came
+  /// up is not what determined the outcome, and it is not what determines
+  /// attribution either.
   ///
-  /// When NOTHING resolved (older migration with no evidence window), everyone
-  /// is unknown, [hasPerDecisionPresence] is false, and this returns the whole
-  /// attendee list for the sheet to head with the weaker "ON THE CALL".
-  List<AttributionAttendee> get attendeesInRoom => hasPerDecisionPresence
-      ? attendeesWhere(DecisionPresence.present)
-      : meeting.attendees;
+  /// The per-decision presence data is still computed and still shown per
+  /// person, because when someone joined and left is a fact worth having. It
+  /// simply no longer PARTITIONS this list. Nobody is dropped from a decision
+  /// for having been in the waiting room when a name was read out.
+  List<AttributionAttendee> get attendeesInRoom => meeting.attendees;
 
-  /// Attendees whose presence for this decision could not be computed at all,
-  /// while it could be for others. Empty in the all-unknown degraded case,
-  /// where [attendeesInRoom] carries everyone under a weaker heading instead.
-  List<AttributionAttendee> get attendeesPresenceNotEstablished =>
-      hasPerDecisionPresence
-          ? attendeesWhere(DecisionPresence.unknown)
-          : const [];
+  /// Retained for callers that want the presence split explicitly. The sheet
+  /// no longer uses it to decide who is attributed; see [attendeesInRoom].
+  List<AttributionAttendee> get attendeesPresenceNotEstablished => const [];
 
   /// Short label for the compact baseline row.
   ///

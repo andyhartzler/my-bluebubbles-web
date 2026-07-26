@@ -5,6 +5,7 @@ import '../../../../theme/moyd_brand.dart';
 import '../../../../widgets/review/stance_visuals.dart';
 import '../../models/candidate_entry.dart';
 import '../../theme/hub_theme.dart';
+import 'candidate_voice.dart';
 import 'decision_activity.dart';
 import 'decision_repository.dart';
 import 'endorsement_vote_repository.dart';
@@ -88,6 +89,15 @@ class _RowExpansionState extends State<RowExpansion> {
     final showDeductions =
         ai != null && ai.overallScore < 100 && deductions.isNotEmpty;
 
+    // 30 of 77 scored questionnaires came back at exactly 100 with zero
+    // deductions, so for two fifths of the field the score and the rationale
+    // separate nobody from anybody. When the AI produced nothing to weigh a
+    // candidate on, what they wrote is the only real evidence in the row, so
+    // it LEADS. When there are disqualifiers or itemised deductions, the exec
+    // already has plenty and the same block sits below them, one tap away.
+    // See CandidateVoiceBlock: this is prominence, not presence.
+    final voiceLeads = ai == null || (!showDeductions && disqualifiers.isEmpty);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
       child: Column(
@@ -106,6 +116,14 @@ class _RowExpansionState extends State<RowExpansion> {
             _DisqualifierCard(disqualifier: d),
           ],
           const SizedBox(height: 10),
+          if (voiceLeads) ...[
+            CandidateVoiceBlock(
+              key: ValueKey('voice-lead-${entry.id}'),
+              entry: entry,
+              lead: true,
+            ),
+            const SizedBox(height: 10),
+          ],
           if (ai != null)
             _AiRationaleBlock(score: ai)
           else
@@ -115,6 +133,14 @@ class _RowExpansionState extends State<RowExpansion> {
           if (showDeductions) ...[
             const SizedBox(height: 10),
             _DeductionsList(deductions: deductions),
+          ],
+          if (!voiceLeads) ...[
+            const SizedBox(height: 4),
+            CandidateVoiceBlock(
+              key: ValueKey('voice-support-${entry.id}'),
+              entry: entry,
+              lead: false,
+            ),
           ],
           const SizedBox(height: 12),
           TallyBar(tally: tally),

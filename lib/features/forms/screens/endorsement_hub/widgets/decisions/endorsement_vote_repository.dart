@@ -68,6 +68,24 @@ class VoteTally {
   bool get majorityYes => cast > 0 && yes > no;
 }
 
+/// One sentence describing tonight's quorum, in a shape that is true.
+///
+/// This used to render as "{effectiveQuorum} of {participants} voting", which
+/// on live data printed "Quorum tonight: 5 of 4 voting": a quorum larger than
+/// the number of people who have voted, formatted as if the two were parts of
+/// one fraction. They are not. `participants` counts who has actually cast a
+/// ballot; `effectiveQuorum` is the threshold, and it is clamped UP to
+/// [kQuorumFloor] so a thin turnout cannot manufacture consensus for the whole
+/// organisation. When the floor is doing the clamping, the threshold is
+/// legitimately above the turnout and the fraction shape becomes a lie.
+String quorumSentence(int effectiveQuorum, int participants) {
+  final execs = participants == 1 ? '1 exec has' : '$participants execs have';
+  if (effectiveQuorum > participants) {
+    return '$execs voted, consensus needs $effectiveQuorum';
+  }
+  return 'Quorum tonight: $effectiveQuorum of $participants voting';
+}
+
 /// Which consensus bucket a ballot candidate falls into tonight.
 enum VoteBucket { stillOpen, consensusReady, split }
 

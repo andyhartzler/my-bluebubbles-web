@@ -8,7 +8,8 @@ import 'attribution_sheet.dart';
 import 'decision_chip.dart';
 import 'decision_repository.dart';
 
-/// "Locked baseline": the decisions the committee already made, read-only.
+/// "Already decided": the decisions the committee has already made. Not
+/// read-only: any of them can be changed or reopened from its own row.
 /// Nothing in the vote path can mutate these; a chair Confirm (elsewhere)
 /// is the only way a candidate ever moves in here tonight.
 ///
@@ -47,6 +48,9 @@ class BaselineSection extends StatefulWidget {
   /// hedged "How this was entered" block. `repository.recordFor` upstream.
   final DecisionRecord Function(String candidateId) recordFor;
   final void Function(CandidateEntry) onOpen;
+
+  /// Change or reopen a decided candidate. Null renders the rows read only.
+  final void Function(CandidateEntry, DecisionState)? onChangeState;
   final DecisionAttributionRepository attribution;
 
   /// Name coalesce (SlateController.displayNameFor). One decided submission
@@ -62,6 +66,7 @@ class BaselineSection extends StatefulWidget {
     required this.expanded,
     required this.onToggle,
     required this.stateFor,
+    this.onChangeState,
     required this.recordFor,
     required this.onOpen,
     required this.attribution,
@@ -159,11 +164,15 @@ class _BaselineSectionState extends State<BaselineSection> {
                   children: [
                     Expanded(
                       child: HubCardHeader(
-                        icon: Icons.lock_clock,
+                        // Not a padlock any more. These decisions can be
+                        // changed or reopened from the row, per the chair's
+                        // 2026-07-26 ruling, so calling the section "locked"
+                        // would describe a state the board no longer has.
+                        icon: Icons.gavel,
                         title: filtered
-                            ? 'Locked baseline · ${widget.entries.length} of '
-                                '${widget.totalCount} decided'
-                            : 'Locked baseline · ${widget.totalCount} decided',
+                            ? 'Already decided · ${widget.entries.length} of '
+                                '${widget.totalCount}'
+                            : 'Already decided · ${widget.totalCount}',
                         subtitle: subtitle,
                         tileGradient: HubTheme.gradAmber,
                       ),
@@ -207,6 +216,10 @@ class _BaselineSectionState extends State<BaselineSection> {
                                   widget.attribution.attributionFor(e.id);
                               if (att != null) _showSheet(e, att);
                             },
+                            onChangeState: widget.onChangeState == null
+                                ? null
+                                : (next) =>
+                                    widget.onChangeState!(e, next),
                           ),
                       ],
                     );
@@ -303,6 +316,15 @@ class BaselineRow extends StatelessWidget {
   final bool narrow;
   final VoidCallback onOpen;
   final VoidCallback onShowAttribution;
+
+  /// Change or reopen this decision. Null only if the caller has no repository
+  /// to write through, in which case the row renders read only.
+  ///
+  /// These rows used to carry a padlock and nothing else. The chair's ruling on
+  /// 2026-07-26 is that a decision is not frozen: "if they want to go in and
+  /// change those decisions that's fine". Reopening puts the candidate back on
+  /// tonight's ballot, which is what unlocking actually means here.
+  final void Function(DecisionState)? onChangeState;
   const BaselineRow({
     super.key,
     required this.entry,
@@ -312,6 +334,7 @@ class BaselineRow extends StatelessWidget {
     required this.narrow,
     required this.onOpen,
     required this.onShowAttribution,
+    this.onChangeState,
   });
 
   @override
@@ -365,8 +388,46 @@ class BaselineRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               DecisionChip(state: state, compact: true),
-              const SizedBox(width: 8),
-              Icon(Icons.lock, size: 14, color: cs.onSurfaceVariant),
+              const SizedBox(width: 4),
+              if (onChangeState != null)
+                PopupMenuButton<DecisionState>(
+                  tooltip: 'Change this decision',
+                  icon: Icon(Icons.more_horiz,
+                      size: 18, color: cs.onSurfaceVariant),
+                  padding: EdgeInsets.zero,
+                  onSelected: (next) {
+                    if (next != state) onChangeState!(next);
+                  },
+                  itemBuilder: (context) => [
+                    for (final s in const [
+                      DecisionState.endorse,
+                      DecisionState.decline,
+                      DecisionState.undecided,
+                    ])
+                      PopupMenuItem<DecisionState>(
+                        value: s,
+                        child: Row(
+                          children: [
+                            Icon(
+                              s == state
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                              size: 17,
+                              color: s == state
+                                  ? HubTheme.royal
+                                  : cs.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(s == DecisionState.undecided
+                                ? 'Reopen, back on the ballot'
+                                : s.label),
+                          ],
+                        ),
+                      ),
+                  ],
+                )
+              else
+                Icon(Icons.lock, size: 14, color: cs.onSurfaceVariant),
             ],
           ),
         ),

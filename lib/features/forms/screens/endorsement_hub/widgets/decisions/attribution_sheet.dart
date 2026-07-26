@@ -120,11 +120,13 @@ class _AttributionSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final meeting = attribution.meeting;
-    final inRoom = attribution.attendeesInRoom;
-    final uncertain =
-        attribution.attendeesWhere(DecisionPresence.uncertain);
-    final absent = attribution.attendeesWhere(DecisionPresence.absent);
-    final unestablished = attribution.attendeesPresenceNotEstablished;
+    // COMMITTEE RULE, set by the chair 2026-07-26: anyone on the call at any
+    // point is attributed to every decision from it, "even if they were only
+    // on for a min or two". So this is ONE list of everyone, not a partition
+    // by who was audibly present when a given name came up. Join and leave
+    // times still render per person on the tile, because that is a fact worth
+    // having; it just no longer decides who counts.
+    final onTheCall = attribution.attendeesInRoom;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.78,
@@ -218,95 +220,22 @@ class _AttributionSheet extends StatelessWidget {
                   const SizedBox(height: 12),
                   _meetingCard(meeting),
                   const SizedBox(height: 16),
-                  if (inRoom.isNotEmpty) ...[
-                    // The stronger label is used ONLY when the view actually
-                    // answered the per-decision presence question. Against an
-                    // older migration it falls back to "on the call", which is
-                    // all that data can support. Attendees whose presence could
-                    // not be computed are NOT in this list; they have their own
-                    // heading below, so a positive claim is never made over a
-                    // row that did not resolve.
-                    _sectionLabel(attribution.hasPerDecisionPresence
-                        ? 'IN THE ROOM WHEN THIS CAME UP · ${inRoom.length}'
-                        : 'ON THE CALL · ${inRoom.length}'),
-                    if (attribution.contested) ...[
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Listed because they were on the call, not because '
-                        'they agreed.',
-                        style: TextStyle(
-                            color: _white90, fontSize: 11.5, height: 1.35),
-                      ),
-                    ],
+                  if (onTheCall.isNotEmpty) ...[
+                    _sectionLabel('ON THE CALL \u00b7 ${onTheCall.length}'),
                     const SizedBox(height: 4),
-                    for (final a in inRoom) _tile(a, meeting),
-                  ],
-                  if (uncertain.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    _sectionLabel('PRESENCE UNCERTAIN · ${uncertain.length}'),
-                    const SizedBox(height: 4),
-                    // Two different truths hide in this group. Someone whose
-                    // secondsStayedAfterStart is POSITIVE was demonstrably in
-                    // the room when the candidate came up, and only the tail
-                    // edge is inside the calibration margin. Saying nothing
-                    // can be established about them under-claims what the
-                    // recording actually shows, so the two cases get their
-                    // own sentences.
                     Text(
-                      uncertain.every((a) =>
-                              (attribution
-                                      .presenceFor(a.memberId)
-                                      .secondsStayedAfterStart ??
-                                  0) >
-                              0)
-                          ? 'The recording places them in the room when this '
-                              'candidate came up, but cannot say whether they '
-                              'were still there when it finished. It carries '
-                              'no timestamps, so the edges are estimated.'
-                          : 'Their join or leave time lands within the margin '
-                              'of error of the recording, which carries no '
-                              'timestamps. For some of them, whether they '
-                              'heard this candidate discussed cannot be '
-                              'established either way.',
+                      attribution.contested
+                          ? 'Everyone on the call is attributed to this '
+                              'decision, however long they were on for. '
+                              'Listed because they were there, not because '
+                              'each of them said so out loud.'
+                          : 'Everyone on the call is attributed to this '
+                              'decision, however long they were on for.',
                       style: const TextStyle(
                           color: _white90, fontSize: 11.5, height: 1.35),
                     ),
-                    const SizedBox(height: 6),
-                    for (final a in uncertain) _tile(a, meeting),
-                  ],
-                  if (absent.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    _sectionLabel('NOT IN THE ROOM FOR THIS · ${absent.length}'),
                     const SizedBox(height: 4),
-                    const Text(
-                      'On the call, but not while this candidate was dealt '
-                      'with. This decision is not attributed to them.',
-                      style: TextStyle(
-                          color: _white90, fontSize: 11.5, height: 1.35),
-                    ),
-                    const SizedBox(height: 6),
-                    for (final a in absent) _tile(a, meeting),
-                  ],
-                  if (unestablished.isNotEmpty) ...[
-                    // Its own group, deliberately. Folding these in above would
-                    // put a person under "IN THE ROOM WHEN THIS CAME UP" on the
-                    // strength of the OTHER attendees having resolved. Not
-                    // reachable on today's data, since all seven Zoom rows
-                    // carry both times, but it is one missing timestamp away.
-                    const SizedBox(height: 14),
-                    _sectionLabel(
-                        'PRESENCE NOT ESTABLISHED · ${unestablished.length}'),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'On the call, but their join or leave time is not '
-                      'recorded, so whether they were in the room for this '
-                      'candidate cannot be worked out at all. Not a claim '
-                      'either way.',
-                      style: TextStyle(
-                          color: _white90, fontSize: 11.5, height: 1.35),
-                    ),
-                    const SizedBox(height: 6),
-                    for (final a in unestablished) _tile(a, meeting),
+                    for (final a in onTheCall) _tile(a, meeting),
                   ],
                   const SizedBox(height: 14),
                   const Divider(color: Colors.white24, height: 1),
@@ -755,10 +684,11 @@ class _AttendeeTile extends StatelessWidget {
         ? null
         : ReviewFile(url: a.avatarUrl!, name: a.name);
 
-    // Absent and uncertain rows are visually de-emphasised so a glance at the
-    // sheet cannot read them as part of the supporting group, but they stay
-    // fully legible: 0.72 opacity of white-90 on navy still clears AA.
-    final dim = presence.state == DecisionPresence.absent;
+    // Nobody is de-emphasised any more. Under the chair's 2026-07-26 rule
+    // everyone on the call is attributed to every decision from it, so dimming
+    // the person who joined late would render a distinction the committee has
+    // explicitly said it does not make. Their join and leave times still show
+    // in the hedge lines below, as a fact rather than a demotion.
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -769,10 +699,7 @@ class _AttendeeTile extends StatelessWidget {
             constraints: const BoxConstraints(minHeight: 48),
             child: Row(
               children: [
-                Opacity(
-                  opacity: dim ? 0.75 : 1,
-                  child: HeadshotAvatar(file: file, name: a.name, size: 36),
-                ),
+                HeadshotAvatar(file: file, name: a.name, size: 36),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -782,8 +709,8 @@ class _AttendeeTile extends StatelessWidget {
                       Text(a.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: dim ? _white90 : Colors.white,
+                          style: const TextStyle(
+                              color: Colors.white,
                               fontSize: 14,
                               fontWeight: FontWeight.w700)),
                       if (a.roleLine.isNotEmpty)

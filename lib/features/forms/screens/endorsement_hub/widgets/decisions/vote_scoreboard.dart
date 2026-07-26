@@ -82,8 +82,7 @@ class VoteScoreboard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            'Quorum tonight: ${buckets.effectiveQuorum} of '
-            '${buckets.participants} voting',
+            quorumSentence(buckets.effectiveQuorum, buckets.participants),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Color(0xE6FFFFFF), fontSize: 11.5),
