@@ -22,7 +22,13 @@ async function requireAuthenticatedUser(req) {
   // send-endorsement-thankyou's x-webhook-secret).
   const cronSecret = Deno.env.get("CRON_SECRET");
   if (cronSecret && req.headers.get("x-cron-secret") === cronSecret) {
-    return { userId: "cron" };
+    // NULL, not the string "cron". This value lands in audit_log.actor_id,
+    // which is `uuid NULL` with "NULL = service_role/system" per
+    // 20260424_01_audit_foundations.sql. Returning "cron" made every hourly
+    // cron sync fail its audit insert with 'invalid input syntax for type
+    // uuid: "cron"', so the sync ran but went unrecorded. Same convention the
+    // other edge functions already use (plaid, receipts, send-email).
+    return { userId: null };
   }
   const authHeader = req.headers.get("Authorization") ?? "";
   const jwt = authHeader.replace(/^Bearer /i, "").trim();
@@ -240,7 +246,7 @@ serve(async (req)=>{
     supabase.from("audit_log").insert({
       action: "EDGE_FN",
       actor_id: actorId,
-      actor_role: "authenticated",
+      actor_role: actorId ? "authenticated" : "service_role",
       schema_name: "public",
       table_name: "edge_fn:sync-google-calendar",
       row_id: null,
