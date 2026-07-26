@@ -172,6 +172,43 @@ async function runTextExtractTask(limit: number): Promise<TaskResult> {
   }
 }
 
+// Collapse sponsor rows that would collide with each other under
+// legislation_bill_sponsors_unique, whose columns are inferred from the
+// ON CONFLICT clause in 20260423_01_backfill_orphan_rpcs.sql to be
+// (bill_id, name, sponsorship_classification). The DDL is not in this repo.
+// OpenStates routinely returns two sponsorship entries for the same person with
+// the same classification on one bill, each with its own sponsorship id. A plain
+// bulk insert of that array trips the unique constraint against itself, Postgres
+// rolls back the whole statement, and the bill is left with no sponsors at all.
+//
+// A row is only a dedupe candidate when both name and classification are
+// present. A NULL in either column is distinct as far as a unique constraint is
+// concerned, so Postgres stores those rows happily and dropping them here would
+// silently lose data that the old code kept.
+function dedupeSponsorRecords(records: any[]): any[] {
+  const seen = new Set<string>();
+  const deduped: any[] = [];
+
+  for (const record of records) {
+    if (record.name == null || record.sponsorship_classification == null) {
+      deduped.push(record);
+      continue;
+    }
+
+    const key = JSON.stringify([
+      record.bill_id,
+      record.name,
+      record.sponsorship_classification,
+    ]);
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(record);
+  }
+
+  return deduped;
+}
+
 // Task 4: Extract sponsors from cached data (NO API calls)
 async function runSponsorsFromCacheTask(): Promise<TaskResult> {
   const startTime = Date.now();
@@ -220,12 +257,21 @@ async function runSponsorsFromCacheTask(): Promise<TaskResult> {
         chamber: s.person?.current_role?.org_classification || null,
       }));
       
+      const deduped = dedupeSponsorRecords(sponsorRecords);
+
       const { error } = await supabase
         .from('legislation_bill_sponsors')
-        .insert(sponsorRecords);
-      
-      if (!error) {
-        extracted += sponsorRecords.length;
+        .insert(deduped);
+
+      if (error) {
+        // Previously swallowed. A failure here leaves the bill with no sponsors,
+        // and the "missing sponsors" filter above then re-selects it on every
+        // run, so a silent failure repeats forever instead of showing up once.
+        console.error(
+          `sponsors_from_cache: insert failed for ${bill.bill_identifier}: ${error.message}`,
+        );
+      } else {
+        extracted += deduped.length;
       }
     }
     

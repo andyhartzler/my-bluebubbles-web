@@ -185,6 +185,38 @@ async function fetchBill(openstatesBillId) {
   params.append("include", "sources");
   return fetchOpenStates(`/bills/${openstatesBillId}`, params);
 }
+// Collapse sponsor rows that would collide with each other under
+// legislation_bill_sponsors_unique, whose columns are inferred from the
+// ON CONFLICT clause in 20260423_01_backfill_orphan_rpcs.sql to be
+// (bill_id, name, sponsorship_classification). The DDL is not in this repo.
+// OpenStates routinely returns two sponsorship entries for the same person with
+// the same classification on one bill, each with its own sponsorship id. A plain
+// bulk insert of that array trips the unique constraint against itself, Postgres
+// rolls back the whole statement, and the bill is left with no sponsors at all.
+//
+// A row is only a dedupe candidate when both name and classification are
+// present. A NULL in either column is distinct as far as a unique constraint is
+// concerned, so Postgres stores those rows happily and dropping them here would
+// silently lose data that the old code kept.
+function dedupeSponsorRecords(records: any[]): any[] {
+  const seen = new Set();
+  const deduped = [];
+  for (const record of records){
+    if (record.name == null || record.sponsorship_classification == null) {
+      deduped.push(record);
+      continue;
+    }
+    const key = JSON.stringify([
+      record.bill_id,
+      record.name,
+      record.sponsorship_classification
+    ]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(record);
+  }
+  return deduped;
+}
 // ============================================================
 // MAIN SYNC LOGIC (preserved from original)
 // ============================================================
@@ -348,7 +380,8 @@ async function syncSingleBill(trackedBill) {
         organization_name: s.organization?.name || null,
         organization_classification: s.organization?.classification || null
       }));
-    const { data: insertedSponsors, error: insertError } = await supabase.from("legislation_bill_sponsors").insert(sponsorRecords).select();
+    const deduped = dedupeSponsorRecords(sponsorRecords);
+    const { data: insertedSponsors, error: insertError } = await supabase.from("legislation_bill_sponsors").insert(deduped).select();
     if (insertError) {
       console.error(`Failed to insert sponsors for ${trackedBill.bill_identifier}:`, insertError);
     } else {
