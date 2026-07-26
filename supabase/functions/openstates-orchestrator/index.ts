@@ -209,38 +209,82 @@ function dedupeSponsorRecords(records: any[]): any[] {
   return deduped;
 }
 
+// Does this bill already have sponsor rows? Asks for at most one row, so the
+// answer cannot be truncated by PostgREST's row cap.
+//
+// Returns null when the probe itself failed, which is deliberately distinct
+// from false: the caller must not insert on an unknown answer, because this
+// task inserts without deleting first and a wrong "no sponsors" answer lands
+// straight in legislation_bill_sponsors_unique.
+async function billHasSponsors(billId: string): Promise<boolean | null> {
+  const { data, error } = await supabase
+    .from('legislation_bill_sponsors')
+    .select('bill_id')
+    .eq('bill_id', billId)
+    .limit(1);
+
+  if (error) {
+    console.error(
+      `sponsors_from_cache: sponsor probe failed for bill ${billId}: ${error.message}`,
+    );
+    return null;
+  }
+
+  return (data?.length ?? 0) > 0;
+}
+
 // Task 4: Extract sponsors from cached data (NO API calls)
 async function runSponsorsFromCacheTask(): Promise<TaskResult> {
   const startTime = Date.now();
-  
+
   try {
     // Get bills missing sponsors that have cached data
-    const { data: billsWithoutSponsors } = await supabase
+    const { data: cachedBills } = await supabase
       .from('legislation_tracked_bills')
       .select('id, bill_identifier, openstates_data')
       .eq('session', '2026')
       .not('openstates_data', 'is', null)
       .limit(100);
-    
-    // Filter to those actually missing sponsors
-    const { data: existingSponsors } = await supabase
-      .from('legislation_bill_sponsors')
-      .select('bill_id');
-    
-    const billsWithSponsors = new Set((existingSponsors || []).map(s => s.bill_id));
-    
-    const billsToProcess = (billsWithoutSponsors || []).filter(
-      b => !billsWithSponsors.has(b.id) && 
-           b.openstates_data?.sponsorships?.length > 0
+
+    const candidateBills = (cachedBills || []).filter(
+      b => b.openstates_data?.sponsorships?.length > 0
     );
-    
+
     let extracted = 0;
-    
-    for (const bill of billsToProcess) {
+    let skipped = 0;
+
+    for (const bill of candidateBills) {
       const sponsorships = bill.openstates_data.sponsorships;
-      
+
       if (!sponsorships?.length) continue;
-      
+
+      // Checked here, one bill at a time, rather than from a single unbounded
+      // probe of the whole table. `.select('bill_id')` with no range sends no
+      // Range header, so PostgREST caps the reply at the project's max-rows
+      // (1000 by default on Supabase) and returns that capped page as an
+      // ordinary success, with nothing to distinguish it from a complete
+      // answer. The old code read that page as the complete set of bills that
+      // have sponsors, so once this table passes the cap, a bill whose rows sit
+      // past it looks like it has none and gets a second copy of its sponsors
+      // inserted into the unique constraint.
+      //
+      // Whether that is what produced the SUPABASE-PLATFORM-1 bursts is not
+      // settled. The other candidate is duplicate sponsorships inside a single
+      // OpenStates payload, which dedupeSponsorRecords above handles as of
+      // 2c401bf. Both produce the same error string in this same function, and
+      // the bursts continuing after 2c401bf landed does not discriminate,
+      // because there is no deploy automation for edge functions anywhere in
+      // this repo, so 2c401bf may not have been live yet. Two things would
+      // settle it: this function's deploy timestamp in the Supabase dashboard
+      // against the timing of the next burst, and a row count of this table
+      // against the max-rows cap. Do not read this comment as a record of
+      // which one it was.
+      const hasSponsors = await billHasSponsors(bill.id);
+      if (hasSponsors !== false) {
+        skipped++;
+        continue;
+      }
+
       const sponsorRecords = sponsorships.map((s: any) => ({
         bill_id: bill.id,
         openstates_sponsorship_id: s.id,
@@ -278,9 +322,10 @@ async function runSponsorsFromCacheTask(): Promise<TaskResult> {
     return {
       task: "sponsors_from_cache",
       success: true,
-      details: { 
-        bills_processed: billsToProcess.length,
-        sponsors_extracted: extracted 
+      details: {
+        bills_processed: candidateBills.length - skipped,
+        bills_skipped: skipped,
+        sponsors_extracted: extracted
       },
       api_calls_used: 0,
       duration_ms: Date.now() - startTime,
