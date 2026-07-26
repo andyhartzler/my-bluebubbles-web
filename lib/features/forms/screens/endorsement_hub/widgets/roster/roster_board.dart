@@ -580,6 +580,22 @@ class RosterBoardState extends State<RosterBoard>
           case DecisionLoadState.ready:
             break;
         }
+        // SECOND load gate, on the ballots themselves. A failed vote fetch
+        // used to fall through to a fully rendered board on which nobody had
+        // voted: every row "No ballots yet", the pill "0 / 50 voted", the
+        // badge showing the whole ballot. That is indistinguishable from the
+        // truth, and an exec would rationally respond by re-voting
+        // everything, which (castVote always writes reason_codes: []) would
+        // wipe their own captured reasons. Never render a tally we do not
+        // have.
+        switch (widget.votes.loadState) {
+          case VoteLoadState.loading:
+            return _loading(context, label: 'Loading ballots…');
+          case VoteLoadState.failed:
+            return _votesFailed(context);
+          case VoteLoadState.ready:
+            break;
+        }
 
         final all = widget.controller.all;
         // Partition by decision STATE, not row existence: undecided (or
@@ -632,8 +648,21 @@ class RosterBoardState extends State<RosterBoard>
         final items =
             _clusterContested(visible, ballot, baseline, unfilteredRaceCounts);
 
+        final live =
+            widget.repository.realtimeHealthy && widget.votes.realtimeHealthy;
+
         return RefreshIndicator(
-          onRefresh: widget.votes.refresh,
+          // BOTH repositories, not just votes. Pull-to-refresh used to cover
+          // ballots only, which left the decision baseline as the one thing
+          // an exec could not resync by hand after a phone sleep, and a stale
+          // baseline is the worse of the two: stateFor defaults a missing row
+          // to undecided, so a candidate decided while the phone was locked
+          // stays on that exec's ballot and every count on their screen is
+          // measured against a baseline that no longer exists.
+          onRefresh: () => Future.wait([
+            widget.votes.refresh(),
+            widget.repository.refresh(),
+          ]),
           edgeOffset: toolbarExtent,
           child: CustomScrollView(
             // Always scrollable so pull-to-refresh works on a short list.
@@ -655,9 +684,14 @@ class RosterBoardState extends State<RosterBoard>
                         ),
                         const SizedBox(height: 10),
                         Text(
+                          // The live-sync promise is CONDITIONAL now. The
+                          // board used to assert "Every ballot syncs live to
+                          // all execs" unconditionally while never checking
+                          // the channel, so a dead subscription looked
+                          // exactly like a healthy one.
                           'Yes, No or Undecided on each ballot candidate. '
                           'Tap your current choice again to withdraw it. '
-                          'Every ballot syncs live to all execs.',
+                          '${live ? 'Every ballot syncs live to all execs.' : 'Live sync is reconnecting; pull down to refresh.'}',
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall
@@ -666,6 +700,10 @@ class RosterBoardState extends State<RosterBoard>
                                       .colorScheme
                                       .onSurfaceVariant),
                         ),
+                        if (!live) ...[
+                          const SizedBox(height: 8),
+                          const _ReconnectingBanner(),
+                        ],
                       ],
                     ),
                   ),
@@ -776,21 +814,79 @@ class RosterBoardState extends State<RosterBoard>
                         // untouched), inter-row gap tightened 8 -> 4. The
                         // rail is decorative reinforcement only; the race cap
                         // text above is the accessible signal.
-                        final railed = Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Container(
+                        //
+                        // THE RAIL MUST BE A BORDER, NEVER A STRETCHED ROW.
+                        // READ THIS BEFORE YOU "TIDY" IT BACK.
+                        //
+                        // af1ca855e drew this rail as
+                        //   Row(crossAxisAlignment: CrossAxisAlignment.stretch,
+                        //       children: [Container(width: 2), ..., Expanded(row)])
+                        // and that single line silently truncated the whole
+                        // ballot to the rows before the first contested race.
+                        // The chair saw ONE candidate out of 26 on 2026-07-26.
+                        // The chain, verified against Flutter 3.41.8 source:
+                        //
+                        //  1. A SliverList lays each child out with
+                        //     `constraints.asBoxConstraints()`, whose
+                        //     `maxExtent` defaults to double.infinity
+                        //     (rendering/sliver.dart:483). So every ballot item
+                        //     arrives with maxHeight == infinity.
+                        //  2. `_constrain` below is Center + ConstrainedBox
+                        //     (maxWidth only). Center calls
+                        //     `constraints.loosen()`, so maxHeight stays
+                        //     infinite all the way down to the Row.
+                        //  3. CrossAxisAlignment.stretch on a horizontal
+                        //     RenderFlex sets fillCrossAxis, which hands the
+                        //     non-flex rail `BoxConstraints.tightFor(height:
+                        //     constraints.maxHeight)` and the Expanded child
+                        //     `minHeight: constraints.maxHeight`
+                        //     (rendering/flex.dart:881-897 and 900-930). With
+                        //     an infinite maxHeight that is a TIGHT INFINITE
+                        //     HEIGHT, so the row's height came back infinity.
+                        //  4. RenderSliverList fills forward with
+                        //     `while (endScrollOffset < targetEndScrollOffset)`
+                        //     (rendering/sliver_list.dart:276). Once
+                        //     endScrollOffset is infinity that test is false
+                        //     immediately: the loop exits, NO further index is
+                        //     ever built, and scrollExtent extrapolates to
+                        //     infinity, which is why the black area below
+                        //     scrolled forever and never yielded a row.
+                        //  5. The offending row itself painted nothing because
+                        //     BallotRow's ClipRRect is built from a non-finite
+                        //     size, so the card never reached the canvas.
+                        //
+                        // The assert that would have caught this ("RenderFlex
+                        // object was given an infinite size during layout",
+                        // rendering/box.dart) lives inside an `assert`, which
+                        // is stripped from the release bundle Netlify ships.
+                        // That is why it reached production silently.
+                        //
+                        // A left BorderSide has no such failure mode: a
+                        // DecoratedBox sizes to its child, so the rail spans
+                        // exactly the row's own height and the sliver keeps a
+                        // finite extent. Geometry is unchanged: the border
+                        // contributes 2px of inset (BoxDecoration.padding ->
+                        // Border.dimensions) and the padding adds 4px, so the
+                        // card still starts 6px in, exactly as before.
+                        //
+                        // The 4px inter-row gap sits INSIDE the bordered box
+                        // (not outside it) so the rail spans the gap too and
+                        // consecutive cluster members read as one continuous
+                        // line, which is what the stretched Row was reaching
+                        // for. The last member drops the gap so the rail ends
+                        // flush with its card.
+                        final railed = Container(
+                          padding: EdgeInsets.only(
+                              left: 4, bottom: it.lastInCluster ? 0 : 4),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              left: BorderSide(
+                                color: cs.primary.withOpacity(0.35),
                                 width: 2,
-                                color: cs.primary.withOpacity(0.35)),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                    bottom: it.lastInCluster ? 0 : 4),
-                                child: row,
                               ),
                             ),
-                          ],
+                          ),
+                          child: row,
                         );
                         return _constrain(
                           it.lastInCluster
@@ -849,7 +945,7 @@ class RosterBoardState extends State<RosterBoard>
     );
   }
 
-  Widget _loading(BuildContext context) {
+  Widget _loading(BuildContext context, {String label = 'Loading decisions…'}) {
     final theme = Theme.of(context);
     return Center(
       child: Column(
@@ -857,7 +953,7 @@ class RosterBoardState extends State<RosterBoard>
         children: [
           const CircularProgressIndicator(strokeWidth: 3),
           const SizedBox(height: 14),
-          Text('Loading decisions…',
+          Text(label,
               style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w600)),
@@ -892,6 +988,55 @@ class RosterBoardState extends State<RosterBoard>
                   children: [
                     FilledButton.icon(
                       onPressed: widget.repository.reload,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                      style: FilledButton.styleFrom(
+                          backgroundColor: HubTheme.navy,
+                          foregroundColor: Colors.white),
+                    ),
+                    TextButton.icon(
+                      onPressed: () =>
+                          _setMode(HubMode.browse, userPicked: true),
+                      icon: const Icon(Icons.grid_view_rounded, size: 18),
+                      label: const Text('Browse the roster'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Failed BALLOT load: the same inline retry card as the decisions failure,
+  /// for the same reason. The alternative is a board that renders every
+  /// tally as zero, which reads as "nobody has voted yet" and is the one
+  /// wrong answer an exec would act on.
+  Widget _votesFailed(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        _constrain(
+          HubCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const HubCardHeader(
+                  icon: Icons.cloud_off,
+                  tileGradient: HubTheme.gradAmber,
+                  title: "Could not load tonight's ballots",
+                  subtitle: 'Your votes are safe. Nothing is shown until the '
+                      'tallies load, so the board cannot understate them.',
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: widget.votes.reload,
                       icon: const Icon(Icons.refresh),
                       label: const Text('Retry'),
                       style: FilledButton.styleFrom(
@@ -1323,12 +1468,64 @@ class _RaceCap extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 6),
-      child: SizedBox(
+      child: ConstrainedBox(
         // 28, not 24: HubCountPill's intrinsic height is ~27px (10px of
         // vertical padding plus a 12px-font text line), and 24 vertically
         // compresses the pill so descenders clip in both themes.
-        height: 28,
+        //
+        // minHeight, not a fixed SizedBox(height: 28): 28 leaves ~1px of
+        // slack at textScale 1.0, so any exec running a bumped OS/browser
+        // font size overflowed a hard 28 and clipped the pill's descenders
+        // in the release build (which shows no overflow stripes). A minimum
+        // keeps the cap's resting height identical while letting it grow.
+        constraints: const BoxConstraints(minHeight: 28),
         child: Row(children: children),
+      ),
+    );
+  }
+}
+
+/// Shown when either realtime channel is not currently joined.
+///
+/// Before this existed, a dead subscription was completely invisible: both
+/// repositories called `.subscribe()` with no status callback, so
+/// CHANNEL_ERROR, TIMED_OUT and CLOSED were all swallowed, and the board went
+/// on promising "Every ballot syncs live to all execs" while receiving
+/// nothing. An exec had no way to know their board had gone stale, and
+/// therefore no reason to pull to refresh.
+///
+/// Colours are the documented self-contained MoydBrand warning pair
+/// (qualifiedFg #8A5A00 on qualifiedBg #FBEDD1, 5.1:1), which is
+/// theme-independent by construction: a light chip with dark text reads the
+/// same on the OLED dark surface the chair uses and on the light one. Never
+/// colour alone: the word "Reconnecting" and an icon both carry the state.
+class _ReconnectingBanner extends StatelessWidget {
+  const _ReconnectingBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: MoydBrand.qualifiedBg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.sync_problem, size: 16, color: MoydBrand.qualifiedFg),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Reconnecting. This board may be behind: pull down to refresh.',
+              style: TextStyle(
+                color: MoydBrand.qualifiedFg,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

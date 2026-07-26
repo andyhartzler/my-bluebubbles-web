@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -84,7 +85,33 @@ abstract class DecisionRepository extends ChangeNotifier {
   DecisionLoadState get loadState;
 
   /// Re-run the initial load (Retry button on the failed state).
+  ///
+  /// DESTRUCTIVE: flips [loadState] back to loading, which tears the whole
+  /// CustomScrollView down to a spinner and loses scroll offset, expansion
+  /// and toolbar state. Only the failed-load retry button may call this, and
+  /// only because there is nothing to lose in that state. Everything else
+  /// wants [refresh].
   Future<void> reload();
+
+  /// NON-DESTRUCTIVE re-fetch: re-reads the table and notifies WITHOUT
+  /// touching [loadState], so the board never blinks to a spinner and the
+  /// exec keeps their place in the list.
+  ///
+  /// This exists because Postgres Changes has NO backfill: when a phone
+  /// sleeps the websocket drops, and although the channel auto-rejoins,
+  /// everything committed while it was down is lost to that client forever.
+  /// The decision baseline going stale is worse than a stale vote tally,
+  /// because `stateFor` defaults a missing row to undecided, so a candidate
+  /// the committee decided while the phone was locked silently stays on that
+  /// exec's ballot and every count on their screen is measured against a
+  /// baseline that no longer exists. Called on every realtime (re)subscribe
+  /// and on app resume.
+  Future<void> refresh();
+
+  /// Whether the realtime channel is currently joined. False means this board
+  /// may be silently behind the database, which the UI must say out loud
+  /// rather than continuing to promise live sync.
+  bool get realtimeHealthy;
 
   /// CHECKED state write: optimistic local update, awaited persist, rollback
   /// + `false` on failure instead of the fire-and-forget [setState]. The
@@ -109,6 +136,14 @@ class LocalDecisionRepository extends DecisionRepository {
 
   @override
   Future<void> reload() => load();
+
+  /// Local storage has no realtime channel and therefore no gap to close.
+  @override
+  Future<void> refresh() async {}
+
+  /// No channel, so it can never be behind.
+  @override
+  bool get realtimeHealthy => true;
 
   @override
   Future<bool> trySetState(String candidateId, DecisionState state) async {
@@ -186,8 +221,18 @@ class SupabaseDecisionRepository extends DecisionRepository {
   final CRMSupabaseService _supabase = CRMSupabaseService();
   final Map<String, DecisionRecord> _records = {};
   bool _loaded = false;
+  bool _disposed = false;
   RealtimeChannel? _channel;
+  Timer? _rtDebounce;
   DecisionLoadState _loadState = DecisionLoadState.loading;
+
+  /// Optimistic: true until the channel actually reports a non-subscribed
+  /// status, so the board does not flash "Reconnecting" during the initial
+  /// join before any status has arrived.
+  bool _realtimeHealthy = true;
+
+  @override
+  bool get realtimeHealthy => _realtimeHealthy;
 
   SupabaseClient get _client => _supabase.client;
 
@@ -206,12 +251,44 @@ class SupabaseDecisionRepository extends DecisionRepository {
   }
 
   /// Retry after a failed initial load (the board's error-state button).
+  ///
+  /// DESTRUCTIVE by design (see the interface doc): only the failed-state
+  /// button calls it. Anything closing a realtime gap must call [refresh].
   @override
   Future<void> reload() async {
     _loadState = DecisionLoadState.loading;
     notifyListeners();
     await _fetch();
     _subscribe();
+  }
+
+  /// Non-destructive re-fetch. Deliberately does NOT touch [_loadState]: the
+  /// board gates its entire scroll view on loadState, so flipping to loading
+  /// here would replace the ballot with a spinner and drop the exec back at
+  /// the top of a 50-row list every time a phone woke up.
+  ///
+  /// A failure here is also non-destructive: the previously loaded baseline
+  /// stays exactly as it was rather than being cleared, because a stale
+  /// baseline is strictly better than an empty one (an empty one silently
+  /// returns every decided candidate to the ballot).
+  @override
+  Future<void> refresh() async {
+    try {
+      final rows = await _client.from(_table).select();
+      final next = <String, DecisionRecord>{};
+      for (final row in (rows as List)) {
+        _applyRowInto(next, Map<String, dynamic>.from(row as Map));
+      }
+      // Swap in one step so no frame can observe a half-empty baseline.
+      _records
+        ..clear()
+        ..addAll(next);
+      // A successful refresh also clears a previously failed load.
+      _loadState = DecisionLoadState.ready;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('SupabaseDecisionRepository.refresh error: $e');
+    }
   }
 
   Future<void> _fetch() async {
@@ -231,13 +308,15 @@ class SupabaseDecisionRepository extends DecisionRepository {
     notifyListeners();
   }
 
-  void _applyRow(Map<String, dynamic> m) {
+  void _applyRow(Map<String, dynamic> m) => _applyRowInto(_records, m);
+
+  void _applyRowInto(Map<String, DecisionRecord> target, Map<String, dynamic> m) {
     final id = m['candidate_id']?.toString();
     if (id == null || id.isEmpty) return;
     // updated_by / updated_at used to be discarded here even though the
     // upsert writes them; the attribution sheet needs both (hedged typist
     // line + the recovery date), so they are kept now.
-    _records[id] = DecisionRecord(
+    target[id] = DecisionRecord(
       state: DecisionState.fromName(m['state'] as String?),
       note: (m['note'] as String?) ?? '',
       updatedBy: m['updated_by']?.toString(),
@@ -246,6 +325,14 @@ class SupabaseDecisionRepository extends DecisionRepository {
   }
 
   // Live-sync every other exec's edits into this board.
+  //
+  // The subscribe status callback is load-bearing, not diagnostics. Postgres
+  // Changes does not replay anything missed while the socket was down, so a
+  // rejoin on its own leaves this client permanently behind. The callback
+  // fires `subscribed` on the initial join AND on every rejoin (verified in
+  // realtime_client 2.7.3: `resend()` never clears the push's recHooks, so
+  // joinPush.receive('ok') runs again), which makes it the exact moment to
+  // re-read the table and close the gap.
   void _subscribe() {
     if (_channel != null) return;
     try {
@@ -261,12 +348,35 @@ class SupabaseDecisionRepository extends DecisionRepository {
             } else if (payload.newRecord.isNotEmpty) {
               _applyRow(Map<String, dynamic>.from(payload.newRecord));
             }
-            notifyListeners();
+            _notifyDebounced();
           },
-        ).subscribe();
+        ).subscribe((status, error) {
+          final healthy = status == RealtimeSubscribeStatus.subscribed;
+          if (healthy != _realtimeHealthy) {
+            _realtimeHealthy = healthy;
+            notifyListeners();
+          }
+          if (!healthy) {
+            debugPrint('SupabaseDecisionRepository realtime $status: $error');
+            return;
+          }
+          // Initial join is harmless (the fetch just ran); every later one is
+          // a rejoin after a drop, which is precisely the gap to close.
+          refresh();
+        });
     } catch (e) {
       debugPrint('SupabaseDecisionRepository.subscribe error: $e');
     }
+  }
+
+  /// Coalesce realtime bursts, mirroring the vote repository. The chair
+  /// working through a run of already-decided rows would otherwise force an
+  /// immediate full ballot-pipeline rebuild on all 16 devices per change.
+  void _notifyDebounced() {
+    _rtDebounce?.cancel();
+    _rtDebounce = Timer(const Duration(milliseconds: 100), () {
+      if (!_disposed) notifyListeners();
+    });
   }
 
   @override
@@ -349,6 +459,8 @@ class SupabaseDecisionRepository extends DecisionRepository {
 
   @override
   void dispose() {
+    _disposed = true;
+    _rtDebounce?.cancel();
     try {
       final ch = _channel;
       if (ch != null) _client.removeChannel(ch);

@@ -153,8 +153,21 @@ class UserSessionProvider extends ChangeNotifier {
 
       // Fetch the member record and superadmin status in parallel — they're
       // independent round-trips, so serializing them just adds spinner time.
+      // ilike, not eq. Email is case INSENSITIVE by RFC and by every provider
+      // people actually use, but GoTrue stores whatever case the account was
+      // created with, and members.email stores whatever case someone typed.
+      // Rogelio Rodriguez had two auth rows differing only in the capital R,
+      // GoTrue resolved his sign-ins to the capital one, and an eq() lookup
+      // against a lowercase members row returned zero, so the CRM threw
+      // "Member record not found" and no session ever loaded. Seven more
+      // account pairs of the same shape exist today; any one of them becomes
+      // the same outage the day that person is made an executive.
+      //
+      // ilike with no wildcards in the pattern is an exact case-insensitive
+      // match, so this cannot widen to a different member. Email is unique
+      // per member in practice, and maybeSingle still throws if it is not.
       final parallelResults = await Future.wait<dynamic>([
-        client.from('members').select().eq('email', email).maybeSingle(),
+        client.from('members').select().ilike('email', email).maybeSingle(),
         _fetchSuperadminFlag(),
       ]);
       final memberResponse = parallelResults[0] as Map<String, dynamic>?;
@@ -166,7 +179,7 @@ class UserSessionProvider extends ChangeNotifier {
         final schoolEmailResponse = await client
             .from('members')
             .select()
-            .eq('school_email', email)
+            .ilike('school_email', email)
             .maybeSingle();
 
         if (schoolEmailResponse != null) {

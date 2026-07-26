@@ -272,7 +272,8 @@ class _BallotRowState extends State<BallotRow> {
           ),
         ),
         const SizedBox(width: 10),
-        _VoteSegmentedControl(entry: entry, votes: votes),
+        _VoteSegmentedControl(
+            entry: entry, votes: votes, displayName: _name),
         const SizedBox(width: 6),
         _chevron(cs),
       ],
@@ -321,7 +322,8 @@ class _BallotRowState extends State<BallotRow> {
         const SizedBox(height: 4),
         Row(
           children: [
-            _VoteSegmentedControl(entry: entry, votes: votes),
+            _VoteSegmentedControl(
+                entry: entry, votes: votes, displayName: _name),
             const SizedBox(width: 8),
             Expanded(
               child: Align(
@@ -583,9 +585,15 @@ class _VoteSegmentedControl extends StatefulWidget {
   final CandidateEntry entry;
   final EndorsementVoteRepository votes;
 
+  /// Name as actually rendered (see [BallotRow.displayName]); used to say
+  /// WHICH candidate failed to save, since the failure snackbar can surface
+  /// after the exec has scrolled that row off screen.
+  final String displayName;
+
   const _VoteSegmentedControl({
     required this.entry,
     required this.votes,
+    required this.displayName,
   });
 
   @override
@@ -593,23 +601,76 @@ class _VoteSegmentedControl extends StatefulWidget {
 }
 
 class _VoteSegmentedControlState extends State<_VoteSegmentedControl> {
-  Future<void> _handleVote(String choice) async {
+  /// True while a ballot write for THIS candidate is in flight.
+  ///
+  /// Without it, two taps produce two concurrent unordered writes against the
+  /// same primary key (candidate_id, voter_id), and the recorded vote is
+  /// decided by chance rather than by the last tap:
+  ///
+  ///  - Double tap on the same segment: tap 1 optimistically sets the vote and
+  ///    issues an UPSERT; tap 2 arrives before that await returns, sees the
+  ///    OPTIMISTIC value, and takes castVote's withdraw branch, issuing a
+  ///    DELETE. If the DELETE is processed first it matches nothing, the
+  ///    UPSERT then commits, and the exec who believes they withdrew is still
+  ///    counted. The realtime echo then re-adds it locally, so the board and
+  ///    the database agree on the wrong answer and nothing looks broken.
+  ///  - Rapid correction (No then Yes): two UPSERTs race, and whichever
+  ///    commits last wins, which may be the FIRST tap.
+  ///
+  /// Nothing in the client, PostgREST or the table enforces last-tap-wins, so
+  /// the only fix is to not issue the second write until the first has
+  /// committed. This is the single caller of castVote (verified), so the guard
+  /// here is sufficient.
+  bool _busy = false;
+
+  Future<void> _handleVote(
+    String choice, {
+    ScaffoldMessengerState? messenger,
+  }) async {
+    if (_busy) return;
+    // Resolved BEFORE the await: rows live in a lazily built SliverList, so a
+    // row scrolled past the cache extent is unmounted by the time the write
+    // returns. The old `if (!mounted) return` swallowed the failure snackbar
+    // in exactly the normal meeting-night rhythm (tap, then flick down two
+    // screens), which is the silent failure this path exists to prevent. The
+    // messenger lives above the list and outlives the row.
+    final m = messenger ?? ScaffoldMessenger.of(context);
     final wasMine = widget.votes.myVote(widget.entry.id);
-    final ok = await widget.votes.castVote(widget.entry.id, choice);
-    if (!mounted) return;
+    // The Retry action can fire after this row has scrolled away and been
+    // unmounted, so every _busy transition goes through this guard rather
+    // than a bare setState, which would throw on a defunct State.
+    void setBusy(bool v) {
+      if (mounted) {
+        setState(() => _busy = v);
+      } else {
+        _busy = v;
+      }
+    }
+
+    setBusy(true);
+    bool ok = false;
+    try {
+      ok = await widget.votes.castVote(widget.entry.id, choice);
+    } finally {
+      setBusy(false);
+    }
     if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text("Vote didn't save. Check connection."),
+      m.showSnackBar(SnackBar(
+        content: Text("${widget.displayName}: vote didn't save. "
+            'Check connection.'),
         behavior: SnackBarBehavior.floating,
         action: SnackBarAction(
-            label: 'Retry', onPressed: () => _handleVote(choice)),
+            label: 'Retry',
+            onPressed: () => _handleVote(choice, messenger: m)),
       ));
       return;
     }
     final withdrew = wasMine == choice;
     if (!withdrew && (choice == 'no' || choice == 'undecided')) {
       // Non-blocking: the ballot is already recorded; the sheet only offers
-      // the optional why.
+      // the optional why. Needs a live context, so it is the one part that
+      // still requires the row to be on screen.
+      if (!mounted) return;
       showVoteReasonSheet(context,
           entry: widget.entry, vote: choice, votes: widget.votes);
     }
@@ -635,7 +696,10 @@ class _VoteSegmentedControlState extends State<_VoteSegmentedControl> {
             ? 'Your vote: $display. Tap to withdraw.'
             : 'Vote $display',
         child: InkWell(
-          onTap: () => _handleVote(code),
+          // Null while a write is in flight: InkWell then renders and reports
+          // itself as disabled, so the second tap of a double tap is never
+          // delivered and the UPSERT/DELETE race cannot be started.
+          onTap: _busy ? null : () => _handleVote(code),
           borderRadius: BorderRadius.circular(8),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
@@ -691,22 +755,31 @@ class _VoteSegmentedControlState extends State<_VoteSegmentedControl> {
         icon: Icons.help_outline,
         fill: MoydBrand.neutralFg);
 
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          yes,
-          const SizedBox(width: 2),
-          no,
-          const SizedBox(width: 2),
-          undecided,
-        ],
+    return AnimatedOpacity(
+      // Brief dim while the write is in flight. The optimistic update has
+      // already painted the exec's choice, so this reads as "saving" rather
+      // than as a dead control, and it explains why a second tap does
+      // nothing. Opacity only, so it is legible in both themes by
+      // construction.
+      duration: const Duration(milliseconds: 120),
+      opacity: _busy ? 0.55 : 1.0,
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: cs.outlineVariant),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            yes,
+            const SizedBox(width: 2),
+            no,
+            const SizedBox(width: 2),
+            undecided,
+          ],
+        ),
       ),
     );
   }

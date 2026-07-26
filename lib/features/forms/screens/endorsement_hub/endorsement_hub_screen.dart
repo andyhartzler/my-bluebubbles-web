@@ -37,7 +37,7 @@ class EndorsementHubScreen extends StatefulWidget {
 enum _CompareMode { matrix, sideBySide }
 
 class _EndorsementHubScreenState extends State<EndorsementHubScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final SlateController _controller = SlateController();
   // Shared across all executive members via public.endorsement_decisions (live
   // sync), so the committee sees one decision board instead of per-device copies.
@@ -63,14 +63,38 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller.load();
     _decisions.load();
     _votes.load();
     _journey.load();
   }
 
+  /// Resync on wake.
+  ///
+  /// Sixteen execs will vote from phones, and phones lock. When the screen
+  /// locks the realtime websocket drops; the channel auto-rejoins on wake, but
+  /// Postgres Changes NEVER backfills, so everything committed while the phone
+  /// was asleep is invisible to this client for the life of the page. The
+  /// repositories also refresh on every (re)subscribe, which covers the common
+  /// case; this hook covers the one it cannot, where the socket was never
+  /// declared dead and so never rejoined.
+  ///
+  /// Both refreshes are non-destructive: neither touches its load state, so
+  /// the ballot never blinks to a spinner and nobody loses their scroll
+  /// position or an expanded row mid-read.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _decisions.refresh();
+      _votes.refresh();
+    }
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabs.dispose();
     _controller.dispose();
     _decisions.dispose();

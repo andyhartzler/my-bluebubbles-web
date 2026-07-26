@@ -49,6 +49,16 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
   // available as a fallback so no one is ever locked out). When true the entry
   // form asks for a phone number and texts a code via Twilio Verify.
   bool _phoneMode = true;
+
+  /// Seconds left before "Resend code" re-enables.
+  ///
+  /// Twilio Verify caps a single verification at 5 send attempts (error
+  /// 60203) and the verification then stays dead until its 10 minute TTL
+  /// lapses. Without a throttle an exec whose SMS is slow taps resend five
+  /// times in as many seconds, burns the quota, and cannot get a code at all
+  /// for ten minutes.
+  int _resendCooldown = 0;
+  Timer? _resendTimer;
   String? _phoneForCode; // E.164 number the SMS code was sent to
   bool _phoneCodeFlow = false; // the pending code is an SMS code, not an email one
 
@@ -215,6 +225,7 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
     WidgetsBinding.instance.removeObserver(this);
     _authSubscription?.cancel();
     _visibilitySubscription?.cancel();
+    _resendTimer?.cancel();
     _emailController.dispose();
     _phoneController.dispose();
     _codeController.dispose();
@@ -530,6 +541,7 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
         _phoneForCode = phone;
         _codeController.clear();
       });
+      _startResendCooldown();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _showCodeInput) _codeFocusNode.requestFocus();
       });
@@ -615,7 +627,22 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
     }
   }
 
+  void _startResendCooldown() {
+    _resendTimer?.cancel();
+    setState(() => _resendCooldown = 30);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() => _resendCooldown--);
+      if (_resendCooldown <= 0) t.cancel();
+    });
+  }
+
   void _switchMode(bool toPhone) {
+    _resendTimer?.cancel();
+    _resendCooldown = 0;
     setState(() {
       _phoneMode = toPhone;
       _showCodeInput = false;
@@ -701,7 +728,22 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
         maxLength: 6,
         textInputAction: TextInputAction.done,
         enabled: !_isVerifyingCode,
-        onSubmitted: (_) => _verifyCode(),
+        // Must branch exactly like the Verify Code button below. It used to be
+        // a hardcoded _verifyCode(), the EMAIL verifier, so pressing the
+        // keyboard's submit key during the PHONE flow hit _verifyCode's own
+        // guard and told someone signing in with a phone number
+        // "Email address is required." (_emailForCode is null and the email
+        // field was never shown). Reachable on any keyboard exposing a submit
+        // key: desktop Enter, Android, and iOS whenever the numeric input
+        // surfaces a Go key.
+        onSubmitted: (_) {
+          if (_isVerifyingCode) return;
+          if (_phoneCodeFlow) {
+            _verifyPhoneCode();
+          } else {
+            _verifyCode();
+          }
+        },
         onChanged: (_) {
           if (_errorMessage != null) {
             setState(() {
@@ -736,9 +778,27 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
-      const SizedBox(height: 12),
+      // Resend, throttled. Before this the ONLY way to get a new code was to
+      // tap "Back to phone entry" and then "Text me a code" again, which is
+      // both undiscoverable and unthrottled: an exec whose SMS was slow would
+      // loop it, burn Twilio's 5 sends per verification (60203) and then be
+      // unable to get a code at all until the 10 minute TTL lapsed.
+      if (_phoneCodeFlow) ...[
+        const SizedBox(height: 4),
+        TextButton.icon(
+          onPressed: (_isSending || _isVerifyingCode || _resendCooldown > 0)
+              ? null
+              : _sendPhoneCode,
+          icon: const Icon(Icons.refresh, size: 18),
+          label: Text(_resendCooldown > 0
+              ? 'Resend code in ${_resendCooldown}s'
+              : 'Resend code'),
+        ),
+      ],
+      const SizedBox(height: 4),
       TextButton(
         onPressed: () {
+          _resendTimer?.cancel();
           setState(() {
             _showCodeInput = false;
             _phoneCodeFlow = false;
@@ -747,6 +807,7 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
             _phoneForCode = null;
             _errorMessage = null;
             _successMessage = null;
+            _resendCooldown = 0;
           });
           (_phoneMode ? _phoneFocusNode : _emailFocusNode).requestFocus();
         },
@@ -769,6 +830,15 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+    // The sign-in error is the one piece of text an exec reads when they
+    // CANNOT get in, and the app's default dark theme is OLED Dark, whose
+    // card surface is near-black (~#191C20). Brand red #E63946 lands about
+    // 4.1:1 there, under the 4.5:1 AA floor for body text. Lightening it to
+    // #FF6B75 in dark mode gives ~6.2:1 while staying recognisably MOYD red;
+    // light mode keeps the brand value unchanged (#E63946 on white is ~4.8:1).
+    final errorRed = theme.brightness == Brightness.dark
+        ? const Color(0xFFFF6B75)
+        : const Color(0xFFE63946);
 
     if (_isAuthenticated) {
       return widget.child;
@@ -886,20 +956,20 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
                                   if (_errorMessage != null)
                                     Container(
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFE63946).withOpacity(0.12),
+                                        color: errorRed.withOpacity(0.12),
                                         borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: const Color(0xFFE63946).withOpacity(0.6)),
+                                        border: Border.all(color: errorRed.withOpacity(0.6)),
                                       ),
                                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                                       child: Row(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          const Icon(Icons.error_outline, color: Color(0xFFE63946)),
+                                          Icon(Icons.error_outline, color: errorRed),
                                           const SizedBox(width: 12),
                                           Expanded(
                                             child: Text(
                                               _errorMessage!,
-                                              style: textTheme.bodyMedium?.copyWith(color: const Color(0xFFE63946)),
+                                              style: textTheme.bodyMedium?.copyWith(color: errorRed),
                                             ),
                                           ),
                                         ],
@@ -956,14 +1026,34 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                       ),
                                     ),
-                                    const SizedBox(height: 8),
-                                    TextButton(
-                                      onPressed: _isSending ? null : () => _switchMode(!_phoneMode),
-                                      child: Text(_phoneMode
-                                          ? 'Sign in with email instead'
-                                          : 'Sign in with phone instead'),
-                                    ),
                                   ],
+                                  // ALWAYS rendered, deliberately outside the
+                                  // `if (!_showCodeInput)` block above.
+                                  //
+                                  // This button used to disappear the moment a
+                                  // code was requested, which is precisely the
+                                  // state execs get stuck in: phone-signin
+                                  // returns "That number is verified, but no
+                                  // account uses it. Sign in with email
+                                  // instead." and "This number is linked to
+                                  // more than one account. Sign in with email
+                                  // instead.", and _verifyPhoneCode's catch
+                                  // leaves _showCodeInput true. So the app
+                                  // told people to do a thing while hiding the
+                                  // only control that does it, and the sole
+                                  // escape was a back link whose label never
+                                  // mentions email. _switchMode already clears
+                                  // the pending code state, so this is safe in
+                                  // every state.
+                                  const SizedBox(height: 8),
+                                  TextButton(
+                                    onPressed: (_isSending || _isVerifyingCode)
+                                        ? null
+                                        : () => _switchMode(!_phoneMode),
+                                    child: Text(_phoneMode
+                                        ? 'Sign in with email instead'
+                                        : 'Sign in with phone instead'),
+                                  ),
                                   const SizedBox(height: 12),
                                   Text(
                                     _phoneMode

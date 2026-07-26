@@ -7,6 +7,20 @@ import 'package:bluebubbles/services/crm/supabase_service.dart';
 /// The three ballot choices (mirrors the widened table CHECK constraint).
 const Set<String> kValidVotes = {'yes', 'no', 'undecided'};
 
+/// Whether the ballot fetch has completed, mirroring [DecisionLoadState].
+///
+/// This exists because a silently failed ballot fetch is the one wrong answer
+/// an exec would ACT on. Before this enum, `load()` caught its error, logged
+/// to debugPrint and set `loaded = true` regardless, so a single transient
+/// failure (expired token mid-refresh, a phone waking, a 5xx) rendered a
+/// fully-populated board on which nobody had voted: every row read "No
+/// ballots yet", the progress pill read "0 / 50 voted", and the needs-vote
+/// badge read the full ballot. An exec seeing that would rationally re-vote
+/// everything, and because `castVote` always writes `reason_codes: []`, doing
+/// so would wipe their own previously captured reasons. Failing loudly is the
+/// only safe behavior.
+enum VoteLoadState { loading, ready, failed }
+
 /// Consensus floor: never let fewer than 5 participants "reach consensus"
 /// for the org, no matter how light attendance is.
 const int kQuorumFloor = 5;
@@ -166,10 +180,20 @@ class EndorsementVoteRepository extends ChangeNotifier {
   String _bucketsKey = '';
   bool _bucketsDirty = true;
 
-  bool _loaded = false;
+  VoteLoadState _loadState = VoteLoadState.loading;
   bool _disposed = false;
   RealtimeChannel? _channel;
   Timer? _rtDebounce;
+
+  /// Optimistic until the channel reports otherwise, so the board does not
+  /// flash "Reconnecting" during the initial join.
+  bool _realtimeHealthy = true;
+
+  /// Candidates with a local write in flight. Their own realtime echo must
+  /// not overwrite the optimistic value, and a pull-to-refresh must not
+  /// discard it. Keyed by candidateId because the PK is
+  /// (candidate_id, voter_id) and only ever the signed-in member writes here.
+  final Set<String> _pendingSelf = <String>{};
 
   String? _currentUserId;
   String _currentUserName = 'You';
@@ -185,11 +209,19 @@ class EndorsementVoteRepository extends ChangeNotifier {
   /// [loaded] instead.
   String? get currentUserId => _currentUserId;
 
-  /// True once [load] has finished its select and notified, success or
-  /// failure. The one honest "votes are in" signal on this repository: the
-  /// board's landing decision reads it so an exec who has already voted on
-  /// everything is never mis-landed by a slow ballot fetch.
-  bool get loaded => _loaded;
+  /// True only once [load] has SUCCEEDED. The one honest "votes are in"
+  /// signal on this repository: the board's landing decision reads it so an
+  /// exec who has already voted on everything is never mis-landed by a slow
+  /// ballot fetch, and, since a failed fetch leaves this false, never landed
+  /// on Browse on the strength of a ballot that never arrived.
+  bool get loaded => _loadState == VoteLoadState.ready;
+
+  /// Load gate for the board's tallies, progress pill and vote controls.
+  VoteLoadState get loadState => _loadState;
+
+  /// Whether the realtime channel is currently joined. False means this
+  /// board may be silently behind the database.
+  bool get realtimeHealthy => _realtimeHealthy;
 
   /// Display name stored alongside the signed-in member's votes.
   String get currentUserName => _currentUserName;
@@ -197,8 +229,11 @@ class EndorsementVoteRepository extends ChangeNotifier {
   /// Denominator for "{cast} of {roomSize} execs in".
   int get roomSize => _knownVoters.length;
 
+  /// Initial ballot fetch. Re-entrant only while it has never SUCCEEDED, so
+  /// the failed state is genuinely retryable (it previously latched `loaded`
+  /// true on failure, which made the outage permanent for that page).
   Future<void> load() async {
-    if (_loaded) return;
+    if (_loadState == VoteLoadState.ready) return;
     try {
       _currentUserId = _client.auth.currentUser?.id;
       await _resolveCurrentUserName();
@@ -209,25 +244,64 @@ class EndorsementVoteRepository extends ChangeNotifier {
         _applyRow(Map<String, dynamic>.from(row as Map));
       }
       _rebuildKnownVoters();
+      _loadState = VoteLoadState.ready;
     } catch (e) {
+      lastError = 'load: $e';
       debugPrint('EndorsementVoteRepository.load error: $e');
+      // Do NOT fall through to a ready board: an empty _votes map renders a
+      // board on which nobody has voted, which is indistinguishable from the
+      // truth and is the one wrong answer an exec would act on.
+      _loadState = VoteLoadState.failed;
     }
-    _loaded = true;
     _invalidateAll();
     notifyListeners();
+    // Subscribe even after a failed fetch: the channel's subscribe callback
+    // calls refresh(), so a later successful join self-heals the board.
     _subscribe();
   }
 
-  /// Re-run the select-all and reapply. Wired to pull-to-refresh: covers
-  /// realtime gaps after phone sleep / offline.
+  /// Retry after a failed initial fetch (the board's inline retry button).
+  Future<void> reload() async {
+    _loadState = VoteLoadState.loading;
+    notifyListeners();
+    await load();
+  }
+
+  /// Re-run the select-all and reapply. Wired to pull-to-refresh, to app
+  /// resume and to every realtime (re)subscribe: covers the gaps Postgres
+  /// Changes leaves after phone sleep / offline, which it never backfills.
   Future<void> refresh() async {
     try {
       final rows = await _client.from(_table).select();
-      _votes.clear();
+      // Build into a scratch map, then swap: `_votes.clear()` followed by an
+      // async gap would be a window where the board renders an empty ballot.
+      // (The old code was safe because the reapply was synchronous after the
+      // await; keeping the swap explicit means it stays safe.)
+      final next = <String, Map<String, BallotEntry>>{};
       for (final row in (rows as List)) {
-        _applyRow(Map<String, dynamic>.from(row as Map));
+        _applyRowInto(next, Map<String, dynamic>.from(row as Map));
       }
+      // An in-flight local write is NOT yet visible to this select, so the
+      // server snapshot would roll the exec's own tap back on screen with no
+      // error and no Retry. Re-assert anything still pending.
+      final uid = _currentUserId;
+      if (uid != null) {
+        for (final candidateId in _pendingSelf) {
+          final mine = _votes[candidateId]?[uid];
+          if (mine != null) {
+            (next[candidateId] ??= {})[uid] = mine;
+          } else {
+            next[candidateId]?.remove(uid);
+            if (next[candidateId]?.isEmpty ?? false) next.remove(candidateId);
+          }
+        }
+      }
+      _votes
+        ..clear()
+        ..addAll(next);
       _rebuildKnownVoters();
+      // A successful refresh clears a previously failed load.
+      _loadState = VoteLoadState.ready;
       _invalidateAll();
       notifyListeners();
     } catch (e) {
@@ -289,13 +363,31 @@ class EndorsementVoteRepository extends ChangeNotifier {
   void _applyRow(Map<String, dynamic> m) {
     final candidateId = m['candidate_id']?.toString();
     final voterId = m['voter_id']?.toString();
+    if (candidateId == null || voterId == null) return;
+    // Ignore our OWN echo while our own write is still in flight. Otherwise
+    // changing Yes -> No inside the echo window renders No (optimistic), Yes
+    // (echo of the first upsert), No (echo of the second); and if the socket
+    // dies between those two echoes the board sits on the stale value with
+    // nothing to correct it. Other execs' rows always apply: the PK is
+    // (candidate_id, voter_id), so a remote payload can never carry ours.
+    if (voterId == _currentUserId && _pendingSelf.contains(candidateId)) {
+      return;
+    }
+    _applyRowInto(_votes, m);
+    _invalidateCandidate(candidateId);
+  }
+
+  void _applyRowInto(
+      Map<String, Map<String, BallotEntry>> target, Map<String, dynamic> m) {
+    final candidateId = m['candidate_id']?.toString();
+    final voterId = m['voter_id']?.toString();
     final vote = m['vote']?.toString();
     if (candidateId == null || candidateId.isEmpty) return;
     if (voterId == null || voterId.isEmpty) return;
     if (vote == null || !kValidVotes.contains(vote)) return;
     final name = m['voter_name']?.toString().trim();
     final other = m['other_text']?.toString();
-    (_votes[candidateId] ??= {})[voterId] = BallotEntry(
+    (target[candidateId] ??= {})[voterId] = BallotEntry(
       candidateId: candidateId,
       voterId: voterId,
       voterName: (name == null || name.isEmpty) ? 'An exec' : name,
@@ -304,13 +396,17 @@ class EndorsementVoteRepository extends ChangeNotifier {
       otherText: (other == null || other.isEmpty) ? null : other,
       updatedAt: DateTime.tryParse(m['updated_at']?.toString() ?? '')?.toLocal(),
     );
-    _invalidateCandidate(candidateId);
   }
 
   void _removeRow(Map<String, dynamic> old) {
     final candidateId = old['candidate_id']?.toString();
     final voterId = old['voter_id']?.toString();
     if (candidateId == null || voterId == null) return;
+    // Same self-echo guard as _applyRow: our own delete echo must not undo an
+    // optimistic re-cast that is still in flight.
+    if (voterId == _currentUserId && _pendingSelf.contains(candidateId)) {
+      return;
+    }
     final perCandidate = _votes[candidateId];
     if (perCandidate == null) return;
     perCandidate.remove(voterId);
@@ -365,7 +461,21 @@ class EndorsementVoteRepository extends ChangeNotifier {
             _rebuildKnownVoters();
             _notifyDebounced();
           },
-        ).subscribe();
+        ).subscribe((status, error) {
+          final healthy = status == RealtimeSubscribeStatus.subscribed;
+          if (healthy != _realtimeHealthy) {
+            _realtimeHealthy = healthy;
+            notifyListeners();
+          }
+          if (!healthy) {
+            debugPrint('EndorsementVoteRepository realtime $status: $error');
+            return;
+          }
+          // Postgres Changes replays nothing missed while the socket was
+          // down, so a rejoin alone leaves this client permanently behind.
+          // Re-read on every successful join to close the gap.
+          refresh();
+        });
     } catch (e) {
       debugPrint('EndorsementVoteRepository.subscribe error: $e');
     }
@@ -528,6 +638,7 @@ class EndorsementVoteRepository extends ChangeNotifier {
     _rebuildKnownVoters();
     _invalidateCandidate(candidateId);
     notifyListeners();
+    _pendingSelf.add(candidateId);
     try {
       await _client.from(_table).upsert({
         'candidate_id': candidateId,
@@ -544,6 +655,8 @@ class EndorsementVoteRepository extends ChangeNotifier {
       debugPrint('EndorsementVoteRepository.castVote error: $e');
       _restoreBallot(candidateId, uid, snapshot);
       return false;
+    } finally {
+      _pendingSelf.remove(candidateId);
     }
   }
 
@@ -557,6 +670,7 @@ class EndorsementVoteRepository extends ChangeNotifier {
     if (_votes[candidateId]?.isEmpty ?? false) _votes.remove(candidateId);
     _invalidateCandidate(candidateId);
     notifyListeners();
+    _pendingSelf.add(candidateId);
     try {
       await _client
           .from(_table)
@@ -569,6 +683,8 @@ class EndorsementVoteRepository extends ChangeNotifier {
       debugPrint('EndorsementVoteRepository.clearVote error: $e');
       _restoreBallot(candidateId, uid, snapshot);
       return false;
+    } finally {
+      _pendingSelf.remove(candidateId);
     }
   }
 
@@ -599,6 +715,7 @@ class EndorsementVoteRepository extends ChangeNotifier {
     );
     _invalidateCandidate(candidateId);
     notifyListeners();
+    _pendingSelf.add(candidateId);
     try {
       await _client.from(_table).upsert({
         'candidate_id': candidateId,
@@ -615,6 +732,8 @@ class EndorsementVoteRepository extends ChangeNotifier {
       debugPrint('EndorsementVoteRepository.updateReason error: $e');
       _restoreBallot(candidateId, uid, snapshot);
       return false;
+    } finally {
+      _pendingSelf.remove(candidateId);
     }
   }
 
