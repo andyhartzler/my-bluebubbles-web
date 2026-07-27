@@ -132,7 +132,10 @@ class _RowExpansionState extends State<RowExpansion> {
                     ?.copyWith(color: cs.onSurfaceVariant)),
           if (showDeductions) ...[
             const SizedBox(height: 10),
-            _DeductionsList(deductions: deductions),
+            _DeductionsList(
+              deductions: deductions,
+              positions: entry.model.allPolicyPositions,
+            ),
           ],
           if (!voiceLeads) ...[
             const SizedBox(height: 4),
@@ -442,12 +445,42 @@ class _AiRationaleBlock extends StatelessWidget {
   }
 }
 
-/// "Where the points went": one row per deduction with a points pill, the
-/// issue label, the explanation, and (when present) the candidate's own words
-/// behind a decorative gold rule.
+/// "Where the points went": the points lost, the issue, and THE CANDIDATE'S
+/// OWN ANSWER. Nothing else.
+///
+/// This used to lead with the model's prose for every deduction, several lines
+/// of "MOYD demands an unapologetic commitment to..." restating the platform
+/// back at an exec who already knows it. The chair's note, verbatim: "I don't
+/// need all this AI garbage about like MOYD beliefs blah blah, all I need here
+/// is the minus the points, the categories, and what the candidate actually
+/// put that caused them to lose points."
+///
+/// The sharper half of that complaint was Medicare for All: minus 5 points and
+/// no indication anywhere of what the candidate had answered. That happens on
+/// 17 of the 120 deductions on record, because the scorer only emits a `quote`
+/// when it chose to pull one. The answer was always in the submission; it just
+/// was not being looked up.
+///
+/// So the deduction is now joined back to the candidate's stance by issue id.
+/// Their selected option leads, because that is the thing that actually cost
+/// the points, and their own words follow when they wrote any. The model's
+/// explanation is not rendered at all.
 class _DeductionsList extends StatelessWidget {
   final List<AiDeduction> deductions;
-  const _DeductionsList({required this.deductions});
+
+  /// The candidate's stance answers, keyed by the same issue id the deduction
+  /// carries. Empty is survivable: the row falls back to the scorer's quote.
+  final List<PolicyPosition> positions;
+
+  const _DeductionsList({required this.deductions, required this.positions});
+
+  PolicyPosition? _positionFor(String issueId) {
+    if (issueId.isEmpty) return null;
+    for (final p in positions) {
+      if (p.id == issueId) return p;
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -464,66 +497,107 @@ class _DeductionsList extends StatelessWidget {
                 letterSpacing: 0.6,
                 color: cs.onSurfaceVariant)),
         for (final d in deductions)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  constraints: const BoxConstraints(minWidth: 52),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: MoydBrand.opposeBg,
-                    borderRadius: BorderRadius.circular(6),
+          Builder(builder: (context) {
+            final pos = _positionFor(d.issueId);
+            // Their written explanation is the best evidence. The scorer's
+            // quote is usually the same text, so it is the fallback rather
+            // than a second thing to show.
+            final written = (pos?.explanation ?? '').trim().isNotEmpty
+                ? pos!.explanation!.trim()
+                : d.quote.trim();
+            final answer = (pos?.answerLabel ?? '').trim();
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 52),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: MoydBrand.opposeBg,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text('-${d.pointsLost} pts',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: MoydBrand.opposeFg,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800)),
                   ),
-                  child: Text('-${d.pointsLost} pts',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          color: MoydBrand.opposeFg,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800)),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(d.label,
-                          style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: cs.onSurface)),
-                      if (d.explanation.isNotEmpty)
-                        Text(d.explanation,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(d.label,
                             style: TextStyle(
-                                fontSize: 12,
-                                height: 1.4,
-                                color: cs.onSurfaceVariant)),
-                      if (d.quote.isNotEmpty)
-                        Container(
-                          margin: const EdgeInsets.only(top: 3),
-                          padding: const EdgeInsets.only(left: 8),
-                          decoration: const BoxDecoration(
-                            // Gold is a decorative rule only, never text on
-                            // a light surface.
-                            border: Border(
-                                left: BorderSide(
-                                    color: HubTheme.gold, width: 3)),
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface)),
+                        if (answer.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text.rich(
+                              TextSpan(
+                                text: 'They answered: ',
+                                style: TextStyle(color: cs.onSurfaceVariant),
+                                children: [
+                                  TextSpan(
+                                    text: answer,
+                                    style: TextStyle(
+                                        color: cs.onSurface,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                                ],
+                              ),
+                              style: const TextStyle(
+                                  fontSize: 12, height: 1.35),
+                            ),
                           ),
-                          child: Text(d.quote,
+                        if (written.isNotEmpty)
+                          Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.only(left: 8),
+                            decoration: const BoxDecoration(
+                              // Gold is a decorative rule only, never text on
+                              // a light surface.
+                              border: Border(
+                                  left: BorderSide(
+                                      color: HubTheme.gold, width: 3)),
+                            ),
+                            child: Text(written,
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.4,
+                                    fontStyle: FontStyle.italic,
+                                    color: cs.onSurface)),
+                          ),
+                        // Never a silent gap. If the answer cannot be resolved
+                        // and the scorer pulled no quote, say so, because "-5
+                        // points and nothing under it" is the exact complaint
+                        // this rewrite exists to fix.
+                        if (answer.isEmpty && written.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              'No answer recorded for this question.',
                               style: TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 12,
                                   fontStyle: FontStyle.italic,
-                                  color: cs.onSurfaceVariant)),
-                        ),
-                    ],
+                                  color: cs.onSurfaceVariant),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
+                ],
+              ),
+            );
+          }),
       ],
     );
   }
