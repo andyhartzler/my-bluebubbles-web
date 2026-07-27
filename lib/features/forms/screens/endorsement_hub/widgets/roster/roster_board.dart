@@ -4,13 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../theme/moyd_brand.dart';
-import '../../decision_attribution_repository.dart';
 import '../../models/candidate_entry.dart';
 import '../../slate_controller.dart';
 import '../../theme/hub_theme.dart';
 import '../decisions/ballot_row.dart';
 import '../decisions/race_field_disclosure.dart';
-import '../decisions/baseline_row.dart';
 import '../decisions/board_toolbar.dart';
 import '../decisions/decision_activity.dart';
 import '../decisions/decision_chip.dart';
@@ -81,8 +79,12 @@ class RosterBoardState extends State<RosterBoard>
   // merging those vocabularies is the silent-ballot-narrowing failure mode
   // this design exists to avoid.
   VoteFilter _filter = VoteFilter.needsMyVote;
+
+  /// Candidates voted on during this pass of the "needs my vote" filter, kept
+  /// visible so nothing disappears under your finger. Cleared when the filter
+  /// changes, so re-selecting it gives a genuinely fresh list of what is left.
+  final Set<String> _justVoted = <String>{};
   VoteSort _sort = VoteSort.yesShare;
-  bool _baselineExpanded = false;
 
   /// Ballot toolbar text field, bound to [SlateController.search] (the single
   /// shared query brain). Seeded here, synced back on external changes.
@@ -286,8 +288,16 @@ class RosterBoardState extends State<RosterBoard>
     int byName(CandidateEntry a, CandidateEntry b) =>
         a.name.toLowerCase().compareTo(b.name.toLowerCase());
     if (_filter == VoteFilter.needsMyVote) {
-      entries =
-          entries.where((e) => widget.votes.myVote(e.id) == null).toList();
+      // A row you just voted on STAYS PUT. Filtering it out the instant the
+      // vote landed is what made candidates pop out from under your thumb and
+      // the list jump, which on a phone reads as "did that register, and on
+      // whom?". _justVoted holds the ids you have acted on since this filter
+      // was last chosen, so the list only actually shrinks when you change
+      // filter or come back to it later.
+      entries = entries
+          .where((e) =>
+              widget.votes.myVote(e.id) == null || _justVoted.contains(e.id))
+          .toList();
     }
     if (_filter == VoteFilter.splits) {
       // The chair reads the splits aloud: Split first, then consensus-ready
@@ -501,16 +511,12 @@ class RosterBoardState extends State<RosterBoard>
               children: [
                 pill,
                 const Spacer(),
-                InkWell(
-                  borderRadius: BorderRadius.circular(999),
-                  onTap: () {
-                    _setMode(HubMode.ballot, userPicked: true);
-                    setState(() => _baselineExpanded = true);
-                  },
-                  child: HubCountPill(
-                    icon: Icons.lock_clock,
-                    text: '$decided decided',
-                  ),
+                // Decided candidates live in the same list as everyone else
+                // now, so this is a count, not a door into a separate
+                // section. No padlock either: nothing here is locked.
+                HubCountPill(
+                  icon: Icons.gavel,
+                  text: '$decided decided',
                 ),
               ],
             );
@@ -607,14 +613,20 @@ class RosterBoardState extends State<RosterBoard>
         // browse-side research filters: a stale histogram drill-in
         // (focusAlignmentRange narrows the range AND clears unscored) must
         // never shrink tonight's ballot.
-        final ballot = <CandidateEntry>[];
-        final baseline = <CandidateEntry>[];
-        for (final e in all) {
-          (widget.repository.stateFor(e.id) == DecisionState.undecided
-                  ? ballot
-                  : baseline)
-              .add(e);
-        }
+        // ONE LIST. There is no separate "already decided" section any more.
+        //
+        // Decided candidates used to be pulled into a collapsed block at the
+        // bottom behind a padlock, with a line of provenance about what the
+        // meeting recording did or did not support. The chair's instruction:
+        // put them in the normal list with everyone else, let anyone change
+        // them, and drop the transcript commentary entirely. A decision is
+        // just a vote that already happened.
+        //
+        // The decision state still shows as a chip on the row, so you can see
+        // where a candidate stands, and changing it is the same control as on
+        // any other row.
+        final ballot = List<CandidateEntry>.of(all);
+        const baseline = <CandidateEntry>[];
         final ballotIds = [for (final e in ballot) e.id];
         // Stale-expansion prune: a realtime decision landing mid-meeting
         // must not leave a locked candidate's row expanded.
@@ -625,9 +637,6 @@ class RosterBoardState extends State<RosterBoard>
         // Search is the final pipeline step, after filter + sort.
         final visible =
             _visibleBallot(ballot, buckets).where(_matches).toList();
-        // Search also covers the locked baseline so decided candidates
-        // stay findable.
-        final filteredBaseline = baseline.where(_matches).toList();
         final needsMyVoteCount =
             ballot.where((e) => widget.votes.myVote(e.id) == null).length;
         // Applicants per race across the UNION of the ballot and baseline
@@ -718,7 +727,10 @@ class RosterBoardState extends State<RosterBoard>
                   query: query,
                   onQueryChanged: widget.controller.setSearch,
                   filter: _filter,
-                  onFilterChanged: (f) => setState(() => _filter = f),
+                  onFilterChanged: (f) => setState(() {
+                      _filter = f;
+                      _justVoted.clear();
+                    }),
                   showSplits: widget.isChair,
                   needsMyVoteCount: needsMyVoteCount,
                   sort: _sort,
@@ -914,29 +926,6 @@ class RosterBoardState extends State<RosterBoard>
                     ),
                   ),
                 ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverToBoxAdapter(
-                  child: _constrain(
-                    BaselineSection(
-                      entries: filteredBaseline,
-                      totalCount: baseline.length,
-                      // A matching search query forces the section open for
-                      // that build so decided candidates surface.
-                      expanded: _baselineExpanded ||
-                          (query.isNotEmpty && filteredBaseline.isNotEmpty),
-                      onToggle: () => setState(
-                          () => _baselineExpanded = !_baselineExpanded),
-                      stateFor: widget.repository.stateFor,
-                      recordFor: widget.repository.recordFor,
-                      attribution: DecisionAttributionRepository.instance,
-                      displayNameFor: widget.controller.displayNameFor,
-                      onOpen: widget.onOpen,
-                      onChangeState: _changeDecision,
-                    ),
-                  ),
-                ),
-              ),
               const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
             ],
           ),
@@ -1158,39 +1147,6 @@ class RosterBoardState extends State<RosterBoard>
     );
   }
 
-  /// Change or reopen an already decided candidate.
-  ///
-  /// The baseline used to be frozen, on the theory that a recorded decision
-  /// should not move. The chair's ruling on 2026-07-26 is the opposite: "it
-  /// shouldn't be locked, if they want to go in and change those decisions
-  /// that's fine". Choosing Undecided here drops the candidate back onto
-  /// tonight's ballot on every device.
-  ///
-  /// Uses the CHECKED write path, so a failed write leaves the row exactly
-  /// where it was on every device rather than showing a change that did not
-  /// persist. endorsement_decisions records updated_by and updated_at, so who
-  /// moved it stays on the record either way.
-  Future<void> _changeDecision(CandidateEntry e, DecisionState next) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final ok = await widget.repository.trySetState(e.id, next);
-    if (!mounted) return;
-    if (!ok) {
-      messenger.showSnackBar(SnackBar(
-        content: const Text("That didn't save. Nothing was changed."),
-        behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-            label: 'Retry', onPressed: () => _changeDecision(e, next)),
-      ));
-      return;
-    }
-    if (next == DecisionState.undecided) {
-      messenger.showSnackBar(SnackBar(
-        content: Text('${widget.controller.displayNameFor(e)} is back on the '
-            'ballot.'),
-        behavior: SnackBarBehavior.floating,
-      ));
-    }
-  }
 
   /// Every sliver child reads best at a bounded width: single full-width
   /// column, centered past 1040.
