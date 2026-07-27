@@ -21,9 +21,32 @@ const Set<String> kValidVotes = {'yes', 'no', 'undecided'};
 /// only safe behavior.
 enum VoteLoadState { loading, ready, failed }
 
-/// Consensus floor: never let fewer than 5 participants "reach consensus"
-/// for the org, no matter how light attendance is.
+/// Consensus floor: a candidate needs at least this many ballots of their own
+/// before any supermajority on them counts as consensus for the org.
 const int kQuorumFloor = 5;
+
+/// Prefix of the reason codes that are NOT a voter's stated reason: they mark
+/// where a ballot row came from. `meeting_2026_07_14` tags the 166 ballots the
+/// July 14 committee call produced when they were backfilled into
+/// `public.endorsement_votes` as ordinary ballots.
+///
+/// These codes are handled apart from the reason vocabulary everywhere:
+///   * they are never rendered as "Reason: ..." (they are not one),
+///   * they are never counted in the chair's split-note reason rollup,
+///   * and they SURVIVE a re-cast, because a re-cast used to write
+///     `reason_codes: []` unconditionally and silently erase them.
+const String kProvenanceReasonPrefix = 'meeting_';
+
+/// True for a provenance tag (see [kProvenanceReasonPrefix]) rather than a
+/// reason the voter chose.
+bool isProvenanceReasonCode(String code) =>
+    code.startsWith(kProvenanceReasonPrefix);
+
+/// Just the provenance tags out of a stored `reason_codes` array.
+List<String> provenanceCodesOf(Iterable<String>? codes) => <String>[
+      for (final c in codes ?? const <String>[])
+        if (isProvenanceReasonCode(c)) c
+    ];
 
 /// One executive member's ballot on one candidate: a 3-way vote plus the
 /// optional reason capture (single-element `reasonCodes` today; array type
@@ -51,7 +74,18 @@ class BallotEntry {
   });
 
   bool get isYes => vote == 'yes';
-  bool get hasReason => reasonCodes.isNotEmpty;
+
+  /// Only the codes the voter actually chose. `meeting_2026_07_14` is a
+  /// provenance tag, not a reason, and rendering it as one printed the raw
+  /// string under "Reason:" on 14 to 23 rows for every exec who was on the
+  /// July 14 call.
+  List<String> get statedReasonCodes =>
+      [for (final c in reasonCodes) if (!isProvenanceReasonCode(c)) c];
+
+  /// Provenance tags on this ballot (see [kProvenanceReasonPrefix]).
+  List<String> get provenanceCodes => provenanceCodesOf(reasonCodes);
+
+  bool get hasReason => statedReasonCodes.isNotEmpty;
 }
 
 /// A per-candidate 3-way tally plus how many seeded execs have not weighed in.
@@ -82,22 +116,20 @@ class VoteTally {
   bool get majorityYes => cast > 0 && yes > no;
 }
 
-/// One sentence describing tonight's quorum, in a shape that is true.
+/// One sentence describing the consensus rule, in a shape that is true.
 ///
-/// This used to render as "{effectiveQuorum} of {participants} voting", which
-/// on live data printed "Quorum tonight: 5 of 4 voting": a quorum larger than
-/// the number of people who have voted, formatted as if the two were parts of
-/// one fraction. They are not. `participants` counts who has actually cast a
-/// ballot; `effectiveQuorum` is the threshold, and it is clamped UP to
-/// [kQuorumFloor] so a thin turnout cannot manufacture consensus for the whole
-/// organisation. When the floor is doing the clamping, the threshold is
-/// legitimately above the turnout and the fraction shape becomes a lie.
-String quorumSentence(int effectiveQuorum, int participants) {
+/// Two separate numbers, never one fraction. [ballotsNeeded] is the per
+/// candidate threshold ([kQuorumFloor]); [participants] is how many execs have
+/// cast a ballot ANYWHERE on the roster, which is a different set from the
+/// people who have voted on any given candidate. Printing them as
+/// "5 of 8 voting" implied both a fraction and that all 8 were live tonight,
+/// and 4 of those 8 have cast nothing since the July 14 call.
+///
+/// No "tonight" anywhere: there is no meeting tonight, there is a deadline.
+String quorumSentence(int ballotsNeeded, int participants) {
   final execs = participants == 1 ? '1 exec has' : '$participants execs have';
-  if (effectiveQuorum > participants) {
-    return '$execs voted, consensus needs $effectiveQuorum';
-  }
-  return 'Quorum tonight: $effectiveQuorum of $participants voting';
+  return 'Consensus needs $ballotsNeeded ballots on a candidate · '
+      '$execs voted so far';
 }
 
 /// Which consensus bucket a ballot candidate falls into tonight.
@@ -112,11 +144,14 @@ class VoteBuckets {
   final List<String> split;
   final List<String> stillOpen;
 
-  /// Distinct voters who have cast at least one ballot on any ballot
-  /// candidate tonight (legacy pre-cast voters count).
+  /// Distinct voters who have cast at least one ballot anywhere on the
+  /// roster. DISPLAY ONLY: it is not part of the consensus threshold any
+  /// more (see [effectiveQuorum]).
   final int participants;
 
-  /// `max(kQuorumFloor, majority of participants)`.
+  /// Ballots one candidate needs before a supermajority on that candidate
+  /// counts as consensus. A FIXED floor ([kQuorumFloor]), deliberately not
+  /// derived from `participants`.
   final int effectiveQuorum;
 
   final Map<String, VoteBucket> byCandidate;
@@ -544,10 +579,22 @@ class EndorsementVoteRepository extends ChangeNotifier {
   /// every rebuild without O(candidates x voters) recomputes per notify.
   ///
   /// Rules (per candidate, `cast = yes + no + undecided`):
-  ///  - still open: cast < effectiveQuorum
-  ///  - consensus ready: cast >= effectiveQuorum AND a 2/3 supermajority of
+  ///  - still open: cast < [kQuorumFloor]
+  ///  - consensus ready: cast >= [kQuorumFloor] AND a 2/3 supermajority of
   ///    cast ballots agrees yes (suggests Endorse) or no (suggests Decline)
-  ///  - split: quorum reached, no supermajority.
+  ///  - split: floor reached, no supermajority.
+  ///
+  /// THE THRESHOLD IS PER CANDIDATE AND FIXED. It used to be
+  /// `max(kQuorumFloor, participants ~/ 2 + 1)` over the DISTINCT VOTERS
+  /// ACROSS THE WHOLE ROSTER, which grows monotonically as more execs start
+  /// voting. At 8 participants that gave a threshold of 5 and every settled
+  /// candidate (8 ballots each) read consensus-ready; the moment the other 8
+  /// execs cast their first ballot anywhere, participants would hit 16, the
+  /// threshold would jump to 9, and every candidate with 5 to 8 ballots would
+  /// silently revert to STILL OPEN: accent strips clearing, Confirm buttons
+  /// vanishing, and the STILL OPEN tile counting UP in response to more
+  /// people voting. A candidate's own ballot count is the only input that can
+  /// make its own bucket move.
   VoteBuckets buckets(List<String> ballotCandidateIds) {
     final key = ballotCandidateIds.join('|');
     if (!_bucketsDirty && key == _bucketsKey) return _bucketsCache;
@@ -558,10 +605,7 @@ class EndorsementVoteRepository extends ChangeNotifier {
       if (perCandidate != null) participantIds.addAll(perCandidate.keys);
     }
     final participants = participantIds.length;
-    final effectiveQuorum =
-        participants > 0 ? (participants ~/ 2) + 1 : kQuorumFloor;
-    final quorum =
-        effectiveQuorum < kQuorumFloor ? kQuorumFloor : effectiveQuorum;
+    const quorum = kQuorumFloor;
 
     final ready = <String>[];
     final split = <String>[];
@@ -611,7 +655,8 @@ class EndorsementVoteRepository extends ChangeNotifier {
 
   /// Cast or change the signed-in member's vote. Tapping the choice they have
   /// already selected withdraws it (deletes their row). Switching a vote
-  /// always clears reasons; the reason sheet then optionally re-writes them.
+  /// clears the STATED reasons (the reason sheet then optionally re-writes
+  /// them) and keeps any provenance tag: see [kProvenanceReasonPrefix].
   ///
   /// Optimistic-with-rollback: returns false (and restores the previous local
   /// ballot) when the write fails, so the UI can show a Retry.
@@ -626,12 +671,19 @@ class EndorsementVoteRepository extends ChangeNotifier {
       return clearVote(candidateId);
     }
     final snapshot = _votes[candidateId]?[uid];
+    // Stated reasons are cleared by a vote change (the sheet re-captures
+    // them). PROVENANCE IS NOT: this write used to send an unconditional
+    // `reason_codes: []`, so every re-cast on one of the 166 ballots the
+    // July 14 call produced silently destroyed the only marker distinguishing
+    // a backfilled ballot from a live one, with no way to tell afterwards how
+    // many had been revised.
+    final carried = provenanceCodesOf(snapshot?.reasonCodes);
     (_votes[candidateId] ??= {})[uid] = BallotEntry(
       candidateId: candidateId,
       voterId: uid,
       voterName: _currentUserName,
       vote: vote,
-      reasonCodes: const [],
+      reasonCodes: List.unmodifiable(carried),
       otherText: null,
       updatedAt: DateTime.now(),
     );
@@ -645,7 +697,7 @@ class EndorsementVoteRepository extends ChangeNotifier {
         'voter_id': uid,
         'voter_name': _currentUserName,
         'vote': vote,
-        'reason_codes': <String>[],
+        'reason_codes': carried,
         'other_text': null,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
@@ -704,12 +756,18 @@ class EndorsementVoteRepository extends ChangeNotifier {
       return false;
     }
     final snapshot = existing;
+    // The sheet only ever sends stated reasons; carry the row's provenance
+    // tags through so saving a reason does not erase them either.
+    final merged = <String>[
+      ...provenanceCodesOf(existing.reasonCodes),
+      ...reasonCodes.where((c) => !isProvenanceReasonCode(c)),
+    ];
     (_votes[candidateId] ??= {})[uid] = BallotEntry(
       candidateId: candidateId,
       voterId: uid,
       voterName: existing.voterName,
       vote: existing.vote,
-      reasonCodes: List.unmodifiable(reasonCodes),
+      reasonCodes: List.unmodifiable(merged),
       otherText: otherText,
       updatedAt: DateTime.now(),
     );
@@ -722,7 +780,7 @@ class EndorsementVoteRepository extends ChangeNotifier {
         'voter_id': uid,
         'voter_name': existing.voterName,
         'vote': existing.vote,
-        'reason_codes': reasonCodes,
+        'reason_codes': merged,
         'other_text': otherText,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       });

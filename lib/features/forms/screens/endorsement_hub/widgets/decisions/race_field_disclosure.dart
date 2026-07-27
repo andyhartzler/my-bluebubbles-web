@@ -16,9 +16,15 @@ import '../headshot_avatar.dart';
 /// whole point (BUILD-SPEC C3):
 ///
 ///   * field:       1+ other filed Democrats -> collapsible list
-///   * solo:        race key exists, zero others -> "Only Democrat filed in
-///                  this race" (the most decision-relevant fact about a solo
-///                  race, at the cost of one line)
+///   * solo:        race key exists, zero others, AND this applicant is the
+///                  only one -> "Only Democrat filed in this race" (the most
+///                  decision-relevant fact about a solo race, at the cost of
+///                  one line)
+///   * no others:   race key exists, zero non-applicants, but 2+ applicants
+///                  -> "No other filed Democrat beyond the applicants".
+///                  MO_HOUSE-39 and MO_SEN-18 each hold two applicants and no
+///                  outsider, and the solo line printed on all four of those
+///                  rows, directly under a race cap reading "2 applicants".
 ///   * keyless:     county / statewide applicants -> "No filed-candidate list
 ///                  for this office" (we hold a filing list for legislative
 ///                  and congressional races and not for these)
@@ -43,12 +49,19 @@ class RaceFieldDisclosure extends StatefulWidget {
   final bool loaded;
   final bool failed;
 
+  /// How many QUESTIONNAIRE APPLICANTS share this race key, this one
+  /// included. [others] holds only the filed Democrats who did NOT apply, so
+  /// without this the widget could not tell a genuinely solo race from a race
+  /// where every filed Democrat happens to have applied.
+  final int applicantsInRace;
+
   const RaceFieldDisclosure({
     super.key,
     required this.raceInfo,
     required this.others,
     required this.loaded,
     required this.failed,
+    this.applicantsInRace = 1,
   });
 
   @override
@@ -72,8 +85,14 @@ class _RaceFieldDisclosureState extends State<RaceFieldDisclosure> {
           'No filed-candidate list for this office');
     }
     if (widget.others.isEmpty) {
-      return _quietLine(context, Icons.person_outline,
-          'Only Democrat filed in this race');
+      // "Only Democrat filed in this race" is false the moment another
+      // applicant is standing in the same race, and the race cap directly
+      // above says so in the same breath.
+      return widget.applicantsInRace >= 2
+          ? _quietLine(context, Icons.groups_outlined,
+              'No other filed Democrat beyond the applicants in this race')
+          : _quietLine(context, Icons.person_outline,
+              'Only Democrat filed in this race');
     }
     return _field(context);
   }

@@ -41,8 +41,36 @@ const List<VoteReasonOption> kUndecidedReasonOptions = [
   VoteReasonOption('other', 'Other (add a note)'),
 ];
 
-/// Resolve a stored reason code to its display label (both vocabularies).
-/// Unknown codes echo back verbatim so an older client never renders blank.
+/// Month names for [provenanceReasonLabel].
+const List<String> _kMonthNames = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/// Display label for a provenance tag (`meeting_YYYY_MM_DD`), or null when the
+/// code is not one.
+///
+/// `meeting_2026_07_14` is on 166 of the 260 ballots on record: the July 14
+/// committee call, backfilled into `endorsement_votes` as ordinary ballots. It
+/// is in NEITHER option list, so the old "unknown codes echo back verbatim"
+/// fallback rendered the raw string as if the exec had typed it, on 14 to 23
+/// rows for everyone who was on that call.
+String? provenanceReasonLabel(String code) {
+  if (!isProvenanceReasonCode(code)) return null;
+  final parts = code.substring(kProvenanceReasonPrefix.length).split('_');
+  if (parts.length == 3) {
+    final month = int.tryParse(parts[1]);
+    final day = int.tryParse(parts[2]);
+    if (month != null && month >= 1 && month <= 12 && day != null) {
+      return 'Recorded at the ${_kMonthNames[month - 1]} $day meeting';
+    }
+  }
+  return 'Recorded at a committee meeting';
+}
+
+/// Resolve a stored reason code to its display label (both vocabularies, plus
+/// the provenance tags). Unknown codes echo back verbatim so an older client
+/// never renders blank.
 String voteReasonLabel(String code) {
   for (final o in kNoReasonOptions) {
     if (o.code == code) return o.label;
@@ -50,7 +78,7 @@ String voteReasonLabel(String code) {
   for (final o in kUndecidedReasonOptions) {
     if (o.code == code) return o.label;
   }
-  return code;
+  return provenanceReasonLabel(code) ?? code;
 }
 
 /// Optional follow-up sheet after a No / Undecided ballot: one tap to say

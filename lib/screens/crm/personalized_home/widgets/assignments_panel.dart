@@ -47,7 +47,7 @@ class AssignmentsPanel extends StatefulWidget {
 }
 
 class _AssignmentsPanelState extends State<AssignmentsPanel>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final _service = AssignmentsService();
   final _autoService = AutoInferredAssignmentsService();
 
@@ -65,6 +65,7 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initSubscribe();
     _loadOutgoing();
     _loadAuto();
@@ -73,9 +74,28 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _toMeSub?.cancel();
     _tabs?.dispose();
     super.dispose();
+  }
+
+  /// Auto-inferred items are a one-shot fetch behind a 30 second cache, and
+  /// nothing on this screen ever invalidated it, so "16 of 73 to vote on"
+  /// survived a whole session of voting: the exec came back from the ballot
+  /// with every candidate covered and the dashboard still said 16.
+  ///
+  /// Two triggers, both explicit: coming back from a deep-linked screen (see
+  /// [_openAuto]) and the app resuming.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) _refreshAuto();
+  }
+
+  Future<void> _refreshAuto() async {
+    _autoService.invalidate();
+    await _loadAuto();
   }
 
   Future<void> _initSubscribe() async {
@@ -116,6 +136,9 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
   }
 
   Future<void> _loadAuto() async {
+    // Reachable from a lifecycle callback and from a returning route now, so
+    // it can no longer assume the panel is still mounted.
+    if (!mounted) return;
     setState(() => _loadingAuto = true);
     final list = await _autoService.fetch(
       authUserId: widget.authUserId,
@@ -232,12 +255,15 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
     // (the Candidates page hosts it inline), so wrap one around it here for
     // a way back to the dashboard.
     if (a.source == 'endorsement_vote') {
-      navigator.push(MaterialPageRoute(
+      // AWAITED, then refreshed: the exec comes back from the hub having just
+      // voted, and the whole point of the card is the count.
+      await navigator.push(MaterialPageRoute(
         builder: (_) => Scaffold(
           appBar: AppBar(title: const Text('Endorsement HQ')),
           body: const EndorsementHubScreen(),
         ),
       ));
+      await _refreshAuto();
       return;
     }
     final kind = a.entityKind;
@@ -568,9 +594,11 @@ class _Item {
     Color bg;
     switch (p) {
       case 'high':
-      // 'urgent' marks deadline-driven auto items (endorsement ballot inside
-      // 48h of close, or closed). Same red as 'high': white-on-red on the
-      // fixed dark branded panel surface, identical in both app themes.
+      // 'urgent' marks deadline-driven auto items still inside their action
+      // window (endorsement ballot, last 48h before close; never after it,
+      // because a closed ballot is not something anyone can act on). Same red
+      // as 'high': white-on-red on the fixed dark branded panel surface,
+      // identical in both app themes.
       case 'urgent':
         bg = const Color(0xFFEF4444);
         break;

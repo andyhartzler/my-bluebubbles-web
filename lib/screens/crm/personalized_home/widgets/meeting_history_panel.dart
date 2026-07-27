@@ -33,6 +33,14 @@ class _MeetingHistoryPanelState extends State<MeetingHistoryPanel>
   List<Map<String, dynamic>> _upcoming = const [];
   List<Map<String, dynamic>> _attended = const [];
   List<Map<String, dynamic>> _hosted = const [];
+
+  /// Exact totals for the tab badges. The lists below them are paged, so
+  /// their lengths saturate at the page size: the chair hosts 17 meetings and
+  /// the Hosted tab read "(10)".
+  int _upcomingTotal = 0;
+  int _attendedTotal = 0;
+  int _hostedTotal = 0;
+
   bool _loading = true;
 
   @override
@@ -50,19 +58,34 @@ class _MeetingHistoryPanelState extends State<MeetingHistoryPanel>
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final results = await Future.wait([
+    final lists = await Future.wait([
       _service.fetchUpcomingInvited(widget.memberId),
       _service.fetchPastAttended(widget.memberId),
-      _service.fetchHosted(memberId: widget.memberId, authUserId: widget.authUserId),
+      _service.fetchHosted(
+          memberId: widget.memberId, authUserId: widget.authUserId),
+    ]);
+    final counts = await Future.wait([
+      _service.countUpcomingInvited(widget.memberId),
+      _service.countPastAttended(widget.memberId),
+      _service.countHosted(
+          memberId: widget.memberId, authUserId: widget.authUserId),
     ]);
     if (!mounted) return;
     setState(() {
-      _upcoming = results[0];
-      _attended = results[1];
-      _hosted = results[2];
+      _upcoming = lists[0];
+      _attended = lists[1];
+      _hosted = lists[2];
+      // Never below what is actually on screen: a count query that failed
+      // returns 0, and "(0)" over three visible rows is worse than a
+      // truncated count.
+      _upcomingTotal = _atLeast(counts[0], _upcoming.length);
+      _attendedTotal = _atLeast(counts[1], _attended.length);
+      _hostedTotal = _atLeast(counts[2], _hosted.length);
       _loading = false;
     });
   }
+
+  static int _atLeast(int count, int shown) => count < shown ? shown : count;
 
   @override
   Widget build(BuildContext context) {
@@ -78,9 +101,9 @@ class _MeetingHistoryPanelState extends State<MeetingHistoryPanel>
         controller: _tabs,
         onTap: (i) => _tabs.animateTo(i),
         tabs: [
-          Tab(text: 'Upcoming (${_upcoming.length})'),
-          Tab(text: 'Recent (${_attended.length})'),
-          Tab(text: 'Hosted (${_hosted.length})'),
+          Tab(text: 'Upcoming ($_upcomingTotal)'),
+          Tab(text: 'Recent ($_attendedTotal)'),
+          Tab(text: 'Hosted ($_hostedTotal)'),
         ],
       ),
       bodyHeight: 280,

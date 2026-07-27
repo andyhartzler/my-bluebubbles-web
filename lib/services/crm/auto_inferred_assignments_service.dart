@@ -33,12 +33,22 @@ tz.Location endorsementDeadlineLocation() {
 /// the first Sunday passed the card cheerfully rolled forward to the following
 /// week, which reads as though nothing is due.
 ///
-/// Change these four numbers to move the deadline. Nothing else needs editing.
+/// Change these five numbers to move the deadline. Nothing else needs editing.
 const int kVoteDeadlineYear = 2026;
 const int kVoteDeadlineMonth = 7;
 const int kVoteDeadlineDay = 27;
 const int kVoteDeadlineHour = 23;
 const int kVoteDeadlineMinute = 59;
+
+/// How long the closed ballot keeps showing up as a to-do after the deadline
+/// passes, before the card drops off the dashboard entirely.
+///
+/// Without a terminal branch this item had no end state at all: past the
+/// deadline the phrase latched to "past due" and the red urgent chip could
+/// never go false again, so a stale constant would have pinned a permanent
+/// red overdue card to every exec's home screen. A closed ballot is not an
+/// action anybody can take.
+const Duration kVoteDeadlineGrace = Duration(hours: 72);
 
 /// The deadline as a Central-time instant. America/Chicago, so daylight saving
 /// is handled rather than assumed.
@@ -53,18 +63,24 @@ tz.TZDateTime endorsementVoteDeadline() {
 /// to wrap the card onto a second row on a phone.
 String endorsementDeadlinePhrase(
     tz.TZDateTime deadline, tz.TZDateTime now) {
-  if (!now.isBefore(deadline)) return 'past due';
+  final time = deadline.hour == 23 && deadline.minute == 59
+      ? '11:59pm'
+      : '${deadline.hour > 12 ? deadline.hour - 12 : deadline.hour}'
+          ':${deadline.minute.toString().padLeft(2, '0')}'
+          '${deadline.hour >= 12 ? 'pm' : 'am'}';
+  // NAME THE DATE once it has passed. A bare "past due" is true of any
+  // deadline in history and says nothing about which one, so a constant left
+  // behind after the vote closed read as a live emergency instead of an
+  // obviously stale date.
+  if (!now.isBefore(deadline)) {
+    return 'closed ${deadline.month}/${deadline.day} $time';
+  }
   final today = tz.TZDateTime(now.location, now.year, now.month, now.day);
   final dueDay = tz.TZDateTime(
       now.location, deadline.year, deadline.month, deadline.day);
   // Round rather than truncate: a spring-forward week makes the
   // midnight-to-midnight span 23 hours, which would otherwise floor to 0.
   final days = (dueDay.difference(today).inHours / 24).round();
-  final time = deadline.hour == 23 && deadline.minute == 59
-      ? '11:59pm'
-      : '${deadline.hour > 12 ? deadline.hour - 12 : deadline.hour}'
-          ':${deadline.minute.toString().padLeft(2, '0')}'
-          '${deadline.hour >= 12 ? 'pm' : 'am'}';
   if (days <= 0) return 'due tonight $time';
   if (days == 1) return 'due tomorrow $time';
   const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -490,13 +506,20 @@ class AutoInferredAssignmentsService {
         final central = endorsementDeadlineLocation();
         final centralNow = tz.TZDateTime.from(now.toUtc(), central);
         final deadline = endorsementVoteDeadline();
-        final urgent =
+        final closed = !centralNow.isBefore(deadline);
+        // TERMINAL BRANCH. Past the grace window the ballot stops being a
+        // to-do at all and the card disappears, rather than sitting on the
+        // dashboard as a permanent red overdue item nobody can clear.
+        if (centralNow.isAfter(deadline.add(kVoteDeadlineGrace))) return;
+        // Urgent means "act now": inside the last 48 hours, and only while
+        // acting is still possible. A closed ballot is not urgent.
+        final urgent = !closed &&
             !centralNow.isBefore(deadline.subtract(const Duration(hours: 48)));
 
         results.add(AutoInferredAssignment(
           key: 'endorsement_vote:ballot',
           source: 'endorsement_vote',
-          title: 'Vote on candidates',
+          title: closed ? 'Voting has closed' : 'Vote on candidates',
           // One line. "16 of 73 to vote on, due Mon 11:59pm" fits a phone;
           // the old "16 of 50 awaiting your vote, Due Sunday at midnight
           // Central" wrapped onto a second row and looked broken.

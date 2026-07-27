@@ -6,6 +6,7 @@ import '../../../../theme/moyd_brand.dart';
 import '../../../../widgets/review/stance_visuals.dart';
 import '../../models/candidate_entry.dart';
 import '../headshot_avatar.dart';
+import 'decision_chip.dart';
 import 'decision_repository.dart';
 import 'district_map_sheet.dart';
 import 'district_ref.dart';
@@ -54,6 +55,12 @@ class BallotRow extends StatefulWidget {
   /// expansion; null keeps the row exactly as before.
   final Widget? raceDisclosure;
 
+  /// Fired after a ballot write on this row COMMITS: true when a vote was
+  /// recorded, false when it was withdrawn or the write failed. The board
+  /// uses it to pin the row in place under the "needs my vote" filter so it
+  /// does not vanish from under the exec's finger.
+  final void Function(bool voted)? onVoted;
+
   const BallotRow({
     super.key,
     required this.entry,
@@ -72,6 +79,7 @@ class BallotRow extends StatefulWidget {
     this.displayName,
     this.conflictLabel,
     this.raceDisclosure,
+    this.onVoted,
   });
 
   @override
@@ -148,6 +156,28 @@ class _BallotRowState extends State<BallotRow> {
 
   /// Name actually rendered (override wins; see [BallotRow.displayName]).
   String get _name => widget.displayName ?? entry.name;
+
+  /// The committee's RECORDED decision on this candidate, or undecided while
+  /// the decisions load is anything but ready.
+  ///
+  /// Gated exactly like the browse gallery's chip builder: `stateFor`
+  /// defaults a missing entry to undecided, so reading it before a successful
+  /// load would label every settled candidate as unsettled. Until this
+  /// existed, DecisionChip was built in ONE place in the whole app (the
+  /// browse gallery), and the ballot the committee actually votes on showed
+  /// no decision state at all: the 23 candidates gavelled on July 14 rendered
+  /// as ordinary open rows.
+  DecisionState get _decision =>
+      widget.repository.loadState == DecisionLoadState.ready
+          ? widget.repository.stateFor(entry.id)
+          : DecisionState.undecided;
+
+  bool get _settled => _decision != DecisionState.undecided;
+
+  /// Only decided rows get a chip. An "Undecided" pill on the other 50 rows
+  /// is noise: on the ballot, no chip already means no decision recorded.
+  Widget? _decisionChip() =>
+      _settled ? DecisionChip(state: _decision, compact: true) : null;
 
   @override
   Widget build(BuildContext context) {
@@ -228,9 +258,11 @@ class _BallotRowState extends State<BallotRow> {
     );
   }
 
-  /// One line: identity, qualifiers, room state, my action, chevron.
+  /// One line: identity, recorded decision, qualifiers, room state, my
+  /// action, chevron.
   Widget _wideHeader(ThemeData theme) {
     final cs = theme.colorScheme;
+    final chip = _decisionChip();
     return Row(
       children: [
         HeadshotAvatar(file: entry.headshot, name: _name, size: 36),
@@ -243,11 +275,18 @@ class _BallotRowState extends State<BallotRow> {
                   ?.copyWith(fontWeight: FontWeight.w800)),
         ),
         const SizedBox(width: 8),
+        if (chip != null) ...[
+          chip,
+          const SizedBox(width: 8),
+        ],
         if (widget.conflictLabel != null) ...[
           // Bounded: the pill's inner Flexible needs finite width inside
-          // this unbounded header Row.
+          // this unbounded header Row. The cap tightens when a decision chip
+          // is also on this line so the two together cannot squeeze the name
+          // out at the 720px breakpoint (no candidate is both settled and
+          // office-conflicted today; this is the guard for when one is).
           ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 240),
+            constraints: BoxConstraints(maxWidth: chip == null ? 240 : 150),
             child: _ConflictPill(label: widget.conflictLabel!),
           ),
           const SizedBox(width: 8),
@@ -268,12 +307,20 @@ class _BallotRowState extends State<BallotRow> {
           width: 110,
           child: Align(
             alignment: Alignment.centerRight,
-            child: _TinyTally(tally: votes.tallyFor(entry.id)),
+            child: _TinyTally(
+                tally: votes.tallyFor(entry.id), settled: _settled),
           ),
         ),
         const SizedBox(width: 10),
+        // onVoted must be passed HERE too, not just in the narrow header.
+        // Without it the sticky-row behaviour only worked on phones, and every
+        // exec voting from a laptop still had the row pop out from under the
+        // cursor and the list re-sort on the first tap.
         _VoteSegmentedControl(
-            entry: entry, votes: votes, displayName: _name),
+            entry: entry,
+            votes: votes,
+            displayName: _name,
+            onVoted: widget.onVoted),
         const SizedBox(width: 6),
         _chevron(cs),
       ],
@@ -286,6 +333,7 @@ class _BallotRowState extends State<BallotRow> {
   /// give way, both behind an ellipsis.
   Widget _narrowHeader(ThemeData theme) {
     final cs = theme.colorScheme;
+    final chip = _decisionChip();
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -308,27 +356,42 @@ class _BallotRowState extends State<BallotRow> {
             _chevron(cs),
           ],
         ),
-        // The conflict pill gets its own chip line on narrow rather than
-        // competing with the name row or squeezing the fixed-size vote
-        // control below: "Filed: Senate 34 · Said: House 34" plus the
-        // segmented control cannot share 360px without an overflow.
-        if (widget.conflictLabel != null) ...[
+        // The decision chip and the conflict pill share their own chip line
+        // on narrow rather than competing with the name row or squeezing the
+        // fixed-size vote control below: "Filed: Senate 34 · Said: House 34"
+        // plus the segmented control cannot share 360px without an overflow.
+        // A Wrap, so the two together fall to a second line instead of
+        // overflowing on the narrowest phones.
+        if (chip != null || widget.conflictLabel != null) ...[
           const SizedBox(height: 4),
           Align(
             alignment: Alignment.centerLeft,
-            child: _ConflictPill(label: widget.conflictLabel!),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (chip != null) chip,
+                if (widget.conflictLabel != null)
+                  _ConflictPill(label: widget.conflictLabel!),
+              ],
+            ),
           ),
         ],
         const SizedBox(height: 4),
         Row(
           children: [
             _VoteSegmentedControl(
-                entry: entry, votes: votes, displayName: _name),
+                entry: entry,
+                votes: votes,
+                displayName: _name,
+                onVoted: widget.onVoted),
             const SizedBox(width: 8),
             Expanded(
               child: Align(
                 alignment: Alignment.centerRight,
-                child: _TinyTally(tally: votes.tallyFor(entry.id)),
+                child: _TinyTally(
+                    tally: votes.tallyFor(entry.id), settled: _settled),
               ),
             ),
           ],
@@ -507,7 +570,12 @@ class _ConflictPill extends StatelessWidget {
 /// segments stay rendered but dimmed so the columns are positionally stable.
 class _TinyTally extends StatelessWidget {
   final VoteTally tally;
-  const _TinyTally({required this.tally});
+
+  /// True on a candidate the committee has already recorded a decision for:
+  /// the "N waiting" suffix is dropped, because nobody is waited on.
+  final bool settled;
+
+  const _TinyTally({required this.tally, this.settled = false});
 
   @override
   Widget build(BuildContext context) {
@@ -551,7 +619,8 @@ class _TinyTally extends StatelessWidget {
         text: ' · ', style: TextStyle(color: cs.onSurfaceVariant));
     return Semantics(
       label: '${tally.yes} yes, ${tally.no} no, '
-          '${tally.undecided} undecided, ${tally.pending} waiting',
+          '${tally.undecided} undecided'
+          '${settled ? '' : ', ${tally.pending} waiting'}',
       child: ExcludeSemantics(
         child: Text.rich(
           TextSpan(children: [
@@ -560,7 +629,7 @@ class _TinyTally extends StatelessWidget {
             seg(tally.no, 'N', MoydBrand.opposeFg),
             sep,
             seg(tally.undecided, 'U', MoydBrand.neutralFg),
-            if (tally.pending > 0)
+            if (tally.pending > 0 && !settled)
               TextSpan(
                   text: ' · ${tally.pending} waiting',
                   style: TextStyle(color: cs.onSurfaceVariant)),
@@ -590,10 +659,14 @@ class _VoteSegmentedControl extends StatefulWidget {
   /// after the exec has scrolled that row off screen.
   final String displayName;
 
+  /// See [BallotRow.onVoted].
+  final void Function(bool voted)? onVoted;
+
   const _VoteSegmentedControl({
     required this.entry,
     required this.votes,
     required this.displayName,
+    this.onVoted,
   });
 
   @override
@@ -636,6 +709,16 @@ class _VoteSegmentedControlState extends State<_VoteSegmentedControl> {
     // messenger lives above the list and outlives the row.
     final m = messenger ?? ScaffoldMessenger.of(context);
     final wasMine = widget.votes.myVote(widget.entry.id);
+    // Tapping the choice already selected withdraws it (castVote's own
+    // branch), which is the one case where the row should NOT be pinned.
+    final withdrawing = wasMine == choice;
+    // Pinned BEFORE the write, not after it: castVote updates the local map
+    // and notifies optimistically, so the board rebuilds while the upsert is
+    // still in flight. Announcing the vote only after the await would leave
+    // one frame in which the "needs my vote" filter has already dropped this
+    // row, which is exactly the row-vanishing-under-your-finger behaviour
+    // this callback exists to stop.
+    if (!withdrawing) widget.onVoted?.call(true);
     // The Retry action can fire after this row has scrolled away and been
     // unmounted, so every _busy transition goes through this guard rather
     // than a bare setState, which would throw on a defunct State.
@@ -655,6 +738,9 @@ class _VoteSegmentedControlState extends State<_VoteSegmentedControl> {
       setBusy(false);
     }
     if (!ok) {
+      // The write rolled back, so the row is genuinely unvoted again: unpin
+      // it rather than leaving a failed vote parked in the list looking done.
+      if (!withdrawing) widget.onVoted?.call(false);
       m.showSnackBar(SnackBar(
         content: Text("${widget.displayName}: vote didn't save. "
             'Check connection.'),
@@ -665,7 +751,8 @@ class _VoteSegmentedControlState extends State<_VoteSegmentedControl> {
       ));
       return;
     }
-    final withdrew = wasMine == choice;
+    final withdrew = withdrawing;
+    if (withdrew) widget.onVoted?.call(false);
     if (!withdrew && (choice == 'no' || choice == 'undecided')) {
       // Non-blocking: the ballot is already recorded; the sheet only offers
       // the optional why. Needs a live context, so it is the one part that

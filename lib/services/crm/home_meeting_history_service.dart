@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_service.dart';
@@ -43,34 +44,138 @@ class HomeMeetingHistoryService {
     }
   }
 
+  /// Today in ISO date form, the comparison basis for "upcoming".
+  static String get _today => DateTime.now().toIso8601String().split('T').first;
+
+  /// The scheduled_meetings ids this member is invited to.
+  Future<List<String>> _invitedMeetingIds(
+      SupabaseClient client, String memberId) async {
+    final rows = await client
+        .from('meeting_invitees')
+        .select('meeting_id')
+        .eq('member_id', memberId);
+    return <String>{
+      for (final r in (rows as List).whereType<Map>())
+        if (r['meeting_id'] != null) r['meeting_id'].toString(),
+    }.toList();
+  }
+
   /// Upcoming scheduled meetings the member is invited to.
+  ///
+  /// TWO BUGS LIVED HERE, and they cancelled out into a permanent "Upcoming
+  /// (0)" that never once threw a visible error:
+  ///
+  ///  1. The embedded select asked scheduled_meetings for `meeting_title`.
+  ///     That column does not exist on that table (it is `title`;
+  ///     public.meetings is the one with `meeting_title`, which is why the
+  ///     attended query works). PostgREST answered 42703, the catch swallowed
+  ///     it to debugPrint, and the panel rendered the empty list as "No
+  ///     upcoming meetings".
+  ///  2. The filtering was client-side over a page ordered by `meeting_id`, a
+  ///     uuid. Sorting meetings by a random identifier and then keeping the
+  ///     first 30 drops genuinely upcoming meetings for no reason a reader
+  ///     could ever see.
+  ///
+  /// Both are now server-side, against the real column names, ordered by the
+  /// date the tab claims to sort by. The `meeting_title:title` alias keeps the
+  /// key the panel reads (see MeetingHistoryPanel) unchanged.
   Future<List<Map<String, dynamic>>> fetchUpcomingInvited(String memberId,
       {int limit = 10}) async {
     final client = _client;
     if (client == null) return const [];
     try {
-      final today = DateTime.now().toIso8601String().split('T').first;
+      final ids = await _invitedMeetingIds(client, memberId);
+      if (ids.isEmpty) return const [];
       final rows = await client
-          .from('meeting_invitees')
+          .from('scheduled_meetings')
           .select(
-              'meeting_id, scheduled_meetings(id, meeting_title, meeting_date, start_time, status, committee_id)')
-          .eq('member_id', memberId)
-          .order('meeting_id', ascending: true)
-          .limit(limit * 3);
-      final flattened = _flattenJoined(rows, joinKey: 'scheduled_meetings');
-      // Filter for status == scheduled and meeting_date >= today
-      return flattened
-          .where((m) {
-            final status = (m['status'] as String?) ?? '';
-            final dateStr = m['meeting_date']?.toString() ?? '';
-            return status == 'scheduled' && dateStr.compareTo(today) >= 0;
-          })
-          .take(limit)
+              'id, meeting_title:title, meeting_date, start_time, status, committee_id')
+          .inFilter('id', ids)
+          .eq('status', 'scheduled')
+          .gte('meeting_date', _today)
+          .order('meeting_date', ascending: true)
+          .limit(limit);
+      return (rows as List)
+          .whereType<Map>()
+          .map((r) => Map<String, dynamic>.from(r))
           .toList();
     } catch (e) {
       debugPrint('[HomeMeetingHistoryService] fetchUpcomingInvited: $e');
       return const [];
     }
+  }
+
+  /// Exact number of upcoming invited meetings, independent of the page size
+  /// [fetchUpcomingInvited] renders. The tab badges are counts, and a count
+  /// that silently saturates at the limit is not one.
+  Future<int> countUpcomingInvited(String memberId) async {
+    final client = _client;
+    if (client == null) return 0;
+    try {
+      final ids = await _invitedMeetingIds(client, memberId);
+      if (ids.isEmpty) return 0;
+      final PostgrestResponse res = await client
+          .from('scheduled_meetings')
+          .select('id')
+          .inFilter('id', ids)
+          .eq('status', 'scheduled')
+          .gte('meeting_date', _today)
+          .count(CountOption.exact);
+      return res.count;
+    } catch (e) {
+      debugPrint('[HomeMeetingHistoryService] countUpcomingInvited: $e');
+      return 0;
+    }
+  }
+
+  /// Exact number of past meetings this member attended.
+  Future<int> countPastAttended(String memberId) async {
+    final client = _client;
+    if (client == null) return 0;
+    try {
+      final PostgrestResponse res = await client
+          .from('meeting_attendance')
+          .select('meeting_id')
+          .eq('member_id', memberId)
+          .count(CountOption.exact);
+      return res.count;
+    } catch (e) {
+      debugPrint('[HomeMeetingHistoryService] countPastAttended: $e');
+      return 0;
+    }
+  }
+
+  /// Exact number of meetings this member hosts: past hosted plus upcoming
+  /// created. The chair hosts 17 and the list pages at 10, so the badge read
+  /// "Hosted (10)".
+  Future<int> countHosted({
+    required String memberId,
+    required String authUserId,
+  }) async {
+    final client = _client;
+    if (client == null) return 0;
+    var total = 0;
+    try {
+      final PostgrestResponse past = await client
+          .from('meetings')
+          .select('id')
+          .eq('meeting_host', memberId)
+          .count(CountOption.exact);
+      total += past.count;
+    } catch (e) {
+      debugPrint('[HomeMeetingHistoryService] countHosted past: $e');
+    }
+    try {
+      final PostgrestResponse upcoming = await client
+          .from('scheduled_meetings')
+          .select('id')
+          .eq('created_by', authUserId)
+          .count(CountOption.exact);
+      total += upcoming.count;
+    } catch (e) {
+      debugPrint('[HomeMeetingHistoryService] countHosted upcoming: $e');
+    }
+    return total;
   }
 
   /// Past meetings the member EITHER attended OR hosted, merged and
@@ -171,9 +276,13 @@ class HomeMeetingHistoryService {
       debugPrint('[HomeMeetingHistoryService] fetchHosted past: $e');
     }
     try {
+      // `meeting_title:title` for the same reason as fetchUpcomingInvited:
+      // scheduled_meetings has no meeting_title column, so this half of the
+      // Hosted tab was answering 42703 and silently contributing nothing.
       final upcoming = await client
           .from('scheduled_meetings')
-          .select('id, meeting_title, meeting_date, start_time, status, committee_id')
+          .select(
+              'id, meeting_title:title, meeting_date, start_time, status, committee_id')
           .eq('created_by', authUserId)
           .order('meeting_date', ascending: true)
           .limit(limit);

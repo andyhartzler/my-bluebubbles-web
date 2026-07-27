@@ -23,13 +23,38 @@ import 'roster_gallery.dart';
 /// ballot, or the research-oriented candidate gallery.
 enum HubMode { ballot, browse }
 
+/// THE ONE definition of "needs my vote": every candidate on the roster this
+/// exec has not cast a ballot on. One function, because there were three
+/// copies of this expression and two of them still carried a
+/// `stateFor(id) == undecided` clause left over from the days when decided
+/// candidates lived in a separate locked section.
+///
+/// That clause is why the mode strip and the Roster tab painted a gold "50"
+/// beside a toolbar reading "Needs my vote (73)", a progress pill reading
+/// "0 / 73 voted" and 73 rows: two different numbers for the same words, on
+/// one screen, for the 8 execs who have not voted yet. Decided candidates are
+/// votable and changeable like every other row now, so a decision does not
+/// remove anything from anyone's ballot.
+///
+/// FULL-BALLOT AGGREGATE INVARIANT: computed from the unfiltered
+/// [SlateController.all], never from the search-filtered visible list.
+int needsMyVoteCount(SlateController controller, EndorsementVoteRepository votes) {
+  var n = 0;
+  for (final e in controller.all) {
+    if (votes.myVote(e.id) == null) n++;
+  }
+  return n;
+}
+
 /// The merged Roster + Decisions tab: one tab, two modes.
 ///
 /// Ballot mode is the landing mode and carries the full committee voting
-/// pipeline (scoreboard, pinned toolbar, [BallotRow] list, locked baseline)
-/// transplanted from the retired DecisionBoard. Browse mode hosts the
-/// existing [RosterGallery] untouched. Search is the ONE query surface the
-/// two modes share (via [SlateController.search]); the browse-side research
+/// pipeline (scoreboard, pinned toolbar, [BallotRow] list) transplanted from
+/// the retired DecisionBoard. Every candidate sits in that one list, decided
+/// or not; there is no locked baseline and no separate decided section.
+/// Browse mode hosts the existing [RosterGallery] untouched. Search is the
+/// ONE query surface the two modes share (via [SlateController.search]); the
+/// browse-side research
 /// filters (office / district / alignment range / flags) are deliberately
 /// never consulted by the ballot, so a stale histogram drill-in can never
 /// silently shrink tonight's ballot.
@@ -109,8 +134,9 @@ class RosterBoardState extends State<RosterBoard>
   void initState() {
     super.initState();
     widget.controller.addListener(_syncSearchFromController);
-    // The landing computation needs all three loads: decisions (partition),
-    // votes (myVote), and the slate itself (the candidate universe).
+    // The landing computation needs the votes (myVote) and the slate itself
+    // (the candidate universe); the decisions load is watched too, because a
+    // failed one must keep the exec on Ballot looking at the retry card.
     _landingListen = Listenable.merge(
         [widget.repository, widget.votes, widget.controller]);
     _landingListen.addListener(_maybeResolveLanding);
@@ -158,7 +184,13 @@ class RosterBoardState extends State<RosterBoard>
   /// One-shot landing computation, raced pinned shut behind
   /// [DecisionLoadState.ready], a completed votes load, and a completed slate
   /// load. If the exec has zero open ballots and never picked a mode, land on
-  /// Browse with the filter widened to All. On a failed decisions load
+  /// Browse with the filter widened to All.
+  ///
+  /// "Zero open ballots" is [needsMyVoteCount], the same definition as every
+  /// badge. It used to carry an extra `stateFor == undecided` clause, so an
+  /// exec who had covered the 50 undecided candidates but none of the 23
+  /// settled ones was silently landed on Browse with 23 unvoted rows behind
+  /// him. On a failed decisions load
   /// `_landingResolved` stays false and the tab stays on Ballot showing the
   /// inline retry card: the board never silently slides to Browse and hides
   /// the outage.
@@ -186,20 +218,22 @@ class RosterBoardState extends State<RosterBoard>
     if (landOnBrowse) _stopClock();
   }
 
-  /// FULL-BALLOT AGGREGATE INVARIANT: this count, the scoreboard, quorum,
-  /// the progress pill, the tab and segment badges, and the copy summary all
-  /// compute from the unfiltered ballot partition of [SlateController.all],
-  /// never from the search-filtered visible list. The numbers never lie even
-  /// when the list is narrowed.
-  int _needsMyVoteCount() {
-    var n = 0;
-    for (final e in widget.controller.all) {
-      if (widget.repository.stateFor(e.id) == DecisionState.undecided &&
-          widget.votes.myVote(e.id) == null) {
-        n++;
-      }
+  /// See [needsMyVoteCount]: one shared definition, no local variant.
+  int _needsMyVoteCount() =>
+      needsMyVoteCount(widget.controller, widget.votes);
+
+  /// Candidates carrying a recorded committee decision. Empty unless the
+  /// decisions load succeeded, because `stateFor` defaults a missing entry to
+  /// undecided and a failed load would report every settled candidate as
+  /// unsettled.
+  Set<String> _recordedIds() {
+    if (widget.repository.loadState != DecisionLoadState.ready) {
+      return const <String>{};
     }
-    return n;
+    return {
+      for (final e in widget.controller.all)
+        if (widget.repository.stateFor(e.id) != DecisionState.undecided) e.id
+    };
   }
 
   void _setMode(HubMode m, {bool userPicked = false}) {
@@ -262,13 +296,20 @@ class RosterBoardState extends State<RosterBoard>
   }
 
   /// Per-row "other Democrats in this race" disclosure for the expansion.
-  Widget _raceDisclosureFor(CandidateEntry e) {
+  ///
+  /// [applicantCounts] is the same unfiltered applicants-per-race map the race
+  /// cap uses, so the disclosure can tell a genuinely solo race from one where
+  /// two applicants are running against each other and nobody else filed.
+  Widget _raceDisclosureFor(
+      CandidateEntry e, Map<String, int> applicantCounts) {
     final info = widget.controller.raceInfoFor(e.id);
+    final key = info?.raceKey;
     return RaceFieldDisclosure(
       raceInfo: info,
-      others: widget.controller.raceFieldFor(info?.raceKey),
+      others: widget.controller.raceFieldFor(key),
       loaded: widget.controller.raceDataLoaded,
       failed: widget.controller.raceLoadFailed,
+      applicantsInRace: key == null ? 1 : (applicantCounts[key] ?? 1),
     );
   }
 
@@ -375,8 +416,8 @@ class RosterBoardState extends State<RosterBoard>
   /// behind a race cap, leaving every solo row in its exact position.
   ///
   /// Pure presentation over the already filtered + sorted + searched
-  /// [visible] list; the unfiltered [ballot] / [baseline] partitions are read
-  /// only to compute the cap's honest counts and its decided-mates suffix.
+  /// [visible] list; the unfiltered [ballot] list is read only to compute the
+  /// cap's honest counts and its decided-mates suffix.
   ///
   /// KNOWN, DELIBERATE SORT PERTURBATION. Do not "fix" this: race mates are
   /// spliced up to their best-sorted member (the anchor), so a
@@ -389,11 +430,12 @@ class RosterBoardState extends State<RosterBoard>
   List<_BallotItem> _clusterContested(
     List<CandidateEntry> visible,
     List<CandidateEntry> ballot,
-    List<CandidateEntry> baseline,
+    Set<String> recordedIds,
     Map<String, int> unfilteredRaceCounts,
   ) {
     final items = <_BallotItem>[];
     final splicedRaces = <String>{};
+    final visibleIds = {for (final v in visible) v.id};
     for (final e in visible) {
       final k = _raceKeyOf(e);
       // Solo (or keyless, or view-uncovered) rows pass through untouched:
@@ -416,9 +458,19 @@ class RosterBoardState extends State<RosterBoard>
         visibleCount: mates.length,
         unfilteredBallotCount:
             ballot.where((b) => _raceKeyOf(b) == k).length,
+        // Race mates that ARE decided but are NOT on screen right now
+        // (filtered out, or hidden by search). Sourced from the ballot
+        // itself: the old source was a `const baseline = <CandidateEntry>[]`
+        // left behind when the separate decided section was deleted, so this
+        // suffix could never appear at all despite the comments claiming it
+        // did. A decided mate that IS on screen needs no link: its own row is
+        // right below the cap, carrying its own decision chip.
         decidedMates: [
-          for (final b in baseline)
-            if (_raceKeyOf(b) == k) b
+          for (final b in ballot)
+            if (_raceKeyOf(b) == k &&
+                recordedIds.contains(b.id) &&
+                !visibleIds.contains(b.id))
+              b
         ],
       ));
       for (var i = 0; i < mates.length; i++) {
@@ -486,23 +538,19 @@ class RosterBoardState extends State<RosterBoard>
           builder: (context, _) {
             final ready =
                 widget.repository.loadState == DecisionLoadState.ready;
-            // Badge and decided count both hide unless the decisions load is
-            // ready: never show a number computed against an unverified
-            // baseline.
-            final needs = ready ? _needsMyVoteCount() : 0;
-            var decided = 0;
-            if (ready) {
-              for (final e in widget.controller.all) {
-                if (widget.repository.stateFor(e.id) !=
-                    DecisionState.undecided) {
-                  decided++;
-                }
-              }
-            }
+            // EACH NUMBER GATES ON THE LOAD IT ACTUALLY READS. The badge is
+            // pure ballot data now, so it waits on the ballots (a failed vote
+            // fetch would otherwise paint a confident "73" over a card that
+            // promises nothing is shown); the decided count is pure decision
+            // data, so it waits on the decisions.
+            final votesReady =
+                widget.votes.loadState == VoteLoadState.ready;
+            final needs = votesReady ? _needsMyVoteCount() : 0;
+            final decided = ready ? _recordedIds().length : 0;
             final pill = _ModeSwitch(
               mode: _mode,
               onChanged: (m) => _setMode(m, userPicked: true),
-              ballotBadge: ready && needs > 0 ? needs : null,
+              ballotBadge: votesReady && needs > 0 ? needs : null,
             );
             if (narrow || !ready || decided == 0) {
               return Row(children: [pill]);
@@ -604,16 +652,8 @@ class RosterBoardState extends State<RosterBoard>
         }
 
         final all = widget.controller.all;
-        // Partition by decision STATE, not row existence: undecided (or
-        // missing) = on the ballot; endorse/decline = locked baseline.
-        // FULL-BALLOT AGGREGATE INVARIANT: every aggregate below (scoreboard,
-        // quorum, progress pill, needsMyVoteCount, badges, copy summary)
-        // computes from this unfiltered partition, never from the
-        // search-filtered `visible`. And the ballot never consults the
-        // browse-side research filters: a stale histogram drill-in
-        // (focusAlignmentRange narrows the range AND clears unscored) must
-        // never shrink tonight's ballot.
-        // ONE LIST. There is no separate "already decided" section any more.
+        // ONE LIST. There is no separate "already decided" section, and no
+        // partition: every candidate is on the ballot, decided or not.
         //
         // Decided candidates used to be pulled into a collapsed block at the
         // bottom behind a padlock, with a line of provenance about what the
@@ -622,14 +662,22 @@ class RosterBoardState extends State<RosterBoard>
         // them, and drop the transcript commentary entirely. A decision is
         // just a vote that already happened.
         //
-        // The decision state still shows as a chip on the row, so you can see
-        // where a candidate stands, and changing it is the same control as on
-        // any other row.
+        // The recorded state rides ON the row: a DecisionChip in the header
+        // (BallotRow._decisionChip) and a "Recorded: Declined" strip in the
+        // expansion instead of a Confirm button. `recordedIds` is the one
+        // place that set is computed for this build.
+        //
+        // FULL-BALLOT AGGREGATE INVARIANT: every aggregate below (scoreboard,
+        // progress pill, needsMyVoteCount, badges, copy summary) computes
+        // from this unfiltered list, never from the search-filtered
+        // `visible`. And the ballot never consults the browse-side research
+        // filters: a stale histogram drill-in (focusAlignmentRange narrows
+        // the range AND clears unscored) must never shrink the ballot.
         final ballot = List<CandidateEntry>.of(all);
-        const baseline = <CandidateEntry>[];
+        final recordedIds = _recordedIds();
         final ballotIds = [for (final e in ballot) e.id];
-        // Stale-expansion prune: a realtime decision landing mid-meeting
-        // must not leave a locked candidate's row expanded.
+        // Stale-expansion prune: an id that leaves the roster entirely must
+        // not stay in the expansion set.
         final ballotIdSet = ballotIds.toSet();
         _expanded.removeWhere((id) => !ballotIdSet.contains(id));
         final buckets = widget.votes.buckets(ballotIds);
@@ -637,13 +685,12 @@ class RosterBoardState extends State<RosterBoard>
         // Search is the final pipeline step, after filter + sort.
         final visible =
             _visibleBallot(ballot, buckets).where(_matches).toList();
-        final needsMyVoteCount =
-            ballot.where((e) => widget.votes.myVote(e.id) == null).length;
-        // Applicants per race across the UNION of the ballot and baseline
-        // partitions, because a race can straddle the partition (House 39
-        // does today: Lakins declined, Lloyd still open). This is the number
-        // the race cap shows and the anchor of its self-defense; contested
-        // detection (>= 2) keys on it too.
+        // Same definition as every other "needs my vote" on the screen.
+        final needsMyVote = _needsMyVoteCount();
+        // Applicants per race across the whole roster. This is the number the
+        // race cap shows and the anchor of its self-defense; contested
+        // detection (>= 2) keys on it too, and so does the race-field
+        // disclosure's solo line.
         final unfilteredRaceCounts = <String, int>{};
         for (final e in all) {
           final k = _raceKeyOf(e);
@@ -653,9 +700,9 @@ class RosterBoardState extends State<RosterBoard>
         }
         // The cluster pass: presentation-only regrouping of the already
         // filtered + sorted + searched `visible` list. Every aggregate above
-        // and below keeps reading the unfiltered partitions.
-        final items =
-            _clusterContested(visible, ballot, baseline, unfilteredRaceCounts);
+        // and below keeps reading the unfiltered roster.
+        final items = _clusterContested(
+            visible, ballot, recordedIds, unfilteredRaceCounts);
 
         final live =
             widget.repository.realtimeHealthy && widget.votes.realtimeHealthy;
@@ -688,8 +735,9 @@ class RosterBoardState extends State<RosterBoard>
                           ballot: ballot,
                           votes: widget.votes,
                           buckets: buckets,
-                          onCopy: () =>
-                              _copySummary(context, ballot, baseline, buckets),
+                          recordedIds: recordedIds,
+                          onCopy: () => _copySummary(
+                              context, ballot, recordedIds, buckets),
                         ),
                         const SizedBox(height: 10),
                         Text(
@@ -732,10 +780,10 @@ class RosterBoardState extends State<RosterBoard>
                       _justVoted.clear();
                     }),
                   showSplits: widget.isChair,
-                  needsMyVoteCount: needsMyVoteCount,
+                  needsMyVoteCount: needsMyVote,
                   sort: _sort,
                   onSortChanged: (s) => setState(() => _sort = s),
-                  votedCount: ballot.length - needsMyVoteCount,
+                  votedCount: ballot.length - needsMyVote,
                   ballotTotal: ballot.length,
                 ),
               ),
@@ -747,15 +795,18 @@ class RosterBoardState extends State<RosterBoard>
                       padding: const EdgeInsets.only(top: 12),
                       child: HubCardHeader(
                         icon: Icons.how_to_vote,
-                        title: 'On the ballot tonight · ${ballot.length}',
-                        // Search is the only shared query surface, so it is
-                        // the only way this list can be narrowed, and the
-                        // header self-defends against it.
-                        subtitle: query.isNotEmpty &&
-                                visible.length < ballot.length
-                            ? '${visible.length} of ${ballot.length} shown '
-                                '· search active'
-                            : '${buckets.stillOpen.length} still open',
+                        // No "tonight": there is no meeting tonight, there is
+                        // a deadline.
+                        title: 'On the ballot · ${ballot.length}',
+                        // SELF-DEFENSE IS KEYED ON THE COUNT MISMATCH, not on
+                        // search: the default needsMyVote filter hides rows
+                        // too, so "73 · 50 still open" used to sit above 16
+                        // visible rows. Same rule as the race cap.
+                        subtitle: visible.length < ballot.length
+                            ? '${visible.length} of ${ballot.length} shown'
+                                '${query.isNotEmpty ? ' · search active' : (_filter != VoteFilter.all ? ' · filtered' : '')}'
+                            : '${buckets.stillOpen.where((id) => !recordedIds.contains(id)).length} '
+                                'still open',
                         tileGradient: HubTheme.gradNavy,
                       ),
                     ),
@@ -807,7 +858,23 @@ class RosterBoardState extends State<RosterBoard>
                             toolbarExtent: toolbarExtent,
                             displayName: widget.controller.displayNameFor(e),
                             conflictLabel: _conflictLabelFor(e),
-                            raceDisclosure: _raceDisclosureFor(e),
+                            raceDisclosure:
+                                _raceDisclosureFor(e, unfilteredRaceCounts),
+                            // A ROW YOU JUST VOTED ON STAYS PUT. This is the
+                            // wiring that was missing: `_justVoted` had a
+                            // declaration, a `.contains()` read in
+                            // _visibleBallot and a `.clear()`, and not one
+                            // `.add()` anywhere in lib/, so under the default
+                            // needsMyVote filter the first tap still popped
+                            // the row out from under the exec's finger and
+                            // re-sorted the list.
+                            onVoted: (voted) => setState(() {
+                              if (voted) {
+                                _justVoted.add(e.id);
+                              } else {
+                                _justVoted.remove(e.id);
+                              }
+                            }),
                           ),
                         );
                         if (!it.inCluster) {
@@ -921,7 +988,7 @@ class RosterBoardState extends State<RosterBoard>
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 24),
                         child: _emptyBallotState(
-                            context, ballot, query, needsMyVoteCount),
+                            context, ballot, query, needsMyVote),
                       ),
                     ),
                   ),
@@ -1049,15 +1116,17 @@ class RosterBoardState extends State<RosterBoard>
   }
 
   Widget _emptyBallotState(BuildContext context, List<CandidateEntry> ballot,
-      String query, int needsMyVoteCount) {
+      String query, int openBallots) {
     if (ballot.isEmpty) {
+      // There is no locked baseline and no section below this one: an empty
+      // roster means no submissions are on the board at all.
       return const HubEmptyState(
-        icon: Icons.verified_outlined,
-        title: 'Every candidate is decided',
-        message: "The locked baseline below is the committee's full slate.",
+        icon: Icons.how_to_vote_outlined,
+        title: 'Nothing on the ballot',
+        message: 'No candidate submissions are on the board right now.',
       );
     }
-    if (_filter == VoteFilter.needsMyVote && needsMyVoteCount == 0) {
+    if (_filter == VoteFilter.needsMyVote && openBallots == 0) {
       return _allInCard(context);
     }
     return Center(
@@ -1175,29 +1244,60 @@ class RosterBoardState extends State<RosterBoard>
     );
   }
 
+  /// The markdown the chair pastes into the minutes.
+  ///
+  /// IT NOW RECORDS THE DECISIONS. The "Already decided" section used to be
+  /// driven by a `const baseline = <CandidateEntry>[]` left behind when the
+  /// separate decided section was deleted, so its `isNotEmpty` guard could
+  /// never fire and every one of the 23 settled candidates printed under "On
+  /// the ballot" labelled with nothing but a live-tally bucket. A Recorded
+  /// column on the one table is the honest shape: one list, one row per
+  /// candidate, the committee's call beside the live count.
   void _copySummary(
     BuildContext context,
     List<CandidateEntry> ballot,
-    List<CandidateEntry> baseline,
+    Set<String> recordedIds,
     VoteBuckets buckets,
   ) {
     String bucketLabel(String id) => switch (buckets.bucketOf(id)) {
           VoteBucket.consensusReady => buckets.suggestionFor[id] == 'yes'
-              ? 'Consensus: Endorse'
-              : 'Consensus: Decline',
+              ? 'Ballots point to Endorse'
+              : 'Ballots point to Decline',
           VoteBucket.split => 'Split',
           VoteBucket.stillOpen => 'Still open',
         };
+    String recordedLabel(String id) => recordedIds.contains(id)
+        ? widget.repository.stateFor(id).label
+        : '-';
+    // How much of the record is the July 14 backfill rather than live
+    // voting, so the minutes cannot overstate live participation.
+    var totalBallots = 0;
+    var backfilled = 0;
+    for (final e in ballot) {
+      for (final b in widget.votes.ballotsFor(e.id).values) {
+        totalBallots++;
+        if (b.provenanceCodes.isNotEmpty) backfilled++;
+      }
+    }
     final buf = StringBuffer();
     buf.writeln('# Endorsement committee vote');
     buf.writeln();
     buf.writeln(
         quorumSentence(buckets.effectiveQuorum, buckets.participants));
     buf.writeln();
+    buf.writeln('${recordedIds.length} of ${ballot.length} candidates have a '
+        'recorded committee decision.');
+    if (backfilled > 0) {
+      buf.writeln();
+      buf.writeln('$backfilled of $totalBallots ballots below were recorded '
+          'from a committee meeting rather than cast in the app.');
+    }
+    buf.writeln();
     buf.writeln('## On the ballot (${ballot.length})');
     buf.writeln();
-    buf.writeln('| Candidate | Office | Yes | No | Undecided | Status |');
-    buf.writeln('| --- | --- | --- | --- | --- | --- |');
+    buf.writeln(
+        '| Candidate | Office | Yes | No | Undecided | Recorded | Ballots |');
+    buf.writeln('| --- | --- | --- | --- | --- | --- | --- |');
     final sorted = ballot.toList()
       ..sort((a, b) {
         final ta = widget.votes.tallyFor(a.id);
@@ -1208,19 +1308,8 @@ class RosterBoardState extends State<RosterBoard>
       final t = widget.votes.tallyFor(e.id);
       buf.writeln('| ${widget.controller.displayNameFor(e)} '
           '| ${e.officeLine.isEmpty ? '-' : e.officeLine} '
-          '| ${t.yes} | ${t.no} | ${t.undecided} | ${bucketLabel(e.id)} |');
-    }
-    if (baseline.isNotEmpty) {
-      buf.writeln();
-      buf.writeln('## Already decided (${baseline.length})');
-      buf.writeln();
-      buf.writeln('| Candidate | Office | Final call |');
-      buf.writeln('| --- | --- | --- |');
-      for (final e in baseline) {
-        buf.writeln('| ${widget.controller.displayNameFor(e)} '
-            '| ${e.officeLine.isEmpty ? '-' : e.officeLine} '
-            '| ${widget.repository.stateFor(e.id).label} |');
-      }
+          '| ${t.yes} | ${t.no} | ${t.undecided} '
+          '| ${recordedLabel(e.id)} | ${bucketLabel(e.id)} |');
     }
     Clipboard.setData(ClipboardData(text: buf.toString()));
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -1254,7 +1343,7 @@ class _RaceCapItem extends _BallotItem {
   /// Compact race label ("Missouri House 39").
   final String raceLabel;
 
-  /// Applicants in this race across the unfiltered ballot + baseline union.
+  /// Applicants in this race across the unfiltered roster.
   final int applicantCount;
 
   /// Still-visible ballot members under the current filter + search.
@@ -1264,8 +1353,10 @@ class _RaceCapItem extends _BallotItem {
   /// [visibleCount] is compared against for the cap's self-defense.
   final int unfilteredBallotCount;
 
-  /// Race mates already decided (locked baseline): surfaced as a tappable
-  /// suffix because that context must sit next to the live opponent.
+  /// Race mates that carry a recorded decision AND are not on screen under
+  /// the current filter or search: surfaced as a tappable suffix because that
+  /// context must sit next to the live opponent. A decided mate that IS on
+  /// screen is not repeated here; its own row carries a decision chip.
   final List<CandidateEntry> decidedMates;
 
   const _RaceCapItem({
@@ -1496,7 +1587,7 @@ class _ModeSwitch extends StatelessWidget {
   final ValueChanged<HubMode> onChanged;
 
   /// Open-ballot count for the gold badge on the My ballot segment; null
-  /// hides the badge (zero open, or the decisions load is not ready).
+  /// hides the badge (zero open, or the BALLOT load is not ready).
   final int? ballotBadge;
 
   const _ModeSwitch({

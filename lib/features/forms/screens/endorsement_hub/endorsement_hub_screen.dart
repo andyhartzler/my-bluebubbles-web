@@ -431,9 +431,14 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
 
   /// "Roster" tab label with a gold needs-my-vote count badge. This badge
   /// replaces the urgency signal the dedicated Decisions tab used to carry;
-  /// the Roster tab now IS the ballot. Hidden while the decisions load is
-  /// loading or failed: never show a count computed against an unverified
-  /// baseline (a failed load defaults every candidate to undecided).
+  /// the Roster tab now IS the ballot.
+  ///
+  /// ONE definition, shared with the board's mode strip and toolbar: see
+  /// [needsMyVoteCount]. This copy carried a `stateFor == undecided` clause,
+  /// so it painted "50" beside a board listing 73 rows and a toolbar reading
+  /// "Needs my vote (73)". Gated on the BALLOT load, which is the data it
+  /// actually reads: a failed vote fetch must not paint a confident number
+  /// over a board that says it is showing nothing.
   Widget _rosterTabLabel() {
     return AnimatedBuilder(
       // The controller is merged in so the badge appears once the slate
@@ -441,12 +446,8 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
       animation: Listenable.merge([_votes, _decisions, _controller]),
       builder: (context, _) {
         var n = 0;
-        if (_decisions.loadState == DecisionLoadState.ready) {
-          n = _controller.all
-              .where((e) =>
-                  _decisions.stateFor(e.id) == DecisionState.undecided &&
-                  _votes.myVote(e.id) == null)
-              .length;
+        if (_votes.loadState == VoteLoadState.ready) {
+          n = needsMyVoteCount(_controller, _votes);
         }
         return Row(
           mainAxisSize: MainAxisSize.min,

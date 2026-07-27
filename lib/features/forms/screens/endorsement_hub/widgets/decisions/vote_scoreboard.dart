@@ -13,6 +13,16 @@ class VoteScoreboard extends StatelessWidget {
   final List<CandidateEntry> ballot;
   final EndorsementVoteRepository votes;
   final VoteBuckets buckets;
+
+  /// Candidates the committee has already recorded a decision on (empty while
+  /// the decisions load is not ready).
+  ///
+  /// These get their own tile and are removed from the other three. Counting
+  /// them as CONSENSUS READY told the chair 23 calls he gavelled on July 14
+  /// were still waiting on his tap; counting them as STILL OPEN would be the
+  /// same lie wearing a different hat.
+  final Set<String> recordedIds;
+
   final VoidCallback onCopy;
 
   const VoteScoreboard({
@@ -20,14 +30,20 @@ class VoteScoreboard extends StatelessWidget {
     required this.ballot,
     required this.votes,
     required this.buckets,
+    required this.recordedIds,
     required this.onCopy,
   });
+
+  int _openCount(List<String> ids) =>
+      ids.where((id) => !recordedIds.contains(id)).length;
 
   @override
   Widget build(BuildContext context) {
     var mine = 0;
+    var recorded = 0;
     for (final e in ballot) {
       if (votes.myVote(e.id) != null) mine++;
+      if (recordedIds.contains(e.id)) recorded++;
     }
     final total = ballot.length;
     final done = total > 0 && mine == total;
@@ -83,7 +99,10 @@ class VoteScoreboard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             quorumSentence(buckets.effectiveQuorum, buckets.participants),
-            maxLines: 1,
+            // Two lines: the sentence names two different numbers now, and
+            // ellipsizing it at one line on a 390px phone would cut the half
+            // that says which set is being counted.
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Color(0xE6FFFFFF), fontSize: 11.5),
           ),
@@ -95,21 +114,32 @@ class VoteScoreboard extends StatelessWidget {
               _SummaryTile(
                 icon: Icons.verified,
                 iconBg: MoydBrand.supportFg,
-                count: buckets.consensusReady.length,
+                count: _openCount(buckets.consensusReady),
                 label: 'CONSENSUS READY',
               ),
               _SummaryTile(
                 icon: Icons.forum,
                 iconBg: MoydBrand.opposeFg,
-                count: buckets.split.length,
+                count: _openCount(buckets.split),
                 label: 'SPLIT',
               ),
               _SummaryTile(
                 icon: Icons.hourglass_empty,
                 iconBg: MoydBrand.neutralFg,
-                count: buckets.stillOpen.length,
+                count: _openCount(buckets.stillOpen),
                 label: 'STILL OPEN',
               ),
+              if (recorded > 0)
+                _SummaryTile(
+                  icon: Icons.gavel,
+                  // A brand token distinct from the green / red / slate the
+                  // other three tiles use, and >= 4.5:1 behind the white
+                  // glyph. Colour is never the only signal: every tile is
+                  // labelled.
+                  iconBg: MoydBrand.qualifiedFg,
+                  count: recorded,
+                  label: 'RECORDED',
+                ),
             ],
           ),
           const SizedBox(height: 14),

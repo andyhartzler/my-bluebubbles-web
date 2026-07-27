@@ -9,7 +9,13 @@ import 'endorsement_vote_repository.dart';
 /// the chair's final-call panel.
 class TallyBar extends StatelessWidget {
   final VoteTally tally;
-  const TallyBar({super.key, required this.tally});
+
+  /// True when the committee has already recorded a decision on this
+  /// candidate. The "N open" clause is then suppressed: the room is not
+  /// waiting on those execs, the call was made.
+  final bool settled;
+
+  const TallyBar({super.key, required this.tally, this.settled = false});
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +23,7 @@ class TallyBar extends StatelessWidget {
     final cs = theme.colorScheme;
     final label = StringBuffer(
         '${tally.yes} Yes · ${tally.no} No · ${tally.undecided} Undecided');
-    if (tally.pending > 0) {
+    if (tally.pending > 0 && !settled) {
       label.write(' · ${tally.pending} open');
     }
     return Column(
@@ -82,8 +88,17 @@ class TallyBar extends StatelessWidget {
 class VoterRollDisclosure extends StatefulWidget {
   final EndorsementVoteRepository votes;
   final String candidateId;
-  const VoterRollDisclosure(
-      {super.key, required this.votes, required this.candidateId});
+
+  /// See [TallyBar.settled]: on a candidate the committee has already decided,
+  /// "8 waiting" reads as an open ask that nobody actually owes.
+  final bool settled;
+
+  const VoterRollDisclosure({
+    super.key,
+    required this.votes,
+    required this.candidateId,
+    this.settled = false,
+  });
 
   @override
   State<VoterRollDisclosure> createState() => _VoterRollDisclosureState();
@@ -99,7 +114,9 @@ class _VoterRollDisclosureState extends State<VoterRollDisclosure> {
     final tally = widget.votes.tallyFor(widget.candidateId);
     final summary = tally.pending == 0
         ? ' · all in'
-        : ' · ${tally.cast} in · ${tally.pending} waiting';
+        : (widget.settled
+            ? ' · ${tally.cast} in'
+            : ' · ${tally.cast} in · ${tally.pending} waiting');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,

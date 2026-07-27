@@ -7,6 +7,7 @@ import '../../models/candidate_entry.dart';
 import '../../theme/hub_theme.dart';
 import 'candidate_voice.dart';
 import 'decision_activity.dart';
+import 'decision_chip.dart';
 import 'decision_repository.dart';
 import 'endorsement_vote_repository.dart';
 import 'tally_widgets.dart';
@@ -57,6 +58,15 @@ class _RowExpansionState extends State<RowExpansion> {
   // the header that must stay clear of the pinned toolbar, so a blanket
   // ensureVisible here would scroll it out from under the user.
 
+  /// The committee's RECORDED decision, or undecided while the decisions load
+  /// is anything but ready (`stateFor` defaults a missing row to undecided,
+  /// so reading it before a successful load would put every settled candidate
+  /// back on the table).
+  DecisionState get _recorded =>
+      widget.repository.loadState == DecisionLoadState.ready
+          ? widget.repository.stateFor(widget.entry.id)
+          : DecisionState.undecided;
+
   Future<void> _confirm() async {
     final s = widget.suggestion == 'yes'
         ? DecisionState.endorse
@@ -72,7 +82,8 @@ class _RowExpansionState extends State<RowExpansion> {
         action: SnackBarAction(label: 'Retry', onPressed: _confirm),
       ));
     }
-    // On success realtime moves this row to the locked baseline everywhere.
+    // On success realtime carries the recorded state to every device; the row
+    // stays exactly where it is (there is no separate decided section).
   }
 
   @override
@@ -83,6 +94,8 @@ class _RowExpansionState extends State<RowExpansion> {
     final votes = widget.votes;
     final tally = votes.tallyFor(entry.id);
     final myBallot = votes.myBallot(entry.id);
+    final recorded = _recorded;
+    final settled = recorded != DecisionState.undecided;
     final ai = entry.aiAlignment;
     final disqualifiers = ai?.disqualifiers ?? const <AiDisqualifier>[];
     final deductions = ai?.deductions ?? const <AiDeduction>[];
@@ -146,7 +159,7 @@ class _RowExpansionState extends State<RowExpansion> {
             ),
           ],
           const SizedBox(height: 12),
-          TallyBar(tally: tally),
+          TallyBar(tally: tally, settled: settled),
           const SizedBox(height: 4),
           Text('${tally.cast} of ${votes.roomSize} execs in',
               style: theme.textTheme.labelSmall?.copyWith(
@@ -154,7 +167,8 @@ class _RowExpansionState extends State<RowExpansion> {
           const SizedBox(height: 10),
           // Collapsed by default: the headline numbers above stay visible
           // without opening the full pill roll.
-          VoterRollDisclosure(votes: votes, candidateId: entry.id),
+          VoterRollDisclosure(
+              votes: votes, candidateId: entry.id, settled: settled),
           if (myBallot != null && myBallot.hasReason) ...[
             const SizedBox(height: 8),
             Row(
@@ -173,9 +187,37 @@ class _RowExpansionState extends State<RowExpansion> {
               ],
             ),
           ],
+          // Provenance is NOT a reason and never renders as one. These tags
+          // mark where the ballot row came from; `meeting_2026_07_14` sits on
+          // 166 of the 260 ballots on record and used to print raw, under a
+          // "Reason:" label, as though the exec had written it.
+          if (myBallot != null && myBallot.provenanceCodes.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.history, size: 13, color: cs.onSurfaceVariant),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    myBallot.provenanceCodes.map(voteReasonLabel).join(', '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (widget.isChair && widget.bucket == VoteBucket.split)
             _splitDetail(context),
-          if (widget.bucket == VoteBucket.consensusReady)
+          // A recorded decision OUTRANKS the live suggestion. Before this,
+          // every one of the 23 candidates the committee settled on July 14
+          // rendered "Consensus: Decline" over a live Confirm button, as if
+          // the call had never been made.
+          if (settled)
+            _recordedBanner(context, tally, recorded)
+          else if (widget.bucket == VoteBucket.consensusReady)
             _consensusBanner(context, tally),
           // Last content item before the footer: the race-field disclosure
           // (solo line / opponent list / honest failure line, see
@@ -222,12 +264,14 @@ class _RowExpansionState extends State<RowExpansion> {
     );
   }
 
+  /// The exec's OWN stated reason. Provenance tags are excluded here and
+  /// rendered on their own line (see the build method).
   String _myReasonText(BallotEntry ballot) {
-    if (ballot.reasonCodes.contains('other') &&
-        (ballot.otherText?.isNotEmpty ?? false)) {
+    final stated = ballot.statedReasonCodes;
+    if (stated.contains('other') && (ballot.otherText?.isNotEmpty ?? false)) {
       return ballot.otherText!;
     }
-    return ballot.reasonCodes.map(voteReasonLabel).join(', ');
+    return stated.map(voteReasonLabel).join(', ');
   }
 
   /// Chair-only rollup on split cards: the reasons behind the No/Undecided
@@ -245,7 +289,10 @@ class _RowExpansionState extends State<RowExpansion> {
           ? noReasons
           : (b.vote == 'undecided' ? undecidedReasons : null);
       if (target == null) continue;
-      for (final code in b.reasonCodes) {
+      // Stated reasons only: a provenance tag is not something anyone said in
+      // the room, and rolling it up printed "8x Recorded at the July 14
+      // meeting" in the chair's read-aloud notes.
+      for (final code in b.statedReasonCodes) {
         if (code == 'other') {
           if (b.vote == 'no') {
             noOther++;
@@ -325,9 +372,100 @@ class _RowExpansionState extends State<RowExpansion> {
     );
   }
 
-  /// Full-width consensus strip. Everyone sees the suggestion; only the chair
-  /// gets the Confirm button, and Confirm uses the CHECKED write path — on a
-  /// failed write the card stays on the ballot on every device.
+  /// Full-width SETTLED strip: the committee already recorded a call on this
+  /// candidate, so it states the record rather than proposing one.
+  ///
+  /// There is no Confirm here. Confirming a decision that is already recorded
+  /// is a no-op write dressed up as an action, and it was the single most
+  /// misleading thing on the ballot: all 23 settled candidates (8 unanimous
+  /// ballots each, floor 5, two-thirds threshold 6) sat in consensusReady and
+  /// rendered a live Confirm button under "Consensus: Decline".
+  ///
+  /// The one case that still offers a control is genuine disagreement: the
+  /// live tally has since reached the OPPOSITE supermajority. Then the strip
+  /// says so out loud and the chair gets an explicit "Change to ..." button.
+  /// Anyone can still change their own ballot on the row above, and the chair
+  /// can still open Final call.
+  Widget _recordedBanner(
+      BuildContext context, VoteTally tally, DecisionState recorded) {
+    final fg = DecisionVisuals.fg(recorded);
+    final bg = DecisionVisuals.bg(recorded);
+    final recordedLabel =
+        recorded == DecisionState.endorse ? 'Endorsed' : 'Declined';
+    // Only a consensus-ready bucket carries a suggestion, and only the
+    // opposite one is a disagreement worth a control.
+    final suggested = widget.bucket == VoteBucket.consensusReady
+        ? (widget.suggestion == 'yes'
+            ? DecisionState.endorse
+            : DecisionState.decline)
+        : null;
+    final disagrees = suggested != null && suggested != recorded;
+    final suggestedLabel =
+        suggested == DecisionState.endorse ? 'Endorse' : 'Decline';
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: fg.withOpacity(0.35)),
+        ),
+        child: Row(
+          children: [
+            Icon(DecisionVisuals.icon(recorded), size: 16, color: fg),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  text: 'Recorded: ',
+                  children: [
+                    TextSpan(
+                        text: recordedLabel,
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                    TextSpan(
+                        text: ' (${tally.yes} Yes · ${tally.no} No · '
+                            '${tally.undecided} Undecided)'),
+                    if (disagrees)
+                      TextSpan(
+                          text: ' · ballots now point to $suggestedLabel'),
+                  ],
+                ),
+                style: TextStyle(
+                    color: fg, fontSize: 12.5, fontWeight: FontWeight.w600),
+              ),
+            ),
+            if (disagrees && widget.isChair) ...[
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _confirming ? null : _confirm,
+                style: FilledButton.styleFrom(
+                  backgroundColor: HubTheme.navy,
+                  foregroundColor: Colors.white,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                ),
+                child: _confirming
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text('Change to $suggestedLabel'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Full-width consensus strip for a candidate with NO recorded decision.
+  /// Everyone sees the suggestion; only the chair gets the Confirm button,
+  /// and Confirm uses the CHECKED write path: on a failed write the card
+  /// stays undecided on every device.
   Widget _consensusBanner(BuildContext context, VoteTally tally) {
     final endorse = widget.suggestion == 'yes';
     final fg = endorse ? MoydBrand.supportFg : MoydBrand.opposeFg;
