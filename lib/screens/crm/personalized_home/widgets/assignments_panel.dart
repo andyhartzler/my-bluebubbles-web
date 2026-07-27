@@ -506,7 +506,10 @@ class _Item {
           ? null
           : Text(
               subtitle!,
-              maxLines: 2,
+              // One row. Two lines made the assignment cards different
+              // heights and the panel looked ragged; anything that does not
+              // fit is better truncated than allowed to reflow the card.
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: Colors.white.withOpacity(0.78)),
             ),

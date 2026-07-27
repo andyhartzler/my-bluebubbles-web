@@ -6,11 +6,10 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:bluebubbles/models/crm/assignment.dart';
 import 'supabase_service.dart';
 
-// ---- Endorsement ballot deadline rule --------------------------------------
-// "Ballots close Sunday at midnight, US Central." Kept in ONE named constant
-// plus two small helpers so a later pass (an actual alert/notification job)
-// can lift the rule wholesale. America/Chicago is DST-aware through the
-// `timezone` package, so no UTC offset is hardcoded anywhere.
+// ---- Endorsement ballot deadline --------------------------------------------
+// One explicit date, set by the committee, in US Central. America/Chicago is
+// DST-aware through the `timezone` package, so no UTC offset is hardcoded
+// anywhere. A later alert job can lift this wholesale.
 const String kEndorsementVoteDeadlineZone = 'America/Chicago';
 
 /// Resolve the Central [tz.Location]. main.dart runs tz.initializeTimeZones()
@@ -27,41 +26,50 @@ tz.Location endorsementDeadlineLocation() {
   }
 }
 
-/// The instant voting closes: midnight at the END of the next upcoming
-/// Sunday, which is Monday 00:00 local. Expressed as the real boundary rather
-/// than 11:59 PM so the promised cutoff and the stored [dueAt] a later alert
-/// pass will alarm on are the same instant, with no silent one-minute buffer.
+/// When endorsement voting closes, as an explicit date.
 ///
-/// On a Sunday the deadline is TONIGHT and stays tonight right up to
-/// midnight, then rolls to next week: past the boundary the weekday is Monday
-/// and the next Sunday is six days out.
-tz.TZDateTime nextEndorsementVoteDeadline(tz.TZDateTime centralNow) {
-  final daysUntilSunday = (DateTime.sunday - centralNow.weekday) % 7;
-  // TZDateTime normalizes the day overflow AND resolves the resulting wall
-  // clock against DST, so this stays correct across spring-forward/fall-back
-  // weeks where naive `now + Duration(days: n)` math drifts an hour.
-  return tz.TZDateTime(centralNow.location, centralNow.year, centralNow.month,
-      centralNow.day + daysUntilSunday + 1);
+/// This was a rolling "next Sunday at midnight" rule. That was wrong twice
+/// over: the committee sets a real date rather than a weekly cadence, and once
+/// the first Sunday passed the card cheerfully rolled forward to the following
+/// week, which reads as though nothing is due.
+///
+/// Change these four numbers to move the deadline. Nothing else needs editing.
+const int kVoteDeadlineYear = 2026;
+const int kVoteDeadlineMonth = 7;
+const int kVoteDeadlineDay = 27;
+const int kVoteDeadlineHour = 23;
+const int kVoteDeadlineMinute = 59;
+
+/// The deadline as a Central-time instant. America/Chicago, so daylight saving
+/// is handled rather than assumed.
+tz.TZDateTime endorsementVoteDeadline() {
+  final loc = endorsementDeadlineLocation();
+  return tz.TZDateTime(loc, kVoteDeadlineYear, kVoteDeadlineMonth,
+      kVoteDeadlineDay, kVoteDeadlineHour, kVoteDeadlineMinute);
 }
 
-/// Plain-language deadline for the panel subtitle: "Due Sunday at midnight
-/// Central", sharpening to tomorrow/tonight as it approaches and flipping to
-/// "closed" once passed.
-String endorsementDeadlinePhrase(tz.TZDateTime deadline, tz.TZDateTime now) {
-  if (!now.isBefore(deadline)) {
-    return 'Voting closed Sunday at midnight Central';
-  }
+/// Short deadline phrase for the card. Kept SHORT on purpose: this shares one
+/// line with the count, and "Due Sunday at midnight Central" was long enough
+/// to wrap the card onto a second row on a phone.
+String endorsementDeadlinePhrase(
+    tz.TZDateTime deadline, tz.TZDateTime now) {
+  if (!now.isBefore(deadline)) return 'past due';
   final today = tz.TZDateTime(now.location, now.year, now.month, now.day);
-  // The deadline INSTANT lands on Monday 00:00; the day people vote on is the
-  // Sunday it closes, so step back one day for the plain-language phrasing.
   final dueDay = tz.TZDateTime(
-      now.location, deadline.year, deadline.month, deadline.day - 1);
+      now.location, deadline.year, deadline.month, deadline.day);
   // Round rather than truncate: a spring-forward week makes the
   // midnight-to-midnight span 23 hours, which would otherwise floor to 0.
   final days = (dueDay.difference(today).inHours / 24).round();
-  if (days <= 0) return 'Due tonight at midnight Central';
-  if (days == 1) return 'Due tomorrow at midnight Central';
-  return 'Due Sunday at midnight Central';
+  final time = deadline.hour == 23 && deadline.minute == 59
+      ? '11:59pm'
+      : '${deadline.hour > 12 ? deadline.hour - 12 : deadline.hour}'
+          ':${deadline.minute.toString().padLeft(2, '0')}'
+          '${deadline.hour >= 12 ? 'pm' : 'am'}';
+  if (days <= 0) return 'due tonight $time';
+  if (days == 1) return 'due tomorrow $time';
+  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  if (days < 7) return 'due ${names[deadline.weekday - 1]} $time';
+  return 'due ${deadline.month}/${deadline.day}';
 }
 
 /// Synthesizes the "things waiting on me" panel from existing tables.
@@ -449,15 +457,18 @@ class AutoInferredAssignmentsService {
         // as "nothing decided" would put every settled candidate back on the
         // ballot (the decision board guards against the same failure mode
         // with DecisionLoadState).
-        final decisionRows = await client
-            .from('endorsement_decisions')
-            .select('candidate_id, state');
-        for (final r in (decisionRows as List).whereType<Map>()) {
-          final state = r['state']?.toString().trim().toLowerCase();
-          if (state == 'endorse' || state == 'decline') {
-            candidateIds.remove(r['candidate_id']?.toString());
-          }
-        }
+        // EVERY candidate counts, decided or not.
+        //
+        // This used to subtract the candidates the committee had already ruled
+        // on, so the card read "16 of 50" against a roster of 73 and the total
+        // silently meant something other than the total. Since the decided
+        // candidates now sit in the same list as everyone else and can be
+        // voted on and changed like any other row, excluding them from the
+        // denominator described a board that no longer exists.
+        //
+        // The numerator is unchanged and was always right: candidates with no
+        // ballot from this exec.
+
         if (candidateIds.isEmpty) return;
 
         // My ballots: endorsement_votes keys voter_id on the auth uid, NOT
@@ -478,7 +489,7 @@ class AutoInferredAssignmentsService {
 
         final central = endorsementDeadlineLocation();
         final centralNow = tz.TZDateTime.from(now.toUtc(), central);
-        final deadline = nextEndorsementVoteDeadline(centralNow);
+        final deadline = endorsementVoteDeadline();
         final urgent =
             !centralNow.isBefore(deadline.subtract(const Duration(hours: 48)));
 
@@ -486,7 +497,10 @@ class AutoInferredAssignmentsService {
           key: 'endorsement_vote:ballot',
           source: 'endorsement_vote',
           title: 'Vote on candidates',
-          subtitle: '$awaiting of ${candidateIds.length} awaiting your vote'
+          // One line. "16 of 73 to vote on, due Mon 11:59pm" fits a phone;
+          // the old "16 of 50 awaiting your vote, Due Sunday at midnight
+          // Central" wrapped onto a second row and looked broken.
+          subtitle: '$awaiting of ${candidateIds.length} to vote on'
               ' · ${endorsementDeadlinePhrase(deadline, centralNow)}',
           entityUrl: '/candidates?area=endorsement-hq',
           // Sort stamp, not a data timestamp: an open ballot is the most
