@@ -303,9 +303,40 @@ async function runSponsorsFromCacheTask(): Promise<TaskResult> {
       
       const deduped = dedupeSponsorRecords(sponsorRecords);
 
-      const { error } = await supabase
+      // ON CONFLICT DO NOTHING rather than a plain INSERT. The probe above is
+      // only advisory: it is a separate round trip, nothing holds a lock on
+      // the bill between the probe and this write, and a second invocation of
+      // this task that overlaps the first reads the same "no sponsors" answer
+      // and issues the same insert. The loser of that race takes
+      // legislation_bill_sponsors_unique on every row, Postgres rolls back the
+      // whole multi-row statement, and the bill is left with zero sponsors and
+      // is re-selected on the next run. Suppressing the collision at the
+      // constraint is what makes the write re-runnable; the probe just saves a
+      // pointless insert in the common case.
+      //
+      // The conflict target is the column list the in-database backfill in
+      // 20260423_01_backfill_orphan_rpcs.sql already uses for this same insert,
+      // so a unique index on exactly these columns is known to exist. It is
+      // assumed, not verified here, that the index is the one named
+      // legislation_bill_sponsors_unique, since the DDL is not in this repo.
+      // If that assumption is wrong the write fails loudly with "no unique or
+      // exclusion constraint matching the ON CONFLICT specification" instead of
+      // silently doing the wrong thing, which is the failure mode to want.
+      //
+      // Known gap this does not close: dedupeSponsorRecords deliberately passes
+      // through rows with a NULL name or NULL sponsorship_classification, and a
+      // default unique index treats NULLs as distinct, so DO NOTHING does not
+      // arbitrate those rows either. Under the same race two such rows can now
+      // both land instead of the statement aborting. That trades a loud failure
+      // that left the bill empty for a quiet duplicate, and closing it needs a
+      // partial unique index that is not in this repo.
+      const { data: insertedRows, error } = await supabase
         .from('legislation_bill_sponsors')
-        .insert(deduped);
+        .upsert(deduped, {
+          onConflict: 'bill_id,name,sponsorship_classification',
+          ignoreDuplicates: true,
+        })
+        .select('bill_id');
 
       if (error) {
         // Previously swallowed. A failure here leaves the bill with no sponsors,
@@ -315,7 +346,10 @@ async function runSponsorsFromCacheTask(): Promise<TaskResult> {
           `sponsors_from_cache: insert failed for ${bill.bill_identifier}: ${error.message}`,
         );
       } else {
-        extracted += deduped.length;
+        // Rows already present are skipped by DO NOTHING and are not returned,
+        // so this counts what this run actually wrote rather than what it
+        // offered.
+        extracted += insertedRows?.length ?? 0;
       }
     }
     
