@@ -171,9 +171,9 @@ class _ActivityPanelState extends State<ActivityPanel>
           Divider(height: 1, color: Colors.white.withOpacity(0.10)),
       itemBuilder: (context, i) {
         final e = _events[i];
-        final name = (e['name'] as String?) ?? 'Event';
+        final name = (e['title'] as String?) ?? 'Event';
         final location = (e['location'] as String?) ??
-            (e['address'] as String?) ??
+            (e['location_address'] as String?) ??
             '';
         final timeLabel = _formatChicago(e['event_date']?.toString(), null);
         return ListTile(
@@ -231,16 +231,28 @@ class _ActivityPanelState extends State<ActivityPanel>
   }
 
   Future<void> _openEvent(Map<String, dynamic> raw) async {
+    final id = raw['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      final ev = Event.fromJson(Map<String, dynamic>.from(raw));
-      Navigator.of(context).push(MaterialPageRoute(
+      // Refetch the whole row before opening the detail screen. The list
+      // query selects only the few columns this panel renders, and
+      // EventDetailScreen seeds its edit form from what it is handed, so a
+      // partial Event would write blanks back over the real record on save.
+      final row = await _service.fetchEventById(id);
+      if (!mounted) return;
+      if (row == null) {
+        messenger.showSnackBar(const SnackBar(content: Text('Event not found')));
+        return;
+      }
+      final ev = Event.fromJson(row);
+      navigator.push(MaterialPageRoute(
         builder: (_) => EventDetailScreen(initialEvent: ev),
       ));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Open failed: $e')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text('Open failed: $e')));
     }
   }
 

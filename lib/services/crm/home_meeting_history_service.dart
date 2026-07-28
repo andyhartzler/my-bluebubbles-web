@@ -232,7 +232,8 @@ class HomeMeetingHistoryService {
     try {
       final rows = await client
           .from('event_attendees')
-          .select('event_id, events:event_id(id, name, event_date, location, address)')
+          .select(
+              'event_id, events:event_id(id, title, event_date, location, location_address)')
           .eq('member_id', memberId)
           .limit(limit * 2);
       final events = _flattenJoined(rows, joinKey: 'events');
@@ -249,6 +250,18 @@ class HomeMeetingHistoryService {
       debugPrint('[HomeMeetingHistoryService] fetchAttendedEvents: $e');
       return const [];
     }
+  }
+
+  /// One complete event row by id, for opening the detail screen from the
+  /// Events tab. [fetchAttendedEvents] deliberately selects only the columns
+  /// the list renders, which is not enough to edit and save an event safely.
+  Future<Map<String, dynamic>?> fetchEventById(String eventId) async {
+    final client = _client;
+    if (client == null) return null;
+    final row =
+        await client.from('events').select().eq('id', eventId).maybeSingle();
+    if (row == null) return null;
+    return Map<String, dynamic>.from(row);
   }
 
   /// Meetings the member hosts: past hosted + upcoming created.
