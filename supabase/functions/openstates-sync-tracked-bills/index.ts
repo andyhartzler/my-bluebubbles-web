@@ -361,19 +361,46 @@ async function syncSingleBill(trackedBill) {
     console.error(`Failed to delete existing sponsors for ${trackedBill.bill_identifier}, skipping sponsor write:`, deleteError);
   }
   let sponsorsInserted = 0;
-  // The insert below is a plain INSERT, and it is safe only because the DELETE
-  // immediately above cleared this bill's rows. When that DELETE fails we no
-  // longer know the bill is empty, and inserting anyway collides with the
-  // surviving rows on legislation_bill_sponsors_unique, which aborts the whole
-  // multi-row statement and emits the "duplicate key value violates unique
-  // constraint" line that SUPABASE-PLATFORM-1 rolls up. Skipping the sponsor
-  // write leaves the bill on its previous sponsors, which is the same data this
-  // sync was about to rewrite from the same OpenStates payload, so nothing is
-  // lost by waiting for the next run.
+  // The DELETE immediately above is what normally leaves this bill with no
+  // sponsor rows before the write. When that DELETE fails we no longer know the
+  // bill is empty, so the write is skipped entirely rather than attempted
+  // against unknown surviving rows. Skipping leaves the bill on its previous
+  // sponsors, which is the same data this sync was about to rewrite from the
+  // same OpenStates payload, so nothing is lost by waiting for the next run.
   //
-  // This closes the deterministic case only. Two overlapping invocations can
-  // still interleave delete and insert on the same bill and collide on the same
-  // constraint, and that path is not addressed here.
+  // The DELETE only makes the write safe against this invocation's own rows.
+  // Two overlapping invocations can still interleave delete and insert on the
+  // same bill, and the loser of that race used to take
+  // legislation_bill_sponsors_unique on every row, which aborts the whole
+  // multi-row statement and leaves the bill with no sponsors until the next
+  // run. The write below is therefore ON CONFLICT DO NOTHING rather than a
+  // plain INSERT, matching the cached-sponsor backfill in
+  // openstates-orchestrator, so a collision is suppressed at the constraint
+  // instead of rolling back the statement.
+  //
+  // The conflict target is the column list the in-database backfill in
+  // 20260423_01_backfill_orphan_rpcs.sql already uses for this same insert. That
+  // is evidence for a unique index on exactly these columns, not proof: the DDL
+  // is not in this repo, and an ON CONFLICT target is validated when the
+  // statement runs, not when the function containing it is created. It is
+  // assumed, not verified here, which is the same assumption
+  // openstates-orchestrator already makes.
+  //
+  // ON CONFLICT binds by column list, not by index name, so a differently named
+  // unique index on these three columns satisfies it silently. If no unique
+  // index covers exactly these columns then every upsert here fails with "no
+  // unique or exclusion constraint matching the ON CONFLICT specification", and
+  // because the DELETE above has already run and insertError is only logged,
+  // that leaves every synced bill with zero sponsors while the run still reports
+  // success. Confirm the index before deploying this function:
+  //   select indexdef from pg_indexes
+  //    where tablename = 'legislation_bill_sponsors';
+  //
+  // Known gap, the same one the orchestrator carries: dedupeSponsorRecords
+  // deliberately passes through rows with a NULL name or NULL
+  // sponsorship_classification, and a default unique index treats NULLs as
+  // distinct, so DO NOTHING does not arbitrate those rows either. Closing that
+  // needs a partial unique index that is not in this repo.
   if (!deleteError && bill.sponsorships?.length > 0) {
     const sponsorRecords = bill.sponsorships.map((s)=>({
         bill_id: trackedBill.id,
@@ -394,10 +421,17 @@ async function syncSingleBill(trackedBill) {
         organization_classification: s.organization?.classification || null
       }));
     const deduped = dedupeSponsorRecords(sponsorRecords);
-    const { data: insertedSponsors, error: insertError } = await supabase.from("legislation_bill_sponsors").insert(deduped).select();
+    const { data: insertedSponsors, error: insertError } = await supabase.from("legislation_bill_sponsors").upsert(deduped, {
+      onConflict: "bill_id,name,sponsorship_classification",
+      ignoreDuplicates: true
+    }).select();
     if (insertError) {
       console.error(`Failed to insert sponsors for ${trackedBill.bill_identifier}:`, insertError);
     } else {
+      // Rows suppressed by DO NOTHING are not returned, so this counts what this
+      // run actually wrote rather than what it offered. On the normal path the
+      // DELETE above emptied the bill first, so every row is new and the count
+      // is unchanged from the old plain-insert behaviour.
       sponsorsInserted = insertedSponsors?.length || 0;
       console.log(`Inserted ${sponsorsInserted} sponsors for ${trackedBill.bill_identifier}`);
     }
