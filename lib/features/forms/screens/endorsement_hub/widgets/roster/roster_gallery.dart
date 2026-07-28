@@ -15,11 +15,17 @@ class RosterGallery extends StatefulWidget {
   /// Optional per-card decision chip (supplied by the Decisions layer).
   final Widget Function(CandidateEntry)? decisionChipBuilder;
 
+  /// Optional per-card "other Democrats in this race" toggle (supplied by the
+  /// board, which owns SlateController's race data). Pure pass-through to
+  /// [RosterCard]; null leaves the gallery exactly as it was.
+  final RaceDisclosureBuilder? raceDisclosureBuilder;
+
   const RosterGallery({
     super.key,
     required this.controller,
     required this.onOpen,
     this.decisionChipBuilder,
+    this.raceDisclosureBuilder,
   });
 
   @override
@@ -269,6 +275,7 @@ class _RosterGalleryState extends State<RosterGallery> {
               raceApplicantCount: race?.raceKey == null
                   ? 0
                   : c.applicantsInRace(race!.raceKey!),
+              raceDisclosureBuilder: widget.raceDisclosureBuilder,
             );
           },
         );
@@ -277,10 +284,14 @@ class _RosterGalleryState extends State<RosterGallery> {
         padding: const EdgeInsets.only(bottom: 24, top: 4),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: 236,
-          // 0.66 before the race line landed; the taller tile absorbs the
-          // extra labelSmall row so busy cards (flags + decision chip +
-          // race pill) never overflow the fixed grid extent.
-          childAspectRatio: 0.62,
+          // 0.66 before the race line landed, 0.62 after it, 0.58 now that the
+          // race-field toggle adds a second labelSmall row under it. The tile
+          // extent here is FIXED, and RosterCard clips (Clip.antiAlias), so a
+          // tile that runs long is silently cut rather than scrolled: the
+          // aspect ratio has to be eased whenever a row is added. This is also
+          // why the grid gets the COMPACT toggle, which opens a modal sheet
+          // instead of growing in place.
+          childAspectRatio: 0.58,
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
         ),
@@ -299,6 +310,7 @@ class _RosterGalleryState extends State<RosterGallery> {
             raceApplicantCount: race?.raceKey == null
                 ? 0
                 : c.applicantsInRace(race!.raceKey!),
+            raceDisclosureBuilder: widget.raceDisclosureBuilder,
           );
         },
       );

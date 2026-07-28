@@ -69,6 +69,7 @@ class SlateController extends ChangeNotifier {
   Map<String, RaceInfo> _raceInfo = const {};
   Map<String, List<RaceFieldCandidate>> _raceField = const {};
   Map<String, int> _raceApplicantCounts = const {};
+  List<OrphanRace> _racesWithoutApplicants = const [];
   bool _raceLoadFailed = false;
   bool _raceDataLoaded = false;
 
@@ -90,6 +91,14 @@ class SlateController extends ChangeNotifier {
   /// >= 2 means the race is contested and drives both the ballot clusters and
   /// the Browse "N applied" pill.
   int applicantsInRace(String raceKey) => _raceApplicantCounts[raceKey] ?? 0;
+
+  /// THE BOTTOM SECTION: the races where NOBODY returned our questionnaire,
+  /// already ordered chamber-then-district by the repository. Empty when the
+  /// fetch failed OR the view predates 182 (the repository leaves the split's
+  /// list empty in exactly those cases), and the board renders NOTHING for an
+  /// empty list rather than a header over an empty section, so emptiness is
+  /// never printed as the claim "every race has an applicant".
+  List<OrphanRace> get racesWithoutApplicants => _racesWithoutApplicants;
 
   /// Display name with the race view's coalesced fallback.
   ///
@@ -225,11 +234,19 @@ class SlateController extends ChangeNotifier {
       try {
         _raceInfo =
             await _races.loadApplicantRaces().timeout(slateLoadTimeout);
-        _raceField = await _races.loadRaceField().timeout(slateLoadTimeout);
+        // ONE round trip for both halves of the field: the toggle payload
+        // keyed by race, and the bottom-section races nobody answered.
+        // loadRaceFieldSplit throws exactly like loadRaceField did, so the
+        // raceLoadFailed contract below is unchanged.
+        final split =
+            await _races.loadRaceFieldSplit().timeout(slateLoadTimeout);
+        _raceField = split.fieldByRace;
+        _racesWithoutApplicants = split.racesWithoutApplicants;
       } catch (e) {
         debugPrint('SlateController race views load failed: $e');
         _raceInfo = const {};
         _raceField = const {};
+        _racesWithoutApplicants = const [];
         _raceLoadFailed = true;
       }
       _raceDataLoaded = true;

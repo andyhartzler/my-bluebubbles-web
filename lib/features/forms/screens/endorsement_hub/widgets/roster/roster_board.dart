@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 
 import '../../../../theme/moyd_brand.dart';
 import '../../models/candidate_entry.dart';
+// OrphanRace only: the bottom section's one model type, so the empty-list
+// fallback below has a type and the section can never be handed a List<dynamic>.
+import '../../race_field_repository.dart';
 import '../../slate_controller.dart';
 import '../../theme/hub_theme.dart';
 import '../decisions/ballot_row.dart';
@@ -311,11 +314,17 @@ class RosterBoardState extends State<RosterBoard>
     return 'Filed: $filedPart · Said: $saidPart';
   }
 
-  /// Per-row "other Democrats in this race" disclosure for the expansion.
+  /// Per-row "other Democrats in this race" toggle, mounted on the BallotRow
+  /// itself (under the header, above the expansion), so it is visible and one
+  /// tap away while the row is collapsed.
   ///
   /// [applicantCounts] is the same unfiltered applicants-per-race map the race
   /// cap uses, so the disclosure can tell a genuinely solo race from one where
   /// two applicants are running against each other and nobody else filed.
+  ///
+  /// This does NOT touch the clustering: applicants standing against each
+  /// other still group under their _RaceCap exactly as before. This toggle is
+  /// only ever about the filed Democrats who never answered us.
   Widget _raceDisclosureFor(
       CandidateEntry e, Map<String, int> applicantCounts) {
     final info = widget.controller.raceInfoFor(e.id);
@@ -326,6 +335,31 @@ class RosterBoardState extends State<RosterBoard>
       loaded: widget.controller.raceDataLoaded,
       failed: widget.controller.raceLoadFailed,
       applicantsInRace: key == null ? 1 : (applicantCounts[key] ?? 1),
+      style: RaceFieldStyle.band,
+    );
+  }
+
+  /// The same toggle for BROWSE, which had no race-field surface at all even
+  /// though "who else is in this race?" is the research question that mode
+  /// exists to answer.
+  ///
+  /// The applicant count comes straight from SlateController, which computes
+  /// it over the DEDUPED entries (the same source _ballotBody's
+  /// `unfilteredRaceCounts` is built from), so the solo line cannot disagree
+  /// between the two modes. Floored at 1 because the candidate on the card is
+  /// himself an applicant in that race.
+  Widget _browseRaceDisclosure(CandidateEntry e, {required bool compact}) {
+    final info = widget.controller.raceInfoFor(e.id);
+    final key = info?.raceKey;
+    final applicants =
+        key == null ? 1 : widget.controller.applicantsInRace(key);
+    return RaceFieldDisclosure(
+      raceInfo: info,
+      others: widget.controller.raceFieldFor(key),
+      loaded: widget.controller.raceDataLoaded,
+      failed: widget.controller.raceLoadFailed,
+      applicantsInRace: applicants < 1 ? 1 : applicants,
+      style: compact ? RaceFieldStyle.compact : RaceFieldStyle.inline,
     );
   }
 
@@ -605,6 +639,7 @@ class RosterBoardState extends State<RosterBoard>
         controller: widget.controller,
         onOpen: widget.onOpen,
         decisionChipBuilder: _decisionChip,
+        raceDisclosureBuilder: _browseRaceDisclosure,
       ),
     );
   }
@@ -725,6 +760,41 @@ class RosterBoardState extends State<RosterBoard>
         // and below keeps reading the unfiltered roster.
         final items = _clusterContested(
             visible, ballot, recordedIds, unfilteredRaceCounts);
+
+        // THE BOTTOM SECTION: the 125 races where NOBODY returned the
+        // questionnaire, rendered below every applicant row. The chair, after
+        // this build started: "yes include the people that didnt fill out a
+        // form at all like no one in that MOHD or SD or congressional district
+        // but just put them at the bottom or something."
+        //
+        // Ordering is the whole point of putting it here and not higher: the
+        // people an exec can actually vote on come first, and this is
+        // landscape underneath them.
+        //
+        // GATED ON THE LOAD, NOT ON EMPTINESS, and the section is OMITTED
+        // rather than shown empty in every degraded state. An empty list has
+        // four meanings here (fetch in flight, fetch failed, the view predates
+        // 182 and cannot describe a race we have no applicant in, or every
+        // race in the state genuinely has an applicant) and only the last is
+        // safe to state out loud. Rendering nothing is the honest answer to
+        // the other three, and it is also why this ships safely before the
+        // migration: today's applicant-anchored view yields an empty list, so
+        // nothing renders and the ballot is byte-identical to before.
+        //
+        // NOT A BALLOT PARTITION. `unanswered` is never merged into `ballot`,
+        // `visible`, `items`, `buckets` or any aggregate: none of these people
+        // is votable, and every count on this screen still measures only the
+        // candidates we heard from.
+        final unansweredAll = widget.controller.raceDataLoaded &&
+                !widget.controller.raceLoadFailed
+            ? widget.controller.racesWithoutApplicants
+            : const <OrphanRace>[];
+        final unanswered =
+            filterUnansweredRaces(unansweredAll, query: query);
+        var unansweredPeople = 0;
+        for (final r in unanswered) {
+          unansweredPeople += r.candidates.length;
+        }
 
         final live =
             widget.repository.realtimeHealthy && widget.votes.realtimeHealthy;
@@ -1015,6 +1085,52 @@ class RosterBoardState extends State<RosterBoard>
                     ),
                   ),
                 ),
+              // --- races nobody answered, below everyone we heard from ---
+              if (unanswered.isNotEmpty) ...[
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: _constrain(
+                      UnansweredRacesHeader(
+                        raceCount: unanswered.length,
+                        totalRaces: unansweredAll.length,
+                        peopleCount: unansweredPeople,
+                        filtered: unanswered.length < unansweredAll.length,
+                      ),
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  // ONE SliverList ITEM PER RACE, in the same CustomScrollView
+                  // as the ballot, so all 125 stay lazily built. Deliberately
+                  // NOT a Column of 125 races inside a SliverToBoxAdapter,
+                  // which would hand one sliver child the whole subtree and
+                  // lay every race out on every frame.
+                  //
+                  // BOUNDED: each child is UnansweredRaceDisclosure inside
+                  // _constrain (Center + ConstrainedBox on WIDTH only) inside
+                  // a Padding. The disclosure's root is a Container with a
+                  // decoration and no size wrapping a MainAxisSize.min Column,
+                  // so its height is a 44px header plus an AnimatedSize that
+                  // adopts its child's height. Nothing in that chain is a
+                  // horizontal Row with CrossAxisAlignment.stretch, which is
+                  // the construct that truncated this exact sliver on
+                  // 2026-07-26 (full autopsy above at the cluster rail).
+                  sliver: SliverList.builder(
+                    itemCount: unanswered.length,
+                    itemBuilder: (context, i) => _constrain(
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: UnansweredRaceDisclosure(
+                          key: ValueKey('unanswered-${unanswered[i].raceKey}'),
+                          race: unanswered[i],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
             ],
           ),

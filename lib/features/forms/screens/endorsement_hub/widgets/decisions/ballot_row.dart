@@ -51,8 +51,14 @@ class BallotRow extends StatefulWidget {
   /// reassign the candidate's race.
   final String? conflictLabel;
 
-  /// "Other Democrats in this race" disclosure, rendered inside the
-  /// expansion; null keeps the row exactly as before.
+  /// "Other Democrats in this race": the chair's per-candidate toggle
+  /// ([RaceFieldDisclosure]), rendered as a band directly under the header and
+  /// ABOVE the expansion, so it is visible and one tap away while the row is
+  /// still collapsed. Null keeps the row exactly as before.
+  ///
+  /// It used to be handed down into [RowExpansion] as the last item before the
+  /// footer, which put it two taps deep on a surface the chair asked to be one
+  /// tap deep, and left it absent from the collapsed ballot entirely.
   final Widget? raceDisclosure;
 
   /// Fired after a ballot write on this row COMMITS: true when a vote was
@@ -230,6 +236,22 @@ class _BallotRowState extends State<BallotRow> {
                       ),
                     ),
                   ),
+                  // THE PER-ROW RACE TOGGLE. Sibling of the header, not a
+                  // child of the expansion: it is on screen while the row is
+                  // collapsed and opens on its own tap without expanding the
+                  // row (its InkWell wins the gesture arena over the header's,
+                  // exactly like _DistrictChip above).
+                  //
+                  // BOUNDED: RaceFieldDisclosure's root is a Container with a
+                  // decoration and no size of its own wrapping a
+                  // MainAxisSize.min Column, so its height is the sum of a
+                  // 44px header and an AnimatedSize that adopts its child's
+                  // size. The enclosing Column here is VERTICAL, so its
+                  // CrossAxisAlignment.stretch tightens the bounded WIDTH axis
+                  // (1040 max via RosterBoard._constrain) and never the
+                  // infinite height a SliverList hands down. See the incident
+                  // note in roster_board.dart before touching either.
+                  if (widget.raceDisclosure != null) widget.raceDisclosure!,
                   AnimatedSize(
                     duration: const Duration(milliseconds: 200),
                     curve: Curves.easeOutCubic,
@@ -245,7 +267,6 @@ class _BallotRowState extends State<BallotRow> {
                             suggestion: widget.suggestion,
                             onOpen: widget.onOpen,
                             onFinalCall: widget.onFinalCall,
-                            raceDisclosure: widget.raceDisclosure,
                           )
                         : const SizedBox(width: double.infinity),
                   ),

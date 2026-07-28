@@ -7,6 +7,13 @@ import '../../models/candidate_entry.dart';
 import '../../theme/hub_theme.dart';
 import '../headshot_avatar.dart';
 
+/// Builds the "other Democrats in this race" toggle for one candidate.
+/// [compact] asks for the one-line, opens-a-sheet variant that the fixed-extent
+/// grid tile needs; false asks for the inline expanding band the natural-height
+/// phone card can carry. See RaceFieldDisclosure / RaceFieldStyle.
+typedef RaceDisclosureBuilder = Widget Function(CandidateEntry entry,
+    {required bool compact});
+
 /// A single candidate tile in the roster gallery: face on top (with a subtle
 /// navy scrim at the base so the frosted badges always read), an info block on
 /// the opaque card surface below, a 3-segment stance strip, and flag chips.
@@ -42,6 +49,12 @@ class RosterCard extends StatefulWidget {
   /// of the race line. Not contested = nothing extra.
   final int raceApplicantCount;
 
+  /// The chair's per-candidate "other Democrats in this race" toggle. Browse
+  /// had no such surface at all before this, which is where the research
+  /// question ("who else is in this race?") is actually asked. Null renders
+  /// the card exactly as before, so a host without race data pays nothing.
+  final RaceDisclosureBuilder? raceDisclosureBuilder;
+
   const RosterCard({
     super.key,
     required this.entry,
@@ -53,6 +66,7 @@ class RosterCard extends StatefulWidget {
     this.displayName,
     this.raceLine,
     this.raceApplicantCount = 0,
+    this.raceDisclosureBuilder,
   });
 
   @override
@@ -91,6 +105,19 @@ class _RosterCardState extends State<RosterCard> {
     );
   }
 
+  /// The chair's per-candidate race toggle, or null when the host supplied no
+  /// builder.
+  ///
+  /// The GRID gets [compact] (one text-height line that opens a modal sheet),
+  /// because grid tiles are laid out at a FIXED extent
+  /// (SliverGridDelegateWithMaxCrossAxisExtent + childAspectRatio) under
+  /// `clipBehavior: Clip.antiAlias`: a child that grew on tap would be
+  /// silently clipped, and the tile's Column would overflow. The phone list
+  /// card has natural height inside a ListView, so it carries the real inline
+  /// toggle.
+  Widget? _raceDisclosure({required bool compact}) =>
+      widget.raceDisclosureBuilder?.call(widget.entry, compact: compact);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -103,6 +130,7 @@ class _RosterCardState extends State<RosterCard> {
     if (widget.horizontal) {
       return _horizontalCard(theme, cs, dark, entry, model);
     }
+    final raceCompact = _raceDisclosure(compact: true);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -248,6 +276,15 @@ class _RosterCardState extends State<RosterCard> {
                                   ),
                                 ),
                               if (_hasRaceLine) _raceLineWidget(theme, cs),
+                              // BOUNDED: the compact variant is a
+                              // MainAxisSize.min Row whose only flex child is
+                              // a Flexible on the bounded WIDTH axis. It adds
+                              // one text-height line and never grows on tap
+                              // (it opens a sheet), so the fixed grid extent
+                              // is safe. roster_gallery's childAspectRatio was
+                              // eased from 0.62 to 0.58 to absorb that line on
+                              // the busiest tiles.
+                              if (raceCompact != null) raceCompact,
                             ],
                           ),
                         ),
@@ -281,6 +318,15 @@ extension on _RosterCardState {
   /// keeps its theme-surface contrast in both light and dark themes.
   Widget _horizontalCard(ThemeData theme, ColorScheme cs, bool dark,
       CandidateEntry entry, SubmissionReviewModel model) {
+    // The real inline toggle: this card lives in a ListView.separated with
+    // natural height, so an expanding child costs nothing but a taller card.
+    //
+    // BOUNDED: RaceFieldDisclosure(style: inline) is a MainAxisSize.min Column
+    // of a 44px header plus an AnimatedSize that adopts its child's size. It
+    // sits inside this card's Expanded Column, whose cross axis (width) is
+    // bounded by the card and whose main axis grows with the ListView's
+    // natural extent. No vertical flex, no nested scrollable.
+    final raceInline = _raceDisclosure(compact: false);
     return GestureDetector(
       onTap: widget.onOpen,
       child: Container(
@@ -384,6 +430,7 @@ extension on _RosterCardState {
                     const SizedBox(height: 8),
                     widget.decisionChip!,
                   ],
+                  if (raceInline != null) raceInline,
                 ],
               ),
             ),

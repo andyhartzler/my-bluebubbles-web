@@ -28,11 +28,13 @@ class RowExpansion extends StatefulWidget {
   final VoidCallback onOpen;
   final VoidCallback onFinalCall;
 
-  /// The "other Democrats in this race" disclosure, built by the board (which
-  /// owns SlateController's race data) and rendered above the footer row.
-  /// Null keeps the expansion exactly as before, so hosts without race data
-  /// pay nothing.
-  final Widget? raceDisclosure;
+  // The "other Democrats in this race" disclosure NO LONGER LIVES HERE. It
+  // used to be the last content item before the footer, which meant the chair
+  // had to expand a row before he could even see that a race had other
+  // Democrats in it. It is now a band on the row itself, above this expansion
+  // (see BallotRow.raceDisclosure). Do not re-add a copy here: two toggles for
+  // the same list on the same row, with independent open state, is worse than
+  // the two-tap problem it would be trying to fix.
 
   const RowExpansion({
     super.key,
@@ -44,7 +46,6 @@ class RowExpansion extends StatefulWidget {
     required this.suggestion,
     required this.onOpen,
     required this.onFinalCall,
-    this.raceDisclosure,
   });
 
   @override
@@ -219,11 +220,6 @@ class _RowExpansionState extends State<RowExpansion> {
             _recordedBanner(context, tally, recorded)
           else if (widget.bucket == VoteBucket.consensusReady)
             _consensusBanner(context, tally),
-          // Last content item before the footer: the race-field disclosure
-          // (solo line / opponent list / honest failure line, see
-          // RaceFieldDisclosure). Informational, so it sits below every
-          // voting-critical block.
-          if (widget.raceDisclosure != null) widget.raceDisclosure!,
           const SizedBox(height: 8),
           Row(
             children: [
