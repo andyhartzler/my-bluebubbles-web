@@ -753,7 +753,12 @@ class _VoteSegmentedControlState extends State<_VoteSegmentedControl> {
     }
     final withdrew = withdrawing;
     if (withdrew) widget.onVoted?.call(false);
-    if (!withdrew && (choice == 'no' || choice == 'undecided')) {
+    // UNDECIDED ONLY. A No is a clear position and the exec has said what they
+    // think; stopping them for a reason on every No is friction on the most
+    // common non-yes answer and slows a 73 candidate ballot to a crawl.
+    // Undecided is the one answer that tells the committee nothing on its own,
+    // so it is the one worth asking about.
+    if (!withdrew && choice == 'undecided') {
       // Non-blocking: the ballot is already recorded; the sheet only offers
       // the optional why. Needs a live context, so it is the one part that
       // still requires the row to be on screen.

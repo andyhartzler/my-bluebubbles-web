@@ -261,30 +261,57 @@ class _VoteReasonSheetState extends State<_VoteReasonSheet> {
             ),
           ],
           const SizedBox(height: 16),
+          // Skip is a FIRST CLASS action here, not a footnote.
+          //
+          // The vote is already saved by the time this sheet opens; the reason
+          // is genuinely optional. A small grey text button next to a filled
+          // primary button says the opposite, and an exec working through 73
+          // candidates on a phone should be able to dismiss this without
+          // aiming. Same height as Save, equal width, real border.
           Row(
             children: [
-              TextButton(
-                onPressed: _saving ? null : () => Navigator.pop(context),
-                child: Text('Skip',
-                    style: TextStyle(
-                        color: cs.onSurfaceVariant,
-                        fontWeight: FontWeight.w700)),
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: OutlinedButton(
+                    onPressed: _saving ? null : () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: cs.onSurface,
+                      side: BorderSide(color: cs.outline, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Skip',
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w800)),
+                  ),
+                ),
               ),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: _selected == null || _saving ? null : _save,
-                icon: _saving
-                    ? const SizedBox(
-                        width: 15,
-                        height: 15,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.flag, size: 17),
-                label: const Text('Save reason'),
-                style: FilledButton.styleFrom(
-                    backgroundColor: HubTheme.navy,
-                    foregroundColor: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: FilledButton.icon(
+                    onPressed: _selected == null || _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 15,
+                            height: 15,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.flag, size: 17),
+                    label: const Text('Save reason',
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w700)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: HubTheme.navy,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
