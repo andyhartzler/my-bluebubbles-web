@@ -554,15 +554,47 @@ serve(async (req)=>{
     } else if (mode === "missing_sponsors") {
       // Get bills missing sponsors
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const { data: billsWithSponsors } = await supabase.from("legislation_bill_sponsors").select("bill_id");
-      const billIdsWithSponsors = new Set((billsWithSponsors || []).map((s)=>s.bill_id));
       const { data: allBills } = await supabase.from("legislation_tracked_bills").select("*").eq("session", "2026").or("is_archived.eq.false,is_archived.is.null").is("sync_error", null).or(`last_synced_at.is.null,last_synced_at.lt.${oneHourAgo}`).order("last_synced_at", {
         ascending: true,
         nullsFirst: true
       }).limit(100);
-      const billsWithoutSponsors = (allBills || []).filter((bill)=>!billIdsWithSponsors.has(bill.id));
-      billsToSync = billsWithoutSponsors.slice(0, limit);
-      console.log(`[missing_sponsors mode] Found ${billsWithoutSponsors.length} bills missing sponsors, processing ${billsToSync.length}`);
+      // Asked one candidate bill at a time, with a query that can return at
+      // most one row, rather than from a single unbounded probe of the whole
+      // legislation_bill_sponsors table. `.select("bill_id")` with no range
+      // sends no Range header, so PostgREST caps the reply at the project's
+      // max-rows (1000 by default on Supabase) and returns that capped page as
+      // an ordinary success, with nothing to distinguish it from a complete
+      // answer. Read as the complete set of bills that have sponsors, it makes
+      // every bill whose rows sit past the cap look sponsorless. This is the
+      // same defect d6db9cb fixed in the orchestrator; it was left here then
+      // because this path deletes before it inserts and so cannot violate the
+      // unique constraint. It still costs: a misclassified bill is handed a
+      // rate-limited OpenStates API call and has its sponsors deleted and
+      // rewritten every hour, forever, which also re-nulls the legislator_id
+      // links resolved against those rows.
+      //
+      // A probe that errors returns null rather than false, and an unknown
+      // answer is not treated as "missing". Guessing wrong here spends API
+      // budget and churns rows, so the safe default is to leave the bill out
+      // and let the next run ask again.
+      const billsWithoutSponsors = [];
+      let sponsorProbeFailures = 0;
+      let billsProbed = 0;
+      for (const bill of allBills || []){
+        if (billsWithoutSponsors.length >= limit) break;
+        billsProbed++;
+        const { data: probe, error: probeError } = await supabase.from("legislation_bill_sponsors").select("bill_id").eq("bill_id", bill.id).limit(1);
+        if (probeError) {
+          sponsorProbeFailures++;
+          console.error(`[missing_sponsors mode] sponsor probe failed for ${bill.bill_identifier}:`, probeError);
+          continue;
+        }
+        if ((probe?.length ?? 0) === 0) billsWithoutSponsors.push(bill);
+      }
+      billsToSync = billsWithoutSponsors;
+      // Counts probes actually issued, not candidates available: the loop stops
+      // early once `limit` bills are found, so these differ on most runs.
+      console.log(`[missing_sponsors mode] Probed ${billsProbed} of ${(allBills || []).length} candidate bills, ${billsToSync.length} missing sponsors, ${sponsorProbeFailures} probe failures skipped`);
     } else {
       // Normal mode: bills needing sync
       const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
