@@ -490,6 +490,18 @@ class Main extends StatelessWidget {
               ),
             ),
           ],
+          // A URL that matches nothing above must never be fatal. Without this
+          // GetX's generator returns null, Flutter's NavigatorState._routeNamed
+          // null-checks it, and the app dies with "Null check operator used on
+          // a null value" before anything renders. That is what happened to an
+          // exec on 2026-07-28 at 23:53 who opened the sign-in link from their
+          // email on a phone: white screen, no error, no way forward.
+          // Falling back to the auth gate means an unexpected link drops you at
+          // sign-in instead of a crash.
+          unknownRoute: GetPage(
+            name: '/notfound',
+            page: () => SupabaseAuthGate(child: const AuthenticatedApp()),
+          ),
           home: SupabaseAuthGate(child: const AuthenticatedApp()),
           // Register tmail's AppLocalizationsDelegate alongside the
           // Flutter defaults. The mail screen does
