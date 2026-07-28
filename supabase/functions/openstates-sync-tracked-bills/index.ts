@@ -358,10 +358,23 @@ async function syncSingleBill(trackedBill) {
   // ========================================
   const { error: deleteError } = await supabase.from("legislation_bill_sponsors").delete().eq("bill_id", trackedBill.id);
   if (deleteError) {
-    console.error(`Failed to delete existing sponsors for ${trackedBill.bill_identifier}:`, deleteError);
+    console.error(`Failed to delete existing sponsors for ${trackedBill.bill_identifier}, skipping sponsor write:`, deleteError);
   }
   let sponsorsInserted = 0;
-  if (bill.sponsorships?.length > 0) {
+  // The insert below is a plain INSERT, and it is safe only because the DELETE
+  // immediately above cleared this bill's rows. When that DELETE fails we no
+  // longer know the bill is empty, and inserting anyway collides with the
+  // surviving rows on legislation_bill_sponsors_unique, which aborts the whole
+  // multi-row statement and emits the "duplicate key value violates unique
+  // constraint" line that SUPABASE-PLATFORM-1 rolls up. Skipping the sponsor
+  // write leaves the bill on its previous sponsors, which is the same data this
+  // sync was about to rewrite from the same OpenStates payload, so nothing is
+  // lost by waiting for the next run.
+  //
+  // This closes the deterministic case only. Two overlapping invocations can
+  // still interleave delete and insert on the same bill and collide on the same
+  // constraint, and that path is not addressed here.
+  if (!deleteError && bill.sponsorships?.length > 0) {
     const sponsorRecords = bill.sponsorships.map((s)=>({
         bill_id: trackedBill.id,
         openstates_sponsorship_id: s.id,
