@@ -109,7 +109,23 @@ class RosterBoardState extends State<RosterBoard>
   /// visible so nothing disappears under your finger. Cleared when the filter
   /// changes, so re-selecting it gives a genuinely fresh list of what is left.
   final Set<String> _justVoted = <String>{};
-  VoteSort _sort = VoteSort.yesShare;
+
+  /// Default sort: NAME, not live yes-share.
+  ///
+  /// yesShare sorts on the tally as it stands right now, and the tally moves
+  /// every time any of the other 15 execs votes, on every device at once. Of
+  /// the 73 candidates on the ballot, 9 carry zero ballots and sort last with
+  /// `yesShare ?? -1`; the moment somebody gives one of them a Yes it jumps
+  /// from the bottom of the list to the top of it, on all 16 screens, under
+  /// 16 thumbs. Every remote vote reshuffles the rows around the row you are
+  /// aiming at, and a mis-tap on this control saves a real wrong vote on a
+  /// real candidate.
+  ///
+  /// Alphabetical is stable under every remote write, and the sort selector
+  /// in the toolbar still offers yes-share for anyone reading the room rather
+  /// than voting. It is honest too: the toolbar shows the sort that is
+  /// actually applied, which a filter-conditional default would not.
+  VoteSort _sort = VoteSort.name;
 
   /// Ballot toolbar text field, bound to [SlateController.search] (the single
   /// shared query brain). Seeded here, synced back on external changes.
@@ -326,8 +342,14 @@ class RosterBoardState extends State<RosterBoard>
   List<CandidateEntry> _visibleBallot(
       List<CandidateEntry> ballot, VoteBuckets buckets) {
     var entries = ballot.toList();
-    int byName(CandidateEntry a, CandidateEntry b) =>
-        a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    // displayNameFor, not e.name: the one nameless submission would otherwise
+    // sort on an empty string and land at the very top of an alphabetical
+    // ballot under a name the list is not sorting by. This is the DEFAULT
+    // sort now, so that mismatch would be on every exec's first screen.
+    int byName(CandidateEntry a, CandidateEntry b) => widget.controller
+        .displayNameFor(a)
+        .toLowerCase()
+        .compareTo(widget.controller.displayNameFor(b).toLowerCase());
     if (_filter == VoteFilter.needsMyVote) {
       // A row you just voted on STAYS PUT. Filtering it out the instant the
       // vote landed is what made candidates pop out from under your thumb and

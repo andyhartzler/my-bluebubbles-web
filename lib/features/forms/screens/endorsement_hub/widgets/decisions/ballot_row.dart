@@ -741,13 +741,27 @@ class _VoteSegmentedControlState extends State<_VoteSegmentedControl> {
       // The write rolled back, so the row is genuinely unvoted again: unpin
       // it rather than leaving a failed vote parked in the list looking done.
       if (!withdrawing) widget.onVoted?.call(false);
+      // A denial and a dropped packet are indistinguishable from `false`, and
+      // they need OPPOSITE instructions. Telling an exec whose account is not
+      // recognised as an executive to "check connection" and handing them a
+      // Retry button sends them into a loop that can never succeed, on a
+      // board that otherwise looks completely normal. Nothing about an RLS
+      // rejection gets better by trying again.
+      final denied =
+          widget.votes.lastFailure == VoteWriteFailure.permissionDenied;
       m.showSnackBar(SnackBar(
-        content: Text("${widget.displayName}: vote didn't save. "
-            'Check connection.'),
+        content: Text(denied
+            ? '${widget.displayName}: the server rejected your vote because '
+                'your account is not recognized as an executive. Message '
+                'Andrew. Retrying will not help.'
+            : "${widget.displayName}: vote didn't save. Check connection."),
         behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-            label: 'Retry',
-            onPressed: () => _handleVote(choice, messenger: m)),
+        duration: Duration(seconds: denied ? 12 : 4),
+        action: denied
+            ? null
+            : SnackBarAction(
+                label: 'Retry',
+                onPressed: () => _handleVote(choice, messenger: m)),
       ));
       return;
     }
@@ -773,20 +787,26 @@ class _VoteSegmentedControlState extends State<_VoteSegmentedControl> {
     final cs = Theme.of(context).colorScheme;
     final mine = widget.votes.myVote(widget.entry.id);
 
+    // EVERY segment carries a written label.
+    //
+    // The third one used to be a bare question-mark icon whose only
+    // explanation was a Tooltip, and the phones the committee votes on have
+    // no hover at all: on a phone the ballot offered Yes, No, and an
+    // unexplained glyph, 73 times. It is also the one choice that opens the
+    // reason sheet, so it is the last one to leave a guess.
     Widget seg({
       required String code,
       required IconData icon,
       required Color fill,
-      String? label,
+      required String label,
     }) {
       final selected = mine == code;
-      final display = label ?? code;
-      final segment = Semantics(
+      return Semantics(
         button: true,
         selected: selected,
         label: selected
-            ? 'Your vote: $display. Tap to withdraw.'
-            : 'Vote $display',
+            ? 'Your vote: $label. Tap to withdraw.'
+            : 'Vote $label',
         child: InkWell(
           // Null while a write is in flight: InkWell then renders and reports
           // itself as disabled, so the second tap of a double tap is never
@@ -795,11 +815,11 @@ class _VoteSegmentedControlState extends State<_VoteSegmentedControl> {
           borderRadius: BorderRadius.circular(8),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            height: 36,
-            width: label == null ? 40 : null,
-            padding: label == null
-                ? null
-                : const EdgeInsets.symmetric(horizontal: 10),
+            // 44, the platform minimum touch target, not 36. These are the
+            // meeting-night tap targets and a mis-tap on this control saves a
+            // real wrong vote.
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
               color: selected ? fill : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
@@ -811,25 +831,18 @@ class _VoteSegmentedControlState extends State<_VoteSegmentedControl> {
                 Icon(icon,
                     size: 15,
                     color: selected ? Colors.white : cs.onSurfaceVariant),
-                if (label != null) ...[
-                  const SizedBox(width: 5),
-                  Text(label,
-                      style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                          color: selected
-                              ? Colors.white
-                              : cs.onSurfaceVariant)),
-                ],
+                const SizedBox(width: 5),
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color:
+                            selected ? Colors.white : cs.onSurfaceVariant)),
               ],
             ),
           ),
         ),
       );
-      if (label == null) {
-        return Tooltip(message: 'Undecided', child: segment);
-      }
-      return segment;
     }
 
     final yes = seg(
@@ -842,10 +855,14 @@ class _VoteSegmentedControlState extends State<_VoteSegmentedControl> {
         icon: Icons.cancel,
         fill: MoydBrand.opposeFg,
         label: 'No');
+    // "Not sure" rather than "Undecided": shorter on a 360px phone, and it
+    // does not collide with the committee's RECORDED "Undecided" decision
+    // state, which is a different thing on the same row.
     final undecided = seg(
         code: 'undecided',
         icon: Icons.help_outline,
-        fill: MoydBrand.neutralFg);
+        fill: MoydBrand.neutralFg,
+        label: 'Not sure');
 
     return AnimatedOpacity(
       // Brief dim while the write is in flight. The optimistic update has

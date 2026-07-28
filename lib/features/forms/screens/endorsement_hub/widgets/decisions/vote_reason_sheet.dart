@@ -147,10 +147,21 @@ class _VoteReasonSheetState extends State<_VoteReasonSheet> {
       Navigator.pop(context);
       return;
     }
+    // Same branch as the vote control: an RLS denial is not a connection
+    // problem, and offering Retry on one is offering a loop.
+    final denied =
+        widget.votes.lastFailure == VoteWriteFailure.permissionDenied;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: const Text("Reason didn't save. Check connection."),
+      content: Text(denied
+          ? 'The server rejected the reason because your account is not '
+              'recognized as an executive. Your ballot itself is unaffected. '
+              'Message Andrew.'
+          : "Reason didn't save. Check connection."),
       behavior: SnackBarBehavior.floating,
-      action: SnackBarAction(label: 'Retry', onPressed: _save),
+      duration: Duration(seconds: denied ? 12 : 4),
+      action: denied
+          ? null
+          : SnackBarAction(label: 'Retry', onPressed: _save),
     ));
   }
 

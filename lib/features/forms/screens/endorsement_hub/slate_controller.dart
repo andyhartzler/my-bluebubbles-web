@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../models/form_schema.dart';
@@ -158,6 +160,16 @@ class SlateController extends ChangeNotifier {
 
   // ==================== load ====================
 
+  /// Ceiling on every await inside [load].
+  ///
+  /// There was none, and `_loading` is only ever cleared at the end of the
+  /// try or in its catch: a request that never completes therefore pinned the
+  /// whole Endorsement HQ on "Loading the slate…" for the rest of the
+  /// session, with no error, no Retry, and no way back except a full reload
+  /// of the app. A timeout converts that into the error card that already
+  /// exists, which carries a Retry button.
+  static const Duration slateLoadTimeout = Duration(seconds: 25);
+
   Future<void> load() async {
     _loading = true;
     _error = null;
@@ -165,22 +177,27 @@ class SlateController extends ChangeNotifier {
     try {
       FormSchema form;
       try {
-        form = await _service.getForm(endorsementFormId);
+        form = await _service
+            .getForm(endorsementFormId)
+            .timeout(slateLoadTimeout);
       } catch (_) {
         // Fallback: resolve by slug when the constant id no longer matches.
-        final forms = await _service.fetchForms('all');
+        final forms =
+            await _service.fetchForms('all').timeout(slateLoadTimeout);
         form = forms.firstWhere(
           (f) => f.slug == endorsementSlug,
           orElse: () => throw StateError(
               'Endorsement form not found by id or slug "$endorsementSlug".'),
         );
       }
-      final submissions = await _service.getSubmissions(form.id);
+      final submissions =
+          await _service.getSubmissions(form.id).timeout(slateLoadTimeout);
       // Gemini alignment scores (keyed by submission id). Non-fatal: an empty
       // map falls back to the rule-based score so the roster still renders.
       Map<String, AiAlignmentScore> aiScores = const {};
       try {
-        aiScores = await _aiScores.loadBySubmission();
+        aiScores =
+            await _aiScores.loadBySubmission().timeout(slateLoadTimeout);
       } catch (_) {
         aiScores = const {};
       }
@@ -189,7 +206,9 @@ class SlateController extends ChangeNotifier {
       // their initials, as before.
       Map<String, String> photoFallback = const {};
       try {
-        photoFallback = await _service.getEndorsementPhotoFallback();
+        photoFallback = await _service
+            .getEndorsementPhotoFallback()
+            .timeout(slateLoadTimeout);
       } catch (_) {
         photoFallback = const {};
       }
@@ -204,8 +223,9 @@ class SlateController extends ChangeNotifier {
       // plus an honest "Race field unavailable" line per expansion.
       _raceLoadFailed = false;
       try {
-        _raceInfo = await _races.loadApplicantRaces();
-        _raceField = await _races.loadRaceField();
+        _raceInfo =
+            await _races.loadApplicantRaces().timeout(slateLoadTimeout);
+        _raceField = await _races.loadRaceField().timeout(slateLoadTimeout);
       } catch (e) {
         debugPrint('SlateController race views load failed: $e');
         _raceInfo = const {};
@@ -229,7 +249,13 @@ class SlateController extends ChangeNotifier {
       _loading = false;
       notifyListeners();
     } catch (e) {
-      _error = '$e';
+      // The error card prints this verbatim, so a raw
+      // "TimeoutException after 0:00:25.000000: Future not completed" would
+      // be what an exec reads when the venue wifi drops.
+      _error = e is TimeoutException
+          ? 'The slate took too long to load. Check your connection and tap '
+              'Retry.'
+          : '$e';
       _loading = false;
       notifyListeners();
     }

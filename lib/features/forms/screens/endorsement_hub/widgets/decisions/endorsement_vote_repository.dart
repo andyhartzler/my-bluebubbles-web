@@ -3,9 +3,80 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/utils/logger/logger.dart';
 
 /// The three ballot choices (mirrors the widened table CHECK constraint).
 const Set<String> kValidVotes = {'yes', 'no', 'undecided'};
+
+/// Rows per page of the ballot fetch.
+///
+/// PostgREST caps EVERY response at the project's `db-max-rows` and does it
+/// SILENTLY: HTTP 200, no error field, just fewer rows. Measured against this
+/// project on 2026-07-27: an unbounded `select()` returned exactly 1000 rows
+/// with `content-range: 0-999/*`, and no role carries a `pgrst.db_max_rows`
+/// override (`pg_roles.rolconfig` for anon/authenticated/authenticator/
+/// service_role holds only statement/lock timeouts).
+///
+/// A full board is 16 execs x 73 candidates = 1168 rows. The bare `select()`
+/// this repository used to issue would therefore have dropped 168 ballots
+/// with nothing to show for it, and the symptom is the worst one available:
+/// an exec's OWN votes come back unvoted, they re-vote, and a re-cast clears
+/// the stated reasons. 267 ballots exist tonight, so truncation was 733
+/// votes away, i.e. mid-evening on a good turnout.
+const int kVoteFetchPageSize = 1000;
+
+/// Hard ceiling on the pager: 20 pages x 1000 = 20,000 ballots, about 17x a
+/// full board. Reaching it means the cursor is not advancing, which is a bug
+/// rather than a big board, so the fetch fails loudly instead of looping.
+const int kVoteFetchMaxPages = 20;
+
+/// Ceiling on a ballot READ (which may span several pages). Long enough that
+/// a slow phone on venue wifi still lands; short enough that a wedged socket
+/// surfaces the board's retry card instead of an eternal spinner.
+const Duration kVoteReadTimeout = Duration(seconds: 20);
+
+/// Ceiling on a single ballot WRITE.
+///
+/// Without it a request that never completes leaves the row's vote control
+/// disabled FOREVER: `_VoteSegmentedControlState._busy` is only cleared in
+/// the `finally` of the await, so a hung upsert takes that candidate's
+/// controls out of service for the rest of the session with no error and no
+/// Retry. The `authenticated` role carries `statement_timeout=8s`
+/// server-side, so 12s only ever catches a network-level stall.
+const Duration kVoteWriteTimeout = Duration(seconds: 12);
+
+/// Why the last ballot write failed, in the only two shapes the UI needs to
+/// say different things about.
+///
+/// A denial and a dropped packet look identical from `castVote`'s `false`,
+/// and telling an exec whose account is not recognised as an executive to
+/// "check connection" sends them into a retry loop that can never succeed.
+enum VoteWriteFailure {
+  /// No write has failed since the last successful one.
+  none,
+
+  /// RLS/JWT rejected the write. Retrying will not help.
+  permissionDenied,
+
+  /// Transport, timeout, or anything else. Retry is worth offering.
+  other,
+}
+
+/// Classify a write failure. RLS violations surface as PostgREST `42501`;
+/// an expired or missing JWT surfaces as `PGRST301` or a bare 401/403.
+VoteWriteFailure classifyVoteWriteFailure(Object e) {
+  if (e is PostgrestException) {
+    final code = e.code;
+    if (code == '42501' ||
+        code == 'PGRST301' ||
+        code == '401' ||
+        code == '403') {
+      return VoteWriteFailure.permissionDenied;
+    }
+  }
+  if (e is AuthException) return VoteWriteFailure.permissionDenied;
+  return VoteWriteFailure.other;
+}
 
 /// Whether the ballot fetch has completed, mirroring [DecisionLoadState].
 ///
@@ -236,6 +307,11 @@ class EndorsementVoteRepository extends ChangeNotifier {
   /// Human-readable description of the last failed write, for debugging.
   String? lastError;
 
+  /// Shape of the last failed ballot write (see [VoteWriteFailure]). Read by
+  /// the vote control and the reason sheet so an RLS denial gets honest copy
+  /// and no Retry button, instead of "Check connection" and a loop.
+  VoteWriteFailure lastFailure = VoteWriteFailure.none;
+
   SupabaseClient get _client => _supabase.client;
 
   /// The signed-in member's auth uid (null when signed out). Set as the FIRST
@@ -264,6 +340,41 @@ class EndorsementVoteRepository extends ChangeNotifier {
   /// Denominator for "{cast} of {roomSize} execs in".
   int get roomSize => _knownVoters.length;
 
+  /// EVERY ballot row on the table, fetched in bounded pages.
+  ///
+  /// See [kVoteFetchPageSize]: a bare `select()` is silently truncated by
+  /// PostgREST at the project row cap, and a truncated ballot is the one
+  /// wrong answer an exec would act on. Three properties make this safe:
+  ///
+  ///  * ORDERED BY THE PRIMARY KEY (candidate_id, voter_id), so offset paging
+  ///    is deterministic rather than dependent on heap order.
+  ///  * TERMINATES ON AN EMPTY PAGE, not on a short one, so it stays correct
+  ///    whatever the server's row cap actually is. It costs exactly one extra
+  ///    round trip (267 ballots today = one full page plus one empty one).
+  ///  * BOUNDED by [kVoteFetchMaxPages], and throws rather than returning a
+  ///    partial list if that bound is hit.
+  ///
+  /// Every page carries [kVoteReadTimeout] so a wedged socket cannot leave
+  /// the board on a spinner forever.
+  Future<List<Map<String, dynamic>>> _fetchAllVotes() async {
+    final out = <Map<String, dynamic>>[];
+    for (var page = 0; page < kVoteFetchMaxPages; page++) {
+      final rows = await _client
+          .from(_table)
+          .select()
+          .order('candidate_id', ascending: true)
+          .order('voter_id', ascending: true)
+          .range(out.length, out.length + kVoteFetchPageSize - 1)
+          .timeout(kVoteReadTimeout);
+      if (rows.isEmpty) return out;
+      for (final row in rows) {
+        out.add(Map<String, dynamic>.from(row));
+      }
+    }
+    throw StateError('ballot fetch did not terminate within '
+        '$kVoteFetchMaxPages pages (${out.length} rows read)');
+  }
+
   /// Initial ballot fetch. Re-entrant only while it has never SUCCEEDED, so
   /// the failed state is genuinely retryable (it previously latched `loaded`
   /// true on failure, which made the outage permanent for that page).
@@ -273,16 +384,20 @@ class EndorsementVoteRepository extends ChangeNotifier {
       _currentUserId = _client.auth.currentUser?.id;
       await _resolveCurrentUserName();
       await _seedExecRoster();
-      final rows = await _client.from(_table).select();
+      final rows = await _fetchAllVotes();
       _votes.clear();
-      for (final row in (rows as List)) {
-        _applyRow(Map<String, dynamic>.from(row as Map));
+      for (final row in rows) {
+        _applyRow(row);
       }
       _rebuildKnownVoters();
       _loadState = VoteLoadState.ready;
-    } catch (e) {
+    } catch (e, s) {
       lastError = 'load: $e';
-      debugPrint('EndorsementVoteRepository.load error: $e');
+      // A Sentry event, not just a debugPrint. Nobody phones in a failed
+      // ballot fetch: the board says "Could not load tonight's ballots" and
+      // the exec reasonably assumes someone already knows.
+      Logger.error('Endorsement ballot fetch failed',
+          tag: 'EndorsementVotes', error: e, trace: s);
       // Do NOT fall through to a ready board: an empty _votes map renders a
       // board on which nobody has voted, which is indistinguishable from the
       // truth and is the one wrong answer an exec would act on.
@@ -306,22 +421,34 @@ class EndorsementVoteRepository extends ChangeNotifier {
   /// resume and to every realtime (re)subscribe: covers the gaps Postgres
   /// Changes leaves after phone sleep / offline, which it never backfills.
   Future<void> refresh() async {
+    // SNAPSHOT BEFORE THE AWAIT. castVote / clearVote / updateReason drop
+    // their candidate from `_pendingSelf` in a `finally` that runs the
+    // instant the HTTP response lands, so a vote cast DURING this select can
+    // already be gone from the set by the time the select resolves. Reading
+    // the set only afterwards therefore skipped exactly the votes the
+    // re-assert exists to protect: the server snapshot predates the write,
+    // the re-assert passes over it, and the exec watches their own tap wiped
+    // off the screen with no error and no Retry. The union below covers both
+    // halves: pending when this started, plus anything that went in flight
+    // while it ran.
+    final pendingBefore = Set<String>.of(_pendingSelf);
     try {
-      final rows = await _client.from(_table).select();
+      final rows = await _fetchAllVotes();
       // Build into a scratch map, then swap: `_votes.clear()` followed by an
       // async gap would be a window where the board renders an empty ballot.
       // (The old code was safe because the reapply was synchronous after the
       // await; keeping the swap explicit means it stays safe.)
       final next = <String, Map<String, BallotEntry>>{};
-      for (final row in (rows as List)) {
-        _applyRowInto(next, Map<String, dynamic>.from(row as Map));
+      for (final row in rows) {
+        _applyRowInto(next, row);
       }
       // An in-flight local write is NOT yet visible to this select, so the
       // server snapshot would roll the exec's own tap back on screen with no
-      // error and no Retry. Re-assert anything still pending.
+      // error and no Retry. Re-assert anything pending at either end.
       final uid = _currentUserId;
       if (uid != null) {
-        for (final candidateId in _pendingSelf) {
+        final pending = <String>{...pendingBefore, ..._pendingSelf};
+        for (final candidateId in pending) {
           final mine = _votes[candidateId]?[uid];
           if (mine != null) {
             (next[candidateId] ??= {})[uid] = mine;
@@ -339,9 +466,14 @@ class EndorsementVoteRepository extends ChangeNotifier {
       _loadState = VoteLoadState.ready;
       _invalidateAll();
       notifyListeners();
-    } catch (e) {
+    } catch (e, s) {
       lastError = 'refresh: $e';
-      debugPrint('EndorsementVoteRepository.refresh error: $e');
+      // Deliberately NON-destructive (see the doc above): the previously
+      // loaded ballot stays exactly as it was. A partial page count throws
+      // out of _fetchAllVotes rather than being applied, so a truncated read
+      // can never quietly understate the board here either.
+      Logger.error('Endorsement ballot refresh failed',
+          tag: 'EndorsementVotes', error: e, trace: s);
     }
   }
 
@@ -355,7 +487,11 @@ class EndorsementVoteRepository extends ChangeNotifier {
           .from('members')
           .select('name')
           .eq('user_id', uid)
-          .maybeSingle();
+          // Bounded like every other await on the load path: this one runs
+          // BEFORE the ballot fetch, so a hang here used to hold the whole
+          // board on its spinner indefinitely.
+          .maybeSingle()
+          .timeout(kVoteReadTimeout);
       final name = row?['name']?.toString().trim();
       if (name != null && name.isNotEmpty) {
         _currentUserName = name;
@@ -381,7 +517,10 @@ class EndorsementVoteRepository extends ChangeNotifier {
           .from('members')
           .select('user_id, name')
           .eq('executive_committee', true)
-          .not('user_id', 'is', null);
+          .not('user_id', 'is', null)
+          // 16 rows today, far under any row cap, but still bounded: it is on
+          // the load path ahead of the ballot fetch.
+          .timeout(kVoteReadTimeout);
       _seededVoters.clear();
       for (final row in (rows as List)) {
         final m = Map<String, dynamic>.from(row as Map);
@@ -700,11 +839,14 @@ class EndorsementVoteRepository extends ChangeNotifier {
         'reason_codes': carried,
         'other_text': null,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
-      });
+      }).timeout(kVoteWriteTimeout);
+      lastFailure = VoteWriteFailure.none;
       return true;
-    } catch (e) {
+    } catch (e, s) {
       lastError = 'castVote: $e';
-      debugPrint('EndorsementVoteRepository.castVote error: $e');
+      lastFailure = classifyVoteWriteFailure(e);
+      Logger.error('Endorsement vote write failed (castVote $vote)',
+          tag: 'EndorsementVotes', error: e, trace: s);
       _restoreBallot(candidateId, uid, snapshot);
       return false;
     } finally {
@@ -728,11 +870,15 @@ class EndorsementVoteRepository extends ChangeNotifier {
           .from(_table)
           .delete()
           .eq('candidate_id', candidateId)
-          .eq('voter_id', uid);
+          .eq('voter_id', uid)
+          .timeout(kVoteWriteTimeout);
+      lastFailure = VoteWriteFailure.none;
       return true;
-    } catch (e) {
+    } catch (e, s) {
       lastError = 'clearVote: $e';
-      debugPrint('EndorsementVoteRepository.clearVote error: $e');
+      lastFailure = classifyVoteWriteFailure(e);
+      Logger.error('Endorsement vote withdrawal failed (clearVote)',
+          tag: 'EndorsementVotes', error: e, trace: s);
       _restoreBallot(candidateId, uid, snapshot);
       return false;
     } finally {
@@ -783,11 +929,14 @@ class EndorsementVoteRepository extends ChangeNotifier {
         'reason_codes': merged,
         'other_text': otherText,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
-      });
+      }).timeout(kVoteWriteTimeout);
+      lastFailure = VoteWriteFailure.none;
       return true;
-    } catch (e) {
+    } catch (e, s) {
       lastError = 'updateReason: $e';
-      debugPrint('EndorsementVoteRepository.updateReason error: $e');
+      lastFailure = classifyVoteWriteFailure(e);
+      Logger.error('Endorsement reason write failed (updateReason)',
+          tag: 'EndorsementVotes', error: e, trace: s);
       _restoreBallot(candidateId, uid, snapshot);
       return false;
     } finally {

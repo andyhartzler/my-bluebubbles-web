@@ -34,9 +34,18 @@ tz.Location endorsementDeadlineLocation() {
 /// week, which reads as though nothing is due.
 ///
 /// Change these five numbers to move the deadline. Nothing else needs editing.
+///
+/// MOVED 2026-07-27 from the 27th to the 29th. The go message goes out on the
+/// evening of the 27th, and NOTHING enforces this date: there is no deadline
+/// check anywhere in the endorsement hub and none in RLS, so at midnight the
+/// dashboard card would have flipped to "Voting has closed" over a ballot
+/// that still saved every write. An exec starting 73 candidates at 11pm
+/// crosses that boundary on their own. The card and the ballot must agree,
+/// and the only way to make them agree without shipping an enforcement path
+/// on the night of the vote is to put the date past the vote.
 const int kVoteDeadlineYear = 2026;
 const int kVoteDeadlineMonth = 7;
-const int kVoteDeadlineDay = 27;
+const int kVoteDeadlineDay = 29;
 const int kVoteDeadlineHour = 23;
 const int kVoteDeadlineMinute = 59;
 
@@ -511,10 +520,18 @@ class AutoInferredAssignmentsService {
         // to-do at all and the card disappears, rather than sitting on the
         // dashboard as a permanent red overdue item nobody can clear.
         if (centralNow.isAfter(deadline.add(kVoteDeadlineGrace))) return;
-        // Urgent means "act now": inside the last 48 hours, and only while
+        // Urgent means "act now": inside the last 72 hours, and only while
         // acting is still possible. A closed ballot is not urgent.
+        //
+        // 72, not 48. The deadline moved from the 27th to the 29th so the
+        // card would stop claiming "Voting has closed" at midnight over a
+        // ballot that still saves, and a 48 hour window would have taken the
+        // urgent treatment off the card on the ONE evening the committee is
+        // being asked to vote. The window is what makes the card red; the
+        // date is what makes it honest. They are separate knobs and both
+        // want to be on tonight.
         final urgent = !closed &&
-            !centralNow.isBefore(deadline.subtract(const Duration(hours: 48)));
+            !centralNow.isBefore(deadline.subtract(const Duration(hours: 72)));
 
         results.add(AutoInferredAssignment(
           key: 'endorsement_vote:ballot',

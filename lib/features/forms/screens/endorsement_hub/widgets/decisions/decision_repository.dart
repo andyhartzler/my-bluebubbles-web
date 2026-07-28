@@ -5,6 +5,26 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/utils/logger/logger.dart';
+
+/// Rows per page of the decisions fetch, and the pager's hard ceiling.
+///
+/// Same latent shape as the ballot fetch: PostgREST silently caps an
+/// unbounded `select()` at the project row cap (measured 1000 on this
+/// project), returning HTTP 200 with fewer rows and no error. 26 decisions
+/// exist today so nothing is truncated, but a silently short decision
+/// baseline is strictly the more dangerous of the two truncations, because
+/// `stateFor` defaults a missing row to undecided: every dropped decision
+/// puts a settled candidate back on all 16 ballots.
+const int kDecisionFetchPageSize = 1000;
+const int kDecisionFetchMaxPages = 20;
+
+/// Ceiling on a decisions read, matching the ballot repository's.
+const Duration kDecisionReadTimeout = Duration(seconds: 20);
+
+/// Ceiling on a decision write (the chair's Confirm and the final-call
+/// pills), matching the ballot repository's write budget.
+const Duration kDecisionWriteTimeout = Duration(seconds: 12);
 
 /// The final endorsement outcome for a candidate. The per-member yes/no
 /// voting board is the committee's working mechanism; this is the lightweight
@@ -274,10 +294,10 @@ class SupabaseDecisionRepository extends DecisionRepository {
   @override
   Future<void> refresh() async {
     try {
-      final rows = await _client.from(_table).select();
+      final rows = await _fetchAllDecisions();
       final next = <String, DecisionRecord>{};
-      for (final row in (rows as List)) {
-        _applyRowInto(next, Map<String, dynamic>.from(row as Map));
+      for (final row in rows) {
+        _applyRowInto(next, row);
       }
       // Swap in one step so no frame can observe a half-empty baseline.
       _records
@@ -286,23 +306,47 @@ class SupabaseDecisionRepository extends DecisionRepository {
       // A successful refresh also clears a previously failed load.
       _loadState = DecisionLoadState.ready;
       notifyListeners();
-    } catch (e) {
-      debugPrint('SupabaseDecisionRepository.refresh error: $e');
+    } catch (e, s) {
+      Logger.error('Endorsement decision refresh failed',
+          tag: 'EndorsementDecisions', error: e, trace: s);
     }
+  }
+
+  /// Every decision row, paged and bounded, for the reasons in
+  /// [kDecisionFetchPageSize]. Terminates on an EMPTY page rather than a
+  /// short one, so it stays correct whatever the server's row cap is, and
+  /// throws rather than returning a partial baseline if the pager runs away.
+  Future<List<Map<String, dynamic>>> _fetchAllDecisions() async {
+    final out = <Map<String, dynamic>>[];
+    for (var page = 0; page < kDecisionFetchMaxPages; page++) {
+      final rows = await _client
+          .from(_table)
+          .select()
+          .order('candidate_id', ascending: true)
+          .range(out.length, out.length + kDecisionFetchPageSize - 1)
+          .timeout(kDecisionReadTimeout);
+      if (rows.isEmpty) return out;
+      for (final row in rows) {
+        out.add(Map<String, dynamic>.from(row));
+      }
+    }
+    throw StateError('decision fetch did not terminate within '
+        '$kDecisionFetchMaxPages pages (${out.length} rows read)');
   }
 
   Future<void> _fetch() async {
     try {
-      final rows = await _client.from(_table).select();
+      final rows = await _fetchAllDecisions();
       _records.clear();
-      for (final row in (rows as List)) {
-        _applyRow(Map<String, dynamic>.from(row as Map));
+      for (final row in rows) {
+        _applyRow(row);
       }
       // An empty-but-successful result set is still ready; the gate guards
       // against FAILED loads, not small ones.
       _loadState = DecisionLoadState.ready;
-    } catch (e) {
-      debugPrint('SupabaseDecisionRepository.load error: $e');
+    } catch (e, s) {
+      Logger.error('Endorsement decision baseline fetch failed',
+          tag: 'EndorsementDecisions', error: e, trace: s);
       _loadState = DecisionLoadState.failed;
     }
     notifyListeners();
@@ -417,8 +461,9 @@ class SupabaseDecisionRepository extends DecisionRepository {
     try {
       await _upsertChecked(candidateId);
       return true;
-    } catch (e) {
-      debugPrint('SupabaseDecisionRepository.trySetState error: $e');
+    } catch (e, s) {
+      Logger.error('Endorsement decision write failed (trySetState)',
+          tag: 'EndorsementDecisions', error: e, trace: s);
       if (snapshot == null) {
         _records.remove(candidateId);
       } else {
@@ -446,6 +491,10 @@ class SupabaseDecisionRepository extends DecisionRepository {
   }
 
   /// Same upsert as [_upsert] but RETHROWS so [trySetState] can roll back.
+  ///
+  /// Bounded: without a timeout a hung request leaves the chair's Confirm
+  /// button spinning with no rollback and no error, exactly the failure the
+  /// checked write exists to prevent.
   Future<void> _upsertChecked(String candidateId) async {
     final rec = recordFor(candidateId);
     await _client.from(_table).upsert({
@@ -454,7 +503,7 @@ class SupabaseDecisionRepository extends DecisionRepository {
       'note': rec.note,
       'updated_by': _client.auth.currentUser?.id,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
-    });
+    }).timeout(kDecisionWriteTimeout);
   }
 
   @override

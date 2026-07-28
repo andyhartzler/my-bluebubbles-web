@@ -458,11 +458,49 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
     return null;
   }
 
+  /// Turn whatever was thrown into something an exec can act on.
+  ///
+  /// This used to be `e.toString()` with the "Exception: " prefix shaved off,
+  /// so the sign-in error box rendered raw Dart. The two shapes that actually
+  /// reach it during phone sign-in are the worst two to print verbatim:
+  /// `FunctionException(status: 500, details: {...}, reasonPhrase: null)`
+  /// from an edge-function failure, and
+  /// `ClientException with SocketException: Failed host lookup...` from a
+  /// dropped connection. Neither tells anyone what to do, and both look like
+  /// the app is broken rather than the network.
   String _cleanError(Object e) {
+    if (e is FunctionException) {
+      final details = e.details;
+      final inner = details is Map ? details['error'] : null;
+      final msg = inner?.toString().trim();
+      if (msg != null && msg.isNotEmpty) return msg;
+      final reason = e.reasonPhrase?.trim();
+      if (reason != null && reason.isNotEmpty) return reason;
+      return 'Could not reach the sign-in service. Please try again in a '
+          'moment, or use the other sign-in method below.';
+    }
+    if (e is AuthException) {
+      final msg = e.message.trim();
+      if (msg.isNotEmpty) return msg;
+    }
     var s = e.toString();
     if (s.startsWith('Exception: ')) s = s.substring('Exception: '.length);
     s = s.trim();
-    return s.isEmpty ? 'Something went wrong. Please try again.' : s;
+    if (s.isEmpty) return 'Something went wrong. Please try again.';
+    // Transport-level failures never reach the user as Dart text.
+    final lower = s.toLowerCase();
+    if (lower.contains('clientexception') ||
+        lower.contains('socketexception') ||
+        lower.contains('handshakeexception') ||
+        lower.contains('timeoutexception') ||
+        lower.contains('failed to fetch') ||
+        lower.contains('xmlhttprequest') ||
+        lower.contains('connection closed') ||
+        lower.contains('connection refused')) {
+      return 'Could not reach the server. Check your connection and try '
+          'again.';
+    }
+    return s;
   }
 
   /// The exec/committee workspace-access gate, shared by both sign-in methods.
@@ -508,6 +546,27 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
       return;
     }
 
+    // THE THROTTLE IS NOT JUST A DISABLED BUTTON.
+    //
+    // Twilio Verify caps a single verification at 5 sends (error 60203) and
+    // then kills it for its full 10 minute TTL: an exec who burns the quota
+    // cannot get a code AT ALL, on the night of the vote. The 30s cooldown
+    // was enforced in exactly one place, the "Resend code" button's
+    // onPressed, and two paths walked straight around it: "← Back to phone
+    // entry" and the email/phone switch both zeroed `_resendCooldown`, and
+    // the entry screen's own "Text me a code" button never consulted it. So
+    // Back, tap, Back, tap was an unthrottled loop into the lockout. The gate
+    // belongs on the send itself, where every path has to pass through it.
+    if (_resendCooldown > 0) {
+      setState(() {
+        _errorMessage = 'Wait ${_resendCooldown}s before asking for another '
+            'code. If the text still has not arrived, use "Sign in with '
+            'email instead" below.';
+        _successMessage = null;
+      });
+      return;
+    }
+
     final phone = _toE164(_phoneController.text);
     if (phone == null) {
       setState(() {
@@ -549,9 +608,24 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
       if (!mounted) return;
       setState(() {
         _errorMessage = _cleanError(e);
-        _showCodeInput = false;
-        _phoneForCode = null;
+        // ONLY tear the code screen down on the FIRST send. A failed RESEND
+        // used to wipe `_showCodeInput` and `_phoneForCode`, which threw the
+        // exec back to the phone-number field and discarded the code they
+        // had already been texted and may have been mid-way through typing.
+        // The first code is very often still valid (Twilio Verify keeps the
+        // verification alive for 10 minutes); the resend is the thing that
+        // failed, not the code. Losing the entry field is what then drives
+        // the send-again loop into the 5-send lockout.
+        if (_phoneForCode == null) {
+          _showCodeInput = false;
+          _phoneCodeFlow = false;
+        }
       });
+      // A failed RESEND still starts the cooldown: the failure may well BE
+      // the 5-send cap (Twilio 60203), and an uncooled retry loop is what
+      // gets there. A failed FIRST send does not, so a mistyped number can be
+      // corrected immediately.
+      if (_phoneForCode != null) _startResendCooldown();
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -641,8 +715,10 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
   }
 
   void _switchMode(bool toPhone) {
-    _resendTimer?.cancel();
-    _resendCooldown = 0;
+    // THE COOLDOWN SURVIVES THE SWITCH. It used to be cancelled and zeroed
+    // here, which turned "Sign in with email instead" and back into a free
+    // reset of the SMS throttle. The timer is about Twilio's per-verification
+    // send quota, not about which form is on screen.
     setState(() {
       _phoneMode = toPhone;
       _showCodeInput = false;
@@ -798,7 +874,10 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
       const SizedBox(height: 4),
       TextButton(
         onPressed: () {
-          _resendTimer?.cancel();
+          // Same rule as _switchMode: the resend cooldown SURVIVES Back. It
+          // used to be cancelled and zeroed right here, which made
+          // "Back → Text me a code" the unthrottled path into Twilio's
+          // 5-send lockout that the cooldown was added to prevent.
           setState(() {
             _showCodeInput = false;
             _phoneCodeFlow = false;
@@ -807,7 +886,6 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
             _phoneForCode = null;
             _errorMessage = null;
             _successMessage = null;
-            _resendCooldown = 0;
           });
           (_phoneMode ? _phoneFocusNode : _emailFocusNode).requestFocus();
         },
@@ -1000,7 +1078,14 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
                                   if (!_showCodeInput) ...[
                                     const SizedBox(height: 16),
                                     FilledButton.icon(
-                                      onPressed: _isSending
+                                      // Gated on the SMS cooldown too, not
+                                      // just on _isSending. _sendPhoneCode
+                                      // now refuses while the cooldown runs,
+                                      // and a button that looks live but does
+                                      // nothing is worse than a disabled one
+                                      // that says how long is left.
+                                      onPressed: (_isSending ||
+                                              (_phoneMode && _resendCooldown > 0))
                                           ? null
                                           : () {
                                               FocusScope.of(context).unfocus();
@@ -1019,7 +1104,11 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
                                           : Icon(_phoneMode ? Icons.sms_outlined : Icons.arrow_forward),
                                       label: Text(_isSending
                                           ? 'Sending...'
-                                          : (_phoneMode ? 'Text me a code' : 'Send magic link')),
+                                          : (_phoneMode
+                                              ? (_resendCooldown > 0
+                                                  ? 'Text me a code in ${_resendCooldown}s'
+                                                  : 'Text me a code')
+                                              : 'Send magic link')),
                                       style: FilledButton.styleFrom(
                                         backgroundColor: const Color(0xFF32A6DE),
                                         padding: const EdgeInsets.symmetric(vertical: 16),

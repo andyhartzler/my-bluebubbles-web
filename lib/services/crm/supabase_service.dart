@@ -44,7 +44,17 @@ class CRMSupabaseService {
         // Every PostgREST/auth/storage request becomes a Sentry breadcrumb;
         // failed requests become events (captureFailedRequests). No-op
         // wrapper when Sentry is disabled (debug builds).
-        httpClient: SentryHttpClient(),
+        //
+        // 400-599, NOT the 500-599 default. The failures that matter on this
+        // app are 4xx: an RLS rejection on a vote write is a 403 or a 401,
+        // an expired JWT is a 401, and a malformed filter is a 400. With the
+        // default range every one of those was dropped on the floor, so the
+        // single most important thing that can go wrong tonight, an exec
+        // whose writes are all being refused, produced no Sentry event at
+        // all and had to arrive as a phone call.
+        httpClient: SentryHttpClient(
+          failedRequestStatusCodes: [SentryStatusCode.range(400, 599)],
+        ),
       );
 
       _client = Supabase.instance.client;
