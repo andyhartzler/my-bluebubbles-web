@@ -38,6 +38,21 @@ class CRMMessageService {
   final Map<String, String> _serviceCache = {};
   final LinkedHashMap<String, _AutomationGuardEntry> _automationGuardCache = LinkedHashMap();
 
+  /// Set when an iMessage availability lookup fails. The lookup lives on the
+  /// legacy iMessage server, so a failure describes that server rather than the
+  /// address that happened to be asked about. Only previewTransportBreakdown
+  /// reads this; the send path still probes every address on its own.
+  bool _availabilityEndpointDown = false;
+
+  /// When the last availability lookup failed, used to hold off the next probe.
+  DateTime? _lastAvailabilityFailureAt;
+
+  /// How long a failed probe stands before another one is worth paying for.
+  /// _updatePreview reruns on every filter toggle of the bulk message screen,
+  /// and a probe against a dead endpoint blocks on the 15 second connect
+  /// timeout, so without this the screen would stall once per interaction.
+  static const Duration _availabilityRetryDelay = Duration(seconds: 60);
+
   /// Fires when a survey response is received, so the UI can refresh.
   final StreamController<String> _surveyResponseController =
       StreamController<String>.broadcast();
@@ -54,6 +69,8 @@ class CRMMessageService {
   static void clearAutomationCache() {
     instance._automationGuardCache.clear();
     instance._serviceCache.clear();
+    instance._availabilityEndpointDown = false;
+    instance._lastAvailabilityFailureAt = null;
     // Clear any other per-session caches if present.
   }
 
@@ -608,8 +625,12 @@ class CRMMessageService {
       final available = response.data['data']['available'] as bool? ?? false;
       final service = available ? 'iMessage' : 'SMS';
       _serviceCache[address] = service;
+      _availabilityEndpointDown = false;
+      _lastAvailabilityFailureAt = null;
       return service;
     } catch (_) {
+      _availabilityEndpointDown = true;
+      _lastAvailabilityFailureAt = DateTime.now();
       // Default to SMS when availability cannot be determined for phone numbers
       final fallback = address.contains('@') ? 'iMessage' : 'SMS';
       _serviceCache[address] = fallback;
@@ -619,22 +640,98 @@ class CRMMessageService {
 
   Future<Map<String, int>> previewTransportBreakdown(List<Member> members) async {
     final counts = <String, int>{'iMessage': 0, 'SMS': 0};
-    final futures = <Future<void>>[];
 
-    for (final member in members) {
-      final address = member.phoneE164 ?? member.phone;
-      if (address == null || address.isEmpty) {
-        continue;
-      }
-
-      futures.add(() async {
-        final normalized = address.contains('@') ? address : cleansePhoneNumber(address);
-        final service = await _determineService(normalized);
-        counts[service] = (counts[service] ?? 0) + 1;
-      }());
+    void tally(String service) {
+      counts[service] = (counts[service] ?? 0) + 1;
     }
 
-    await Future.wait(futures);
+    String guess(String address) =>
+        _serviceCache[address] ?? (address.contains('@') ? 'iMessage' : 'SMS');
+
+    final addresses = <String>[];
+    for (final member in members) {
+      final raw = member.phoneE164 ?? member.phone;
+      if (raw == null || raw.isEmpty) {
+        continue;
+      }
+      final address = raw.contains('@') ? raw : cleansePhoneNumber(raw);
+      if (address.isEmpty) {
+        // A junk value like "n/a" cleanses away to nothing. Looking it up can
+        // only fail, and the failure yields 'SMS', so count that directly
+        // rather than firing a request that cannot succeed.
+        tally('SMS');
+        continue;
+      }
+      addresses.add(address);
+    }
+
+    if (addresses.isEmpty) {
+      counts.removeWhere((key, value) => value == 0);
+      return counts;
+    }
+
+    // A probe against a dead endpoint costs the full connect timeout, and
+    // _updatePreview reruns on every filter toggle, so one recent failure
+    // stands for a minute rather than stalling each interaction in turn.
+    final lastFailure = _lastAvailabilityFailureAt;
+    if (_availabilityEndpointDown &&
+        lastFailure != null &&
+        DateTime.now().difference(lastFailure) < _availabilityRetryDelay) {
+      for (final address in addresses) {
+        tally(guess(address));
+      }
+      counts.removeWhere((key, value) => value == 0);
+      return counts;
+    }
+
+    // Resolve one address on its own before fanning out the rest. The probe has
+    // to be an address that actually reaches the availability endpoint, so it
+    // must be a phone number and it must not already be answered from cache.
+    // Otherwise the probe performs no lookup and _availabilityEndpointDown
+    // still describes some earlier request rather than this one.
+    final probeIndex = addresses.indexWhere(
+        (address) => !address.contains('@') && !_serviceCache.containsKey(address));
+
+    if (probeIndex == -1) {
+      // Every address is an email or already cached, so none of these reach the
+      // endpoint and this resolves with no request either way.
+      for (final service in await Future.wait(addresses.map(_determineService))) {
+        tally(service);
+      }
+      counts.removeWhere((key, value) => value == 0);
+      return counts;
+    }
+
+    tally(await _determineService(addresses[probeIndex]));
+
+    final rest = <String>[
+      for (var i = 0; i < addresses.length; i++)
+        if (i != probeIndex) addresses[i],
+    ];
+
+    if (rest.isNotEmpty) {
+      if (_availabilityEndpointDown) {
+        // The probe just failed, so asking again only repeats the same failure
+        // once per member, which is what filed one Sentry event per member on
+        // every open of this preview.
+        //
+        // Counted but deliberately NOT cached. The catch that sets the flag is
+        // also reached by a plain timeout and by a per-address non-200, so the
+        // flag is not proof the server is down. Writing a guess into
+        // _serviceCache would hand it to _sendSingleMessageImpl, which reads
+        // the same cache to choose iMessage or SMS for a real outbound
+        // message, and one slow lookup would quietly downgrade a whole
+        // recipient list to SMS. A cache hit is a real answer, so it wins.
+        for (final address in rest) {
+          tally(guess(address));
+        }
+      } else {
+        for (final service in await Future.wait(rest.map(_determineService))) {
+          tally(service);
+        }
+      }
+    }
+
     counts.removeWhere((key, value) => value == 0);
     return counts;
   }
