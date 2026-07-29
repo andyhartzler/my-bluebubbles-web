@@ -783,6 +783,14 @@ class _HomeState extends OptimizedState<Home>
   final Set<_HomeSection> _visitedSections = {_HomeSection.home};
   final PageStorageBucket _bucket = PageStorageBucket();
 
+  // The web keydown and visibility listeners below attach to html.document, not
+  // to this widget, and dispose() does not cancel them. They are registered
+  // inside the postFrameCallback in initState, which runs once per _HomeState
+  // mount, so without this flag a second mount of Home would add a second copy
+  // of each to the document and leak it for the life of the page. Static so the
+  // count that reaches the document stays at one per program run.
+  static bool _webDocumentListenersBound = false;
+
   Future<void> _checkMailAlias() async {
     try {
       final has = await MailApiClient().hasActiveAlias();
@@ -811,7 +819,19 @@ class _HomeState extends OptimizedState<Home>
     });
 
     SchedulerBinding.instance.addPostFrameCallback((_) async {
-      StartupTasks.uiReady.complete();
+      // StartupTasks.uiReady is a static final Completer, so it lives for the
+      // whole program run while this callback is registered once per _HomeState
+      // mount. A second mount of Home calls complete() on the already-completed
+      // Completer, which throws StateError out of the frame callback and so
+      // abandons everything below it in this closure: the web relayout nudges,
+      // the ErrorWidget.builder install, the server-version check and the
+      // document listeners. Guarding the completion lets that work run again on
+      // a remount. The two html.document listeners are the deliberate exception
+      // and stay at one registration per program run, because nothing cancels
+      // them; see _webDocumentListenersBound.
+      if (!StartupTasks.uiReady.isCompleted) {
+        StartupTasks.uiReady.complete();
+      }
 
       if (kIsWeb) {
         // Belt-and-suspenders for the iOS standalone cold-launch stale-inset
@@ -921,30 +941,35 @@ class _HomeState extends OptimizedState<Home>
           });
         }
 
-        /* ----- CTRL-F OVERRIDE ----- */
-        html.document.onKeyDown.listen((e) {
-          if (e.keyCode == 114 || (e.ctrlKey && e.keyCode == 70)) {
-            e.preventDefault();
-          }
-        });
+        if (!_webDocumentListenersBound) {
+          _webDocumentListenersBound = true;
 
-        /* ----- PWA LIFECYCLE: MINIMAL RESUME HANDLER ----- */
-        // The REAL fix for iOS Safari PWA touch unresponsiveness was removing
-        // the SelectionArea wrapper on mobile web (see Main.build).
-        // SelectionArea's gesture detector competed with tap events, causing
-        // the first touch to be swallowed by the text-selection gesture arena.
-        //
-        // We keep ONLY a lightweight visibility-change listener to handle
-        // legitimate background→foreground transitions. The previous approach
-        // of firing 15+ setState() calls, unfocus() calls, and resize events
-        // in the first 2.5 seconds was itself CAUSING the unresponsiveness by
-        // continuously resetting gesture recognizers and stealing focus.
-        html.document.onVisibilityChange.listen((event) {
-          if (html.document.visibilityState == 'visible' && mounted) {
-            // Single rebuild is sufficient to refresh stale UI after resume
-            setState(() {});
-          }
-        });
+          /* ----- CTRL-F OVERRIDE ----- */
+          html.document.onKeyDown.listen((e) {
+            if (e.keyCode == 114 || (e.ctrlKey && e.keyCode == 70)) {
+              e.preventDefault();
+            }
+          });
+
+          /* ----- PWA LIFECYCLE: MINIMAL RESUME HANDLER ----- */
+          // The REAL fix for iOS Safari PWA touch unresponsiveness was removing
+          // the SelectionArea wrapper on mobile web (see Main.build).
+          // SelectionArea's gesture detector competed with tap events, causing
+          // the first touch to be swallowed by the text-selection gesture arena.
+          //
+          // We keep ONLY a lightweight visibility-change listener to handle
+          // legitimate background to foreground transitions. The previous
+          // approach of firing 15+ setState() calls, unfocus() calls, and resize
+          // events in the first 2.5 seconds was itself CAUSING the
+          // unresponsiveness by continuously resetting gesture recognizers and
+          // stealing focus.
+          html.document.onVisibilityChange.listen((event) {
+            if (html.document.visibilityState == 'visible' && mounted) {
+              // Single rebuild is sufficient to refresh stale UI after resume
+              setState(() {});
+            }
+          });
+        }
       }
 
       if (kIsDesktop) {
