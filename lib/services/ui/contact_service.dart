@@ -290,11 +290,24 @@ class ContactsService extends GetxService {
 
   Future<List<Contact>> fetchNetworkContacts({Function(String)? logger}) async {
     final networkContacts = <Contact>[];
+    // Set when the no-avatar REQUEST below fails, and only then. Both web
+    // fetches call the same /contact endpoint on the same server, so a failed
+    // request describes the server rather than the call. Read once, at the
+    // avatar fetch further down, which spells out why skipping is safe.
+    bool webContactsFetchFailed = false;
     // refresh UI on web without waiting for avatars
     if (kIsWeb) {
       logger?.call("Fetching contacts (no avatars)...");
       try {
+        // Armed across the request and disarmed the instant it returns, so it
+        // stays set only if the request itself threw. Scoping it this tightly
+        // is the point: the catch below also covers the parsing loop, and a
+        // parse failure means the server DID answer, which says nothing about
+        // whether a second request would reach it. Setting the flag there would
+        // strip avatars off contacts that parsed perfectly well.
+        webContactsFetchFailed = true;
         final response = await http.contacts();
+        webContactsFetchFailed = false;
 
         if (response.statusCode == 200 && !isNullOrEmpty(response.data['data'])) {
           logger?.call("Found contacts!");
@@ -337,7 +350,20 @@ class ContactsService extends GetxService {
 
     logger?.call("Fetching contacts (with avatars)...");
     try {
-      if (kIsWeb) {
+      if (kIsWeb && webContactsFetchFailed) {
+        // The request above already failed against this same endpoint, so this
+        // one can only fail too. It would not merely be wasted: every failed
+        // request runs through ApiInterceptor.onError, which calls Logger.error
+        // before it decides to resolve or reject, and that files a Sentry event
+        // whether or not the caller catches. So the pair filed two identical
+        // events describing one unreachable server.
+        //
+        // Nothing is lost. The flag is only set when the request itself threw,
+        // which means nothing was parsed, so networkContacts is empty here, and
+        // the web avatar pass below only fills in avatars on entries already in
+        // that list. It never adds any.
+        logger?.call("Skipping avatars: the contacts request above failed");
+      } else if (kIsWeb) {
         final response = await http.contacts(withAvatars: true);
 
         if (!isNullOrEmpty(response.data['data'])) {
