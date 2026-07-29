@@ -945,8 +945,19 @@ class _HomeState extends OptimizedState<Home>
           _webDocumentListenersBound = true;
 
           /* ----- CTRL-F OVERRIDE ----- */
+          // Read keyCode and ctrlKey off the raw JS event rather than through
+          // the dart:html getters. Both are declared non-nullable (`int get
+          // keyCode`, `bool get ctrlKey`), so dart2js compiles each read as an
+          // implicit null check; a keydown event that reaches document without
+          // those properties makes the read itself throw NoSuchMethodError
+          // before preventDefault can run, and it throws out of this listener
+          // uncaught. An event with no keyCode is by definition not a find
+          // shortcut, so a missing property just leaves the predicate false.
           html.document.onKeyDown.listen((e) {
-            if (e.keyCode == 114 || (e.ctrlKey && e.keyCode == 70)) {
+            final raw = js.JsObject.fromBrowserObject(e);
+            final keyCode = raw['keyCode'];
+            final ctrlKey = raw['ctrlKey'];
+            if (keyCode == 114 || (ctrlKey == true && keyCode == 70)) {
               e.preventDefault();
             }
           });
