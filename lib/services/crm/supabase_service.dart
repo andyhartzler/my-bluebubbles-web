@@ -41,6 +41,41 @@ class CRMSupabaseService {
       await Supabase.initialize(
         url: url,
         anonKey: anonKey,
+        // AuthCallbackScreen is the only thing that should redeem a magic
+        // link. With detectSessionInUri at its default of true, the SDK
+        // redeems it a second time on its own during initialize, and that
+        // second redemption is what files Sentry FLUTTER-Q.
+        //
+        // When an exec opens the emailed link in a different browser than
+        // the one that requested it, which is what happens every time Gmail
+        // hands the link to Safari instead of reusing the tab, the PKCE code
+        // verifier is not in that browser's local storage and the exchange
+        // throws. The SDK's own path does catch it: SupabaseAuth's web
+        // initial-URI handler catches the AuthException and then re-emits it
+        // with GoTrueClient.notifyException, which calls addError on the
+        // onAuthStateChange stream. Both of this app's listeners on that
+        // stream (password_screen.dart and auth_refresh_guard.dart) subscribe
+        // without an onError, so Dart rethrows the stream error into the zone
+        // carrying the original getItem/exchangeCodeForSession stack. That is
+        // the stack FLUTTER-Q shows.
+        //
+        // AuthCallbackScreen's own call cannot produce this: getSessionFromUrl
+        // and exchangeCodeForSession throw straight to the caller and never
+        // touch notifyException, so its try/catch really does contain it.
+        // Disabling the automatic path therefore removes the only source of
+        // this particular unhandled error, and it also drops the race the two
+        // redeemers had over a single-use code.
+        //
+        // Safe to disable: every sign-in link this app mints points at
+        // https://moyd.app/auth/callback (password_screen.dart), a registered
+        // route rendering AuthCallbackScreen, and the only other auth entry
+        // point is verifyOTP with the 6-digit code, which reads no URL at all.
+        //
+        // Still open, deliberately not fixed here because it is a separate
+        // pre-existing bug: those two listeners will keep turning any other
+        // notifyException, a failed token refresh above all, into its own
+        // unhandled exception. They need onError handlers.
+        authOptions: FlutterAuthClientOptions(detectSessionInUri: false),
         // Every PostgREST/auth/storage request becomes a Sentry breadcrumb;
         // failed requests become events (captureFailedRequests). No-op
         // wrapper when Sentry is disabled (debug builds).
