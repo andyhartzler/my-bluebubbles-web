@@ -20,22 +20,48 @@
 
 const ALLOWED_ORIGIN = "*";
 const ALLOWED_METHODS = "POST, OPTIONS";
+
+// Fallback only, for the case where the browser did not tell us which headers
+// it intends to send. A hand-maintained allow-list here is a trap.
+//
+// The CRM wraps its whole Supabase client in SentryHttpClient
+// (lib/services/crm/supabase_service.dart) and tracesSampleRate is 0.2
+// (lib/main.dart). On a sampled session Sentry attaches `sentry-trace` and
+// `baggage` to every outgoing request, so the browser asked permission for two
+// headers this list did not grant, failed the preflight, and never sent the
+// POST at all. Dart surfaces that as "ClientException: Failed to fetch", which
+// is Sentry FLUTTER-5 on mail-identities-get. It looked intermittent because it
+// tracks trace sampling, not the caller and not the function.
+//
+// The same hardcoded list on verify-phone, phone-signin and
+// lookup-email-by-phone locked execs out of phone sign-in on 2026-07-28 and was
+// fixed there the same way. Reflecting the request means a future SDK or
+// instrumentation header cannot reopen this.
 const ALLOWED_HEADERS =
-  "authorization, x-client-info, apikey, content-type, x-supabase-api-version";
+  "authorization, x-client-info, apikey, content-type, " +
+  "x-supabase-api-version, x-supabase-client-platform, " +
+  "x-supabase-client-platform-version, x-region, sentry-trace, baggage";
 const MAX_AGE = "86400";
 
-export function corsHeaders(): Record<string, string> {
+// `req` is optional so the ~29 handlers that spread corsHeaders() into their
+// own responses keep working unchanged. Access-Control-Allow-Headers is only
+// read by the browser on the preflight response, so reflecting it in
+// handleCors is what actually fixes the block.
+export function corsHeaders(req?: Request): Record<string, string> {
+  const requested = req?.headers.get("access-control-request-headers");
   return {
     "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
     "Access-Control-Allow-Methods": ALLOWED_METHODS,
-    "Access-Control-Allow-Headers": ALLOWED_HEADERS,
+    "Access-Control-Allow-Headers": requested && requested.trim().length > 0
+      ? requested
+      : ALLOWED_HEADERS,
     "Access-Control-Max-Age": MAX_AGE,
   };
 }
 
 export function handleCors(req: Request): Response | null {
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders() });
+    return new Response(null, { status: 204, headers: corsHeaders(req) });
   }
   return null;
 }
