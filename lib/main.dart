@@ -905,7 +905,17 @@ class _HomeState extends OptimizedState<Home>
         // true); read the cached value synchronously so a slow BlueBubbles
         // server can't block the listener setup below.
         int version = ss.serverDetailsSync().item4;
-        if (version < 42) {
+        // A version of 0 means "not fetched yet", NOT "ancient server".
+        // serverDetailsSync reads prefs and defaults to 0, so on a browser
+        // that has never talked to the BlueBubbles server (a brand new
+        // browser, a private tab, or a fresh tab opened from an email link)
+        // this read returns 0, 0 is less than 42, and the whole app was
+        // replaced with "Server version too low, please upgrade!". Execs
+        // clicking their sign-in link from Gmail on a phone hit this on
+        // 2026-07-28 and could not vote at all. Only block on a version we
+        // actually know, and never gate sign-in on the legacy iMessage
+        // server being reachable.
+        if (version > 0 && version < 42) {
           setState(() {
             serverCompatible = false;
           });
