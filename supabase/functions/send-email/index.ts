@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { google } from "npm:googleapis@130";
-import { handleCors, corsHeaders } from "../_shared/cors.ts";
+import { handleCors } from "../_shared/cors.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 // --- Supabase Client ---
 const supabaseUrl = Deno.env.get("SUPABASE_URL");

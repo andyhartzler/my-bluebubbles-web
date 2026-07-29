@@ -24,7 +24,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { resolveCaller } from "../_shared/alias-resolver.ts";
 
-import { handleCors, corsHeaders } from "../_shared/cors.ts";
+import { handleCors } from "../_shared/cors.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
