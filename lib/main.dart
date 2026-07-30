@@ -358,6 +358,21 @@ Future<void> initSentry() async {
             return null;
           }
         }
+        // gotrue clears the local session and fires signedOut BEFORE it calls
+        // /auth/v1/logout, then swallows 401/403/404 from that call on
+        // purpose: an expired or already revoked JWT still means the user is
+        // signed out (gotrue 2.20.0, GoTrueClient.signOut). SentryHttpClient
+        // wraps the transport underneath that catch, so captureFailedRequests
+        // files the swallowed response as an error anyway. Our own session
+        // expiry path calls signOut() precisely when the token is stale, so
+        // this fires on normal sign-out. Drop only the codes gotrue ignores;
+        // a 500 from logout is still a real fault and still reports.
+        if (url.contains('/auth/v1/logout')) {
+          final status = event.contexts.response?.statusCode;
+          if (status == 401 || status == 403 || status == 404) {
+            return null;
+          }
+        }
         return event;
       };
     });
