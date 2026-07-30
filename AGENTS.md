@@ -1,5 +1,80 @@
 # BlueBubbles CRM Integration - Complete Implementation Instructions
 
+## READ FIRST: edge functions are not deployed by CI
+
+No automation in either repo deploys anything under `supabase/functions/`.
+Netlify builds only the Flutter web app (`netlify.toml` runs
+`netlify-build.sh` and publishes `build/web`); there is no `.github`
+directory in this repo at all, and no script anywhere in it runs
+`supabase functions deploy`. The same is true of the `moyoungdemocrats` repo,
+where Vercel builds only the Next.js site. The repo docs deploy functions by
+hand with `npx supabase functions deploy <name> --project-ref <ref>`.
+
+That is a verified negative about these two repos, not a positive claim about
+how deploys actually happen. A dashboard-side Supabase GitHub integration, or
+some external system, would be invisible from here.
+
+Consequence: committing and pushing a change to an edge function does NOT put
+that change in production. It changes the source of record and nothing else.
+Do not read a merged commit as evidence that the behaviour it describes is
+live, and do not treat a Sentry issue as handled because a commit names it.
+
+This was established on 2026-07-30 from the production error stream, not
+assumed. Two separate defects had a correct fix committed and were still
+firing at an unchanged rate days later:
+
+- `invalid input syntax for type uuid: "cron"`, once an hour on the hour.
+  Fixed in `1cdb96e` on 2026-07-26 by returning a NULL actor instead of the
+  string `"cron"` in `sync-google-calendar`. That string no longer exists on
+  any uuid path in either repo, so the running function cannot be the
+  committed one. Still firing hourly on 2026-07-30.
+- `duplicate key value violates unique constraint
+  "legislation_bill_sponsors_unique"`, exactly 32 per six-hour cycle. The
+  emitter is `runSponsorsFromCacheTask` in `openstates-orchestrator`, not the
+  per-bill loop in `openstates-sync-tracked-bills`: the lines land 17 to 19 ms
+  apart, which is a tight probe-and-insert loop, and `e79339b` had already
+  identified the same signature at 13 to 17 ms. That orchestrator write was
+  switched to ON CONFLICT DO NOTHING in `e79339b` on 2026-07-27, with
+  `2c401bf`, `d6db9cb`, `708ff55` and `b61d6cb` covering the dedupe, probe and
+  delete-guard work around it. `913decb` made the matching change in
+  `openstates-sync-tracked-bills`, which this timing evidence exonerates.
+  Since `e79339b` the burst has run about twelve more cycles at an unchanged
+  size: the three sampled directly (2026-07-29 18:00, 2026-07-30 00:00 and
+  06:00 UTC) each still carried exactly 32 of these lines, and the seven-day
+  aggregate shows no downward step at any point.
+
+The second case is strong evidence but not proof, and the cheap checks that
+would settle it were not run. A live ON CONFLICT whose target does not match
+any unique index raises `42P10 no unique or exclusion constraint matching the
+ON CONFLICT specification` rather than a duplicate-key error, and no `42P10`
+line appears in the stream. That argues the new statement is not running, but
+it assumes the constraint named `legislation_bill_sponsors_unique` covers
+exactly `(bill_id, name, sponsorship_classification)`, which is inferred from
+an ON CONFLICT list in `20260423_01_backfill_orphan_rpcs.sql` and is not
+confirmed anywhere in this repo. Two queries settle it:
+`select indexdef from pg_indexes where tablename = 'legislation_bill_sponsors';`
+and, decisively, the deployed-version timestamps from `supabase functions list`.
+The hourly `"cron"` case is the stronger leg, because it has no alternative
+mechanism at all.
+
+Not explained by any of this, and still firing: a FATAL
+`password authentication failed` roughly once every five minutes, continuously.
+Nothing in either repo opens a direct Postgres connection, so it originates
+outside them and no code change here addresses it.
+
+Before deploying, note that the deployed and committed versions of many
+functions have diverged for an unknown period. Deploying them all at once
+pushes that entire backlog live in one step. Deploy the specific function you
+changed, and check what else has drifted before running a bulk deploy.
+
+The endorsement-vote functions are a separate hazard in the other direction.
+`verify-member-for-vote` and `send-endorsement-thankyou` have no commits other
+than the ones that rescued their already-deployed source into git, so there is
+no known committed-newer-than-deployed drift to push. What a bulk deploy would
+do instead is overwrite whatever is live for them, including any out-of-band
+dashboard edit, and their live state has never been compared against git. That
+is a bad thing to do while sixteen people are casting real ballots.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
