@@ -59,6 +59,8 @@ mechanism at all.
 
 Not explained by any of this, and still firing: a FATAL
 `password authentication failed` roughly once every five minutes, continuously.
+Nothing committed in either repo emits it, and it is most likely scan traffic,
+but that last part is inference. See below, including how to settle it.
 
 An earlier revision of this file said no code in either repo opens a direct
 Postgres connection. That was wrong. The scripts under `scripts/voter_file/`
@@ -68,13 +70,111 @@ matching jobs with no scheduler behind them, and nothing runs them every five
 minutes. So the conclusion stands, but for a different reason than the one
 originally given.
 
+Two separate things are known about that FATAL, and they are not equally
+certain. Keep them apart. What is ESTABLISHED is that port 5432 is reachable
+from the open internet and is being scanned. What is INFERRED, and not proven,
+is that the password failures are that same scan traffic. The established part
+comes from a second FATAL that landed in the same five-minute rollup window on
+2026-07-31:
+
+    unsupported frontend protocol 65363.19778: server supports 3.0 to 3.0
+
+A Postgres startup packet is a 4-byte length followed by a 4-byte protocol
+version, which the server logs as two 16-bit halves. 65363 is 0xFF53 and
+19778 is 0x4D42, so the four version bytes it actually read were FF 53 4D 42,
+the sequence `\xFFSMB`, which is the SMB1 protocol identifier.
+
+The byte offsets line up exactly, which is what takes this past coincidence.
+SMB1 over TCP is framed by a 4-byte NetBIOS session header, and `\xFFSMB`
+begins at offset 4, precisely where Postgres expects the protocol version to
+start. An SMB negotiate request sent to port 5432 produces this exact log
+line and this exact pair of numbers. No Postgres client library can emit that
+byte sequence, and nothing in either repo speaks SMB at all, so the sender is
+a generic port scanner walking the host. That is the established part: the
+direct-connect endpoint is reachable from the open internet and is taking
+unsolicited traffic.
+
+The inferred part is the step from there to the password failures. A steady
+low rate of failed authentication against a port in that condition is what
+credential-stuffing scan traffic looks like, and that is the most economical
+reading, but the two lines are correlated only by sharing a rollup window. Do
+not write it down as fact until the check below is run.
+
+The arrival times rule out one specific suspect, and it is worth doing
+because this repo does have a `*/5 * * * *` pg_cron job whose period matches
+"once every five minutes" exactly: job `mail-poll-fallback-5min`, which POSTs
+the `mail-poll` function, in
+`supabase/migrations/20260425_07_mail_phase5_cron.sql`. It is not the source,
+nor is any other boundary-aligned scheduler. pg_cron fires on the boundary, so
+its log lines cluster a few seconds past `:00`, `:05` and `:10`. Ten FATAL
+timestamps sampled across 2026-07-31 00:50 to 10:13 UTC sit at 56, 60, 85,
+139, 164, 196, 216, 233, 244 and 285 seconds into their five-minute window:
+spread over 229 seconds of the available 300, with no clustering anywhere. The
+244 and the 60 fall in adjacent windows in that order, which puts those two
+arrivals 116 seconds apart, and a job with a 300 second period cannot produce
+that. So "roughly every five minutes" is a rate, not a schedule.
+
+Be careful how far that argument reaches. It eliminates pg_cron and anything
+else firing on a fixed period. It does NOT eliminate every emitter of ours,
+and the reason is the whole point of the section at the top of this file: a
+stale deployed function, a retired box, or a third-party integration still
+retrying an old DSN would be a misconfigured client of ours, would not be on a
+boundary, and is invisible from these repos. Nothing here rules that out.
+
+So: the exposure is proven, the attribution is not. The Supabase dashboard log
+explorer keeps the unscrubbed lines that Sentry strips, and two fields settle
+it in about a minute. Many source addresses attempting names like `admin` or
+`root` is scanning. One address attempting the `postgres` role is the leaked
+credential in use, and is an incident. A single address attempting one of our
+own role names is the stale-client case above, and is a config fix.
+
+Scanning being the answer is not the same as nothing to do. If 5432 does not
+need to be open to the world, closing it is the actual remediation: Supabase
+network restrictions, or dropping the direct-connect endpoint in favour of the
+pooler. That is deferred rather than dismissed, because the
+`scripts/voter_file/` jobs connect directly and would need an allowed source
+first.
+
+One more line appeared in the rollup on 2026-07-31 and is recorded here only
+so the next run does not spend itself rediscovering it:
+
+    invalid input syntax for type integer: "2019.5"
+
+ERROR level, once in 24 hours, at 02:56:46 UTC. A search of both repos for
+code that writes a fractional value into an integer column came back empty:
+the year `RangeSlider`s in `call_time_tab.dart` and `mec_research_tab.dart`
+`.round()` before they reach `p_year_from` and `p_year_to`, and the
+`birth_year` and `estimated_age` writers in `scripts/voter_file/` are `int`
+typed or `::int` cast. Nothing is scheduled at 02:56 either.
+
+The likeliest remaining candidate, and the reason a repo search cannot clear
+this, is `graduation_year`. It is text, inferred from the `!= ''` comparison
+in `supabase/migrations/20260423_01_backfill_orphan_rpcs.sql` and from the
+text-typed Dart model, since no DDL for it exists in this repo. Being text is
+what makes it interesting rather than what clears it: a text column is the
+only way a string like `2019.5` gets stored at all, member-supplied with no
+numeric validation on either write path
+(`supabase/functions/process-member-info-update/index.ts` and
+`zapier-webhook/index.ts`), and `2019.5` reads exactly like a graduation year.
+A write to it cannot raise this error, but a later `graduation_year::int` cast
+raises precisely this error. No such cast exists in this repo, which given the
+deployment drift documented at the top of this file clears very little: a
+deployed-only RPC casting that column is exactly the emitter a repo search
+cannot see.
+
+Left alone deliberately anyway. One log line a day with no stack trace does
+not justify guessing, and the guess above is a hypothesis for the next run to
+test, not a diagnosis. If it becomes frequent, the Supabase log explorer has
+the statement that threw.
+
 Those scripts carried the production `postgres` password as a hardcoded
 literal, in a repo that is public. See the commit that replaced it with the
 required `MOYD_DB_DSN` environment variable. Removing the literal does not
 revoke it: it stayed in the published history and has to be assumed harvested
-until the password is rotated in the Supabase dashboard. Whether that leak is
-what is failing authentication every five minutes is not established, because
-Sentry scrubs the role name out of the log line before it reaches the event.
+until the password is rotated in the Supabase dashboard. Read the scan finding
+above the right way round. It does not make that rotation less urgent. It
+makes it more urgent, because it establishes that the port this credential
+opens is being actively probed from the open internet.
 
 The same commit scrubbed a second published credential: the shared
 `crm@moyoungdemocrats.org` workspace mailbox password, which was sitting in
