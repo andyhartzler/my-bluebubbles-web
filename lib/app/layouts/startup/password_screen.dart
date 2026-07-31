@@ -59,6 +59,23 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
   /// for ten minutes.
   int _resendCooldown = 0;
   Timer? _resendTimer;
+
+  /// The email cooldown is deliberately a SEPARATE field from the SMS one.
+  /// gotrue and Twilio are independent rate limiters, so one shared counter
+  /// would let a slow SMS disable the email button, and the phone path's own
+  /// guard copy tells the member to "Sign in with email instead" when the
+  /// text does not arrive. Sharing the counter would close the escape hatch
+  /// the other path points at, which on the night of a vote is worse than
+  /// the noise this throttle exists to stop.
+  ///
+  /// 60s, not the SMS path's 30s, because it has to cover gotrue's own
+  /// minimum interval between OTP sends for one address. Supabase ships that
+  /// as a 60s `max_frequency` default; a client gate shorter than the server
+  /// window just re-enables the button into a guaranteed 429. If this
+  /// project's `max_frequency` is set to something else, this is the number
+  /// to align with it.
+  int _emailResendCooldown = 0;
+  Timer? _emailResendTimer;
   String? _phoneForCode; // E.164 number the SMS code was sent to
   bool _phoneCodeFlow = false; // the pending code is an SMS code, not an email one
 
@@ -226,6 +243,7 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
     _authSubscription?.cancel();
     _visibilitySubscription?.cancel();
     _resendTimer?.cancel();
+    _emailResendTimer?.cancel();
     _emailController.dispose();
     _phoneController.dispose();
     _codeController.dispose();
@@ -252,6 +270,29 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
         _successMessage = null;
       });
       _emailFocusNode.requestFocus();
+      return;
+    }
+
+    // THE EMAIL PATH NEEDS THE SAME GATE THE PHONE PATH ALREADY HAS.
+    //
+    // gotrue enforces its own minimum interval between OTP sends for one
+    // address and answers 429 when it is not respected. Nothing on this path
+    // throttled it: _sendMagicLink neither armed nor consulted a cooldown,
+    // the entry button only consulted the SMS one in phone mode, and the code
+    // screen rendered no Resend button outside the phone flow, so the only
+    // way to ask for another email code was Back then Send. That loop was
+    // unthrottled, so an exec whose code was slow, or whose first code was
+    // rejected, walked straight into the rate limit and could not get a code
+    // at all until it lapsed. Same failure shape as the Twilio 5-send lockout
+    // on the phone path, and the gate belongs on the send for the same
+    // reason: every route to a send has to pass through here.
+    if (_emailResendCooldown > 0) {
+      setState(() {
+        _errorMessage = 'Wait ${_emailResendCooldown}s before asking for '
+            'another code. Check your spam folder first: the code already '
+            'sent to you may still work.';
+        _successMessage = null;
+      });
       return;
     }
 
@@ -316,6 +357,11 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
         _emailForCode = email;
         _codeController.clear();
       });
+      // Armed only on a SUCCESSFUL send, matching the phone path: a send that
+      // failed validation returned long before this, so a mistyped address is
+      // still correctable immediately and only a code that really went out
+      // starts the clock.
+      _startEmailResendCooldown();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _showCodeInput) {
           _codeFocusNode.requestFocus();
@@ -347,18 +393,36 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
         errorMessage = _mapErrorMessage(message);
       }
 
+      final normalized = message.toLowerCase();
+      final rateLimited = normalized.contains('rate limit') ||
+          normalized.contains('only request this after') ||
+          normalized.contains('for security purposes');
+
       setState(() {
         _errorMessage = errorMessage;
-        _showCodeInput = false;
-        _emailForCode = null;
+        // ONLY tear the code screen down on the FIRST send, matching the
+        // phone path. A failed RESEND used to wipe _showCodeInput and
+        // _emailForCode, which threw the member back to the address field
+        // and discarded a code they had already been sent and may have been
+        // part way through typing. The first code is very often still valid;
+        // the resend is the thing that failed, not the code.
+        if (_emailForCode == null) {
+          _showCodeInput = false;
+        }
       });
+      // A failed send still arms the cooldown when the failure IS the rate
+      // limit, because otherwise the member re-taps immediately and every tap
+      // is another 429. A failure for any other reason does not arm it, so a
+      // mistyped address stays correctable at once.
+      if (rateLimited) _startEmailResendCooldown();
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _errorMessage =
             'Something went wrong. Please try again or contact info@moyoungdemocrats.org for assistance.';
-        _showCodeInput = false;
-        _emailForCode = null;
+        if (_emailForCode == null) {
+          _showCodeInput = false;
+        }
       });
     } finally {
       if (!mounted) return;
@@ -714,6 +778,21 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
     });
   }
 
+  /// Email twin of [_startResendCooldown]. Separate field and separate timer,
+  /// so throttling one send path never disables the other.
+  void _startEmailResendCooldown() {
+    _emailResendTimer?.cancel();
+    setState(() => _emailResendCooldown = 60);
+    _emailResendTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() => _emailResendCooldown--);
+      if (_emailResendCooldown <= 0) t.cancel();
+    });
+  }
+
   void _switchMode(bool toPhone) {
     // THE COOLDOWN SURVIVES THE SWITCH. It used to be cancelled and zeroed
     // here, which turned "Sign in with email instead" and back into a free
@@ -745,6 +824,15 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
         normalized.contains('do not have workspace access enabled') ||
         normalized.contains('not associated with a missouri young democrats member')) {
       return decoded;
+    }
+
+    // gotrue's rate-limit refusals used to fall all the way through to the
+    // `return decoded` at the bottom, which put its raw wording in front of
+    // the member. Map them to one sentence that says what to do instead.
+    if (normalized.contains('rate limit') ||
+        normalized.contains('only request this after') ||
+        normalized.contains('for security purposes')) {
+      return 'Too many sign-in codes were requested for this address. Wait a minute, then try again. Check your inbox and spam folder first: the code already sent to you may still work.';
     }
 
     if (normalized.contains('unexpected_failure') || normalized.contains('403')) {
@@ -868,6 +956,22 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
           icon: const Icon(Icons.refresh, size: 18),
           label: Text(_resendCooldown > 0
               ? 'Resend code in ${_resendCooldown}s'
+              : 'Resend code'),
+        ),
+      ] else ...[
+        // The email flow had no resend at all, so the only way to a second
+        // code was Back then Send, which dropped the member out of the code
+        // field and is the round trip that fed the 429s. Same throttled
+        // button as the phone flow, on the email cooldown.
+        const SizedBox(height: 4),
+        TextButton.icon(
+          onPressed:
+              (_isSending || _isVerifyingCode || _emailResendCooldown > 0)
+                  ? null
+                  : _sendMagicLink,
+          icon: const Icon(Icons.refresh, size: 18),
+          label: Text(_emailResendCooldown > 0
+              ? 'Resend code in ${_emailResendCooldown}s'
               : 'Resend code'),
         ),
       ],
@@ -1078,14 +1182,19 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
                                   if (!_showCodeInput) ...[
                                     const SizedBox(height: 16),
                                     FilledButton.icon(
-                                      // Gated on the SMS cooldown too, not
-                                      // just on _isSending. _sendPhoneCode
-                                      // now refuses while the cooldown runs,
+                                      // Gated on the cooldown of whichever path
+                                      // this button actually sends on. Both
+                                      // _sendPhoneCode and _sendMagicLink now
+                                      // refuse while their own cooldown runs,
                                       // and a button that looks live but does
                                       // nothing is worse than a disabled one
-                                      // that says how long is left.
+                                      // that says how long is left. The two
+                                      // cooldowns stay independent so a slow
+                                      // SMS never disables the email fallback.
                                       onPressed: (_isSending ||
-                                              (_phoneMode && _resendCooldown > 0))
+                                              (_phoneMode
+                                                  ? _resendCooldown > 0
+                                                  : _emailResendCooldown > 0))
                                           ? null
                                           : () {
                                               FocusScope.of(context).unfocus();
@@ -1108,7 +1217,9 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
                                               ? (_resendCooldown > 0
                                                   ? 'Text me a code in ${_resendCooldown}s'
                                                   : 'Text me a code')
-                                              : 'Send magic link')),
+                                              : (_emailResendCooldown > 0
+                                                  ? 'Send magic link in ${_emailResendCooldown}s'
+                                                  : 'Send magic link'))),
                                       style: FilledButton.styleFrom(
                                         backgroundColor: const Color(0xFF32A6DE),
                                         padding: const EdgeInsets.symmetric(vertical: 16),
