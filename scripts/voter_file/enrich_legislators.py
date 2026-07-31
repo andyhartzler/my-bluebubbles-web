@@ -1,9 +1,15 @@
 """Enrich legislators with nickname-expanded voter file matching."""
 from __future__ import annotations
+import os
 import psycopg
 from nickname_expander import candidate_first_names, candidate_last_names
 
-DB_DSN = 'postgresql://postgres:LNEERaCSbAKOVtdR@db.faajpcarasilbfndzkmd.supabase.co:5432/postgres'
+DB_DSN = os.environ.get('MOYD_DB_DSN')
+if not DB_DSN:
+    raise SystemExit(
+        'MOYD_DB_DSN is not set. Export the Postgres connection string before '
+        'running this script.'
+    )
 
 
 def try_match(cur, fn: str, ln: str) -> tuple[str, int] | None:

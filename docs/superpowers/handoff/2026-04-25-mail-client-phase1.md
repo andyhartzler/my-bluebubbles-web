@@ -21,10 +21,10 @@ Phase 1 task 0.2 — set up GCP Pub/Sub topic + push subscription. Then 0.3 (sch
 
 ### Secrets — ALWAYS check Obsidian first
 Master plaintext secrets file: `/Users/moyd/Desktop/MOYD/MOYD Obsidian/Credentials-and-Secrets.md`. Has:
-- Supabase DB password (you'll need it: `LNEERaCSbAKOVtdR`, host `db.faajpcarasilbfndzkmd.supabase.co:5432`, user `postgres`)
+- Supabase DB password (you'll need it: in the Supabase dashboard, host `db.faajpcarasilbfndzkmd.supabase.co:5432`, user `postgres`)
 - Supabase CLI access token (`SUPABASE_ACCESS_TOKEN=sbp_...`)
 - Service account key path: `/Users/moyd/Desktop/MOYD/backend-everything-a599411a62b5.json` — its full contents are what you'll set as `GOOGLE_SERVICE_ACCOUNT_JSON` Supabase secret in Task 1.1
-- The shared workspace mailbox: `crm@moyoungdemocrats.org` / `qoqxyn-cubgaw-zIzko5` (only needed for manual Gmail-side debugging; the code never touches the password)
+- The shared workspace mailbox: `crm@moyoungdemocrats.org`, password in the Obsidian file above (only needed for manual Gmail-side debugging; the code never touches the password)
 
 If a credential isn't in that file, ASK Andrew once and add it to the file as part of the response.
 
@@ -33,7 +33,7 @@ If a credential isn't in that file, ASK Andrew once and add it to the file as pa
 2. **He has commit/push autonomy on MOYD repos** — don't ask permission for obvious next steps. Just commit and push.
 3. **Autonomous execution preference.** Don't pause to confirm between obvious steps; just do the work.
 4. **CONTRAST PET PEEVE.** Never ship a UI surface where text is hard to see. Verify contrast BEFORE picking colors. Specifically: never use `Theme.of(context).cardColor` on a branded surface (resolves to ~black on dark theme). For text on the navy/momentum gradient, use `Colors.white` for primary + `Colors.white.withOpacity(0.85)` for secondary.
-5. **Supabase migrations:** the migration ledger is desynced (80+ remote migrations have no local files). Do NOT use `supabase db push --linked` — it'll be blocked. Apply migrations directly via psql: `PGPASSWORD="LNEERaCSbAKOVtdR" psql -h db.faajpcarasilbfndzkmd.supabase.co -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f <migration.sql>`. Make sure `export PATH="/opt/homebrew/opt/libpq/bin:$PATH"` first.
+5. **Supabase migrations:** the migration ledger is desynced (80+ remote migrations have no local files). Do NOT use `supabase db push --linked`, it'll be blocked. Apply migrations directly via psql: `PGPASSWORD="$MOYD_DB_PASSWORD" psql -h db.faajpcarasilbfndzkmd.supabase.co -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f <migration.sql>`. Make sure `export PATH="/opt/homebrew/opt/libpq/bin:$PATH"` first.
 6. **Schema search_path.** Default is `listmonk, extensions, public` — always prefix DDL with `public.`. NEVER drop the `listmonk` schema (PGRST002 cascade).
 
 ### License posture

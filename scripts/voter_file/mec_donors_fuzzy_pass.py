@@ -8,6 +8,7 @@ Run only after SQL passes 3-5 are done. Confidence: 0.85.
 """
 from __future__ import annotations
 
+import os
 import sys
 import time
 from collections import defaultdict
@@ -19,7 +20,12 @@ except ImportError:
     print("Install rapidfuzz:  uv pip install rapidfuzz psycopg", file=sys.stderr)
     sys.exit(1)
 
-DB_DSN = "postgresql://postgres:LNEERaCSbAKOVtdR@db.faajpcarasilbfndzkmd.supabase.co:5432/postgres"
+DB_DSN = os.environ.get("MOYD_DB_DSN")
+if not DB_DSN:
+    raise SystemExit(
+        "MOYD_DB_DSN is not set. Export the Postgres connection string before "
+        "running this script."
+    )
 
 THRESHOLD = 85      # rapidfuzz 0-100
 TOP_MARGIN = 5      # best must beat 2nd by 5 points to count as unique

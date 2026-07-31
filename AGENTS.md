@@ -59,8 +59,29 @@ mechanism at all.
 
 Not explained by any of this, and still firing: a FATAL
 `password authentication failed` roughly once every five minutes, continuously.
-Nothing in either repo opens a direct Postgres connection, so it originates
-outside them and no code change here addresses it.
+
+An earlier revision of this file said no code in either repo opens a direct
+Postgres connection. That was wrong. The scripts under `scripts/voter_file/`
+connect straight to `db.<ref>.supabase.co:5432` as the `postgres` superuser
+via psycopg. They are still not the emitter: they are hand-run one-off
+matching jobs with no scheduler behind them, and nothing runs them every five
+minutes. So the conclusion stands, but for a different reason than the one
+originally given.
+
+Those scripts carried the production `postgres` password as a hardcoded
+literal, in a repo that is public. See the commit that replaced it with the
+required `MOYD_DB_DSN` environment variable. Removing the literal does not
+revoke it: it stayed in the published history and has to be assumed harvested
+until the password is rotated in the Supabase dashboard. Whether that leak is
+what is failing authentication every five minutes is not established, because
+Sentry scrubs the role name out of the log line before it reaches the event.
+
+The same commit scrubbed a second published credential: the shared
+`crm@moyoungdemocrats.org` workspace mailbox password, which was sitting in
+plaintext in `docs/superpowers/handoff/2026-04-25-mail-client-phase1.md`. It
+needs rotating on the same assumption and for the same reason. Both now point
+at the Obsidian credentials file instead of inlining the value. Do not inline
+a secret in this repo again: it is public.
 
 Before deploying, note that the deployed and committed versions of many
 functions have diverged for an unknown period. Deploying them all at once

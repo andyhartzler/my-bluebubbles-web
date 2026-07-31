@@ -25,10 +25,12 @@ from typing import Iterable
 
 # --- config ---------------------------------------------------------------------
 
-DB_DSN = os.environ.get(
-    'MOYD_DB_DSN',
-    'postgresql://postgres:LNEERaCSbAKOVtdR@db.faajpcarasilbfndzkmd.supabase.co:5432/postgres',
-)
+DB_DSN = os.environ.get('MOYD_DB_DSN')
+if not DB_DSN:
+    raise SystemExit(
+        'MOYD_DB_DSN is not set. Export the Postgres connection string before '
+        'running this script.'
+    )
 FUZZY_THRESHOLD = 85  # rapidfuzz partial_ratio cutoff (0-100)
 
 

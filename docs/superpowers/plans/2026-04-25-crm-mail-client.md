@@ -506,7 +506,7 @@ CREATE TRIGGER trg_mps_updated_at
 
 ```bash
 export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
-PGPASSWORD="LNEERaCSbAKOVtdR" psql -h db.faajpcarasilbfndzkmd.supabase.co -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/20260425_05_mail_client.sql
+PGPASSWORD="$MOYD_DB_PASSWORD" psql -h db.faajpcarasilbfndzkmd.supabase.co -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/20260425_05_mail_client.sql
 ```
 
 Expected: 5 CREATE TABLE, multiple CREATE POLICY/TRIGGER/INDEX, no errors.
@@ -514,7 +514,7 @@ Expected: 5 CREATE TABLE, multiple CREATE POLICY/TRIGGER/INDEX, no errors.
 - [ ] **Step 3: Verify the schema:**
 
 ```bash
-PGPASSWORD="LNEERaCSbAKOVtdR" psql -h db.faajpcarasilbfndzkmd.supabase.co -p 5432 -U postgres -d postgres -c "
+PGPASSWORD="$MOYD_DB_PASSWORD" psql -h db.faajpcarasilbfndzkmd.supabase.co -p 5432 -U postgres -d postgres -c "
 SELECT n.nspname || '.' || c.relname AS tbl, c.relrowsecurity AS rls_on
 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
 WHERE c.relname IN ('mail_aliases','mail_messages_cache','mail_threads_cache','mail_send_log','mail_pubsub_state')
@@ -526,7 +526,7 @@ Expected: 5 rows, all `rls_on = t`.
 - [ ] **Step 4: Notify PostgREST:**
 
 ```bash
-PGPASSWORD="LNEERaCSbAKOVtdR" psql -h db.faajpcarasilbfndzkmd.supabase.co -p 5432 -U postgres -d postgres -c "NOTIFY pgrst, 'reload schema';"
+PGPASSWORD="$MOYD_DB_PASSWORD" psql -h db.faajpcarasilbfndzkmd.supabase.co -p 5432 -U postgres -d postgres -c "NOTIFY pgrst, 'reload schema';"
 ```
 
 - [ ] **Step 5: Commit:**
@@ -1498,7 +1498,7 @@ Expected: `{"ok": true, "historyId": "...", "expires": "..."}`
 - [ ] **Step 5: Apply the cron migration:**
 
 ```bash
-PGPASSWORD="LNEERaCSbAKOVtdR" psql -h db.faajpcarasilbfndzkmd.supabase.co -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/20260425_06_mail_cron.sql
+PGPASSWORD="$MOYD_DB_PASSWORD" psql -h db.faajpcarasilbfndzkmd.supabase.co -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/20260425_06_mail_cron.sql
 ```
 
 - [ ] **Step 6: Send a test email to `andrew.crm@moyoungdemocrats.org`. Within 1 minute, query `public.mail_messages_cache` and confirm a row appeared with the correct `alias_email = 'andrew.crm@moyoungdemocrats.org'`.**

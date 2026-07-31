@@ -5,12 +5,18 @@ by nickname_expander + exact last_name + zip. If exactly one voter-file row
 matches, accept it. Batched by 10k for progress visibility.
 """
 from __future__ import annotations
+import os
 import psycopg
 import time
 from collections import Counter
 from nickname_expander import candidate_first_names, candidate_last_names
 
-DB_DSN = 'postgresql://postgres:LNEERaCSbAKOVtdR@db.faajpcarasilbfndzkmd.supabase.co:5432/postgres'
+DB_DSN = os.environ.get('MOYD_DB_DSN')
+if not DB_DSN:
+    raise SystemExit(
+        'MOYD_DB_DSN is not set. Export the Postgres connection string before '
+        'running this script.'
+    )
 BATCH = 10_000
 
 

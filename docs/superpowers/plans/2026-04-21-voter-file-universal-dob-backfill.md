@@ -165,7 +165,7 @@ NOTIFY pgrst, 'reload schema';
 
 ```bash
 export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
-PGPASSWORD="LNEERaCSbAKOVtdR" psql -h db.faajpcarasilbfndzkmd.supabase.co -U postgres -d postgres \
+PGPASSWORD="$MOYD_DB_PASSWORD" psql -h db.faajpcarasilbfndzkmd.supabase.co -U postgres -d postgres \
   -f /Users/moyd/my-bluebubbles-web/supabase/migrations/20260421_01_mo_voter_file.sql
 ```
 
@@ -263,7 +263,7 @@ Expected: ~4M output rows, header row + data.
 
 ```bash
 export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
-PGPASSWORD="LNEERaCSbAKOVtdR" psql -h db.faajpcarasilbfndzkmd.supabase.co -U postgres -d postgres \
+PGPASSWORD="$MOYD_DB_PASSWORD" psql -h db.faajpcarasilbfndzkmd.supabase.co -U postgres -d postgres \
   -c "\COPY public.mo_voter_file(voter_id,first_name,middle_name,last_name,suffix,date_of_birth,registration_date,voter_status,party,house_number,street_prefix,street_name,street_suffix,unit_type,unit_number,residence_city,residence_zip5,residence_zip4,county,precinct,split,ward,township,congressional_district,state_senate_district,state_house_district,school_district,mail_address_line1,mail_city,mail_state,mail_zip) FROM '/Users/moyd/MOYD/voter-file-enrichment-2026-04/02_normalized.csv' WITH (FORMAT csv, HEADER true, NULL '')"
 ```
 

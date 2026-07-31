@@ -19,10 +19,12 @@ from collections import Counter
 from dataclasses import dataclass
 from nickname_expander import candidate_first_names, candidate_last_names
 
-DB_DSN = os.environ.get(
-    'MOYD_DB_DSN',
-    'postgresql://postgres:LNEERaCSbAKOVtdR@db.faajpcarasilbfndzkmd.supabase.co:5432/postgres',
-)
+DB_DSN = os.environ.get('MOYD_DB_DSN')
+if not DB_DSN:
+    raise SystemExit(
+        'MOYD_DB_DSN is not set. Export the Postgres connection string before '
+        'running this script.'
+    )
 FUZZY_THRESHOLD = 82
 
 

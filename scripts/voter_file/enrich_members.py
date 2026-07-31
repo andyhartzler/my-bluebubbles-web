@@ -34,10 +34,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from match_people_v2 import EnhancedMatcher, Person  # noqa: E402
 
-DB_DSN = os.environ.get(
-    "MOYD_DB_DSN",
-    "postgresql://postgres:LNEERaCSbAKOVtdR@db.faajpcarasilbfndzkmd.supabase.co:5432/postgres",
-)
+DB_DSN = os.environ.get("MOYD_DB_DSN")
+if not DB_DSN:
+    raise SystemExit(
+        "MOYD_DB_DSN is not set. Export the Postgres connection string before "
+        "running this script."
+    )
 
 
 _ZIP_RE = re.compile(r"\b(\d{5})(?:-\d{4})?\b")
