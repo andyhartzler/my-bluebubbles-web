@@ -94,6 +94,50 @@ a generic port scanner walking the host. That is the established part: the
 direct-connect endpoint is reachable from the open internet and is taking
 unsolicited traffic.
 
+That was a single observation when it was written, which left open the reading
+that one stray packet had been over-interpreted. It is not a one-off. A second
+burst landed on 2026-07-31 in the 15:44 to 15:49 rollup window, carrying three
+rejected startup packets across a 50 millisecond span:
+
+    15:48:38.586  unsupported frontend protocol 0.0: server supports 3.0 to 3.0
+    15:48:38.608  unsupported frontend protocol 255.255: server supports 3.0 to 3.0
+    15:48:38.636  no PostgreSQL user name specified in startup packet
+
+Decode those the same way as the SMB line above, major half then minor half.
+0.0 is four version bytes of 00 00 00 00. 255.255 is 00 FF 00 FF, and it is
+worth being exact about that rather than calling it all ones: an all-ones
+version would log as 65535.65535. So the second one is a repeated 0x00FF
+pattern, not a ones-complement sentinel. Both are impossible protocol versions
+that no client library would ask for. The third line is a structurally valid
+startup packet whose user field is empty or absent; Postgres logs that same
+line either way and the two cases cannot be told apart from it.
+
+Three different rejected handshakes 22 and 28 ms apart is what one client
+enumerating the port looks like, and the unscrubbed source addresses in the log
+explorer are what would confirm it. It is poorly explained by a misconfigured
+client of ours retrying: no client in these repos configures an empty user, and
+libpq-family clients default it to the OS account, so an empty user field is
+not a plausible misconfiguration of anything committed here. That argument
+reaches only as far as committed clients, for the reason given below.
+
+So the exposure finding is now a recurring pattern with two independent
+fingerprint families: SMB framing in the 10:05 UTC rollup window, recorded in
+commit e72e361, and this protocol probing at 15:48, about five and three
+quarter hours apart on the same day.
+
+It does not settle the attribution, and it should not be read as if it did. The
+fourth FATAL in that window is the password failure, identified by elimination
+rather than read directly, because Sentry scrubs that line: the window carried
+four FATALs, the three above are named, and the rollup's message table lists
+exactly one other message family, the scrubbed password-failure line. Its
+timestamp is not scrubbed and reads 15:48:20.127, roughly 18 seconds before
+the burst, so it is still tied to the scan only by sharing a window and is
+still not part of the burst itself. The two-field check in the log explorer
+described below remains the thing that settles it. What this does change is
+that the exposure is a recurring pattern rather than a single observation,
+which strengthens the case for the deferred remediation recorded below. It is
+not on its own a reason to escalate past what that paragraph already says.
+
 The inferred part is the step from there to the password failures. A steady
 low rate of failed authentication against a port in that condition is what
 credential-stuffing scan traffic looks like, and that is the most economical
