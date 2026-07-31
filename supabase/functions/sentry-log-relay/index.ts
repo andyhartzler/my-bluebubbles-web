@@ -75,17 +75,52 @@ async function sendSentryEvent(opts: {
   return eventId;
 }
 
+// The management API fronts the logs endpoint behind a CDN that intermittently
+// answers 5xx with an HTML error page. Retry those, and network-level failures,
+// before giving up on the window.
+const LOGS_QUERY_ATTEMPTS = 3;
+const LOGS_RETRY_BASE_MS = 750;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Carries the upstream body out of band so it stays out of the error message.
+// The message is the Sentry issue title, so it has to stay stable and short;
+// the body goes in extra, where a 300-line HTML page is harmless.
+class LogsQueryError extends Error {
+  readonly status: number;
+  readonly body: string;
+  constructor(status: number, attempts: number, body: string) {
+    super(`logs query failed ${status} after ${attempts} attempt(s)`);
+    this.name = "LogsQueryError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function queryLogs<T>(sql: string, startIso: string, endIso: string): Promise<T[]> {
   const url = `${MGMT_BASE}?iso_timestamp_start=${encodeURIComponent(startIso)}` +
     `&iso_timestamp_end=${encodeURIComponent(endIso)}&sql=${encodeURIComponent(sql)}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${MGMT_TOKEN}` },
-  });
-  if (!res.ok) {
-    throw new Error(`logs query failed ${res.status}: ${(await res.text()).slice(0, 300)}`);
+
+  for (let attempt = 1; ; attempt++) {
+    const last = attempt >= LOGS_QUERY_ATTEMPTS;
+    let res: Response;
+    try {
+      res = await fetch(url, { headers: { Authorization: `Bearer ${MGMT_TOKEN}` } });
+    } catch (e) {
+      if (last) throw new LogsQueryError(0, attempt, String(e));
+      await sleep(LOGS_RETRY_BASE_MS * attempt);
+      continue;
+    }
+    if (res.ok) {
+      const data = await res.json();
+      return (data.result ?? []) as T[];
+    }
+    // Body must be consumed either way so the connection is not left open.
+    const body = (await res.text()).slice(0, 300);
+    // 4xx is a bad token or a bad query: retrying cannot change the answer.
+    if (res.status < 500 || last) throw new LogsQueryError(res.status, attempt, body);
+    await sleep(LOGS_RETRY_BASE_MS * attempt);
   }
-  const data = await res.json();
-  return (data.result ?? []) as T[];
 }
 
 function tally<T>(rows: T[], keyFn: (r: T) => string, cap = 10): Record<string, number> {
@@ -291,15 +326,22 @@ Deno.serve(async (req: Request) => {
     console.error("sentry-log-relay failed:", err);
     // Report the relay's own failure so a broken relay is not silent
     try {
+      const reason = err instanceof Error ? err.message : String(err);
       await sendSentryEvent({
-        message: `sentry-log-relay failure: ${String(err).slice(0, 300)}`,
+        message: `sentry-log-relay failure: ${reason.slice(0, 300)}`,
         level: "error",
         fingerprint: ["supabase-platform", "relay-failure"],
         tags: { category: "relay-internal" },
-        extra: { error: String(err) },
+        extra: {
+          error: String(err),
+          ...(err instanceof LogsQueryError
+            ? { upstream_status: err.status, upstream_body: err.body }
+            : {}),
+        },
       });
     } catch (_) { /* last resort: runtime logs only */ }
-    return new Response(JSON.stringify({ error: String(err) }), {
+    // Detail belongs in Sentry, not in the response body.
+    return new Response(JSON.stringify({ error: "relay run failed" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
