@@ -2,7 +2,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { google } from "npm:googleapis@130";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { handleCors } from "../_shared/cors.ts";
 // --- CORS Headers ---
+// Kept for the non-preflight responses below. Access-Control-Allow-Headers is
+// only read by the browser on the preflight, which handleCors now answers by
+// reflecting access-control-request-headers, so this list no longer gates
+// anything. Do not add sentry-trace or baggage here by hand: a hand-maintained
+// list is the defect this is fixing.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -377,6 +383,8 @@ async function cacheEmailsToDatabase(emailDetails, memberId) {
 }
 // --- Main Handler ---
 Deno.serve(async (req)=>{
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   if (req.method === "OPTIONS") {
     return new Response("ok", {
       headers: corsHeaders

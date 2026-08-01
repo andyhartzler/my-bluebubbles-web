@@ -5,6 +5,12 @@
 // Wave 4 access-audit 2026-04-24: user-JWT + is_staff() gate + audit_log.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { handleCors } from "../_shared/cors.ts";
+// Kept for the non-preflight responses below. Access-Control-Allow-Headers is
+// only read by the browser on the preflight, which handleCors now answers by
+// reflecting access-control-request-headers, so this list no longer gates
+// anything. Do not add sentry-trace or baggage here by hand: a hand-maintained
+// list is the defect this is fixing.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
@@ -46,6 +52,8 @@ async function requireStaffUser(req, supabaseUrl, supabaseAnonKey) {
 }
 
 serve(async (req)=>{
+  const _cors = handleCors(req);
+  if (_cors) return _cors;
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, {
