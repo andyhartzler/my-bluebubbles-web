@@ -153,10 +153,12 @@ nor is any other boundary-aligned scheduler. pg_cron fires on the boundary, so
 its log lines cluster a few seconds past `:00`, `:05` and `:10`. Ten FATAL
 timestamps sampled across 2026-07-31 00:50 to 10:13 UTC sit at 56, 60, 85,
 139, 164, 196, 216, 233, 244 and 285 seconds into their five-minute window:
-spread over 229 seconds of the available 300, with no clustering anywhere. The
-244 and the 60 fall in adjacent windows in that order, which puts those two
-arrivals 116 seconds apart, and a job with a 300 second period cannot produce
-that. So "roughly every five minutes" is a rate, not a schedule.
+spread over 229 seconds of the available 300, with no clustering anywhere in
+that sample; for a later window that does cluster, see the 2026-08-01 burst
+recorded below. The 244 and the 60 fall in adjacent windows in that order,
+which puts those two arrivals 116 seconds apart, and a job with a 300 second
+period cannot produce that. So "roughly every five minutes" is a rate, not a
+schedule.
 
 Be careful how far that argument reaches. It eliminates pg_cron and anything
 else firing on a fixed period. It does NOT eliminate every emitter of ours,
@@ -164,6 +166,47 @@ and the reason is the whole point of the section at the top of this file: a
 stale deployed function, a retired box, or a third-party integration still
 retrying an old DSN would be a misconfigured client of ours, would not be on a
 boundary, and is invisible from these repos. Nothing here rules that out.
+
+The 2026-08-01 rollup adds a shape the sampling above did not see, and it is
+worth recording because that sampling is where "no clustering anywhere" comes
+from. The 15:09 to 15:14 UTC window carried seven FATALs, all of the
+password-failure family and no other message: `by_severity` reads FATAL 7 and
+`by_message` carries exactly one key, which a 15-key tally cannot have
+truncated. The rollup samples only five of the seven, so two timestamps are
+unknown, but the five it does carry land between 15:12:16.775 and
+15:12:18.836, spaced 692, 388, 585 and 396 ms apart. At least five attempts
+inside 2.1 seconds is a burst, not a drip.
+
+For scale: across the relay events from 14:00 to 15:55 UTC that day, every
+other rollup carried one or two Postgres errors, and each was titled "includes
+FATAL", which the relay sets only when some row is FATAL or PANIC. This one
+carried seven, and nothing else in the sampled range approaches it. Four
+five-minute slots in that stretch produced no rollup at all.
+
+Do not read those four as proven-empty windows, and it is worth spelling out
+why, because the obvious reading is wrong. No rollup means only that the run
+sent nothing, and this relay has two paths that send nothing while still
+advancing the watermark: a failed `postgres_logs` query is caught non-fatally
+and substitutes an empty row set, and `sendSentryEvent` returns null on a
+failed ingest without throwing. Either hides real errors permanently, because
+the watermark moves on regardless. What IS established about the slot before
+the burst is that a run completed near 15:10, since the burst rollup's
+`window_start` of 15:09:01.451 gives it a clean five-minute window and a
+skipped or failed run would have left a wider one. Whether that run saw
+nothing or swallowed something needs the runtime logs, which were not checked.
+
+What that rules out is narrower than it first looks, and the temptation to
+overclaim here is the reason this paragraph is worded so carefully. It is a
+poor fit for exactly one alternative: a single stale client retrying on a
+timer does not fire five times inside two seconds. It is NOT evidence for the
+scanning reading over the rest of the alternative class, because a connection
+pool cold-starting against a stale credential produces this same shape, and
+that is squarely the "stale deployed function, retired box, or third-party
+integration" case the paragraph above preserves. Sub-second spacing is
+ordinary for any serially reconnecting client and is not a fingerprint of
+anything on its own. So the burst removes one sub-variant and leaves the two
+readings that actually matter exactly where they were. The two unscrubbed
+fields named below remain the only thing that settles it.
 
 So: the exposure is proven, the attribution is not. The Supabase dashboard log
 explorer keeps the unscrubbed lines that Sentry strips, and two fields settle
