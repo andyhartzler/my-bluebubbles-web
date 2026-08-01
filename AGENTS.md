@@ -57,6 +57,95 @@ and, decisively, the deployed-version timestamps from `supabase functions list`.
 The hourly `"cron"` case is the stronger leg, because it has no alternative
 mechanism at all.
 
+A third case reaches the same conclusion for one function without needing any
+of those queries, because `0d2963e` on 2026-07-31 changed the error text
+itself. That commit changed 62 lines in `sentry-log-relay/index.ts`; two sites
+matter for the fingerprint. The thrown error went from
+
+    throw new Error(`logs query failed ${res.status}: ${(await res.text()).slice(0, 300)}`);
+
+to a `LogsQueryError` whose message is
+
+    `logs query failed ${status} after ${attempts} attempt(s)`
+
+and the outer catch that builds the Sentry title went from
+
+    message: `sentry-log-relay failure: ${String(err).slice(0, 300)}`,
+
+to
+
+    const reason = err instanceof Error ? err.message : String(err);
+    message: `sentry-log-relay failure: ${reason.slice(0, 300)}`,
+
+Every one of the nine SUPABASE-PLATFORM-3 events, 2026-07-24 07:05 through
+2026-08-01 08:05 UTC, reads
+
+    sentry-log-relay failure: Error: logs query failed 502: <!DOCTYPE html>
+
+Exactly two of those landed after the commit, at 2026-07-31 23:40 and
+2026-08-01 08:05 UTC. This was read from the per-event `message` field, not the
+group title, which is not a per-event record and cannot be trusted for this.
+
+Two independent things in that string are pre-fix, and the second is the
+load-bearing one. The retry wording is specific to the logs-query path. The
+`Error: ` prefix is not. `String(err)` renders `${err.name}: ${err.message}`,
+and every pre-fix throw site in this file constructs a plain `new Error`, whose
+name is `Error`; the post-fix line uses `err.message`, which carries no name
+prefix at all. The prefix is the error's name, not a constant, which this file
+demonstrates on itself: `LogsQueryError` sets `this.name`, so `String()` of one
+would render `LogsQueryError: `.
+
+So a post-fix build cannot produce that prefix from any throw site in this
+file. Stating it as a universal about JavaScript would be wrong: an `Error`
+whose own message already begins with `Error: `, or a non-Error throw that
+stringifies that way, would reproduce it. Neither can arise here. The only two
+sites that wrap an upstream message, the state-read throw and the
+watermark-update throw, prepend their own fixed text, so even a PostgREST
+message that happened to contain this string would render as
+`failure: state read failed: Error: ...` and not match. Nothing in the file
+throws a non-Error.
+
+That distinction matters because this fingerprint is a catch-all. `0d2963e`
+says so itself: the `relay-failure` fingerprint also collects state-read and
+watermark-update failures. So the `extra` shape does NOT discriminate builds
+here. `extra.error` is always set, and `upstream_status` and `upstream_body`
+are spread in only for a `LogsQueryError`, so a post-fix build failing on a
+state read emits an `extra` with only `error` in it, exactly like a pre-fix
+build. The observed events do carry that shape and it is consistent with the
+reading, but it is not evidence for it. The message text is the whole proof.
+
+Message shape fingerprints the build rather than the failure, so unlike a rate
+argument this needs no assumption about DDL, cron timing or how often the CDN
+502s. No code path in the post-fix function constructs that title. Grep finds
+`logs query failed` only in this function, as the `LogsQueryError` message and
+as a substring of the `postgres_logs query failed` console.error that never
+reaches a title, and in this document. A GitHub code search across the account,
+which indexes default branches only, returns this one file.
+
+Scope this claim carefully. It establishes that a pre-`0d2963e` build was
+serving as of the 2026-08-01 08:05 UTC event, not that one is serving now: the
+relay only emits here on roughly 1 percent of runs, so no later event is not
+evidence of anything, and a hand deploy at any point after 08:05 falsifies the
+present tense while these events stay on the record. It also assumes no second
+deployment of this source under another function name, which is possible
+because `logger` and `server_name` are hard-coded constants in the file rather
+than deployment identity. `supabase functions list` remains the check for
+current state and for that assumption. And it is one function: it does not
+establish the state of any other, though it is consistent with the two cases
+above.
+
+The method generalizes and is cheap, with one condition that is easy to get
+wrong. When a fix changes a string that the event itself carries, the next
+event in that group tells you which build answered, with no database or CLI
+access. The condition is that the observed event must demonstrably have taken
+the changed code path. For a catch-all fingerprint like this one it usually has
+not, so prefer a discriminator that every path through the handler shares, the
+way the `Error: ` prefix does here. The absence of an added `extra` key is
+never a discriminator on its own: absence is also what an older path, a
+different error type or a skipped branch produces. When writing a fix to a
+function you cannot verify is deployed, deliberately change something
+observable on every path, for exactly this reason.
+
 Not explained by any of this, and still firing: a FATAL
 `password authentication failed` roughly once every five minutes, continuously.
 Nothing committed in either repo emits it, and it is most likely scan traffic,
