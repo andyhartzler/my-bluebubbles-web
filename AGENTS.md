@@ -283,6 +283,55 @@ do instead is overwrite whatever is live for them, including any out-of-band
 dashboard edit, and their live state has never been compared against git. That
 is a bad thing to do while sixteen people are casting real ballots.
 
+## READ SECOND: check where the local branch refs point before committing
+
+Check where `master` actually points before you commit anything. In the
+2026-08-01 triage container both repos presented a local branch ref a week
+behind the real remote head:
+
+    local master                      f17be39   2026-07-26 UTC
+    local origin/master               f17be39   stale copy of the same
+    refs/heads/master on the remote   5c4d3ac   2026-08-01 UTC
+
+`f17be39` is a plain ancestor of `5c4d3ac`, so the local ref was behind rather
+than divergent. The same shape was present in `moyoungdemocrats`: local `main`
+at `d2c3cd7` from 2026-07-26 UTC against a real `refs/heads/main` of `77d879f`.
+
+How the container arrives in that state is NOT established, and the reflogs
+argue against the obvious guess that it clones with `HEAD` detached at the true
+tip: in both repos the earliest recorded `HEAD` is the stale tip, and the
+detached checkout at the true tip appears later. Two observations inside one
+container is also not enough to call it a property of the clone. Treat this as
+something to check, not something known to recur.
+
+Why it matters more than an inconvenience: `git checkout master` silently moves
+you onto the stale tip, and a commit made there is based on a tree missing
+every triage commit since the stale date. The push is then refused as a
+non-fast-forward, because the remote head is not an ancestor of your new
+commit. That refusal is the good case. The bad case is reading it as something
+to force past. Never force-push here to resolve it.
+
+The check is `git ls-remote --heads origin <branch>` compared against
+`git rev-parse <branch>`. The repair is:
+
+    git fetch origin <branch>
+    git checkout -B <branch> FETCH_HEAD
+
+`-B` moves the branch ref and will discard any local commits already sitting on
+it, including one made on the stale base, recoverable afterwards only through
+the reflog. Commit or stash first, then rebase or cherry-pick your own work
+onto the new tip rather than assuming `-B` carried it across.
+
+One more trap in the same area: the clone is shallow, 51 commits here, so
+history ends at a graft point, and ancestry questions across that boundary do
+not give a trustworthy negative. If the far commit is absent locally,
+`git merge-base --is-ancestor` fails outright rather than answering; if it is
+present but the graft cuts connectivity, the answer can be a wrong NO. Neither
+case means history has diverged.
+
+This was found by a stash pop conflicting during the 2026-08-01 run, not by
+looking for it.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
