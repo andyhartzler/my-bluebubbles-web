@@ -421,6 +421,149 @@ case means history has diverged.
 This was found by a stash pop conflicting during the 2026-08-01 run, not by
 looking for it.
 
+## READ THIRD: storage 400s on the private `meetings` bucket, and the fix that must never be made
+
+SUPABASE-PLATFORM-4 is the storage category of the 5-minute Supabase log
+rollup. It fired 6 times between 2026-07-25 15:05 and 2026-08-03 00:45 UTC,
+carrying 9 failed requests in total, and Sentry records 0 users impacted.
+Every one of the nine is status 400 against the `meetings` bucket from a
+single source address, which is not reproduced here. For five of the nine, and
+the only recurring shape among them, the only code that ever minted that URL
+shape was removed in `af1ca85`, so no further code follows. This note exists so
+the next run does not rediscover that, and above all so it does not reach for
+the obvious fix, which is forbidden.
+
+THE FIX THAT MUST NEVER BE MADE
+Do not flip `meetings` public, and do not widen the storage read policy to
+clear this. That bucket holds the verbatim transcripts of executive committee
+and all-members meetings. Per the comment in `storage_uri_resolver.dart`, it
+was public until `050_meetings_transcript_access.sql` in the `moyd-ops` repo
+took it private and gated reads on `public.is_executive()`. That SQL lives in
+a third repo and cannot be verified from here, but the direction of travel is
+not in doubt. A 400 on an unauthenticated read of this bucket is the system
+doing its job. The resolver says the same thing in its own words: a dead link
+is the correct outcome, a working unauthenticated one is not.
+
+WHAT THE KEYS MEAN, SO NOBODY "FIXES" THEM
+The observed keys look like a mangled filename and are not. `storeTranscript`
+in both `meetings-zap` and `import-historical-meetings` writes
+`transcripts/${cleanTitle}/${month}/${day}/${year}.txt`, so
+`transcripts/Executive Committee Meeting/07/15/2026.txt` is one path segment
+per date component by design. Both writers return that key and store it
+verbatim in `meetings.transcript_file_path`. Do not add encoding, and do not
+collapse the date segments.
+
+THE NINE REQUESTS
+    2026-07-25 15:00:58  GET  /object/public/meetings/transcripts/<title>.vtt
+    2026-07-25 15:53:29  POST /object/sign/meetings/transcripts/<title>/07/15/2026.txt
+    2026-07-25 16:33:47  POST /object/sign/meetings/transcripts/<title>/07/15/2026.txt
+    2026-07-26 14:45:13  GET  /object/public/meetings/transcripts/<title>/07/15/2026.txt
+    2026-07-26 14:45:14  GET  /object/public/meetings/transcripts/<title>/06/17/2026.txt
+    2026-07-26 14:45:14  GET  /object/public/meetings/transcripts/<title>/05/20/2026.txt
+    2026-07-27 08:39:50  GET  /object/public/meetings/
+    2026-08-03 00:41:20  GET  /object/public/meetings/transcripts/<title>/07/15/2026.txt
+    2026-08-03 00:41:33  GET  /object/meetings/transcripts/<title>/07/15/2026.txt
+
+WHERE THE FIVE RECURRING REQUESTS COME FROM, AND WHY NO CODE FOLLOWS
+Read the resolver as it stood before `af1ca85`, at
+`af1ca85^:lib/services/crm/storage_uri_resolver.dart`: for a relative path
+starting `transcripts/`, `recordings/` or `documents/` it built
+`storage/v1/object/public/meetings/$relativePath` and returned it.
+
+That branch accounts for five of the nine requests. Four are in the writers'
+exact key shape, the 07-26 trio and the 08-03 00:41:20 request, and it
+reproduces their URLs character for character once percent-encoding is applied.
+The fifth is the 07-25 15:00:58 `.vtt`, which is not a shape either writer
+produces but does begin `transcripts/`, so the same branch turns a stored value
+of that form into exactly the URL observed. So the mechanism is not a mystery
+and is not something a person had to construct by hand: it is the old build
+doing exactly what it was written to do, against a bucket that has since gone
+private.
+
+`af1ca85`, 2026-07-25 16:48 UTC, replaced that branch with a signing branch
+and added `_privateBuckets`, so the current build signs these and returns null
+on failure rather than emitting a public URL. Both 07-25 signing requests
+predate it, and no signing request appears anywhere in the group afterwards.
+
+Why the shape still appeared on 08-03, nine days after the fix, is NOT
+established, and two explanations survive that cannot be told apart from here.
+One is a stale client: `netlify.toml` records that `main.dart.js` and the
+`*.part.js` chunks are NOT content-hashed, and a reload picks up the new build,
+but a CRM tab left open since before the 07-25 deploy keeps running the old
+resolver out of memory. Nine days is a long time for one tab. The other needs
+no tab at all: these URLs worked while the bucket was public, so a bookmark, a
+saved link or one pasted into a document reproduces the identical GET forever.
+
+Do not collapse those two. The 08-03 pair argues against the tab reading if
+anything: the 00:41:33 request on the bare `/object/` endpoint landed 13
+seconds after the 00:41:20 public GET, from the same source, and nothing in
+this repo constructs the bare form. One actor emitting an old-build-shaped URL
+and a no-build-shaped URL 13 seconds apart fits someone replaying and editing a
+link at least as well as it fits a nine-day-old tab.
+
+Note also that the 07-26 trio landed inside 0.5 seconds, at 14:45:13.915, .199
+and .406, which is faster than anyone clicks through three meeting screens.
+That is what a browser session restore looks like. No surface in this repo
+bulk-resolves transcripts: both resolver call sites,
+`meeting_detail_screen.dart` and `global_crm_search_dialog.dart`, are
+click-driven and resolve one path each.
+
+WHAT THE CURRENT SOURCE DOES AND DOES NOT RULE OUT
+For a transcript path in the writers' shape, that is one beginning
+`transcripts/`, the current resolver has no path that produces a public URL:
+it signs, and `_privateBuckets` refuses the public fallback for `meetings`.
+That is a claim about writer-shaped values only, and it is NOT a claim that
+the current app can never emit one. Two pass-throughs survive in the current
+file. An absolute `https://` value is returned untouched, and a relative value
+already beginning `storage/v1/object/` is resolved against the project URL and
+returned. Either would reproduce the public-GET shape, and either is reachable
+today, because `meeting_edit_sheet.dart` exposes `transcript_file_path` as a
+free-text field. The 07-25 15:00 request names `transcripts/<title>.vtt`, a
+shape neither writer produces, so rows outside the convention likely exist. The
+request alone cannot prove one does, since a saved or hand-typed URL needs no
+row behind it, and that is exactly why you check the row rather than the code
+before concluding the current build is innocent of some future occurrence.
+
+For completeness on the endpoints: `/object/sign/` is not the only storage
+endpoint the current app touches for this bucket. `global_search_service.dart`
+also calls `/object/list/` against `meetings` on every global document search.
+A list failure would not present as a public-object GET, so it does not
+explain anything here, but do not repeat the claim that signing is the only
+call.
+
+WHAT REMAINS UNESTABLISHED
+Why the two signing requests returned 400. That is the half that could still
+be a live defect, because a failed sign puts an exec on "Unable to open
+transcript link". A 400 there is consistent with the key not existing and with
+the read being refused, and nothing in this repo distinguishes them. Do not
+build a diagnosis on an assumed meaning for that status code. The other two
+one-off shapes, the bare bucket root and the 08-03 `/object/` GET, are also
+unexplained, and nothing in this repo constructs either. Do not describe those
+two as unauthenticated: the rollup sample carries no authentication
+information at all, only ip, method, path, status and timestamp, and on the
+bare `/object/` endpoint an anonymous caller, an
+authenticated non-executive and an executive with a bad key are
+indistinguishable from that.
+
+Two checks in the Supabase dashboard settle the signing question, and neither
+can be run from this container: list the `meetings` bucket under
+`transcripts/Executive Committee Meeting/07/15/` and see whether `2026.txt` is
+there, and read the unscrubbed storage log line for either 07-25 signing
+request, which carries the error the 400 stands for.
+
+Left alone deliberately on 2026-08-03. No code change: the only recurring
+mechanism was already fixed in `af1ca85`, the residue is consistent with a
+stale client or an old saved link and cannot be attributed from here, and the
+signing 400 is not established well enough to act on. Do not resolve
+SUPABASE-PLATFORM-4 in Sentry. Nothing was fixed this run.
+
+One disclosure judgement, made deliberately rather than by accident: this repo
+is public, and this note commits the issue ID, the private object key prefix
+and three executive meeting dates to it. None of that is a secret, none of it
+widens read access, and the source address is withheld. It was judged worth it
+so the next memoryless run does not re-derive all of the above, but it is a
+call, and a future note should weigh the same trade rather than assume it.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
