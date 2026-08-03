@@ -457,6 +457,54 @@ case means history has diverged.
 This was found by a stash pop conflicting during the 2026-08-01 run, not by
 looking for it.
 
+It recurred on 2026-08-03 in a form the paragraphs above do not quite cover,
+and the difference is the part worth reading. The stale ref that did the damage
+was not `master`. It was `origin/master`, the remote-tracking ref, which the
+container presented at `5d8a5b0` while the real `refs/heads/master` was two
+commits further on at `dfc890d`. Nothing about that is visible from
+`git rev-parse origin/master`, `git log origin/master`, or `git status`: a
+remote-tracking ref is a local cache, it is only as fresh as the last fetch,
+and in a container that has never fetched it answers confidently and wrongly.
+`git status` reported "up to date with origin/master" the entire time, which is
+true and useless, because it compares two local refs.
+
+The `git ls-remote` check prescribed above is the right check and would have
+caught it in one command. It was simply not run, because `origin/master` looked
+like an answer. So the rule is not a new check, it is: `origin/<branch>` is not
+evidence about the remote until you have fetched in this container. Fetch
+first, then reason.
+
+What it cost is the reason this is recorded rather than shrugged off. The run
+found two commits sitting on a detached `HEAD` that it believed were unpushed
+and about to be lost, and built a whole plan on that belief: it squashed them
+to keep an already-redacted meeting title out of public history, wrote a long
+commit message arguing the case, and spent a full adversarial audit round on
+it. All of it was answering a question that was already moot: both commits are
+reachable from the real remote head, so the unredacted blob is published and no
+squash could have changed that.
+
+Be exact about what that does and does not establish, because the sloppy
+version of it is the same error twice. What is established is reachability now,
+plus commit dates of 02:44 and 08:44 UTC that precede this run. When the push
+actually happened is NOT established and cannot be from here; git records no
+push time. The commits may have been pushed before this run began or by
+something concurrent with it. Either way the conclusion holds, which is why the
+distinction is safe to state plainly rather than paper over.
+
+The push refusal was what surfaced it, and only because `-u` compared against a
+freshly fetched ref. The wasted work was the good outcome; the bad one was
+available, and it was to read that refusal as something to force past.
+
+Two smaller things fell out of it, both worth keeping. Committing on the wrong
+base does not necessarily mean re-doing the work: the corrected commit here was
+verified by comparing `git write-tree` against the audited commit's tree hash,
+which proved the content was unchanged and let a clean audit stand across the
+rebase. And an audit conclusion is only as good as the premises handed to the
+auditor. That reviewer verified every claim it was given and returned CLEAN,
+correctly, while the framing it was given was false, because nobody had checked
+the one fact the framing rested on. Give an auditor the premises to check, not
+just the diff.
+
 ## READ THIRD: storage 400s on the private `meetings` bucket, and the fix that must never be made
 
 SUPABASE-PLATFORM-4 is the storage category of the 5-minute Supabase log
