@@ -77,14 +77,26 @@ to
     const reason = err instanceof Error ? err.message : String(err);
     message: `sentry-log-relay failure: ${reason.slice(0, 300)}`,
 
-Every one of the nine SUPABASE-PLATFORM-3 events, 2026-07-24 07:05 through
-2026-08-01 08:05 UTC, reads
+Every one of the fourteen SUPABASE-PLATFORM-3 events, 2026-07-24 07:05 through
+2026-08-03 15:45 UTC, reads
 
     sentry-log-relay failure: Error: logs query failed 502: <!DOCTYPE html>
 
-Exactly two of those landed after the commit, at 2026-07-31 23:40 and
-2026-08-01 08:05 UTC. This was read from the per-event `message` field, not the
-group title, which is not a per-event record and cannot be trusted for this.
+`0d2963e` landed at 2026-07-31 02:31:19 UTC, and seven of the fourteen are
+after it: 07-31 23:40, 08-01 08:05, 08-02 at 06:20, 09:55 and 13:10, and 08-03
+at 15:35 and 15:45 UTC. The 07-31 00:30 event is two hours before the commit
+and belongs to the other seven. This was read from the per-event `message`
+field, not the group title, which is not a per-event record and cannot be
+trusted for this.
+
+Enumerate this group from the per-event list over the full range. Do not take
+the previous note's count and add whatever the last 24 hours produced. The
+2026-08-03 18:00 UTC run did exactly that, reached eleven and four, and missed
+the three 08-02 events completely, because a 24 hour issue search returns only
+the newest pair. The issue's own Occurrences field already read 14 in that same
+run's tool output and went unreconciled. An adversarial auditor caught it as a
+BLOCKER by querying Sentry directly, which is the only reason the wrong census
+is not in this file.
 
 Two independent things in that string are pre-fix, and the second is the
 load-bearing one. The retry wording is specific to the logs-query path. The
@@ -123,9 +135,9 @@ reaches a title, and in this document. A GitHub code search across the account,
 which indexes default branches only, returns this one file.
 
 Scope this claim carefully. It establishes that a pre-`0d2963e` build was
-serving as of the 2026-08-01 08:05 UTC event, not that one is serving now: the
+serving as of the 2026-08-03 15:45 UTC event, not that one is serving now: the
 relay only emits here on roughly 1 percent of runs, so no later event is not
-evidence of anything, and a hand deploy at any point after 08:05 falsifies the
+evidence of anything, and a hand deploy at any point after 15:45 falsifies the
 present tense while these events stay on the record. It also assumes no second
 deployment of this source under another function name, which is possible
 because `logger` and `server_name` are hard-coded constants in the file rather
@@ -133,6 +145,30 @@ than deployment identity. `supabase functions list` remains the check for
 current state and for that assumption. And it is one function: it does not
 establish the state of any other, though it is consistent with the two cases
 above.
+
+What the 08-02 and 08-03 events add is duration rather than a new mechanism.
+The fix has now been committed and undeployed for three days, across seven
+failures it would most likely have absorbed, five of them since the note above
+was written. Most likely rather than certainly, because the fix retries three
+times over roughly three seconds, so a CDN 502 episode outlasting that window
+still fails and still lands here. The shape argues it usually would not: the
+08-03 events sit in the 15:35 and 15:45 five-minute slots with 15:40 clean, and
+the 08-02 three are hours apart, which is the intermittent CDN 502 that
+`0d2963e` was written for and not a sustained upstream outage. So this is the
+same finding as before rather than a new one, and the only action it supports
+is the hand deploy:
+`npx supabase functions deploy sentry-log-relay --project-ref <ref>`, then read
+the next event in this group to confirm the message shape changed. Deploy that
+one function, not everything: the bulk-deploy hazard recorded at the end of this
+section still applies, and the endorsement-vote functions must not be swept up
+in it while ballots are open.
+
+Do not rate this higher than it is. A failed run does not lose the window,
+because the watermark update sits after the sends inside the same `try`, so a
+throw leaves `last_end` where it was and the next run re-reads the same span
+under the 60 minute cap. The cost of leaving it undeployed is a recurring Sentry
+issue and a delayed rollup, not missing platform errors. That is the reason this
+stays a report rather than an escalation.
 
 The method generalizes and is cheap, with one condition that is easy to get
 wrong. When a fix changes a string that the event itself carries, the next
