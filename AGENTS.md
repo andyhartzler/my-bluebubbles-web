@@ -448,7 +448,7 @@ WHAT THE KEYS MEAN, SO NOBODY "FIXES" THEM
 The observed keys look like a mangled filename and are not. `storeTranscript`
 in both `meetings-zap` and `import-historical-meetings` writes
 `transcripts/${cleanTitle}/${month}/${day}/${year}.txt`, so
-`transcripts/Executive Committee Meeting/07/15/2026.txt` is one path segment
+`transcripts/<title>/07/15/2026.txt` is one path segment
 per date component by design. Both writers return that key and store it
 verbatim in `meetings.transcript_file_path`. Do not add encoding, and do not
 collapse the date segments.
@@ -547,9 +547,10 @@ indistinguishable from that.
 
 Two checks in the Supabase dashboard settle the signing question, and neither
 can be run from this container: list the `meetings` bucket under
-`transcripts/Executive Committee Meeting/07/15/` and see whether `2026.txt` is
+`transcripts/<title>/07/15/` and see whether `2026.txt` is
 there, and read the unscrubbed storage log line for either 07-25 signing
-request, which carries the error the 400 stands for.
+request, which carries the error the 400 stands for. The unredacted title is
+in the SUPABASE-PLATFORM-4 event sample in Sentry, which is where it belongs.
 
 Left alone deliberately on 2026-08-03. No code change: the only recurring
 mechanism was already fixed in `af1ca85`, the residue is consistent with a
@@ -558,11 +559,15 @@ signing 400 is not established well enough to act on. Do not resolve
 SUPABASE-PLATFORM-4 in Sentry. Nothing was fixed this run.
 
 One disclosure judgement, made deliberately rather than by accident: this repo
-is public, and this note commits the issue ID, the private object key prefix
-and three executive meeting dates to it. None of that is a secret, none of it
-widens read access, and the source address is withheld. It was judged worth it
-so the next memoryless run does not re-derive all of the above, but it is a
-call, and a future note should weigh the same trade rather than assume it.
+is PUBLIC, confirmed against the GitHub API on 2026-08-03, not private. This
+note commits the issue ID, the object key prefix and three executive meeting
+dates to it. None of that is a secret, none of it widens read access, and the
+source address is withheld. The meeting title is redacted to `<title>`
+everywhere in this note, including in the dashboard-check instruction; it adds
+nothing a future run needs and it is the one identifying part. Weigh this same
+trade rather than assume it, and check the visibility rather than assume it:
+the sibling `moyoungdemocrats` repo is private and this one is not, so the
+habit of reasoning about "the repo" as one thing is itself the trap.
 
 ## Table of Contents
 1. [Overview](#overview)
