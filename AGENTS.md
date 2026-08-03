@@ -653,6 +653,139 @@ trade rather than assume it, and check the visibility rather than assume it:
 the sibling `moyoungdemocrats` repo is private and this one is not, so the
 habit of reasoning about "the repo" as one thing is itself the trap.
 
+## READ FOURTH: SUPABASE-PLATFORM-1 holds eight message shapes, not three
+
+SUPABASE-PLATFORM-1 is a 5 minute rollup of raw Postgres log lines. Its per
+event title, `Postgres errors: N (ERROR level)` or `N (includes FATAL)`, is a
+count and a severity flag. It is not the content. The content is in
+`by_message`. Two events with identical titles routinely carry completely
+different errors, so a title scan cannot decompose this group. Read
+`by_message` on every event in the window, never on a sample.
+
+That is not advice, it is the record of two consecutive failures in one run on
+2026-08-03. The run first read titles, concluded the group held three shapes
+and that all three were already handled. An adversarial auditor falsified
+that. The corrected note said six. A second auditor falsified that too, by
+reading `by_message` on events the corrected pass had skipped because their
+titles looked redundant. Only the third pass, a mechanical sweep of all 74
+events whose per shape totals were reconciled against the sum of the per event
+`count` fields, produced the list below. Two of the eight shapes are titled
+`Postgres errors: 1 (ERROR level)`, the same title the hourly uuid line
+carries, so they are invisible to any title based method by construction.
+
+Enumerated across all 74 events in the window 2026-08-02 20:05:04 UTC
+exclusive to 2026-08-03 20:05:04 UTC inclusive. The per shape totals sum to
+250, which equals the sum of every in window event `count` field, so this
+decomposition is complete rather than merely longer than the last one.
+
+Two caveats on that reconciliation, so a future run does not trust it further
+than it goes. Shape 1 is the only total that is derived rather than read:
+Sentry filters that message, so its `by_message` value is null and its 83 is a
+per event residual of `by_severity` FATAL minus the startup packet and
+protocol lines. That component of the sum therefore cannot fail, so
+completeness rests on the sweep of `by_message` keys across all 74 events and
+the reconciliation together, not on the arithmetic alone. And both window
+boundaries land on seconds that carry events, so the counts hold only under
+the exclusive start and inclusive end convention stated above; at millisecond
+precision the start boundary admits a 75th event and the totals move.
+
+1. `password authentication failed for user "?"`, 83 lines across 48 events,
+   FATAL, body `[Filtered]` since `50bba91`. Scan noise. Total derived, see
+   the caveat above.
+2. `duplicate key value violates unique constraint
+   "legislation_bill_sponsors_unique"`, 128 lines, exactly 32 in each of four
+   cycles a day at 00, 06, 12 and 18 UTC. Fixed in `e79339b`, committed and
+   undeployed.
+3. `invalid input syntax for type uuid: "cron"`, 23 lines, once an hour at
+   HH:00, in 23 of the 24 window hours. Fixed in `1cdb96e`, committed and
+   undeployed.
+4. `unsupported frontend protocol N.N`, 10 lines across 6 events, FATAL. Scan
+   noise. Values observed are 255.255, 0.0, 65363.19778 and 16.0; the value
+   varies per probe, so do not treat any list of them as exhaustive.
+5. `no PostgreSQL user name specified in startup packet`, 3 lines, FATAL.
+   Scan noise, same probe family as 4.
+6. `invalid input value for enum committee_type: "-"`, 1 line, ERROR,
+   2026-08-03 00:40:04 UTC.
+7. `column v.id does not exist`, 1 line, ERROR, 2026-08-02 21:25:40 UTC.
+8. `operator does not exist: text = integer`, 1 line, ERROR, 2026-08-02
+   21:30:53 UTC.
+
+Shapes 4 and 5 matter mostly because earlier sections of this file named the
+password line as though it were the only FATAL. It is not. It is one of three
+probe shapes, and a future run that greps for the password line alone will
+under count the scan traffic.
+
+Hour 16 on 2026-08-03 is the one window hour carrying no uuid line, and it has
+no :05 rollup at all, so the hourly cron either did not run or was not
+captured in that window. One gap in 24 hours proves nothing by itself. It is
+recorded so the next run does not read "once an hour" as a guarantee and then
+treat a gap as a fix.
+
+### Shapes 7 and 8, a hand query pair, unattributed
+
+One occurrence each, five minutes and thirteen seconds apart, in consecutive
+rollup windows on 2026-08-02, and the only two lines of their kind anywhere in
+the window. A missing column on an alias `v` followed by a text to integer
+comparison failure is the shape of somebody iterating on a query by hand
+rather than of a scheduled job, because a job repeats on its next tick and
+neither of these has recurred since. That reading is an inference from timing
+and message shape and is not established. No emitter is attributed for either
+in this repo, and nothing was changed for them. If they recur on a schedule, a
+future run should revisit that inference rather than inherit it.
+
+### The committee_type enum error, recorded 2026-08-03, not fixed
+
+One occurrence, 2026-08-03 00:40:04.481 UTC, ERROR level, carried inside the
+00:45 rollup event. No commit in either repo names it and no earlier section
+of this file mentions it. Shapes 7 and 8 are equally unrecorded, so this is
+one of three previously undocumented errors in this window rather than the
+only new thing in it.
+
+It is not scan noise. The probe family in shapes 4 and 5 opens malformed
+connections and never reaches SQL; this is a statement that reached the
+planner and failed an enum cast, so something authenticated wrote it.
+
+It is also not ours to fix from here, and that is checked rather than assumed.
+No code in either repo writes `committee_type`. Every code reference in this
+repo reads it: `lib/models/crm/mec_committee.dart`,
+`lib/screens/crm/candidate_detail_screen.dart`,
+`lib/screens/crm/tabs/committees_tab.dart` and
+`lib/screens/crm/mec_committee_picker.dart`, and the RPC in
+`supabase/migrations/20260423_01_backfill_orphan_rpcs.sql` returns the column
+as `text` rather than as the enum. Three planning documents under `docs/` also
+mention the column, one of them sketching it as `committee_type TEXT`; none of
+the three is a writer. The `moyoungdemocrats` repo does not contain the string
+at all. No `CREATE TYPE ... committee_type` DDL exists in either repo. So the
+emitting writer and the enum definition both live outside these two repos and
+no fix is available from this container. Do not invent a local mechanism to
+explain it, and do not change a read path to make it go away.
+
+The value that failed to cast is a single hyphen. That is what a blank or
+placeholder cell looks like coming out of a CSV or a scrape, so the likely
+shape is an importer passing an empty field into an enum column instead of a
+NULL. That is a hint about the input, not a diagnosis, and the importer is not
+in this repo to check.
+
+Offered as correlation and explicitly not as proof: the two 2026-08-03
+SUPABASE-PLATFORM-4 storage 400s land at 00:41:20 and 00:41:33 UTC, 76 and 89
+seconds after this error, and the READ THIRD note records them as coming from
+a single source address. One human session tripping both is consistent with
+that timing and is not established by it. If a real executive hit a failed
+write and then two failed transcript reads inside ninety seconds, that is one
+broken workflow rather than three unrelated log lines, and that is the reading
+a future run should test rather than inherit.
+
+### The Sentry project census is eight, not five
+
+`endorsement-scorer`, `flutter`, `mautic`, `moydforms`, `n8n`,
+`supabase-edge`, `supabase-platform`, `website`. The 2026-08-03 run reported
+that "website, flutter and mautic were silent" and did not know the other
+three existed. All three were in fact silent, so the conclusion held by luck.
+`moydforms` is the archived duplicate that must never be touched, but it still
+has a Sentry project and can still fire. A census that does not know its own
+denominator is not a census; list the projects before claiming a set was
+quiet.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
