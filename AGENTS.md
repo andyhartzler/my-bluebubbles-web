@@ -5254,3 +5254,172 @@ The key to success is:
 4. Keeping CRM and messaging concerns separate
 
 Good luck with your implementation! 🎉
+
+## READ FOURTEENTH: the 20:20 UTC sweep, three issues that are one request, and a "dead" host that answered
+
+Swept the 24 hours to 2026-08-04 20:20 UTC. One code change this run, `6ff6a45`,
+in THIS repo, and unlike everything in READ FIRST it is deployed by CI: Netlify
+builds the Flutter web app from `master`. Check the deployment rather than the
+commit, per the usual rule.
+
+Per the overlap warning in READ FOURTH: this window shares about 22 hours with
+the sweep that closed at 18:20 UTC, so only about 2 hours is new observation.
+Nothing below independently confirms anything above it. The `flutter` finding
+lands entirely inside that new slice.
+
+THE FINDING: THREE SENTRY ISSUES, ONE REQUEST, THREE EVENTS PER CHAT OPENED
+`flutter` went from 5 events to 38. All of it is ONE executive session: every
+event in FLUTTER-8, FLUTTER-B, FLUTTER-X, FLUTTER-5, FLUTTER-6 and FLUTTER-Y
+carries trace id `b499754a7fca476b933272f434f2a8c3`. The newest events of the
+first three land within 0.01s of each other at 19:34:33 UTC.
+
+`MessagesViewState.initState` calls `getFocusState()` for every 1:1 iMessage chat
+opened. That issues GET `/api/v1/handle/<address>/focus`, and the server answers
+500 with a Private API body of "Selector not found!", meaning its helper cannot
+read Focus status at all. One failed request files THREE Sentry events: the
+sentry_dio `FailedRequestInterceptor` at interceptor index 0, `ApiInterceptor`'s
+own `Logger.error` (the "Failed Request: [GET]" line that IS FLUTTER-8), and the
+`.catchError` in `getFocusState` (which is FLUTTER-B). FLUTTER-X is the
+DioException shape.
+
+`6ff6a45` stops asking once the server has said it cannot answer, which is the
+pattern `ece34e3` and `dd2a052` already set here. Residual volume after deploy is
+precisely 3 events per session per tab load, from the first 1:1 open, down from 3
+per conversation opened. None of the three issues was auto-closed and none should
+be resolved.
+
+CORRECTION TO READ EIGHTH, READ NINTH, READ TENTH, READ ELEVENTH AND READ TWELFTH
+Every one of them calls FLUTTER-8 "the dead `messages.moydchat.org` host per
+`dd2a052`". That is now STALE and it cost this run real time before the event
+body was read. The host is not dead. It answered an HTTP 500 with a structured
+JSON body at 19:34:33 today, and FLUTTER-8's current title names the focus
+endpoint rather than the contacts endpoint `dd2a052` was about. `dd2a052` was
+correct when written; FLUTTER-8 is a catch-all whose CONTENTS changed underneath
+the note. Read the newest event's body before inheriting any group's diagnosis.
+
+THE TRAP THAT NEARLY SHIPPED A NO-OP, AND IT GENERALISES
+The first version of the fix tested `error is DioException`. That would have been
+dead code, and the reasoning is worth keeping because it is not obvious from the
+call site. `ApiInterceptor.onError` does
+`if (err.response != null && err.response!.data is Map) return handler.resolve(err.response!)`.
+A 500 whose body is a Map is therefore RESOLVED, so `dio.get` never throws;
+`returnSuccessOrError` is what rejects, with a RAW dio `Response`. App code
+downstream of this interceptor receives a `Response`, not a `DioException`, for
+every error response carrying a Map body. The 502-Cloudflare branch in
+`runApiGuarded` already assumed this and is the tell.
+
+Production proved it independently: FLUTTER-B's title is the response body JSON,
+which is what stringifying a `Response` with a Map body produces. When a Sentry
+title looks like a data structure rather than a message, it is telling you the
+runtime type of the thing that was logged.
+
+Two more edges on the same interceptor. It mints 500s of its OWN: a timeout
+forged as `type: timeout`, and a non-Map upstream body wrapped as `type: Error`.
+So a bare `statusCode == 500` test would let one transient timeout disable a
+working feature for a whole session. The shipped predicate positively requires
+the server's own `type: Server Error`.
+
+Two other Dart gotchas this run: `Response` is exported by BOTH `package:dio` and
+`package:get`, so an unprefixed dio import is a hard `ambiguous_import` ERROR in
+any file importing get; use `as dio`, as `oauth_panel.dart` already does. And
+`flutter pub get` rewrites five generated plugin registrant files under `linux/`,
+`macos/` and `windows/` on every run, per READ EIGHTH; discard them before every
+commit, not just the first.
+
+LEFT ALONE, DELIBERATELY
+FLUTTER-6 and FLUTTER-Y are the same defect under two groups:
+`RenderBox was not laid out` raised inside Flutter's own
+`selectable_region.dart`, at
+`MultiSelectableSelectionContainerDelegate._compareScreenOrder` sorting
+selectables before layout. ZERO first-party frames in either stack; they differ
+only in whether the microtask or the frame-callback path got there. One is
+`crm.section=dashboard`, the other `conversations`, so it is not one screen. No
+mechanism is establishable from this repo plus the event, so nothing was changed.
+Do not guess at a SelectionArea to "fix".
+
+FLUTTER-5 is `Failed to fetch` on `mail-identities-get`, mechanism
+`SentryHttpClient`, no stacktrace, same session and same trace id. That is
+browser-level transport, the class READ EIGHTH established for FLUTTER-1, and it
+is captured independently of app handling. Not a defect.
+
+SUPABASE-PLATFORM-1: FULL DECOMPOSITION OF THE NEW SLICE
+`by_message` read on all 13 events after 18:20 UTC, FATAL tagged ones included,
+per READ SEVENTH. Twenty log lines, reconciling against the sum of the thirteen
+per event `count` fields:
+
+     9  the ad hoc hand SQL family (ERROR)
+     9  password authentication failed for user "?"   FATAL, filtered
+     2  invalid input syntax for type uuid: "cron"    19:00 and 20:00
+
+The password total is the usual `by_severity` residual, per the standing caveat
+in READ FOURTH. The malformed startup packet families and the SASL Terminate line
+are all absent; the password family is the only probe shape present this window.
+
+The ad hoc family, which READ TWELFTH recorded as silent, is active again:
+
+    20:09:21  syntax error at or near "union"
+    20:06:25  column "updated_at" does not exist
+    20:03:00  column "updated_at" does not exist
+    19:34:13  missing FROM-clause entry for table "req"
+    19:23:17  column "opens_at" does not exist
+    19:18:14  column "election_year" does not exist
+    19:18:14  column "is_public" does not exist
+    19:13:50  "array_agg" is an aggregate function
+    18:35:47  column "slug" does not exist
+
+`missing FROM-clause entry for table "req"` is new in kind: it is what referencing
+an alias absent from the FROM produces, which is a typing mistake rather than
+anything a deployed statement does. `array_agg` and `slug` recur from READ
+SEVENTH. Nothing was changed for any of them and nothing should be; the standing
+instruction not to change a working query to make one of these go away applies.
+
+THE CENSUS, CROSS FOOTED ON BOTH AXES PER READ TWELFTH
+
+    by project   endorsement-scorer 359, supabase-platform 108, flutter 38 = 505
+    by issue     ENDORSEMENT-SCORER-4 359                                  = 359
+                 SUPABASE-PLATFORM-1 104, -4 3, -3 1                       = 108
+                 FLUTTER-8 11, -B 10, -X 9, -1 3, -5 2, -Y 1, -6 1, -2 1   =  38
+                                                                             505
+
+`website`, `mautic`, `moydforms`, `n8n` and `supabase-edge` at zero. Queried with
+NO status filter per READ EIGHTH, which is how the ignored watchdog and the three
+resolved `flutter` issues stayed visible. Read READ TWELFTH's caveat on what the
+equality does and does not buy.
+
+FOUR FIXES STILL COMMITTED AND UNDEPLOYED
+Computed from `git show -s --format=%cI`, not carried forward: `1cdb96e` at 9
+days, `e79339b` at 8, `0d2963e` at 4, `285a05f` at under 8 hours. All four are
+hand deploy work per READ FIRST, still blocked on a `SUPABASE_ACCESS_TOKEN` in the
+triage environment, re-checked and still absent this run. The single item ask in
+READ TWELFTH stands unchanged.
+
+THE BRANCH REF TRAP HAS A SECOND HALF: THE REMOTE MOVES MID RUN
+Both repos started with `HEAD` detached at the true remote tip and the named
+branch stale, the shape READ THIRTEENTH describes, repaired with
+`git -C <path> checkout -B <branch> HEAD`.
+
+The new lesson is that checking once is not enough. `refs/heads/master` moved from
+`286403e` to `74f6fc2` WHILE this run was working, and the only reason that was
+caught is that `git ls-remote` was run again immediately before committing rather
+than only at the start. Committing on the start-of-run tip would have produced a
+non-fast-forward push and the temptation READ SECOND warns about. Re-run
+`git ls-remote` immediately before you commit, every time, and rebase onto the
+real tip. `286403e` was a plain ancestor of `74f6fc2`, so a stash, `checkout -B`
+to FETCH_HEAD, and stash pop was sufficient, and `74f6fc2` touched only edge
+functions, so the audit of this diff survived the move unchanged. Check that last
+point rather than assume it: a base commit touching your file invalidates the
+audit.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public. Named above: the focus endpoint path shape, the upstream
+BlueBubbles server error text "Selector not found!", the host
+`messages.moydchat.org`, and the file and symbol names in the diff. The host and
+the endpoint are already published verbatim in this file by READ EIGHTH and by
+`dd2a052`, and the error text is the open source BlueBubbles server's own
+published string rather than anything about this deployment. The recipient phone
+number that appears in the Sentry title is deliberately NOT reproduced. No
+credential, no DSN, no probe source address, no policy body and no internal path
+appears, and nothing here widens access to anything. Withheld per the practice
+READ SIXTH set: the state of the live endorsement vote, the identity of the
+executive whose session produced all six `flutter` issues, and the operational
+read on who is running the ad hoc statements.
