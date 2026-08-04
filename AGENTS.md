@@ -2114,6 +2114,138 @@ read on who is running the negative tests. Those go to Andrew directly.
 No credential, no DSN, no source address, no policy body and no raw upstream
 error appears, and nothing here widens access to anything.
 
+## READ TWELFTH: the 16:20 UTC sweep, a quiet window, and a census that cross foots
+
+Swept the 24 hours to 2026-08-04 16:20 UTC. No code change this run, and no
+defect to change: every line in the genuinely new observation belongs to a family
+the sections above already enumerate. This section is deliberately short. A
+sweep that finds nothing should cost the next run a minute, not an hour.
+
+Per the overlap warning in READ FOURTH: this window shares about 22 hours with
+the sweep that closed at 14:21 UTC, so only about 1 hour 59 minutes of it is new
+observation. Nothing below independently confirms anything above it.
+
+SCOPE, AND THE FULL DECOMPOSITION OF THE NEW SLICE
+`by_message` read on all 8 SUPABASE-PLATFORM-1 events after 14:21 UTC, FATAL
+tagged ones included, per READ SEVENTH. Thirteen log lines, which reconciles
+against the sum of the eight per event `count` fields:
+
+    6  password authentication failed for user "?"   FATAL, filtered
+    3  unsupported frontend protocol N.N             FATAL, values 16.0, 255.255, 0.0
+    2  no PostgreSQL user name specified in startup packet   FATAL
+    2  invalid input syntax for type uuid: "cron"    ERROR, 15:00:10 and 16:00:06
+
+The password total is the usual `by_severity` residual and not a direct read,
+per the standing caveat in READ FOURTH.
+
+Eleven of the thirteen are scan noise, at a rate consistent with every prior
+window rather than elevated. Split them the way READ ELEVENTH insists rather
+than lumping them: five are the two malformed startup packet families READ
+FOURTH enumerates as shapes 4 and 5, and six are the filtered password family,
+whose attribution to that same scan traffic is INFERRED and not established, per
+READ FIRST. The third probe family, the SASL Terminate line READ ELEVENTH added,
+is absent from this window.
+
+The two remaining lines are the hourly `1cdb96e` line. So the new slice carried
+ZERO ERROR level lines other than that one known emitter.
+
+In particular the ad hoc hand SQL family produced nothing at all: no missing
+column, no missing relation, no permission denied, no syntax error. That is
+worth noticing, because READ SEVENTH counted 14 of those lines in a 43 minute
+stretch this morning and READ ELEVENTH decoded a five family cluster at 12:30 to
+13:03. Record it as an observation and not as a resolution: silence settles
+nothing, for exactly the conditionality reason READ FOURTH gives, and a family
+that is somebody typing SQL by hand is expected to stop when they stop typing.
+
+The 32 line sponsors dup key burst is absent from the new slice only because no
+6 hour boundary falls inside 14:21 to 16:20. It has not stopped.
+
+CENSUS BY BOTH AXES, CROSS FOOTED
+READ FIFTH says to census by event count per project rather than by issue
+status, and READ EIGHTH says to query issues with no status filter. Do both and
+cross foot them. It costs one extra call:
+
+    by project   endorsement-scorer 360, supabase-platform 103, flutter 5   = 468
+    by issue     ENDORSEMENT-SCORER-4 360                                   = 360
+                 SUPABASE-PLATFORM-1 99, -4 3, -3 1                         = 103
+                 FLUTTER-1 3, FLUTTER-8 1, FLUTTER-2 1                      =   5
+                                                                              468
+
+`website`, `mautic`, `moydforms`, `n8n` and `supabase-edge` at zero.
+
+Be precise about what the equality buys, because it is less than it looks. Both
+sides are drawn from the same event store, so agreement is not independent
+corroboration of either. What it catches is an issue missing from the issue
+list, which is the specific failure READ FIFTH hit with an ignored issue and
+READ EIGHTH hit with two resolved ones. Treat it as evidence and not as proof
+even for that: compensating errors, one issue over counted while another is
+absent, would still sum correctly, and READ FIFTH records that the rolling
+window moves between two calls inside one run. And it says nothing at all about
+a project that emitted zero events while still being broken.
+
+NOTHING FIRED THAT IS NOT ALREADY HANDLED
+- SUPABASE-PLATFORM-4's newest event is the 12:55:16 `form-uploads` probe that
+  READ ELEVENTH documents. Same occurrence, not a recurrence. Do not resolve it.
+- SUPABASE-PLATFORM-3's only event is the 12:10:02 429. `285a05f` landed at
+  12:43:21, after it, so it has not fired since its fix was committed.
+- FLUTTER-2 last fired 07:24:26 and `2a90af9` landed 08:44:37. FLUTTER-1's three
+  events are the same 07:25:04 transport occurrence inside the protected
+  endorsement surface. FLUTTER-8 is the dead `messages.moydchat.org` host per
+  `dd2a052`. None was re-resolved.
+- ENDORSEMENT-SCORER-4 is the expected n8n watchdog, correctly ignored, and it
+  stays ignored.
+
+FOUR FIXES COMMITTED AND UNDEPLOYED, AND ONE INHERITED NUMBER CORRECTED
+`1cdb96e` at 9 days, `e79339b` at 8, `0d2963e` at 4, and `285a05f` at under 4
+hours. All four are hand deploy work per READ FIRST.
+
+READ SEVENTH, READ EIGHTH and READ NINTH each put `0d2963e` at nine days. That
+is wrong, and it propagated by being copied rather than computed. READ SIXTH is
+NOT one of them, and the distinction is worth keeping
+straight in a note whose whole point is not copying: it says only that `0d2963e`
+is "in the same state", meaning committed and undeployed, and it attaches no day
+count to that commit at all.
+`0d2963e` landed 2026-07-31 02:31:19 UTC, which READ FIRST states correctly, so
+on 2026-08-04 it is four days old. Compute these from `git show -s --format=%cI`
+rather than carrying the previous section's figure forward.
+
+WHY THE HAND DEPLOY IS BLOCKED, WHICH IS NOT THE REASON THE FILE HAS BEEN GIVING
+Checked this run rather than inherited, and the inherited half was wrong. There
+is no `supabase` binary on the image, which is true and is where the checking
+used to stop. But the npm registry IS reachable from this container: `npm ping`
+answers PONG from `registry.npmjs.org` in about 120 ms, `npm view supabase
+version` returns 2.111.0, and an actual `npm install supabase` into the
+scratchpad completes in seconds and yields a working binary. READ ELEVENTH's
+"npx cannot reach the registry" was a true observation of its own container, and
+this run's first draft inherited it as though it were a property of the image.
+It is not one. Test it rather than inherit it; network policy differs per run.
+
+So the CLI is installable and the blocker is exactly one thing: no Supabase
+access token. Nothing matching `SUPABASE` or `PROJECT_REF` exists in the
+environment, and `supabase functions deploy` refuses before doing any work
+without a token, so the deploy is blocked on that credential alone. The project
+ref is NOT part of the gap, and it is worth saying so rather than padding the
+ask: it is the subdomain of the project URL, which is already committed
+throughout this repo and is also carried in the `server_name` tag on every
+Sentry event read above.
+
+That narrows the ask to a single item, and it is the one thing worth putting in
+front of Andrew. If a `SUPABASE_ACCESS_TOKEN` is placed in the triage
+environment, a future run can close this loop itself with a targeted
+`npx supabase functions deploy <name> --project-ref <ref>`. Deploy the one
+function named in the commit, never everything: the bulk deploy hazard in READ
+FIRST is unchanged, and the endorsement vote functions must not be swept up in
+it while ballots are open.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public. Nothing new is named: every table, bucket, function, issue
+id and commit above already appears in this file. The probe source address is
+not reproduced. Withheld per the practice READ SIXTH set: the state of the live
+endorsement vote, and the operational read on who is running the ad hoc
+statements and the storage probes. No credential, no DSN, no source address, no
+policy body and no raw upstream error appears, and nothing here widens access to
+anything.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
