@@ -1,5 +1,5 @@
 // Mints a Google OAuth access token via service-account JWT + DWD
-// impersonation. Caches per (subject, scopes) for ~50 minutes — well
+// impersonation. Caches per (subject, scopes) for ~50 minutes, well
 // inside the 1-hour token lifetime.
 
 interface CachedToken {

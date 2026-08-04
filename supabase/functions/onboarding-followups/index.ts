@@ -1,14 +1,14 @@
 // ============================================================================
-// onboarding-followups  (Member Poloooza rebuild — cron processor)
+// onboarding-followups  (Member Poloooza rebuild, cron processor)
 // ============================================================================
 // Invoked every 10 min by pg_cron. Selects due onboarding_tasks
 // (done=false AND run_after <= now()) and processes each:
 //
-//   slack_channel_sync   — look the member up in Slack (users.lookupByEmail).
+//   slack_channel_sync  , look the member up in Slack (users.lookupByEmail).
 //                          If present, invite to all target channels and mark
 //                          done. If not present yet, reschedule (poll again
 //                          later) until an attempt cap, then give up.
-//   slack_join_reminder  — if the member is NOT in Slack, send the variant
+//   slack_join_reminder , if the member is NOT in Slack, send the variant
 //                          reminder email (verbatim, spec §5), threaded onto
 //                          the welcome email. Mark done. If already in Slack,
 //                          mark done with no send.
@@ -17,10 +17,10 @@
 // never reprocessed. Safe to run repeatedly.
 //
 // HARD GATING (ONBOARDING_MODE): same as member-onboard.
-//   dry_run (DEFAULT) — no email, no Slack writes; logs what WOULD happen and
+//   dry_run (DEFAULT), no email, no Slack writes; logs what WOULD happen and
 //                       still advances/rechedules tasks so the queue drains.
-//   test              — reminder emails routed to ONBOARDING_TEST_EMAIL; no Slack.
-//   live              — real reminders + real Slack channel invites.
+//   test             , reminder emails routed to ONBOARDING_TEST_EMAIL; no Slack.
+//   live             , real reminders + real Slack channel invites.
 //
 // Auth: x-cron-secret == CRON_SECRET (pattern copied from slack-sync-to-slack).
 // Deployed --no-verify-jwt.
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
 
     if (!email || !EMAIL_RE.test(email)) {
       await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
-      log.result = "no valid email — closed";
+      log.result = "no valid email, closed";
       results.push(log);
       continue;
     }
@@ -138,16 +138,16 @@ Deno.serve(async (req) => {
           groups.push(`${group}:${g.action}${g.scopeError ? "(SCOPE_ERROR client-114261141581576499255)" : ""}`);
         }
         await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
-        log.result = "in Slack — invited + done";
+        log.result = "in Slack, invited + done";
         log.invites = invited;
         if (groups.length) log.group_adds = groups;
       } else if (attempts >= MAX_SYNC_ATTEMPTS) {
         await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
-        log.result = `not joined after ${attempts} polls — gave up`;
+        log.result = `not joined after ${attempts} polls, gave up`;
       } else {
         const next = new Date(Date.now() + SYNC_RETRY_MINUTES * 60_000).toISOString();
         await supabase.from("onboarding_tasks").update({ attempts, run_after: next }).eq("id", t.id);
-        log.result = mode === "live" ? "not joined yet — reschedule" : `${mode}: no Slack write — reschedule`;
+        log.result = mode === "live" ? "not joined yet, reschedule" : `${mode}: no Slack write, reschedule`;
       }
       results.push(log);
       continue;
@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
     if (t.task_type === "slack_join_reminder") {
       if (mode === "live" && inSlack) {
         await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
-        log.result = "already in Slack — no reminder needed";
+        log.result = "already in Slack, no reminder needed";
         results.push(log);
         continue;
       }
@@ -169,7 +169,7 @@ Deno.serve(async (req) => {
         log.result = `DRY_RUN: would send ${variant} reminder to ${email}`;
       } else {
         if (mode === "test" && (!recipient || !EMAIL_RE.test(recipient))) {
-          log.result = "ONBOARDING_TEST_EMAIL missing — left pending";
+          log.result = "ONBOARDING_TEST_EMAIL missing, left pending";
           results.push(log);
           continue;
         }
@@ -177,6 +177,7 @@ Deno.serve(async (req) => {
           const sent = await sendGmail({
             to: recipient, cc: ccList, subject: built.subject,
             html: built.html, text: built.text, threadId: meta.thread_id ?? null,
+            from: built.from, replyTo: built.replyTo,
           });
           await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
           log.result = `${mode.toUpperCase()}: sent ${variant} reminder to ${recipient} [msg ${sent.id}]`;
@@ -189,9 +190,9 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    // Unknown task type — close it so it doesn't loop forever.
+    // Unknown task type, close it so it doesn't loop forever.
     await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
-    log.result = `unknown task_type '${t.task_type}' — closed`;
+    log.result = `unknown task_type '${t.task_type}', closed`;
     results.push(log);
   }
 

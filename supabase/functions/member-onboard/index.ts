@@ -1,5 +1,5 @@
 // ============================================================================
-// member-onboard  (Member Poloooza rebuild — entry point)
+// member-onboard  (Member Poloooza rebuild, entry point)
 // ============================================================================
 // Input: { member_id }  (POST JSON)
 // Loads the member, determines the welcome variant (General / College /
@@ -7,11 +7,11 @@
 // enqueues follow-up tasks in public.onboarding_tasks.
 //
 // HARD GATING (ONBOARDING_MODE):
-//   dry_run (DEFAULT) — build email + compute Slack actions, send NOTHING, write
+//   dry_run (DEFAULT), build email + compute Slack actions, send NOTHING, write
 //                       NO Slack. Returns a full plan of what WOULD happen.
-//   test              — send the welcome email to ONBOARDING_TEST_EMAIL only,
+//   test             , send the welcome email to ONBOARDING_TEST_EMAIL only,
 //                       skip ALL Slack writes.
-//   live              — real welcome email to the member + real Slack channel
+//   live             , real welcome email to the member + real Slack channel
 //                       invites (only if they are already in Slack).
 // A real member is only ever emailed/invited when mode === "live".
 //
@@ -33,9 +33,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleCors, corsHeaders } from "../_shared/cors.ts";
 import {
   getMode, testEmail, buildWelcomeEmail, buildTooYoungEmail, buildAgedOutEmail,
-  sendGmail, computeVariant, computeAge, ageBranchFromDob, targetChannels, caucusChannel,
-  committeeChannels, firstNameOf, slackLookupByEmail, slackInvite, EMAIL_RE,
-  DEFAULT_CHANNELS, MIN_AGE_YEARS, MAX_AGE_YEARS,
+  sendGmail, computeVariant, targetChannels, caucusChannel,
+  committeeChannels, firstNameOf, slackLookupByEmail, slackInvite,
+  slackWorkspaceInvite, EMAIL_RE, DEFAULT_CHANNELS, WORKSPACE_TEAM_ID,
   groupTargets, addMemberToGroup,
   type MemberRow, type Variant, type BuiltEmail,
 } from "../_shared/onboarding.ts";
@@ -88,27 +88,27 @@ Deno.serve(async (req) => {
 
   const first = firstNameOf(m.name);
 
-  // --- AGE GATE (CALENDAR-YEAR): eligible = the age you TURN this calendar year
-  // is 13 through 35 (i.e. 13 through under 36); you age out the year you turn 36.
-  // The authoritative logic lives in the DB (public.moyd_age_branch + the
-  // members.membership_eligible trigger); we call the same function here so there
-  // is ONE source of truth. Everyone is already LOGGED as a member upstream; this
-  // only decides which email is sent and whether Slack/committee/follow-up actions
-  // run. Missing birth date/year => eligible. --------------------------------------
+  // --- AGE GATE. The ONLY age rule is public.moyd_age_branch in the database,
+  // called here by RPC. It also drives the members.membership_eligible trigger.
+  // There is deliberately no second implementation in TypeScript: duplicating
+  // this rule in a second language is exactly what silently broke the n8n
+  // cascade. `age` below is a LOG/DISPLAY value only and decides nothing.
+  // Everyone is already LOGGED as a member upstream; this branch only decides
+  // which email is sent and whether Slack/committee/follow-up actions run.
   const birthYr = m.date_of_birth
     ? new Date(m.date_of_birth).getUTCFullYear()
-    : ((m as { birth_year?: number | null }).birth_year ?? null);
+    : (m.birth_year ?? null);
   const age = birthYr && !Number.isNaN(birthYr)
     ? new Date().getUTCFullYear() - birthYr // the age they turn this calendar year
     : null;
   const { data: branchData, error: branchErr } = await supabase.rpc("moyd_age_branch", {
     p_dob: m.date_of_birth ?? null,
-    p_birth_year: (m as { birth_year?: number | null }).birth_year ?? null,
+    p_birth_year: m.birth_year ?? null,
   });
-  if (branchErr) console.warn(`member ${memberId}: moyd_age_branch rpc failed (${branchErr.message}) — treating as eligible`);
+  if (branchErr) console.warn(`member ${memberId}: moyd_age_branch rpc failed (${branchErr.message}), treating as eligible`);
   const branch: string = (branchErr || !branchData) ? "eligible" : String(branchData);
   if (age === null) {
-    console.warn(`member ${memberId}: birth date/year missing — treating as eligible`);
+    console.warn(`member ${memberId}: birth date/year missing, treating as eligible`);
   }
 
   if (branch !== "eligible") {
@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
     const ccList = mode === "test" ? [] : ageEmail.cc; // don't CC info@ during a test
     const plan = {
       mode, member_id: memberId, age, age_branch: branch,
-      eligible_range: `${MIN_AGE_YEARS} to ${MAX_AGE_YEARS} inclusive (under 36)`,
+      age_rule: "public.moyd_age_branch (DB, single source of truth)",
       variant: null, first_name: first,
       email_subject: ageEmail.subject,
       email_from: ageEmail.from,
@@ -142,7 +142,8 @@ Deno.serve(async (req) => {
       try {
         emailResult = await sendGmail({
           to: recipient, cc: ccList, subject: ageEmail.subject,
-          html: ageEmail.html, text: ageEmail.text, from: ageEmail.from,
+          html: ageEmail.html, text: ageEmail.text,
+          from: ageEmail.from, replyTo: ageEmail.replyTo,
         });
         actions.push(`${mode.toUpperCase()}: sent "${ageEmail.subject}" (${branch}, age ${age}) to ${recipient} [msg ${emailResult.id}]`);
       } catch (e) {
@@ -171,6 +172,7 @@ Deno.serve(async (req) => {
     member_id: memberId,
     age,
     age_branch: branch,
+    age_rule: "public.moyd_age_branch (DB, single source of truth)",
     variant,
     first_name: first,
     email_subject: built.subject,
@@ -198,6 +200,7 @@ Deno.serve(async (req) => {
     try {
       emailResult = await sendGmail({
         to: recipient, cc: ccList, subject: built.subject, html: built.html, text: built.text,
+        from: built.from, replyTo: built.replyTo,
       });
       actions.push(`${mode.toUpperCase()}: sent "${built.subject}" (${variant}) to ${recipient} [msg ${emailResult.id}]`);
     } catch (e) {
@@ -206,18 +209,30 @@ Deno.serve(async (req) => {
   }
 
   // --- 2. Slack: workspace invite + channel adds ---------------------------
-  // Workspace "invite" is the shared join link embedded in the email (spec §7).
-  // Channel adds require the member to already be in Slack (need a user id).
-  // If they are already present we add them now; otherwise the followup task
-  // polls and adds them once they appear.
+  // Two mechanisms, both of which n8n had:
+  //   a) a programmatic workspace invite (admin.users.invite) seeded with the
+  //      three default channels, which pushes the member in rather than waiting
+  //      for them to self-serve. Non-fatal if the token lacks admin scope.
+  //   b) channel adds, which need the member to already be in Slack (user id).
+  // The shared join link is in the email either way, and the followup poller
+  // adds them to channels once they appear.
   let slackUserId: string | null = m.slack_user_id;
   if (mode === "live") {
     if (!SLACK_BOT_TOKEN) {
-      actions.push("LIVE: SLACK_BOT_TOKEN missing — skipped Slack channel adds");
+      actions.push("LIVE: SLACK_BOT_TOKEN missing, skipped Slack workspace invite and channel adds");
     } else {
       if (!slackUserId) {
         const look = await slackLookupByEmail(realEmail, SLACK_BOT_TOKEN);
         if (look.found) slackUserId = look.userId!;
+      }
+      if (!slackUserId) {
+        const inv = await slackWorkspaceInvite(realEmail, DEFAULT_CHANNELS, SLACK_BOT_TOKEN);
+        actions.push(
+          `LIVE: admin.users.invite ${WORKSPACE_TEAM_ID} <- ${realEmail}: ${inv.ok ? (inv.error || "ok") : inv.error}`,
+        );
+        if (!inv.ok) {
+          actions.push("LIVE: workspace invite failed (non-fatal). Shared join link is in the email; followup poller will still add channels.");
+        }
       }
       if (slackUserId) {
         for (const ch of targets) {
@@ -229,10 +244,10 @@ Deno.serve(async (req) => {
         for (const { channel, group } of groupAdds) {
           const g = await addMemberToGroup(realEmail, group);
           actions.push(`LIVE: group add ${group} (<- ${channel}): ${g.action}${g.scopeError ? " SCOPE_ERROR" : ""}${g.error ? " err=" + g.error : ""}`);
-          if (g.scopeError) actions.push("LIVE: DWD scope 'admin.directory.group.member' NOT authorized for client 114261141581576499255 — Andrew must add it in admin.google.com");
+          if (g.scopeError) actions.push("LIVE: DWD scope 'admin.directory.group.member' NOT authorized for client 114261141581576499255, Andrew must add it in admin.google.com");
         }
       } else {
-        actions.push("LIVE: member not yet in Slack — channel adds + group adds deferred to followup");
+        actions.push("LIVE: member not yet in Slack, channel adds + group adds deferred to followup");
       }
     }
   } else {
