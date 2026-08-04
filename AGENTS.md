@@ -1949,6 +1949,171 @@ go to Andrew directly.
 No credential, no DSN, no source address, no policy body and no raw upstream
 error appears, and nothing here widens access to anything.
 
+## READ ELEVENTH: the 14:21 UTC sweep, a real chartering defect, and the burst decoded as negative testing
+
+Swept the 24 hours to 2026-08-04 14:21 UTC. One code change this run, in the
+SIBLING repo: `1f2bc35`, described below.
+
+Per the overlap warning in READ FOURTH: this window shares about 22 of its 24
+hours with the sweep that closed at 12:27 UTC, so only about 1 hour 54 minutes
+of it is new observation. Nothing below independently confirms anything above it.
+
+SCOPE OF THIS SWEEP
+`by_message` was read on all 10 SUPABASE-PLATFORM-1 events after 12:19 UTC,
+FATAL tagged ones included, per READ SEVENTH. The remaining 84 of the window's
+94 events fall inside ground the previous three sweeps already decomposed and
+were classified by title and timestamp against families those sweeps enumerate.
+That is the weaker guarantee READ SIXTH describes, and it is recorded as weaker.
+The window carried 94 rollup events holding 312 Postgres log lines, including
+four 33 line cycles at 00:05, 06:05, 12:05 and 18:05, each 32 sponsors dup key
+lines plus 1 hourly uuid line.
+
+THE REAL DEFECT, AND IT IS IN THE PUBLIC FORMS STACK
+`null value in column "name" of relation "members" violates not-null
+constraint`, once, at 2026-08-04 12:30:29 UTC. No earlier section records it.
+
+The mechanism is established from the sibling repo rather than guessed.
+`coalesceName` in `process-chartering-submission` returns `string | null`, and
+returns null when a chapter chartering submission carries neither the legacy
+`contact_name` nor the `contact_first_name` / `contact_last_name` pair. Nothing
+between its assignment and its use guards it, so the null was assigned to the
+`name` key of the members upsert. `members.name` is NOT NULL, which the Sentry
+line itself establishes by naming the column, so the statement was refused. NOT
+NULL is checked against the proposed tuple before ON CONFLICT arbitration, so an
+existing row for that email did not save it either.
+
+The consequence was quiet rather than loud, which is why nobody reported it. The
+error was logged and never thrown, so the chartering application still returned
+success while the chapter contact was silently never recorded as a member.
+
+Fixed in `1f2bc35` by skipping the member write when there is no contact name.
+Nothing downstream reads the member row: the upsert's `.select('id')` result was
+already discarded, and the officers roster, the membership roster, the
+`form_submissions` update and the response body all key off the chapter id. This
+is an edge function, so per READ FIRST no automation deploys it and it needs a
+hand deploy of that one function.
+
+Two things were deliberately NOT fixed, one issue per commit, both pre existing
+and both found by the auditor rather than by the diff's author. `contact_email`
+is unguarded in exactly the same way, so a submission carrying a name but no
+email still fails or mints an email-less row. And an existing contact's name
+could be recovered from the row this function already reads, which would
+preserve the committee merge the skip gives up.
+
+THE 12:30 TO 13:03 CLUSTER IS NEGATIVE TESTING, AND THAT READING IS NEW
+Five separate error families landed inside 33 minutes, and read together they
+decode in a way no single one of them does alone:
+
+    12:30:29  null value in column "name" of relation "members"
+    12:36:40  column reference "created_at" is ambiguous
+    12:55:16  GET /storage/v1/object/form-uploads/probe/nonexistent-<date>.csv  400
+    12:56:47  insert or update on a service-role-only provenance table in the
+              sibling repo violates its submission foreign key
+    13:02:56  permission denied for three admin RPCs, at 97 and 98 ms spacing
+
+The storage request is the one that carries the argument, because its key is
+literally named `probe/nonexistent-<date>.csv` with today's date in it. That is
+not a stale link, a bookmark or a mangled filename, all of which READ THIRD had
+to weigh at length for the `meetings` bucket. It is a request deliberately
+constructed to name an object that does not exist, in order to observe the
+error. Nothing in either repo constructs it.
+
+Once one member of the cluster is a deliberate negative test, the others read as
+the same thing: assert the NOT NULL holds, assert the foreign key holds, assert
+an authenticated non-admin is refused the admin RPC family. Each of those errors
+is the database correctly refusing something. That is a better fit for the RPC
+walk than READ TENTH could reach on its own, and READ TENTH's reading that it is
+"very likely the system working correctly" survives and strengthens.
+
+Be exact about what this does and does not settle. It explains the SHAPE of the
+cluster. It does not identify who is running it, and the rollup carries message,
+severity and timestamp only, with no client address, user or application name.
+Nor does it retire the chartering defect above: that one has a real code path
+behind it, and whether the 12:30:29 line came from that path or from a test
+asserting the constraint is NOT established either way. The fix stands on the
+code being wrong, not on the attribution.
+
+Do not grant EXECUTE on the admin RPC family to clear the permission lines. The
+prohibition in READ TENTH applies unchanged and this run adds a reason for it:
+if these are assertions, granting the permission makes the assertion fail.
+
+A NEW FATAL SHAPE, AND IT IS SCAN NOISE
+`expected SASL response, got message type 88`, once, at 13:00:05 UTC. Decode 88
+the way READ FIRST decodes the protocol numbers: it is ASCII `X`, the Postgres
+Terminate message. So a client opened a connection, was asked for SASL
+authentication, and sent Terminate instead of answering. That is a port scanner
+confirming something listens and hanging up, and it belongs with the
+`unsupported frontend protocol` and `no PostgreSQL user name` families READ
+FOURTH enumerates as shapes 4 and 5, not with the password failures. A run that
+greps only for those two shapes will now undercount the probe traffic by a third
+family.
+
+STILL COMMITTED AND UNDEPLOYED, ALL FOUR, UNCHANGED
+`1cdb96e` (hourly uuid line, seen at 13:00 and 14:00), `e79339b` (the 32 line
+sponsors burst, seen in the 12:05 cycle), `0d2963e` and `285a05f` (both in
+`sentry-log-relay`). SUPABASE-PLATFORM-3's newest event is the 12:10:02 429 that
+READ TENTH documents, and `285a05f` landed at 12:43:21, AFTER it, so that issue
+has not fired since its fix was committed. Same occurrence, not a recurrence.
+
+THE FLUTTER PROJECT: NOTHING NEW
+FLUTTER-2 last fired 07:24:26 and its fix `2a90af9` landed 08:44:37, so it has
+not fired since. FLUTTER-1's three events are the same 07:25:04 transport
+occurrence, and they carry the same trace id as the FLUTTER-2 event 38 seconds
+earlier, so one session produced both, exactly as READ NINTH records. FLUTTER-8
+is the dead `messages.moydchat.org` host per `dd2a052`. Nothing to do for any of
+the three, and none was re-resolved.
+
+THE CENSUS
+By event count per project, per READ FIFTH, not by an issue status filter:
+`endorsement-scorer` 360, `supabase-platform` 100, `flutter` 5, and `website`,
+`mautic`, `moydforms`, `n8n` and `supabase-edge` at zero. The 100 splits 94 plus
+3 plus 3 across SUPABASE-PLATFORM-1, -4 and -3. The issue list was queried with
+NO status filter per READ EIGHTH, which is how the two resolved `flutter` issues
+stayed visible. `endorsement-scorer` is the expected n8n watchdog, correctly
+ignored, and it stays ignored.
+
+TWO CONTAINER NOTES
+The branch ref trap did NOT bite this run, which is the first time in six. Both
+repos started on a detached HEAD that was ALREADY at the true remote tip, so
+`git ls-remote` against `git rev-parse` agreed. Keep running the check, per READ
+SECOND; the point is that it now sometimes passes, not that it has been fixed.
+
+`node_modules` was absent in the sibling repo, so `npx tsc --noEmit` first
+returned a wall of `Cannot find module` and `Cannot find name 'process'`. That is
+the signature of a missing install, not of a type regression. Run `npm ci`
+first. After it, `tsc` is clean and `npm run build` fails exactly as the sibling
+repo's own notes record, at "Collecting page data" with `supabaseUrl is
+required` on an unrelated route.
+
+`npx` cannot reach the registry from this container, so the differential type
+check READ TENTH describes must use the repo's own
+`node_modules/.bin/tsc` rather than `npx typescript`. It was needed again here,
+because `tsconfig.json` EXCLUDES `supabase/functions`, so the required `tsc`
+gate does not read the changed file at all. Head versus working tree gave
+identical diagnostic sets, 6 and 6, all Deno environment noise.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is not. Weighed rather than inherited.
+
+Named above: the `members` table and its `name` column, already named in this
+repo by READ EIGHTH; the `form-uploads` bucket, already committed in this repo's
+own `20260424_03_storage_rls.sql` audit snapshot; the edge function
+`process-chartering-submission` and the helper `coalesceName`, which follows the
+practice this file already applies to a dozen other function names.
+
+Deliberately withheld, and this is a judgement rather than an oversight: the
+NAME of the service-role-only provenance table behind the 12:56:47 foreign key
+line, and its constraint name. That table is the anti forgery mechanism for
+progressive form sessions, it lives only in the private repo, and unlike
+`subscribers_email_unique` in READ SEVENTH it is not already committed here. The
+finding survives without it, so it is not named. Also withheld per the practice
+READ SIXTH set: the storage source address, the state of the live endorsement
+vote, the identity of the executive in the FLUTTER events, and the operational
+read on who is running the negative tests. Those go to Andrew directly.
+
+No credential, no DSN, no source address, no policy body and no raw upstream
+error appears, and nothing here widens access to anything.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
