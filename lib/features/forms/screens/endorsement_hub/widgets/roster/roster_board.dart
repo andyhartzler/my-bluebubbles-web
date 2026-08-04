@@ -639,6 +639,7 @@ class RosterBoardState extends State<RosterBoard>
         controller: widget.controller,
         onOpen: widget.onOpen,
         decisionChipBuilder: _decisionChip,
+        voteStripBuilder: _voteStrip,
         raceDisclosureBuilder: _browseRaceDisclosure,
       ),
     );
@@ -662,6 +663,76 @@ class RosterBoardState extends State<RosterBoard>
               DecisionChip(
                   state: widget.repository.stateFor(e.id), compact: true),
             if (my != null) _MyVotePill(vote: my),
+          ],
+        );
+      },
+    );
+  }
+
+  /// The committee's ballot tally for one card in browse mode.
+  ///
+  /// Browse used to show the candidate's own policy answers in this slot. That
+  /// reads like a vote count without being one, and it barely varied: 14 of the
+  /// 77 applicants answered every policy question identically and another 11
+  /// shared a second identical set, so most cards drew the same bar. The
+  /// ballots do vary, and they are the thing being browsed for.
+  ///
+  /// Gated on the same ready-load as [_decisionChip]: a failed vote fetch must
+  /// never render as "nobody voted", which is indistinguishable from the truth
+  /// and is exactly what makes an exec re-vote and wipe their captured reasons.
+  Widget _voteStrip(CandidateEntry e) {
+    return AnimatedBuilder(
+      animation: widget.votes,
+      builder: (context, _) {
+        if (!widget.votes.loaded) return const SizedBox.shrink();
+        final t = widget.votes.tallyFor(e.id);
+        final scheme = Theme.of(context).colorScheme;
+        if (!t.hasVotes) {
+          return Text(
+            'No ballots yet',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
+          );
+        }
+        final segs = <(Color, int)>[
+          (MoydBrand.supportFg, t.yes),
+          (MoydBrand.opposeFg, t.no),
+          (MoydBrand.neutralFg, t.undecided),
+        ].where((seg) => seg.$2 > 0).toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: SizedBox(
+                height: 8,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < segs.length; i++)
+                      Expanded(
+                        flex: segs[i].$2,
+                        child: Container(color: segs[i].$1),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              [
+                '${t.yes} yes',
+                if (t.no > 0) '${t.no} no',
+                if (t.undecided > 0) '${t.undecided} undecided',
+                if (t.pending > 0) '${t.pending} pending',
+              ].join(' \u00b7 '),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: scheme.onSurfaceVariant),
+            ),
           ],
         );
       },

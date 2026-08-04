@@ -55,6 +55,18 @@ class RosterCard extends StatefulWidget {
   /// the card exactly as before, so a host without race data pays nothing.
   final RaceDisclosureBuilder? raceDisclosureBuilder;
 
+  /// The exec committee's ballot tally for this candidate, built by the
+  /// Decisions layer (which owns EndorsementVoteRepository) and injected the
+  /// same way [decisionChip] is.
+  ///
+  /// This card used to show the candidate's own policy answers here, which
+  /// reads like a vote count and is not one. It was also nearly useless: 14 of
+  /// the 77 applicants gave byte identical answers to every policy question and
+  /// another 11 shared a second identical set, so the strip rendered the same
+  /// bar on most cards. The committee's actual yes/no ballots do differ per
+  /// candidate, and they are what somebody browsing this page is looking for.
+  final Widget? voteStrip;
+
   const RosterCard({
     super.key,
     required this.entry,
@@ -67,6 +79,7 @@ class RosterCard extends StatefulWidget {
     this.raceLine,
     this.raceApplicantCount = 0,
     this.raceDisclosureBuilder,
+    this.voteStrip,
   });
 
   @override
@@ -291,7 +304,7 @@ class _RosterCardState extends State<RosterCard> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    _StanceStrip(entry: entry),
+                    widget.voteStrip ?? _StanceStrip(entry: entry),
                     if (entry.flags.any) ...[
                       const SizedBox(height: 10),
                       _FlagChips(flags: entry.flags),
@@ -421,7 +434,7 @@ extension on _RosterCardState {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  _StanceStrip(entry: entry),
+                  widget.voteStrip ?? _StanceStrip(entry: entry),
                   if (entry.flags.any) ...[
                     const SizedBox(height: 8),
                     _FlagChips(flags: entry.flags),

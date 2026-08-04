@@ -15,6 +15,11 @@ class RosterGallery extends StatefulWidget {
   /// Optional per-card decision chip (supplied by the Decisions layer).
   final Widget Function(CandidateEntry)? decisionChipBuilder;
 
+  /// Builds the committee ballot tally shown on each card. Supplied by the
+  /// Decisions layer, which owns the vote repository. Null falls back to the
+  /// old policy-answer strip.
+  final Widget Function(CandidateEntry)? voteStripBuilder;
+
   /// Optional per-card "other Democrats in this race" toggle (supplied by the
   /// board, which owns SlateController's race data). Pure pass-through to
   /// [RosterCard]; null leaves the gallery exactly as it was.
@@ -25,6 +30,7 @@ class RosterGallery extends StatefulWidget {
     required this.controller,
     required this.onOpen,
     this.decisionChipBuilder,
+    this.voteStripBuilder,
     this.raceDisclosureBuilder,
   });
 
@@ -270,6 +276,7 @@ class _RosterGalleryState extends State<RosterGallery> {
               onOpen: () => widget.onOpen(e),
               onToggleSelect: () => c.toggleSelected(e.id),
               decisionChip: widget.decisionChipBuilder?.call(e),
+              voteStrip: widget.voteStripBuilder?.call(e),
               displayName: c.displayNameFor(e),
               raceLine: race?.raceLabel,
               raceApplicantCount: race?.raceKey == null
@@ -305,6 +312,7 @@ class _RosterGalleryState extends State<RosterGallery> {
             onOpen: () => widget.onOpen(e),
             onToggleSelect: () => c.toggleSelected(e.id),
             decisionChip: widget.decisionChipBuilder?.call(e),
+            voteStrip: widget.voteStripBuilder?.call(e),
             displayName: c.displayNameFor(e),
             raceLine: race?.raceLabel,
             raceApplicantCount: race?.raceKey == null
