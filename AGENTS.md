@@ -1290,6 +1290,157 @@ log lines, not the surveillance.
 No source address, no credential, no RPC name, no database DSN and no raw
 upstream error text appears, and nothing here widens access to anything.
 
+## READ SEVENTH: the 06:25 UTC sweep, a real defect in the newsletter form, and the FATAL rollup hole closed
+
+Swept the 24 hours to 2026-08-04 06:25 UTC.
+
+Read the overlap warning in READ FOURTH before quoting any number here. This
+window shares about 22 of its 24 hours with the sweep that closed at 04:20 UTC,
+so only about 2 hours 5 minutes of it is new observation. Nothing below is
+independent confirmation of anything above it.
+
+THE COVERAGE HOLE READ SIXTH LEFT IS NOW CLOSED, AND IT WAS A REAL ONE
+READ SIXTH read `by_message` on 4 of 75 events and recorded honestly that it
+could not see inside rollups tagged `includes FATAL`. This run read
+`by_message` on ALL 10 events after 04:20 UTC, FATAL tagged ones included. The
+hole was not theoretical. The 05:40 rollup, titled `Postgres errors: 4
+(includes FATAL)`, carries two filtered password FATALs AND two ERROR lines of
+the ad hoc query family: `column "first_name" does not exist` at 05:35:32 and
+`column "current_page" does not exist` at 05:34:58. A sweep that reads only
+ERROR titled rollups misses both. Read every event, as READ FOURTH says.
+
+THE NEW SHAPE, AND IT IS THE FIRST DEFECT THESE SWEEPS HAVE FOUND IN OUR OWN
+APPLICATION CODE RATHER THAN IN AN UNDEPLOYED FIX OR SOMEBODY ELSE'S SESSION
+`duplicate key value violates unique constraint "subscribers_email_unique"`, 2
+lines, at 2026-08-04 04:30:49 and 04:34:12 UTC, inside the 04:35 and 04:40
+rollups. It is absent from every decomposition in READ FOURTH, READ FIFTH and
+READ SIXTH, so it is new to the record.
+
+The mechanism is established from the sibling repo, not guessed. The contact
+page newsletter form posts through a client component that does a bare
+`.insert()` into `public.subscribers` on the anon key, and `subscribers.email`
+carries a unique constraint. A supporter who is already on the list and submits
+again gets 23505; the component threw on any error at all, and the catch showed
+a generic "Something went wrong. Please try again" message. So an existing
+subscriber was told the form was broken and invited to retry, which could never
+succeed. The two lines are 3 minutes 23 seconds apart, which is what that
+retry looks like.
+
+Fixed in the sibling repo in `be458c9` by treating 23505, and only 23505, as
+success. The INSERT statement itself is unchanged. Unlike the edge function
+work in READ FIRST, this one IS deployed by CI: Vercel builds the Next.js site
+from `main`, and per the sibling repo's own `AGENTS.md` the deploy block that
+held every build between 2026-07-29 and 2026-08-04 was cleared on 2026-08-04.
+Check the deployment rather than the commit, per the usual rule.
+
+BE HONEST ABOUT WHAT THAT FIX DOES NOT DO
+It does not stop the log line. The INSERT still fails at the database, so the
+ERROR is still written and SUPABASE-PLATFORM-1 still carries it. That is
+deliberate, because both ways of silencing it are worse. An `ON CONFLICT`
+clause cannot be verified from a container with no database access, and if the
+real unique object is composite or an expression index then
+`onConflict: 'email'` raises 42P10 at PLAN time and breaks EVERY newsletter
+signup rather than only the duplicate ones. A pre-read of `subscribers` to
+check first is both an email enumeration vector and a read the anon role does
+not have.
+
+That first version was in fact written and then killed by an adversarial
+auditor, which is the part worth inheriting. It used
+`.upsert(..., { onConflict: 'email', ignoreDuplicates: true })` and justified
+itself as "the same pattern the RSVP route already uses on the anon key". That
+premise was FALSE. The RSVP route builds its client with the SERVICE ROLE key,
+and the sibling repo's own `service.ts` says in as many words that the anon
+role has no UPDATE grant on `subscribers`. There is no proven anon
+`ON CONFLICT` precedent anywhere in either repo. Check which client a
+precedent actually uses before citing it as one, because a precedent from a
+privileged client is not a precedent for an unprivileged one.
+
+DO NOT WRITE `Fixes SUPABASE-PLATFORM-1` IN A COMMIT MESSAGE
+SUPABASE-PLATFORM-1 is the catch all rollup for every Postgres ERROR and FATAL
+line, over 2000 occurrences since 2026-07-24 and still firing. Resolving it
+would auto close an issue that also carries the sponsors dup key burst, the
+hourly uuid line, the scan noise and the ad hoc query family. READ FIFTH
+already records what it costs when a whole project's errors hide behind one
+issue's status. Name the mechanism in the commit message instead.
+
+THE AD HOC QUERY FAMILY HAS INTENSIFIED SHARPLY
+READ SIXTH called six lines in four minutes the densest this family had
+produced. This window beats it: 14 ERROR lines between 04:52 and 05:35 UTC,
+every one of them read directly from a rollup `sample` rather than inferred.
+
+    04:52:58.336  column "name" does not exist
+    04:54:14.656  column "ordinality" does not exist
+    04:54:45.072  "array_agg" is an aggregate function
+    04:54:45.654  column "slug" does not exist
+    04:56:31.580  "array_agg" is an aggregate function
+    05:28:11.514  column "created_at" does not exist
+    05:28:14.746  column "email" does not exist
+    05:28:45.049  syntax error at or near "minute"
+    05:32:25.048  column "email" does not exist
+    05:32:42.146  column s.first_name does not exist
+    05:32:57.208  column d.full_name does not exist
+    05:33:27.279  "array_agg" is an aggregate function
+    05:34:58.057  column "current_page" does not exist
+    05:35:32.103  column "first_name" does not exist
+
+Two of these are new in kind rather than merely new identifiers, and both
+sharpen the hand iteration reading instead of just repeating it. `syntax error
+at or near "minute"` is what `interval 1 minute` produces when the literal is
+left unquoted, which is a typing mistake rather than something a deployed
+statement does. `"array_agg" is an aggregate function` is raised when an
+aggregate is used where a set returning function belongs, and it appears three
+times alongside `column "ordinality" does not exist` in the same five minute
+window, which is the shape of somebody trying to write
+`FROM array_agg(...) WITH ORDINALITY` and iterating on it.
+
+The aliases `d` and `s` recur, consistent with READ SIXTH. Nothing was changed
+for any of these lines and nothing should be: no committed statement in either
+repo makes these qualified references, and the standing instruction not to
+change a working query to make one of these go away applies unchanged.
+
+THE CENSUS
+By event count per project, per READ FIFTH, rather than by `is:unresolved`:
+`endorsement-scorer` 360, `supabase-platform` 83, and `website`, `flutter`,
+`mautic`, `moydforms`, `n8n` and `supabase-edge` at zero. The 83 splits 80 plus
+2 plus 1 across SUPABASE-PLATFORM-1, -3 and -4. `endorsement-scorer` is the
+expected n8n watchdog, correctly ignored, and it stays ignored.
+
+STILL COMMITTED AND UNDEPLOYED, UNCHANGED
+`e79339b` (the 32 line sponsors dup key burst, seen again in the 06:00 cycle),
+`1cdb96e` (the hourly uuid line, seen at 05:00 and 06:00) and `0d2963e` (the
+relay 502 behind SUPABASE-PLATFORM-3, last fired 2026-08-03 15:45). All three
+are hand deploy work per READ FIRST, now at nine, eight and nine days.
+
+SUPABASE-PLATFORM-4 carried the same single `events` bucket 400 from 02:03:37
+UTC that READ FIFTH documents in full. Same occurrence, not a recurrence. Do
+not count it twice and do not resolve the issue.
+
+BOTH LOCAL BRANCH REFS WERE STALE AGAIN, IN BOTH REPOS AT ONCE
+READ SECOND's trap was live in this container. `git ls-remote` against
+`git rev-parse`:
+
+    my-bluebubbles-web  local master  5d8a5b0   real refs/heads/master  22117fd
+    moyoungdemocrats    local main    77d879f   real refs/heads/main    bc8b12e
+
+In both repos the detached `HEAD` the container started on was ALREADY at the
+true tip and the named branch ref was behind it, so `git checkout master` would
+have moved BACKWARD onto a stale base. That is now the third run to meet this.
+Treat it as expected rather than as something to check for once.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public. Named above: the `subscribers` table and its `email`
+column, the constraint name `subscribers_email_unique`, and the fact that the
+sibling repo's RSVP path uses a service role client. The table and column are
+already committed in this repo's own
+`20260422_06_rls_phase2_1_tighten_anon_writes.sql` and
+`20260423_01_backfill_orphan_rpcs.sql`, and the constraint name is already
+published verbatim in the Sentry error text. No credential, no DSN, no source
+address, no RPC name, no policy body and no raw upstream error appears, and
+nothing here widens access to anything. Deliberately not written down, per the
+practice READ SIXTH set: the state of any live endorsement vote, and the
+operational read on who is running the ad hoc statements. Both go to Andrew
+directly.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
