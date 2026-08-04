@@ -1170,7 +1170,14 @@ Plus one more 48 minutes earlier, in the 03:25 rollup: `column "full_name" does
 not exist`, at 03:21:27, unqualified and quoted.
 
 Every previous appearance of this family was one or two lines. Six inside four
-minutes, all of them different, is a change in density rather than in kind.
+minutes is a change in density rather than in kind.
+
+Count it correctly, because an earlier draft of this section did not and the
+commit that introduced it repeats the error in its message, where it cannot be
+corrected. Six LINES, five DISTINCT shapes: `operator does not exist: text =
+uuid` occurs twice, as the table above shows. Any claim that all six differ is
+false against this section's own table. The density argument does not depend on
+it and is unaffected.
 
 WHAT IS ACTUALLY NEW: THE MISMATCH IS NOW READABLE FROM THE IDENTIFIERS
 Every earlier note on this family rested on timing and message shape, and said
@@ -1221,8 +1228,9 @@ not evidence of absence, since a service need not report its database errors.
 The literal failing statements are still attributable to no code in either repo,
 but state that precisely, because the loose version of it is false. It is NOT
 that these identifiers exist nowhere in either tree. Several of the bare names
-do exist: `form_id` is the real column this section documents, `is_active` sits
-on several unrelated tables in both repos, and `full_name` is common in both.
+do exist: `form_id` is the real column this section documents, `is_active`
+appears in both trees on unrelated tables, on several of them in this repo and
+on exactly one in the website, and `full_name` is common in both.
 What no committed statement in either tree does is make these QUALIFIED
 references, the column on that particular table. That combination is what rules
 the repos out, and nothing weaker does. The psycopg point does not weaken it
@@ -1248,7 +1256,8 @@ common in both repos. No emitter is attributed to it.
 Left alone deliberately on 2026-08-04. No code change: no committed statement in
 either repo makes any of these qualified references, per the precision note
 above, so there is nothing here to fix, and the standing instruction not to
-change a working query to make one of these go away applies unchanged. The two real defects in this window, `1cdb96e` and `e79339b`, are
+change a working query to make one of these go away applies unchanged. The two
+real defects in this window, `1cdb96e` and `e79339b`, are
 still committed and undeployed at nine and eight days, and both are hand deploy
 work per READ FIRST. `0d2963e` is in the same state, which is why
 SUPABASE-PLATFORM-3 fired again at 2026-08-03 15:45.
