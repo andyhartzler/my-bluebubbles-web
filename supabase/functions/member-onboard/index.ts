@@ -12,8 +12,18 @@
 //   test             , send the welcome email to ONBOARDING_TEST_EMAIL only,
 //                       skip ALL Slack writes.
 //   live             , real welcome email to the member + real Slack channel
-//                       invites (only if they are already in Slack).
-// A real member is only ever emailed/invited when mode === "live".
+//                       invites (only if they are already in Slack), and the two
+//                       follow-up tasks are enqueued.
+// A real member is only ever emailed/invited when mode === "live". Follow-up
+// tasks are created in LIVE MODE ONLY: they are drained up to 24h later by
+// onboarding-followups, which reads the mode at drain time, so a task minted in
+// dry_run or test would start sending the moment the mode is flipped to live.
+//
+// SEND IDEMPOTENCY: the two follow-up tasks are the record that a member has
+// been welcomed. If this member has ANY onboarding_tasks row, the function
+// returns a no-op plan and sends nothing. The website form upserts members on
+// email and calls this unconditionally, so without that probe a returning member
+// receives a second welcome.
 //
 // Age gate (calendar-year): eligible = the age you turn this year is 13 through
 // 35 (13 through under 36); age out the year you turn 36. Authoritative logic is
@@ -105,11 +115,23 @@ Deno.serve(async (req) => {
     p_dob: m.date_of_birth ?? null,
     p_birth_year: m.birth_year ?? null,
   });
-  if (branchErr) console.warn(`member ${memberId}: moyd_age_branch rpc failed (${branchErr.message}), treating as eligible`);
-  const branch: string = (branchErr || !branchData) ? "eligible" : String(branchData);
-  if (age === null) {
-    console.warn(`member ${memberId}: birth date/year missing, treating as eligible`);
+  // FAIL CLOSED. This used to fall back to "eligible" when the RPC errored,
+  // which threw away the single source of truth at the one moment it could not
+  // be consulted: a transient PostgREST error would have sent "Welcome Aboard!"
+  // to a 55 year old, pushed them into the Slack workspace and added them to the
+  // mapped Google Groups, none of which the member can undo. Stop instead. The
+  // website form calls this fire-and-forget and the member is already saved, so
+  // a hard stop costs nothing but a retry. A missing DOB is NOT this case: the
+  // DB function answers 'eligible' for NULL/NULL by design, which is an answer.
+  if (branchErr || !branchData) {
+    return json({
+      error: "age branch unavailable, nothing sent",
+      detail: branchErr?.message ?? "moyd_age_branch returned no value",
+      member_id: memberId,
+      age_rule: "public.moyd_age_branch (DB, single source of truth)",
+    }, 502);
   }
+  const branch: string = String(branchData);
 
   if (branch !== "eligible") {
     // Too young or aged out: send the branch email only. No Slack, no committee
@@ -190,6 +212,34 @@ Deno.serve(async (req) => {
   const actions: string[] = [];
   let emailResult: { id: string; threadId: string } | null = null;
 
+  // --- 0. Already onboarded? -----------------------------------------------
+  // The two follow-up tasks are enqueued together with the welcome, and only in
+  // live mode, so the existence of ANY onboarding_tasks row for this member is
+  // the record that they have already been welcomed. The website form upserts
+  // members on email and calls this unconditionally, so a returning member who
+  // re-submits would otherwise receive a second "Welcome Aboard!" and a second
+  // reminder cycle. Two details matter: the probe covers the member's whole task
+  // history (rows are marked done, never deleted, so filtering on done=false
+  // went blind as soon as the first cycle finished), and it runs BEFORE the send.
+  const { data: priorTasks, error: priorErr } = await supabase
+    .from("onboarding_tasks")
+    .select("id")
+    .eq("member_id", memberId)
+    .limit(1);
+  if (priorErr) {
+    // Fail closed for the same reason as the age gate: unable to tell is not a
+    // licence to send a duplicate.
+    return json({ error: "onboarding history probe failed, nothing sent", detail: priorErr.message, plan }, 502);
+  }
+  if (priorTasks && priorTasks.length) {
+    return json({
+      ok: true,
+      plan: { ...plan, email_actually_to: null },
+      actions: ["already onboarded (onboarding_tasks rows exist for this member): no email, no Slack writes, no new tasks"],
+      email_msg_id: null,
+    });
+  }
+
   // --- 1. Welcome email ----------------------------------------------------
   if (mode === "dry_run") {
     actions.push(`DRY_RUN: would send "${built.subject}" (${variant}) to ${realEmail}`);
@@ -255,58 +305,52 @@ Deno.serve(async (req) => {
     if (groupAdds.length) actions.push(`${mode.toUpperCase()}: Google Group writes SKIPPED. Would add ${realEmail} to groups: ${groupAdds.map((x) => x.group).join(", ")}`);
   }
 
-  // --- 3. Enqueue follow-up tasks (spec §5 / §8) ---------------------------
-  // Idempotent: skip if this member already has open tasks. We always enqueue
-  // (even in dry_run) so the queue reflects the real plan; the followup
-  // processor is itself gated and will not send/write in dry_run.
-  const nowMs = Date.now();
-  const metaBase = {
-    variant,
-    email: realEmail,
-    first_name: first,
-    targets,
-    caucus,
-    committees,
-    thread_id: emailResult?.threadId ?? null,
-  };
-
-  const { data: existingTasks } = await supabase
-    .from("onboarding_tasks")
-    .select("id, task_type")
-    .eq("member_id", memberId)
-    .eq("done", false);
-
-  const have = new Set((existingTasks || []).map((t) => (t as { task_type: string }).task_type));
-  const toInsert: Record<string, unknown>[] = [];
-
-  // slack_channel_sync: poll for the member joining Slack, then auto-add to all
-  // target channels. Students first checked at +30m (spec §3.3), general at +24h.
-  if (!have.has("slack_channel_sync")) {
+  // --- 3. Enqueue follow-up tasks (spec §5 / §8), LIVE ONLY ----------------
+  // A task is created only when a real welcome has really been sent. It used to
+  // be enqueued in every mode, on the reasoning that the followup processor is
+  // itself gated, but that gate is read up to 24 hours LATER, at drain time: a
+  // task minted while the system was deliberately silent becomes sendable the
+  // moment the mode is flipped to live, and the member gets "Don't forget to
+  // join us on Slack!" as their first ever contact from MOYD, unthreaded because
+  // no welcome thread exists. dry_run and test report the plan in the response
+  // instead, which is exactly what those modes are for.
+  // Nothing here needs a duplicate check: the probe above returned early if this
+  // member had any task history at all, so reaching this point means zero rows.
+  if (mode !== "live") {
+    actions.push(`${mode.toUpperCase()}: no follow-up tasks enqueued (tasks are created in live mode only, so a reminder can never fire for a member whose welcome was never sent)`);
+  } else {
+    const nowMs = Date.now();
+    const metaBase = {
+      variant,
+      email: realEmail,
+      first_name: first,
+      targets,
+      caucus,
+      committees,
+      thread_id: emailResult?.threadId ?? null,
+    };
+    // slack_channel_sync: poll for the member joining Slack, then auto-add to
+    // all target channels. Students first checked at +30m (spec §3.3), general
+    // at +24h. slack_join_reminder: at +24h, if still not in Slack, send the
+    // variant reminder email (spec §5), threaded onto the welcome.
     const firstCheckMin = variant === "general" ? 24 * 60 : 30;
-    toInsert.push({
-      member_id: memberId,
-      task_type: "slack_channel_sync",
-      run_after: new Date(nowMs + firstCheckMin * 60_000).toISOString(),
-      meta: metaBase,
-    });
-  }
-  // slack_join_reminder: at +24h, if still not in Slack, send the variant
-  // reminder email (spec §5). Applies to everyone in this branch (spec §8 fix).
-  if (!have.has("slack_join_reminder")) {
-    toInsert.push({
-      member_id: memberId,
-      task_type: "slack_join_reminder",
-      run_after: new Date(nowMs + 24 * 60 * 60_000).toISOString(),
-      meta: metaBase,
-    });
-  }
-
-  if (toInsert.length) {
+    const toInsert = [
+      {
+        member_id: memberId,
+        task_type: "slack_channel_sync",
+        run_after: new Date(nowMs + firstCheckMin * 60_000).toISOString(),
+        meta: metaBase,
+      },
+      {
+        member_id: memberId,
+        task_type: "slack_join_reminder",
+        run_after: new Date(nowMs + 24 * 60 * 60_000).toISOString(),
+        meta: metaBase,
+      },
+    ];
     const { error: insErr } = await supabase.from("onboarding_tasks").insert(toInsert);
     if (insErr) actions.push(`WARN: onboarding_tasks insert failed: ${insErr.message}`);
     else actions.push(`enqueued ${toInsert.length} follow-up task(s): ${toInsert.map((t) => t.task_type).join(", ")}`);
-  } else {
-    actions.push("follow-up tasks already present (idempotent skip)");
   }
 
   return json({ ok: true, plan, actions, email_msg_id: emailResult?.id ?? null });

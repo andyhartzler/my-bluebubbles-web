@@ -186,12 +186,23 @@ export function targetChannels(m: MemberRow, variant: Variant): string[] {
 // Two deliberate departures from that reference:
 //   1. Dark mode. The reference has none: it hardcodes a white card with
 //      #333333 and #263351 text, which force-inverting clients wreck. This
-//      declares color-scheme and carries a prefers-color-scheme block.
+//      declares color-scheme and carries a prefers-color-scheme block. An
+//      earlier pass deleted that block and pinned the emails "light only" on the
+//      grounds that the reference has no dark rules, which is true but is not
+//      the brief: the dark block changes NOTHING about how the email renders in
+//      a light client, so the likeness to the endorsement invitation is intact
+//      either way, and without it a dark-theme client is left to invert a
+//      hardcoded white card by algorithm. Readability in both schemes is a
+//      standing rule here. Do not delete it again.
 //   2. The footer band (social icons + paid-for disclaimer) keeps a LIGHT
 //      background in dark mode. paid-for-banner.png is a transparent PNG whose
 //      ink is dark (mean luminance 107 of 255), so on a dark card it is
 //      unreadable. It is a filed compliance asset and must stay the image, so
-//      the background is what gives way, not the asset.
+//      the background is what gives way, not the asset. That protection lives in
+//      a <style> rule, which the Gmail app strips on non-Gmail accounts, so both
+//      plate cells also carry bgcolor="#f3f6fb" as an HTML attribute: a
+//      presentational attribute survives style stripping and client-side
+//      inverters treat it more conservatively than an inline background-color.
 // ============================================================================
 function escapeHtml(s: string): string {
   return s
@@ -216,7 +227,11 @@ export const EMAIL_RE = /^[^\s<>"',;:\r\n]+@[^\s<>"',;:\r\n]+\.[^\s<>"',;:\r\n]+
 // --- Brand tokens (light) ----------------------------------------------------
 const NAVY = "#263351";
 const BODY_TX = "#333333";
-const MID_BLUE = "#2f7fc1";
+// 5.02:1 on the white card. The endorsement reference uses #2f7fc1, which
+// measures 4.26:1 and misses the 4.5:1 floor: it carries both the 12px eyebrow
+// and every 16px body link, and body links are new here (the reference has
+// none), so the darker blue is used throughout. Visually near-identical.
+const MID_BLUE = "#2b73b0";
 const MUTED = "#6b7280";
 const HAIRLINE = "#e5e9f0";
 const PAGE_BG = "#eef2f7";
@@ -233,7 +248,10 @@ const H = (emoji: string, title: string) =>
 interface Rendered {
   preheader: string;
   eyebrow: string;   // uppercase kicker, the one line that varies per email type
-  greeting: string;  // "Hi Andrew!"
+  // "Hi Andrew!", RAW. Escaping happens once, inside shell(), on the HTML path
+  // only. Escaping it here instead leaked "Hi D&#39;Angelo!" verbatim into the
+  // text/plain part, which plainOf() emits without decoding.
+  greeting: string;
   body: string;      // paragraphs + headings
   ctaText: string;
   ctaHref: string;
@@ -281,14 +299,14 @@ a{text-decoration:none}
 <table role="presentation" class="container card" width="600" cellspacing="0" cellpadding="0" border="0" style="width:600px;max-width:600px;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(38,51,81,0.12);">
 
 <tr><td style="font-size:0;line-height:0;">
-<a href="${HOME}" target="_blank"><img src="https://email.moyd.app/media/images/cover-banner.png" width="600" alt="Missouri Young Democrats" style="display:block;width:100%;max-width:600px;height:auto;"></a>
+<a href="${HOME}" target="_blank"><img src="https://email.moyd.app/media/images/cover-banner.png" width="600" alt="Missouri Young Democrats" style="display:block;width:100%;max-width:600px;height:auto;font-size:15px;line-height:1.4;font-weight:700;color:${NAVY};"></a>
 </td></tr>
 
 <tr><td class="px" style="padding:36px 44px 30px 44px;">
 
 <div class="eyebrow" style="color:${MID_BLUE};font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin:0 0 12px 0;">${r.eyebrow}</div>
 
-<p class="hd" style="color:${NAVY};font-size:20px;line-height:1.5;margin:0 0 20px 0;font-weight:700;">${r.greeting}</p>
+<p class="hd" style="color:${NAVY};font-size:20px;line-height:1.5;margin:0 0 20px 0;font-weight:700;">${escapeHtml(r.greeting)}</p>
 
 ${r.body}
 
@@ -312,7 +330,7 @@ ${r.signoff}<br>
 
 </td></tr>
 
-<tr><td class="plate" style="background-color:#ffffff;padding:6px 40px 26px 40px;text-align:center;">
+<tr><td class="plate" bgcolor="#f3f6fb" style="background-color:#ffffff;padding:6px 40px 26px 40px;text-align:center;">
 <a href="https://www.facebook.com/MOyoungdemocrats" target="_blank" style="display:inline-block;margin:0 5px;"><img src="https://email.moyd.app/media/images/facebook-circle-256.png" width="32" height="32" alt="Facebook" style="display:inline-block;width:32px;height:32px;"></a>
 <a href="${INSTAGRAM}" target="_blank" style="display:inline-block;margin:0 5px;"><img src="https://email.moyd.app/media/images/instagram-circle-256_2.png" width="32" height="32" alt="Instagram" style="display:inline-block;width:32px;height:32px;"></a>
 <a href="https://threads.net/moyoungdemocrats" target="_blank" style="display:inline-block;margin:0 5px;"><img src="https://email.moyd.app/media/images/threadsss-circle-256.png" width="32" height="32" alt="Threads" style="display:inline-block;width:32px;height:32px;"></a>
@@ -321,8 +339,8 @@ ${r.signoff}<br>
 <a href="https://www.reddit.com/user/moyoungdemocrats" target="_blank" style="display:inline-block;margin:0 5px;"><img src="https://email.moyd.app/media/images/reddit-circle-256_1.png" width="32" height="32" alt="Reddit" style="display:inline-block;width:32px;height:32px;"></a>
 </td></tr>
 
-<tr><td class="plate" style="background-color:#ffffff;padding:0 40px 30px 40px;text-align:center;font-size:0;line-height:0;">
-<img src="https://email.moyd.app/media/images/paid-for-banner.png" width="300" alt="Paid for by Missouri Young Democrats" style="display:inline-block;width:300px;max-width:80%;height:auto;">
+<tr><td class="plate" bgcolor="#f3f6fb" style="background-color:#ffffff;padding:0 40px 30px 40px;text-align:center;font-size:0;line-height:0;">
+<img src="https://email.moyd.app/media/images/paid-for-banner.png" width="300" alt="Paid for by Missouri Young Democrats" style="display:inline-block;width:300px;max-width:80%;height:auto;font-size:13px;line-height:1.4;color:#4b5563;">
 </td></tr>
 
 </table>
@@ -408,11 +426,13 @@ function collegeBody(): string {
     P(`How to get plugged in:`),
     H("&#128172;", "Join the Slack"),
     P(`We use Slack as our digital organizing HQ. You can ${A(SLACK_JOIN, "click here to join our Slack workspace")} and start connecting with other members across Missouri. If you've already received an invite, check your inbox and accept it. Once you're in, say hi in #general and join the #college-democrats channel to connect with other college chapter members statewide!`),
-    H("&#128075;", "Meet your Missouri College Democrats leadership"),
-    // Elena Wierich was removed from exec 2026-07-14 and is off COLLEGE_CC. The
-    // body still named her as a serving co-chair, so the two disagreed. Corrected
-    // to the CC list, which is the dated source of truth.
-    P(`We want to introduce you to Jaelyn Woodley, Co-Chair of Missouri College Democrats. She is here to support you and help you plug into organizing opportunities on campus and beyond. You'll see her active in the #college-democrats channel, so don't hesitate to reach out!`),
+    // NO "Meet your leadership" section. Andrew removed it from both the college
+    // and high school variants on 2026-08-04. It named serving officers in
+    // evergreen copy, which is a maintenance trap: the previous version still
+    // introduced a co-chair who had been off the exec since 2026-07-14, so the
+    // email was introducing new members to someone who had left. The officers
+    // are still CC'd (COLLEGE_CC / HS_CC), which is how they learn about a new
+    // member, and the caucus channel below is where people actually meet them.
     H("&#10024;", "Introduce yourself"),
     P(`We want to get to know you! If you feel comfortable, upload a profile picture to your Slack profile and drop a short intro in the #college-democrats channel. Let us know what school you're at, your graduation year, and what brought you to this movement. It's a great way to meet other student organizers across the state who care about the same things you do.`),
     H("&#128241;", "Visit the Members Portal"),
@@ -435,8 +455,8 @@ function highSchoolBody(): string {
     P(`How to get plugged in:`),
     H("&#128172;", "Join the Slack"),
     P(`We use Slack as our digital organizing HQ. You can ${A(SLACK_JOIN, "click here to join our Slack workspace")} and start connecting with other members across Missouri. If you've already received an invite, check your inbox and accept it. Once you're in, say hi in #general and join the #high-school-democrats channel to connect with other high school members statewide!`),
-    H("&#128075;", "Meet your Missouri High School Democrats leadership"),
-    P(`We want to introduce you to the Chair of Missouri High School Democrats, Dwayne Irvin, and Co-Chair Chelsea Schuette. They're here to support you and help you plug into organizing opportunities at your school and beyond. You'll see them active in the #high-school-democrats channel, so don't hesitate to reach out!`),
+    // NO "Meet your leadership" section here either. Same reason as the college
+    // variant above: named officers in evergreen copy go stale silently.
     H("&#10024;", "Introduce yourself"),
     P(`We want to get to know you! If you feel comfortable, upload a profile picture to your Slack profile and drop a short intro in the #high-school-democrats channel. Let us know what school you're at, your graduation year, and what brought you to this movement. It's a great way to meet other student organizers across the state who care about the same things you do.`),
     H("&#128241;", "Visit the Members Portal"),
@@ -536,7 +556,7 @@ export function buildTooYoungEmail(first: string): BuiltEmail {
   const r: Rendered = {
     preheader: `Missouri Young Democrats membership opens at ${AGE_MIN_WORD}. Here is how to stay engaged until then.`,
     eyebrow: "Missouri Young Democrats &middot; Membership",
-    greeting: `Hi ${escapeHtml(first)}!`,
+    greeting: `Hi ${first}!`,
     body: tooYoungBody(),
     ctaText: "Follow us on Instagram",
     ctaHref: INSTAGRAM,
@@ -554,7 +574,7 @@ export function buildAgedOutEmail(first: string): BuiltEmail {
   const r: Rendered = {
     preheader: `Missouri Young Democrats serves ${AGE_SENTENCE}. Here are ways to stay involved.`,
     eyebrow: "Missouri Young Democrats &middot; Thank you",
-    greeting: `Hi ${escapeHtml(first)}!`,
+    greeting: `Hi ${first}!`,
     body: agedOutBody(),
     ctaText: "Support Young Democrats",
     ctaHref: DONATE,
@@ -596,7 +616,7 @@ export function buildWelcomeEmail(variant: Variant, first: string): BuiltEmail {
   const r: Rendered = {
     preheader: "Welcome to Missouri Young Democrats. Here is how to get plugged in.",
     eyebrow: EYEBROW_WELCOME[variant],
-    greeting: `Hi ${escapeHtml(first)}!`,
+    greeting: `Hi ${first}!`,
     body: WELCOME_BODY[variant](),
     ctaText: "Join our Slack workspace",
     ctaHref: SLACK_JOIN,
@@ -615,7 +635,7 @@ export function buildReminderEmail(variant: Variant, first: string): BuiltEmail 
   const r: Rendered = {
     preheader: "You haven't joined our Slack workspace yet.",
     eyebrow: EYEBROW_REMINDER[variant],
-    greeting: `Hi ${escapeHtml(first)}!`,
+    greeting: `Hi ${first}!`,
     body: REMINDER_BODY[variant](),
     ctaText: "Join our Slack workspace",
     ctaHref: SLACK_JOIN,
