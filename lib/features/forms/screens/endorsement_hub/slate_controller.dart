@@ -44,6 +44,24 @@ class SlateController extends ChangeNotifier {
   /// The canonical endorsement form id. A slug fallback runs if this id 404s.
   static const String endorsementFormId =
       '945738f0-ff66-420f-8707-afb4a23ca58b';
+
+  /// The live value of `form_schemas.slug` for that row. Renamed from
+  /// `endorsement-questionnaire-2026` on 2026-08-04, when the questionnaire
+  /// stopped being a single-year artifact.
+  ///
+  /// This is NOT only the id's fallback. It is also passed to
+  /// `LiveJourneyController` and used verbatim as the `form_drafts.form_slug`
+  /// filter behind the Journey tab, so a stale value here does not fail loudly:
+  /// the drafts query simply matches nothing, the service swallows it as
+  /// "drafts unavailable", and every in-flight candidate quietly disappears
+  /// from the tab while everything else keeps working. Keep it equal to the
+  /// website's `form_schemas.slug` whenever that is renamed.
+  ///
+  /// KEEP THIS EQUAL TO THE LIVE DATABASE. It was briefly changed ahead of a
+  /// rename that has not happened: production form_schemas.slug is still
+  /// endorsement-questionnaire-2026, and so are all 19 form_drafts rows. The
+  /// mismatch is silent, which is the whole danger, so this reverts until the
+  /// rename actually lands.
   static const String endorsementSlug = 'endorsement-questionnaire-2026';
 
   bool _loading = true;
@@ -328,8 +346,14 @@ class SlateController extends ChangeNotifier {
   }
 
   void _applySort(List<CandidateEntry> list) {
-    int byName(CandidateEntry a, CandidateEntry b) =>
-        a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    // displayNameFor, not e.name. The one nameless submission (Hope Tinker,
+    // 587c32d7) has an empty `name`, so sorting on it put that card first
+    // under "Name (A → Z)" and first on every tie-break of every other sort,
+    // labelled with a name the sort was not using. RosterBoard's ballot sort
+    // was fixed for exactly this; the browse gallery reads this comparator.
+    int byName(CandidateEntry a, CandidateEntry b) => displayNameFor(a)
+        .toLowerCase()
+        .compareTo(displayNameFor(b).toLowerCase());
 
     switch (_sort) {
       case SlateSort.alignmentDesc:

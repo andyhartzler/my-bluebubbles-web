@@ -1774,7 +1774,7 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
 
     // Use the slug if available, otherwise fall back to ID
     final identifier = vote.slug ?? vote.id;
-    return 'https://forms.moyoungdemocrats.org/vote/$identifier';
+    return 'https://moyoungdemocrats.org/forms/vote/$identifier';
   }
 
   void _shareVote() {

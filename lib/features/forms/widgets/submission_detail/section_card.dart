@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../models/submission_review_model.dart';
-import '../../theme/moyd_brand.dart';
 import 'answer_display.dart';
+import 'gold_rule_header.dart';
+import 'review_text.dart';
 
-/// One card per form section: a full-bleed navy-tinted header band (gold rule
-/// + title + answer count), then the answers rendered as content via
-/// [AnswerDisplay]. On wide cards (>= 560px inner width) consecutive short
-/// answers flow two-up so a run of one-word answers reads as a tidy grid
-/// instead of a wall.
+/// One card per form section: the shared [GoldRuleHeader] (gold rule + title +
+/// answer count), then the answers rendered as content via [AnswerDisplay]. On
+/// wide cards (>= 560px inner width) consecutive short answers flow two-up so
+/// a run of one-word answers reads as a tidy grid instead of a wall.
+///
+/// The navy-tinted header band is gone. It was the only card on the page
+/// wearing one, which made the section cards read as a different product from
+/// the verdict block sitting directly above them.
 class SectionCard extends StatelessWidget {
   final ReviewSection section;
 
@@ -21,90 +25,40 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
     final answerCount =
         section.answers.length + section.policyPositions.length;
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
+    return ReviewCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (section.title.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-              // Navy TINT of the ambient surface — the title stays
-              // cs.onSurface, so contrast holds in both themes (~15:1 in
-              // light over the 7% navy wash, >= 4.5:1 in dark over the
-              // navySoft wash). The brightness branch exists only because
-              // the tint direction flips per theme.
-              color: isDark
-                  ? MoydBrand.navySoft.withOpacity(0.45)
-                  : MoydBrand.navy.withOpacity(0.07),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 4,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFD4A039), Color(0xFFB8860B)],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      section.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    answerCount == 1 ? '1 answer' : '$answerCount answers',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+          if (section.title.isNotEmpty) ...[
+            GoldRuleHeader(
+              title: section.title,
+              trailing: Text(
+                answerCount == 1 ? '1 answer' : '$answerCount answers',
+                style: ReviewText.caption(context),
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final blocks =
-                    _contentBlocks(constraints.maxWidth);
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (int i = 0; i < blocks.length; i++) ...[
-                      if (i > 0)
-                        Divider(
-                            height: 1,
-                            color: cs.outlineVariant.withOpacity(0.6)),
-                      blocks[i],
-                    ],
+            const SizedBox(height: 8),
+          ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final blocks = _contentBlocks(constraints.maxWidth);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (int i = 0; i < blocks.length; i++) ...[
+                    if (i > 0)
+                      Divider(
+                          height: 1,
+                          color: cs.outlineVariant.withValues(alpha: 0.6)),
+                    blocks[i],
                   ],
-                );
-              },
-            ),
+                ],
+              );
+            },
           ),
         ],
       ),

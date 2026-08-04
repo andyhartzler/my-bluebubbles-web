@@ -26,7 +26,12 @@ import 'widgets/roster/roster_board.dart';
 
 /// "Endorsement HQ 2026": the candidate survey intelligence hub. A gradient
 /// hero banner with live KPIs sits over four tabs: Roster (ballot + browse),
-/// Live, Compare, Analytics.
+/// Compare, Analytics, Live.
+///
+/// Live sits last on purpose. The first three are the work: vote, compare,
+/// read the room. Live is a watch-only feed of people still filling the
+/// questionnaire in, so it belongs at the end of the run rather than one tab
+/// away from the ballot.
 class EndorsementHubScreen extends StatefulWidget {
   const EndorsementHubScreen({super.key});
 
@@ -142,7 +147,9 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
 
   void _startCompare() {
     setState(() => _compareMode = _CompareMode.sideBySide);
-    _tabs.animateTo(2);
+    // Compare is tab 1 now that Live moved to the end. Keep this in step with
+    // both lists in _tabBar / build.
+    _tabs.animateTo(1);
   }
 
   void _focusRange(double lo, double hi) {
@@ -185,12 +192,12 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
                       isChair: _isChair,
                       onOpen: _openCandidate,
                     ),
+                    _padded(_compareTab(context)),
+                    _padded(_analyticsTab(context)),
                     _padded(JourneyTab(
                       controller: _journey,
                       onOpenSubmission: _openBySubmission,
                     )),
-                    _padded(_compareTab(context)),
-                    _padded(_analyticsTab(context)),
                   ],
                 );
               },
@@ -418,13 +425,15 @@ class _EndorsementHubScreenState extends State<EndorsementHubScreen>
       labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
       unselectedLabelStyle:
           const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+      // ORDER IS LOAD-BEARING: it must match the TabBarView children above
+      // one for one, and _startCompare's animateTo index below. Live is last.
       tabs: [
         Tab(
             icon: const Icon(Icons.groups_2_outlined, size: 19),
             child: _rosterTabLabel()),
-        Tab(icon: const Icon(Icons.sensors, size: 19), child: _liveTabLabel()),
         const Tab(icon: Icon(Icons.compare_arrows, size: 19), text: 'Compare'),
         const Tab(icon: Icon(Icons.insights_outlined, size: 19), text: 'Analytics'),
+        Tab(icon: const Icon(Icons.sensors, size: 19), child: _liveTabLabel()),
       ],
     );
   }

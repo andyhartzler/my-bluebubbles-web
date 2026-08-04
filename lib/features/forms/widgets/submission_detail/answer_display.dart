@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../models/submission_review_model.dart';
 import '../../theme/moyd_brand.dart';
 import '../review/stance_visuals.dart';
+import 'review_text.dart';
 
 /// Renders one answered question as content: a small muted label above the
 /// value, with the value typed by what it is — long free text gets the gold
@@ -38,8 +39,10 @@ class AnswerDisplay extends StatelessWidget {
   static bool _isMulti(ReviewAnswer a) => a.rawValue is List;
 
   /// True when this answer renders compactly enough to flow two-up in a wide
-  /// card (everything except the full-width long-text block and pill wraps).
-  static bool flowsTwoUp(ReviewAnswer a) => !_isLong(a) && !_isMulti(a);
+  /// card (everything except the full-width long-text block, pill wraps, and
+  /// anything carrying an attached explanation).
+  static bool flowsTwoUp(ReviewAnswer a) =>
+      !_isLong(a) && !_isMulti(a) && a.companion == null;
 
   static bool _isCurrency(ReviewAnswer a) {
     if (a.type == 'currency') return true;
@@ -110,24 +113,28 @@ class AnswerDisplay extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    final label = Text(
-      answer.label.toUpperCase(),
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.7,
-        color: cs.onSurfaceVariant,
-      ),
-    );
+    final companion = answer.companion;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          label,
+          Text(answer.label.toUpperCase(),
+              style: ReviewText.fieldLabel(context)),
           const SizedBox(height: 5),
           _value(context, theme, cs),
+          // The candidate's explanation or write-in, attached to the question
+          // it answers. These used to render as orphan rows in every section
+          // that was not detected as a policy grid, labelled with a raw field
+          // id and floating free of the question.
+          if (companion != null) ...[
+            const SizedBox(height: 8),
+            Text(companion.label.toUpperCase(),
+                style: ReviewText.fieldLabel(context)),
+            const SizedBox(height: 4),
+            _LongAnswerText(text: companion.text),
+          ],
         ],
       ),
     );
@@ -178,8 +185,7 @@ class AnswerDisplay extends StatelessWidget {
       if (n != null) {
         return Text(
           ReviewFormat.currency(n),
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
+          style: ReviewText.bodyStrong(context).copyWith(
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
         );
@@ -201,10 +207,7 @@ class AnswerDisplay extends StatelessWidget {
                 Flexible(
                   child: Text(
                     answer.displayValue,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: ReviewText.bodyStrong(context),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -218,13 +221,18 @@ class AnswerDisplay extends StatelessWidget {
 
     return SelectableText(
       answer.displayValue,
-      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+      style: ReviewText.bodyStrong(context),
     );
   }
 }
 
-/// Long free text: gold left-rule quote block, collapsed to 5 lines with a
-/// Show more / Show less toggle past 240 chars.
+/// Long free text: gold left-rule quote block on a SOLID raised fill,
+/// collapsed to 5 lines with a Show more / Show less toggle past 240 chars.
+///
+/// The fill used to be `surfaceContainerHighest` at 40% opacity, which is the
+/// exact pattern the brand file forbids: an alpha fill under text composites
+/// against whatever the parent happens to be, so its real contrast is not
+/// knowable from this widget. Solid is knowable in both themes.
 class _LongAnswerText extends StatefulWidget {
   final String text;
   const _LongAnswerText({required this.text});
@@ -244,9 +252,9 @@ class _LongAnswerTextState extends State<_LongAnswerText> {
     final isTruncatable = widget.text.length > 240;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withOpacity(0.4),
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(10),
         border: const Border(
           left: BorderSide(color: MoydBrand.gold, width: 3),
@@ -260,7 +268,7 @@ class _LongAnswerTextState extends State<_LongAnswerText> {
             alignment: Alignment.topLeft,
             child: Text(
               widget.text,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+              style: ReviewText.body(context),
               maxLines: _expanded ? null : 5,
               overflow:
                   _expanded ? TextOverflow.visible : TextOverflow.ellipsis,

@@ -59,7 +59,7 @@ const FROM_NAME = "Missouri Young Democrats";
 // --- Links referenced in the verbatim copy -----------------------------------
 const SLACK_JOIN =
   "https://join.slack.com/t/moyoungdemocrats/shared_invite/zt-37w5tg3s5-Ds2_SyOxiBRdP71_HxnXtw";
-const PORTAL = "https://members.moyoungdemocrats.org";
+const PORTAL = "https://moyoungdemocrats.org/members";
 const INSTAGRAM = "https://www.instagram.com/moyoungdemocrats";
 const TIKTOK = "https://www.tiktok.com/@moyoungdemocrats";
 const DONATE = "https://secure.actblue.com/donate/moyd";

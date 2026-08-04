@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../models/submission_review_model.dart';
 import '../../theme/moyd_brand.dart';
+import '../review/stance_visuals.dart';
+import 'review_text.dart';
 
 /// Renders a section's policy positions: a summary line plus one row each of
 /// [position label] + [stance pill] + optional expandable explanation.
+///
+/// The pill is [StanceVisuals.pill], the same one the compare matrix, the
+/// stance bars and the answer rows use. The fixed-width glyphless pill this
+/// file used to carry was the only stance chip in the product that read by
+/// color and word alone, with no icon, so it was also the only one that
+/// failed the "never by color alone" rule the rest of the palette follows.
 class PolicyPositionsGrid extends StatelessWidget {
   final List<PolicyPosition> positions;
 
@@ -11,9 +19,6 @@ class PolicyPositionsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
     var support = 0, oppose = 0, qualified = 0;
     for (final p in positions) {
       if (p.stance == Stance.support) support++;
@@ -35,10 +40,8 @@ class PolicyPositionsGrid extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(
               summaryParts.join('  ·  '),
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: cs.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
+              style: ReviewText.caption(context)
+                  .copyWith(fontWeight: FontWeight.w600),
             ),
           ),
         for (int i = 0; i < positions.length; i++)
@@ -72,8 +75,12 @@ class _PolicyRowState extends State<_PolicyRow> {
 
     return Container(
       decoration: BoxDecoration(
+        // Zebra stripe pre-blended against the card surface rather than left
+        // as a translucent fill, so the color under this row's text is a
+        // known value in both themes instead of whatever composites behind it.
         color: widget.alt
-            ? cs.surfaceContainerHighest.withOpacity(0.25)
+            ? Color.alphaBlend(
+                cs.surfaceContainerHighest.withValues(alpha: 0.35), cs.surface)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
@@ -89,28 +96,23 @@ class _PolicyRowState extends State<_PolicyRow> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      p.question,
-                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.3),
-                    ),
+                    Text(p.question, style: ReviewText.body(context)),
                     if (p.answerLabel.isNotEmpty &&
                         p.answerLabel.toLowerCase() !=
-                            _StancePill.labelFor(p.stance).toLowerCase()) ...[
+                            StanceVisuals.label(p.stance).toLowerCase()) ...[
                       const SizedBox(height: 2),
                       Text(
                         p.answerLabel,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                          fontStyle: FontStyle.italic,
-                          height: 1.3,
-                        ),
+                        style: ReviewText.secondary(context)
+                            .copyWith(fontStyle: FontStyle.italic),
                       ),
                     ],
                   ],
                 ),
               ),
               const SizedBox(width: 12),
-              _StancePill(stance: p.stance),
+              StanceVisuals.pill(p.stance,
+                  text: StanceVisuals.label(p.stance)),
             ],
           ),
           if (hasExplain) ...[
@@ -128,7 +130,9 @@ class _PolicyRowState extends State<_PolicyRow> {
                   ),
                   const SizedBox(width: 2),
                   Text(
-                    _expanded ? 'Hide explanation' : 'Explanation',
+                    _expanded
+                        ? 'Hide ${p.explanationLabel.toLowerCase()}'
+                        : p.explanationLabel,
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: cs.primary,
                       fontWeight: FontWeight.w600,
@@ -152,70 +156,13 @@ class _PolicyRowState extends State<_PolicyRow> {
                       ),
                       child: Text(
                         p.explanation!.trim(),
-                        style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+                        style: ReviewText.body(context),
                       ),
                     )
                   : const SizedBox.shrink(),
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _StancePill extends StatelessWidget {
-  final Stance stance;
-  const _StancePill({required this.stance});
-
-  static String labelFor(Stance s) {
-    switch (s) {
-      case Stance.support:
-        return 'Support';
-      case Stance.oppose:
-        return 'Oppose';
-      case Stance.qualified:
-        return 'Qualified';
-      case Stance.unsure:
-        return 'Unsure';
-      case Stance.neutral:
-        return 'See note';
-    }
-  }
-
-  ({Color fg, Color bg}) _colors() {
-    switch (stance) {
-      case Stance.support:
-        return (fg: MoydBrand.supportFg, bg: MoydBrand.supportBg);
-      case Stance.oppose:
-        return (fg: MoydBrand.opposeFg, bg: MoydBrand.opposeBg);
-      case Stance.qualified:
-        return (fg: MoydBrand.qualifiedFg, bg: MoydBrand.qualifiedBg);
-      case Stance.unsure:
-      case Stance.neutral:
-        return (fg: MoydBrand.neutralFg, bg: MoydBrand.neutralBg);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = _colors();
-    return Container(
-      width: 90,
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-      decoration: BoxDecoration(
-        color: c.bg,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        labelFor(stance),
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: c.fg,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
       ),
     );
   }

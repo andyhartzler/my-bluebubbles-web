@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../models/form_submission.dart';
+import '../../../models/submission_review_model.dart';
 import '../theme/hub_theme.dart';
+import '../widgets/headshot_avatar.dart';
 import 'journey_models.dart';
 import 'journey_timeline_screen.dart';
 import 'live_journey_controller.dart';
@@ -194,7 +196,7 @@ class _JourneyCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                _avatar(name, cs),
+                _avatar(name),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -281,24 +283,23 @@ class _JourneyCard extends StatelessWidget {
     return parts.join(' | ');
   }
 
-  Widget _avatar(String name, ColorScheme cs) {
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: const BoxDecoration(
-        gradient: HubTheme.hero,
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 18,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
+  /// The candidate's real face, falling back to two initials on the shared
+  /// deterministic navy palette.
+  ///
+  /// The photo was already being fetched and thrown away: `journey_service`
+  /// selects `members.profile_pictures` on every row, and this tile drew a
+  /// single-letter gradient circle regardless. [HeadshotAvatar] is the one
+  /// face widget in the hub, so Live now matches the roster and the review
+  /// screens, including the initials fallback for a submitter who is not a
+  /// member or has no photo on file.
+  Widget _avatar(String name) {
+    final url = entry.submission.displayPhotoUrl;
+    return HeadshotAvatar(
+      file: url == null || url.isEmpty
+          ? null
+          : ReviewFile(url: url, name: name),
+      name: name,
+      size: 44,
     );
   }
 

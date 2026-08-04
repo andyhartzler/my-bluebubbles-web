@@ -179,8 +179,17 @@ class _RosterCardState extends State<RosterCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ---- face ----
-              AspectRatio(
-                aspectRatio: 1,
+              //
+              // Expanded, not AspectRatio(1). The tile has a fixed
+              // mainAxisExtent (see roster_gallery), so the info block below
+              // takes its natural height first and the photo absorbs whatever
+              // is left. A square face plus a fixed extent meant the info
+              // block got a fixed remainder, and anything past it was clipped
+              // by the Clip.antiAlias above. Letting the decoration flex
+              // instead of the content is what keeps the flag chips and the
+              // decision chip on screen. HeadshotAvatar is cover-fit at
+              // circle: false, so any height crops cleanly.
+              Expanded(
                 child: Stack(
                   fit: StackFit.expand,
                   children: [

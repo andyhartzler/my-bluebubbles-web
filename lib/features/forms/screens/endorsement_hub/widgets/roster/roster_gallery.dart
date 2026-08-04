@@ -291,14 +291,37 @@ class _RosterGalleryState extends State<RosterGallery> {
         padding: const EdgeInsets.only(bottom: 24, top: 4),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: 236,
-          // 0.66 before the race line landed, 0.62 after it, 0.58 now that the
-          // race-field toggle adds a second labelSmall row under it. The tile
-          // extent here is FIXED, and RosterCard clips (Clip.antiAlias), so a
-          // tile that runs long is silently cut rather than scrolled: the
-          // aspect ratio has to be eased whenever a row is added. This is also
-          // why the grid gets the COMPACT toggle, which opens a modal sheet
-          // instead of growing in place.
-          childAspectRatio: 0.58,
+          // mainAxisExtent, NEVER childAspectRatio. READ THIS BEFORE YOU
+          // "TIDY" IT BACK.
+          //
+          // childAspectRatio ties the tile HEIGHT to the tile WIDTH, and the
+          // width here is whatever is left after
+          // SliverGridDelegateWithMaxCrossAxisExtent divides the viewport:
+          // ceil(W / 250) columns, so a 502px-wide gallery gives three
+          // 158px columns and a 968px one gives four 231px columns. At 0.58
+          // the info block under the square face got width * 0.724, i.e. 167px
+          // at four columns and 114px at three. RosterCard clips
+          // (Clip.antiAlias), so anything past that was silently cut off
+          // rather than scrolled, and the ratio had to be re-eased by hand
+          // every time a row was added. It was not re-eased when the browse
+          // card swapped the candidate's own stance strip for the committee's
+          // ballot tally in 22117fd36, and that strip is taller: bodySmall
+          // instead of labelSmall, a 6px gap instead of 4, and a label that
+          // reaches 39 characters ("10 yes · 2 no · 1 undecided · 3 pending",
+          // measured against production) which wraps to a second line inside a
+          // 207px column. Under the old ratio the busiest cards lost their
+          // flag chips and decision chip entirely, and at three columns every
+          // card lost something.
+          //
+          // A fixed extent decouples height from column count, so the narrow
+          // three-column case gets the SAME room as the wide one instead of
+          // two thirds of it. 430 is the square face at the widest column
+          // (236) plus ~194 for the info block, which covers name + office +
+          // race line + race toggle + a two-line tally + a flag row + the
+          // decision chip. The face is Expanded inside the card, so whatever
+          // the info block does not use goes to the photo instead of to dead
+          // space, and a card with less to say simply shows more face.
+          mainAxisExtent: 430,
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
         ),

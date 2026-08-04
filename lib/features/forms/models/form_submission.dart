@@ -1,4 +1,4 @@
-import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/models/crm/member.dart';
 
 /// Form submission model with manual JSON serialization
 /// Note: Converted from Freezed to manual to avoid build_runner dependency issues
@@ -209,93 +209,24 @@ extension FormSubmissionDisplay on FormSubmission {
     return null;
   }
 
+  /// The joined member's primary profile photo, or null.
+  ///
+  /// ONE parsing rule, shared with [Member.primaryProfilePhotoUrl]:
+  /// [MemberProfilePhoto.parseList] already handles every shape
+  /// `members.profile_pictures` is stored in (a full array entry, a metadata
+  /// array entry, a bare social-handle object, an empty object, a JSON string)
+  /// and already promotes the first entry when no row carries `primary`.
+  ///
+  /// The hand-rolled shape guessing this replaced took `.first` blindly, so a
+  /// member whose primary photo was not the first array element showed the
+  /// wrong face, and it duplicated the storage-URL construction that
+  /// [MemberProfilePhoto.publicUrl] already owns.
   String? get displayPhotoUrl {
-    if (members == null) return null;
-
-    // Try to get profile pictures from joined member data
-    final profilePictures = members!['profile_pictures'];
-    if (profilePictures == null) return null;
-
-    // Handle list of photos
-    if (profilePictures is List && profilePictures.isNotEmpty) {
-      final firstPhoto = profilePictures.first;
-      return _extractPhotoUrl(firstPhoto);
-    }
-
-    // Handle single photo entry
-    if (profilePictures is Map) {
-      return _extractPhotoUrl(profilePictures);
-    }
-
-    // Handle string URL directly
-    if (profilePictures is String && profilePictures.isNotEmpty) {
-      return profilePictures;
-    }
-
-    return null;
-  }
-
-  /// Helper to extract URL from a photo entry
-  String? _extractPhotoUrl(dynamic photo) {
-    if (photo == null) return null;
-
-    // If it's already a full URL string, return it
-    if (photo is String && photo.isNotEmpty) {
-      if (photo.startsWith('http://') || photo.startsWith('https://')) {
-        return photo;
-      }
-      // Construct full URL from relative path
-      return _buildFullUrl(photo);
-    }
-
-    if (photo is Map) {
-      // Try common URL field names
-      final url = photo['publicUrl'] ??
-                  photo['public_url'] ??
-                  photo['url'];
-      if (url != null && url.toString().isNotEmpty) {
-        final urlStr = url.toString();
-        if (urlStr.startsWith('http://') || urlStr.startsWith('https://')) {
-          return urlStr;
-        }
-        return _buildFullUrl(urlStr);
-      }
-
-      // Try to construct URL from path
-      final path = photo['path']?.toString();
-      if (path != null && path.isNotEmpty) {
-        // If path is already a full URL, return it
-        if (path.startsWith('http://') || path.startsWith('https://')) {
-          return path;
-        }
-        // Construct storage URL path
-        final bucket = photo['bucket']?.toString() ?? 'member-photos';
-        final storagePath = path.startsWith('storage/')
-            ? path
-            : 'storage/v1/object/public/$bucket/$path';
-        return _buildFullUrl(storagePath);
-      }
-    }
-
-    return null;
-  }
-
-  /// Build full URL from relative path using Supabase URL
-  String? _buildFullUrl(String relativePath) {
-    final supabaseUrl = CRMConfig.supabaseUrl;
-    if (supabaseUrl.isEmpty) return null;
-
-    // Ensure path starts with /
-    final normalizedPath = relativePath.startsWith('/')
-        ? relativePath
-        : '/$relativePath';
-
-    // Remove trailing slash from base URL if present
-    final baseUrl = supabaseUrl.endsWith('/')
-        ? supabaseUrl.substring(0, supabaseUrl.length - 1)
-        : supabaseUrl;
-
-    return '$baseUrl$normalizedPath';
+    final photos = MemberProfilePhoto.parseList(members?['profile_pictures']);
+    if (photos.isEmpty) return null;
+    final primary =
+        photos.firstWhere((p) => p.isPrimary, orElse: () => photos.first);
+    return primary.publicUrl;
   }
 
   String get displayInitial {

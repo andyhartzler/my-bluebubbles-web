@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/submission_review_model.dart';
+import 'gold_rule_header.dart';
+import 'review_text.dart';
 
 /// Collects the applicant's headshot, budget file, signature and any other
 /// uploads into one card. Headshot opens a fullscreen zoomable viewer; the
@@ -22,7 +24,6 @@ class DocumentsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
 
     final children = <Widget>[];
 
@@ -78,48 +79,17 @@ class DocumentsCard extends StatelessWidget {
 
     if (children.isEmpty) return const SizedBox.shrink();
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFD4A039), Color(0xFFB8860B)],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'Documents',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            for (int i = 0; i < children.length; i++) ...[
-              if (i > 0) const SizedBox(height: 14),
-              children[i],
-            ],
+    return ReviewCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const GoldRuleHeader(title: 'Documents'),
+          const SizedBox(height: 14),
+          for (int i = 0; i < children.length; i++) ...[
+            if (i > 0) const SizedBox(height: 14),
+            children[i],
           ],
-        ),
+        ],
       ),
     );
   }
@@ -199,7 +169,9 @@ class _FileRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest.withOpacity(0.5),
+          // Solid, for the same reason the long-answer block is: this row
+          // carries a link label and its contrast must be knowable.
+          color: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(

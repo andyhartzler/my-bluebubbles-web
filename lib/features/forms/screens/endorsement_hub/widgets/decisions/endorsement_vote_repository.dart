@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/utils/logger/logger.dart';
 
@@ -159,6 +160,36 @@ class BallotEntry {
   bool get hasReason => statedReasonCodes.isNotEmpty;
 }
 
+/// One member of the executive committee as the ballot surfaces need them:
+/// their auth uid, their name, the title they hold, and their face.
+///
+/// `photoUrl` is resolved through [MemberProfilePhoto.parseList], which is the
+/// project's single rule for reading `public.members.profile_pictures`. That
+/// column holds four different shapes in production (a full array entry, a
+/// metadata array entry, a social-handle object with no primary flag, and an
+/// empty object), and parseList already handles all four, promoting the first
+/// entry to primary when none is flagged. Do not hand-roll a second reader.
+@immutable
+class ExecVoter {
+  final String userId;
+  final String name;
+
+  /// public.members.executive_title: President, Chair, Representative and so
+  /// on. Real data, shown under the name.
+  final String? executiveTitle;
+
+  /// Public URL of their primary profile photo, or null when they have none
+  /// (the avatar then falls back to deterministic initials).
+  final String? photoUrl;
+
+  const ExecVoter({
+    required this.userId,
+    required this.name,
+    this.executiveTitle,
+    this.photoUrl,
+  });
+}
+
 /// A per-candidate 3-way tally plus how many seeded execs have not weighed in.
 @immutable
 class VoteTally {
@@ -276,6 +307,11 @@ class EndorsementVoteRepository extends ChangeNotifier {
   /// The exec roster seeded from public.members (uid -> name); vote rows then
   /// overwrite/add so an edge-case voter outside the seed still counts.
   final Map<String, String> _seededVoters = {};
+
+  /// The same seed with the title and the face attached (uid -> [ExecVoter]).
+  /// Kept alongside [_seededVoters] rather than replacing it so every existing
+  /// caller of [knownVoters] compiles and behaves untouched.
+  final Map<String, ExecVoter> _execRoster = {};
 
   /// Seeded roster + every voter seen in a vote row + the signed-in member.
   final Map<String, String> _knownVoters = {};
@@ -515,19 +551,44 @@ class EndorsementVoteRepository extends ChangeNotifier {
     try {
       final rows = await _client
           .from('members')
-          .select('user_id, name')
+          .select('user_id, name, executive_title, profile_pictures')
           .eq('executive_committee', true)
           .not('user_id', 'is', null)
           // 16 rows today, far under any row cap, but still bounded: it is on
           // the load path ahead of the ballot fetch.
           .timeout(kVoteReadTimeout);
       _seededVoters.clear();
+      _execRoster.clear();
       for (final row in (rows as List)) {
         final m = Map<String, dynamic>.from(row as Map);
         final uid = m['user_id']?.toString();
         if (uid == null || uid.isEmpty) continue;
-        final name = m['name']?.toString().trim();
-        _seededVoters[uid] = (name == null || name.isEmpty) ? 'An exec' : name;
+        final rawName = m['name']?.toString().trim();
+        final name = (rawName == null || rawName.isEmpty) ? 'An exec' : rawName;
+        _seededVoters[uid] = name;
+
+        // Canonical photo rule: parse, prefer the primary entry, fall back to
+        // the first. parseList already promotes the first to primary when the
+        // stored objects carry no flag, so firstWhere-with-orElse is not a
+        // second rule, it is a guard.
+        final photos = MemberProfilePhoto.parseList(m['profile_pictures']);
+        String? photoUrl;
+        if (photos.isNotEmpty) {
+          final primary = photos.firstWhere(
+            (p) => p.isPrimary,
+            orElse: () => photos.first,
+          );
+          photoUrl = primary.publicUrl;
+        }
+
+        final rawTitle = m['executive_title']?.toString().trim();
+        _execRoster[uid] = ExecVoter(
+          userId: uid,
+          name: name,
+          executiveTitle:
+              (rawTitle == null || rawTitle.isEmpty) ? null : rawTitle,
+          photoUrl: (photoUrl == null || photoUrl.isEmpty) ? null : photoUrl,
+        );
       }
     } catch (e) {
       debugPrint('EndorsementVoteRepository.seedExecRoster error: $e');
@@ -621,7 +682,16 @@ class EndorsementVoteRepository extends ChangeNotifier {
   void _subscribe() {
     if (_channel != null) return;
     try {
-      _channel = _client.channel('public:$_table')
+      // The topic is namespaced PER INSTANCE, not just 'public:endorsement_votes'.
+      // Three surfaces now build their own repository (the hub, the
+      // questionnaire panel and the submission detail screen) and the hub stays
+      // mounted underneath when a candidate profile is pushed from it, so two
+      // or more live at once. supabase realtime_client always constructs a NEW
+      // channel for a topic rather than reusing one, and two joins of the same
+      // topic on one socket is the case Supabase warns against: the losing
+      // channel's subscribe callback returns without reaching refresh() below,
+      // so that board silently stops updating and shows a frozen tally.
+      _channel = _client.channel('public:$_table:${identityHashCode(this)}')
         ..onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
@@ -789,6 +859,13 @@ class EndorsementVoteRepository extends ChangeNotifier {
   /// The full voter roster (uid -> display name): seeded execs plus everyone
   /// seen voting plus the signed-in member.
   Map<String, String> get knownVoters => Map.unmodifiable(_knownVoters);
+
+  /// The executive committee with titles and faces (uid -> [ExecVoter]).
+  ///
+  /// This is the SEED only, so it does not include a voter who cast a ballot
+  /// without being on the exec roster. Surfaces that must show everyone union
+  /// this with [knownVoters] and fall back to the name for anyone missing.
+  Map<String, ExecVoter> get execRoster => Map.unmodifiable(_execRoster);
 
   // ==================== writes ====================
 

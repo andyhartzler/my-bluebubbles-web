@@ -117,6 +117,7 @@ class AutoInferredAssignmentsService {
   /// the hub's controller stack.
   static const String _endorsementFormId =
       '945738f0-ff66-420f-8707-afb4a23ca58b';
+  // Matches the live database. See SlateController.endorsementSlug.
   static const String _endorsementSlug = 'endorsement-questionnaire-2026';
   DateTime? _cacheStamp;
   List<AutoInferredAssignment> _cache = const [];

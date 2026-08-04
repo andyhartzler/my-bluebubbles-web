@@ -34,6 +34,37 @@ class EndorsementAiScoreRepository {
     return out;
   }
 
+  static const _historyTable = 'endorsement_ai_score_history';
+
+  /// Every superseded scoring run for one submission, newest first.
+  ///
+  /// Explicitly bounded. A bare `select()` is silently truncated by PostgREST
+  /// at the project row cap (HTTP 200, no error, just fewer rows), and while
+  /// 50 is far above anything one submission produces today, the bound is what
+  /// makes that a stated ceiling rather than an accident. Failure degrades to
+  /// an empty list: the disclosure then renders nothing, which is also what a
+  /// submission with no history renders.
+  Future<List<AiScoreHistoryEntry>> loadHistory(String submissionId) async {
+    if (submissionId.isEmpty) return const [];
+    final out = <AiScoreHistoryEntry>[];
+    try {
+      final rows = await _supabase.client
+          .from(_historyTable)
+          .select()
+          .eq('submission_id', submissionId)
+          .order('scored_at', ascending: false)
+          .limit(50);
+      for (final row in (rows as List)) {
+        final parsed =
+            AiScoreHistoryEntry.fromRow(Map<String, dynamic>.from(row as Map));
+        if (parsed != null) out.add(parsed);
+      }
+    } catch (e) {
+      debugPrint('EndorsementAiScoreRepository.loadHistory error: $e');
+    }
+    return out;
+  }
+
   /// A single submission's AI score, or null.
   Future<AiAlignmentScore?> loadOne(String submissionId) async {
     try {

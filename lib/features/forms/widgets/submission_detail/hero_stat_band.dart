@@ -28,6 +28,7 @@ class HeroStatBand extends StatelessWidget {
       model.raisedToDate != null ||
       model.selfFundedPct != null ||
       model.track != null ||
+      model.youngDemByDob ||
       (model.nonDemHistory && model.partyHistory != null);
 
   @override
@@ -47,11 +48,19 @@ class HeroStatBand extends StatelessWidget {
     }
     if (model.track != null) add('TRACK', model.track!);
 
-    final flag = (model.nonDemHistory && model.partyHistory != null)
-        ? _flagChip()
-        : null;
+    // Both flags are self-contained light pills on the fixed navy fill, which
+    // is the same treatment the party-history flag already ships with.
+    final flags = <Widget>[
+      if (model.nonDemHistory && model.partyHistory != null)
+        _chip(Icons.flag_outlined, model.partyHistory!),
+      // dob_is_young_dem is derived off-schema, stored as a string, and true
+      // on 9 of the 67 submissions that carry it. Real eligibility data that
+      // used to render nowhere at all.
+      if (model.youngDemByDob)
+        _chip(Icons.cake_outlined, 'Young Dem by DOB'),
+    ];
 
-    if (tiles.isEmpty && flag == null) return const SizedBox.shrink();
+    if (tiles.isEmpty && flags.isEmpty) return const SizedBox.shrink();
 
     return Container(
       width: double.infinity,
@@ -72,7 +81,7 @@ class HeroStatBand extends StatelessWidget {
                 if (i > 0) _divider(),
                 tiles[i],
               ],
-              if (flag != null) flag,
+              ...flags,
             ],
           );
         }
@@ -89,9 +98,9 @@ class HeroStatBand extends StatelessWidget {
                   ),
                 tiles[i],
               ],
-              if (flag != null) ...[
-                if (tiles.isNotEmpty) const SizedBox(width: 20),
-                flag,
+              for (int i = 0; i < flags.length; i++) ...[
+                if (i > 0 || tiles.isNotEmpty) const SizedBox(width: 12),
+                flags[i],
               ],
             ],
           ),
@@ -102,10 +111,10 @@ class HeroStatBand extends StatelessWidget {
 
   Widget _divider() => Container(width: 1, height: 26, color: Colors.white24);
 
-  /// Non-Democrat party-history flag: the shipped self-contained light pill
-  /// (dark amber text on amberBg, ~7.3:1) reads as a deliberate warning tag
-  /// on the navy band.
-  Widget _flagChip() {
+  /// A flag chip on the navy band: the shipped self-contained light pill
+  /// (dark amber text on amberBg, ~7.3:1) reads as a deliberate tag rather
+  /// than as part of the band's own type.
+  Widget _chip(IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -115,10 +124,10 @@ class HeroStatBand extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.flag_outlined, size: 14, color: MoydBrand.amber),
+          Icon(icon, size: 14, color: MoydBrand.amber),
           const SizedBox(width: 5),
           Text(
-            model.partyHistory!,
+            label,
             style: const TextStyle(
               color: Color(0xFF6B4E00),
               fontSize: 12,

@@ -7,9 +7,11 @@ import '../../models/form_submission.dart';
 import '../../models/submission_review_model.dart';
 import 'candidate_hero_header.dart';
 import 'documents_card.dart';
+import 'gold_rule_header.dart';
 import 'hero_stat_band.dart';
 import 'policy_positions_grid.dart';
 import 'references_card.dart';
+import 'review_text.dart';
 import 'section_card.dart';
 import 'section_nav_bar.dart';
 import 'verdict_block.dart';
@@ -30,6 +32,15 @@ class SubmissionReviewBody extends StatefulWidget {
   final FormSubmission submission;
   final AiAlignmentScore? aiAlignment;
 
+  /// Superseded scoring runs for this submission (see
+  /// [EndorsementAiScoreRepository.loadHistory]). Empty renders nothing.
+  final List<AiScoreHistoryEntry> aiHistory;
+
+  /// Rendered above everything else when supplied: the exec ballot block.
+  /// Passed in rather than built here so this widget keeps no dependency on
+  /// the vote repository and stays a pure renderer of a submission.
+  final Widget? leading;
+
   /// Show the MOYD hero header. The candidate-profile tab hides it (the
   /// profile already renders the candidate's identity above the tabs).
   final bool showHero;
@@ -42,6 +53,8 @@ class SubmissionReviewBody extends StatefulWidget {
     required this.form,
     required this.submission,
     this.aiAlignment,
+    this.aiHistory = const [],
+    this.leading,
     this.showHero = true,
     this.onOpenLinkedProfile,
     this.linkedProfileLabel,
@@ -346,6 +359,7 @@ class _SubmissionReviewBodyState extends State<SubmissionReviewBody> {
     // rect + pin state re-derive on the next frame).
     return LayoutBuilder(builder: (context, constraints) {
       _scheduleTick();
+      final cs = Theme.of(context).colorScheme;
       return Column(
         key: _bodyKey,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -358,6 +372,37 @@ class _SubmissionReviewBodyState extends State<SubmissionReviewBody> {
                 status: widget.submission.status,
                 onOpenLinkedProfile: widget.onOpenLinkedProfile,
                 linkedProfileLabel: widget.linkedProfileLabel,
+              ),
+            ),
+          // Who voted, and how, before anything else on the page.
+          if (widget.leading != null) widget.leading!,
+          if (model.aiAlignment != null)
+            keyed(
+              '_verdict',
+              VerdictBlock(
+                ai: model.aiAlignment!,
+                rulePct: model.ruleAlignmentPct,
+                selectedOptions: model.selectedOptions,
+                history: widget.aiHistory,
+              ),
+            )
+          else
+            // Defensive: all 75 endorsement submissions carry a score today.
+            // An unscored one gets an honest placeholder rather than a silent
+            // gap where the verdict belongs.
+            ReviewCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Not scored yet',
+                      style: ReviewText.bodyStrong(context)),
+                  const SizedBox(height: 6),
+                  Text(
+                    'The Gemini verdict appears after the scorer runs on this '
+                    'submission.',
+                    style: ReviewText.secondary(context),
+                  ),
+                ],
               ),
             ),
           if (band.hasContent)
@@ -373,19 +418,26 @@ class _SubmissionReviewBodyState extends State<SubmissionReviewBody> {
                 overlayChildBuilder: _pinnedNav,
                 child: KeyedSubtree(
                   key: _navAnchorKey,
-                  child: ReviewSectionNav(
-                    targets: _targets,
-                    activeId: _activeId,
-                    onTap: _jumpTo,
+                  // The pill row's edge fades are drawn in cs.surface, so it
+                  // needs its own opaque cs.surface container to fade INTO.
+                  // Without one the fades sat directly on whatever the host
+                  // painted (navy, on the candidate profile) and read as two
+                  // near-white strips over the branded background.
+                  child: Container(
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: cs.outlineVariant),
+                    ),
+                    child: ReviewSectionNav(
+                      targets: _targets,
+                      activeId: _activeId,
+                      onTap: _jumpTo,
+                    ),
                   ),
                 ),
               ),
-            ),
-          if (model.aiAlignment != null)
-            keyed(
-              '_verdict',
-              VerdictBlock(
-                  ai: model.aiAlignment!, rulePct: model.ruleAlignmentPct),
             ),
           _SectionsFlow(cards: [...sectionCards, ...tailCards]),
         ],
@@ -470,7 +522,11 @@ class _SectionsFlow extends StatelessWidget {
 
 /// Collapsed submission-metadata tile (moved out of the detail screen so the
 /// embedded review shows the same provenance).
-class ReviewMetadataTile extends StatelessWidget {
+///
+/// Wears the same card chrome and the same [GoldRuleHeader] as every other
+/// block: the bare M3 [ExpansionTile] look was the fourth distinct header
+/// treatment on one page.
+class ReviewMetadataTile extends StatefulWidget {
   final FormSubmission submission;
   final FormSchema form;
 
@@ -480,13 +536,20 @@ class ReviewMetadataTile extends StatelessWidget {
     required this.form,
   });
 
+  @override
+  State<ReviewMetadataTile> createState() => _ReviewMetadataTileState();
+}
+
+class _ReviewMetadataTileState extends State<ReviewMetadataTile> {
+  bool _open = false;
+
   String _fmt(DateTime d) =>
       '${d.month}/${d.day}/${d.year} at ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
+    final s = widget.submission;
 
     Widget row(String label, String value) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -495,47 +558,57 @@ class ReviewMetadataTile extends StatelessWidget {
             children: [
               SizedBox(
                 width: 120,
-                child: Text(label,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: cs.onSurfaceVariant)),
+                child: Text(label, style: ReviewText.fieldLabel(context)),
               ),
               Expanded(
                 child: SelectableText(value,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(fontWeight: FontWeight.w500)),
+                    style: ReviewText.caption(context)
+                        .copyWith(color: cs.onSurface)),
               ),
             ],
           ),
         );
 
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Theme(
-        data: theme.copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          leading: Icon(Icons.info_outline, color: cs.onSurfaceVariant),
-          title: Text('Submission info',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w600)),
-          childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          expandedCrossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            row('Submission ID', submission.id),
-            row('Form ID', submission.formId),
-            if (submission.memberId != null)
-              row('Member ID', submission.memberId!),
-            if (submission.candidateId != null)
-              row('Candidate ID', submission.candidateId!),
-            row('Submitted at', _fmt(submission.createdAt)),
-            row('Status', submission.status),
-          ],
-        ),
+    return ReviewCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _open = !_open),
+            borderRadius: BorderRadius.circular(8),
+            child: GoldRuleHeader(
+              title: 'Submission info',
+              trailing: AnimatedRotation(
+                turns: _open ? 0.5 : 0,
+                duration: const Duration(milliseconds: 160),
+                child: Icon(Icons.expand_more,
+                    size: 18, color: cs.onSurfaceVariant),
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 160),
+            sizeCurve: Curves.easeOut,
+            crossFadeState:
+                _open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  row('Submission ID', s.id),
+                  row('Form ID', s.formId),
+                  if (s.memberId != null) row('Member ID', s.memberId!),
+                  if (s.candidateId != null)
+                    row('Candidate ID', s.candidateId!),
+                  row('Submitted at', _fmt(s.createdAt)),
+                  row('Status', s.status),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

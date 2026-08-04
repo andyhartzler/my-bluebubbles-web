@@ -121,8 +121,12 @@ Deno.serve(async (req) => {
 
     // Determine which app is requesting login
     const isExecutiveApp = email_data.redirect_to?.includes('moyd.app');
-    const isJobPosterApp = email_data.redirect_to?.includes('jobs.moyoungdemocrats.org/poster');
-    const isMembersApp = email_data.redirect_to?.includes('members.moyoungdemocrats.org');
+    // Match both URL forms: legacy subdomain (jobs.moyoungdemocrats.org/poster) and
+    // apex path (moyoungdemocrats.org/jobs/poster). Both stay live permanently.
+    const isJobPosterApp = email_data.redirect_to?.includes('jobs.moyoungdemocrats.org/poster') ||
+      email_data.redirect_to?.includes('moyoungdemocrats.org/jobs/poster');
+    const isMembersApp = email_data.redirect_to?.includes('members.moyoungdemocrats.org') ||
+      email_data.redirect_to?.includes('moyoungdemocrats.org/members');
 
     // === MOYD.APP (Executive + Committee Members) ===
     if (isExecutiveApp) {
@@ -235,7 +239,7 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({
           error: {
             http_code: 403,
-            message: 'No job postings found for this email address. Please use the same email you used when submitting your job posting or the contact email listed on the posting. If you haven\'t submitted a job yet, visit jobs.moyoungdemocrats.org/submit to post an opportunity.'
+            message: 'No job postings found for this email address. Please use the same email you used when submitting your job posting or the contact email listed on the posting. If you haven\'t submitted a job yet, visit moyoungdemocrats.org/jobs/submit to post an opportunity.'
           }
         }), {
           status: 403,
@@ -336,7 +340,7 @@ Deno.serve(async (req) => {
           </p>
           <hr style="margin: 24px 0; border: none; border-top: 1px solid #ddd;">
           <p style="font-size: 12px; color: #999; text-align: center;">
-            Missouri Young Democrats • <a href="https://jobs.moyoungdemocrats.org" style="color: #273351; text-decoration: none;">jobs.moyoungdemocrats.org</a>
+            Missouri Young Democrats • <a href="https://moyoungdemocrats.org/jobs" style="color: #273351; text-decoration: none;">moyoungdemocrats.org/jobs</a>
           </p>
         </div>
       `;

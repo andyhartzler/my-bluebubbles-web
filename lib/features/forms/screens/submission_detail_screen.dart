@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import '../models/form_schema.dart';
 import '../models/form_submission.dart';
 import '../models/submission_review_model.dart';
+import '../widgets/submission_detail/exec_ballot_block.dart';
 import '../widgets/submission_detail/submission_review_body.dart';
 import '../services/forms_service.dart';
 import 'endorsement_hub/ai_score_repository.dart';
+import 'endorsement_hub/widgets/decisions/endorsement_vote_repository.dart';
 import '../../../models/crm/member.dart';
 import '../../../models/crm/subscriber.dart';
 import '../../../screens/crm/candidate_detail_screen.dart';
@@ -55,6 +57,12 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   final EndorsementAiScoreRepository _aiScoreRepo =
       EndorsementAiScoreRepository();
   AiAlignmentScore? _aiAlignment;
+  List<AiScoreHistoryEntry> _aiHistory = const [];
+
+  /// Ballots for the exec ballot block. Loaded lazily: only an endorsement
+  /// questionnaire has a ballot, and every other form that lands on this
+  /// screen must not pay for a full ballot fetch.
+  EndorsementVoteRepository? _votes;
 
   final MemberRepository _memberRepo = MemberRepository();
   final SubscriberRepository _subscriberRepo = SubscriberRepository();
@@ -76,6 +84,14 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    // Closes the ballot repository's realtime channel; null when this form is
+    // not an endorsement questionnaire and no ballot was ever fetched.
+    _votes?.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -129,12 +145,34 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     if (s == null) return;
     try {
       final score = await _aiScoreRepo.loadOne(s.id);
-      if (mounted && score != null) {
-        setState(() => _aiAlignment = score);
-      }
+      final history = await _aiScoreRepo.loadHistory(s.id);
+      if (!mounted) return;
+      setState(() {
+        if (score != null) _aiAlignment = score;
+        _aiHistory = history;
+      });
     } catch (e) {
       debugPrint('Error loading AI alignment score: $e');
     }
+  }
+
+  /// True for the endorsement questionnaire, which is the only form on this
+  /// screen the executive committee casts ballots on.
+  bool get _isEndorsementQuestionnaire =>
+      (form?.slug ?? '').startsWith('endorsement-questionnaire');
+
+  /// The exec ballot block, or null for any other form.
+  ///
+  /// This screen is where the 24 questionnaire submissions with no linked CRM
+  /// candidate land, so without this they were the only submissions in the
+  /// set whose page did not show who had voted. Ballots key on the SUBMISSION
+  /// id (`endorsement_votes.candidate_id` is that id as text), which this
+  /// screen has, so no candidate link is needed.
+  Widget? _ballotBlock() {
+    final s = submission;
+    if (s == null || s.id.isEmpty || !_isEndorsementQuestionnaire) return null;
+    final repo = _votes ??= (EndorsementVoteRepository()..load());
+    return ExecBallotBlock(votes: repo, submissionId: s.id);
   }
 
   Future<void> _loadLinkedPerson() async {
@@ -307,6 +345,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
               form: form!,
               submission: submission!,
               aiAlignment: _aiAlignment,
+              aiHistory: _aiHistory,
+              leading: _ballotBlock(),
               showHero: true,
               onOpenLinkedProfile: onOpenProfile,
               linkedProfileLabel: linkedLabel,

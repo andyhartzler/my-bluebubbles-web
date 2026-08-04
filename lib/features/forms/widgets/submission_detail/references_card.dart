@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/submission_review_model.dart';
+import 'gold_rule_header.dart';
+import 'review_text.dart';
 
 /// Renders the applicant's references as a Wrap of ~280px mini-cards. Phone
 /// and email values copy to the clipboard on tap.
@@ -12,52 +14,21 @@ class ReferencesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (references.isEmpty) return const SizedBox.shrink();
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFD4A039), Color(0xFFB8860B)],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text('References',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800)),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                for (final ref in references)
-                  _RefMiniCard(entry: ref),
-              ],
-            ),
-          ],
-        ),
+    return ReviewCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const GoldRuleHeader(title: 'References'),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (final ref in references) _RefMiniCard(entry: ref),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -78,7 +49,9 @@ class _RefMiniCard extends StatelessWidget {
       width: 280,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withOpacity(0.4),
+        // Solid raised fill, not an alpha over an unknown parent: the mini
+        // card carries text and its contrast has to be knowable.
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outlineVariant),
       ),

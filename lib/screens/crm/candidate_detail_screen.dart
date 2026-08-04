@@ -14,6 +14,7 @@ import 'package:bluebubbles/widgets/crm/candidate_rubric_card.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_painters.dart';
 import 'package:bluebubbles/screens/crm/voter_file/voter_file_card.dart';
 import 'package:bluebubbles/screens/crm/widgets/candidate_questionnaire_panel.dart';
+import 'package:bluebubbles/screens/crm/widgets/endorsement_questionnaire_section.dart';
 import 'package:bluebubbles/screens/crm/widgets/socials/candidate_socials_panel.dart';
 import 'package:bluebubbles/screens/crm/candidate_edit_dialog.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
@@ -855,7 +856,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   // ── Copy the candidate-specific endorsement questionnaire link. ──
   void _copyQuestionnaireLink() {
     final link =
-        'https://forms.moyoungdemocrats.org/endorsement-questionnaire-2026?candidate_id=${c.id}';
+        'https://moyoungdemocrats.org/forms/endorsement-questionnaire?candidate_id=${c.id}';
     _copyToClipboard(link, 'Questionnaire link');
   }
 
@@ -896,6 +897,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     });
   }
 
+  /// Reaches the Questionnaire tab's state so pull-to-refresh re-fetches it.
+  final GlobalKey<EndorsementQuestionnaireSectionState> _questionnaireKey =
+      GlobalKey<EndorsementQuestionnaireSectionState>();
+
   // ── Refresh handlers for RefreshIndicator — one per tab. ──
   Future<void> _refreshCurrentTab() async {
     final idx = _tabController.index;
@@ -920,10 +925,15 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         await _loadIntelData();
         break;
       case 4:
+        // The questionnaire panel owns its own fetches, so refresh it through
+        // its state rather than resolving a fake delay: pulling used to spin,
+        // stop, and change nothing on screen.
+        await _questionnaireKey.currentState?.reload();
+        break;
       case 5:
-        // Questionnaire and Socials panels own their own content; nothing to
-        // do at this level. Pull-to-refresh still resolves after ~250ms so
-        // the user gets a visible completion.
+        // Socials panel owns its own content; nothing to do at this level.
+        // Pull-to-refresh still resolves after ~250ms so the user gets a
+        // visible completion.
         await Future.delayed(const Duration(milliseconds: 250));
         break;
     }
@@ -999,7 +1009,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                         _refreshable(_buildMoneyTab()),
                         _refreshable(_buildRaceTab()),
                         _refreshable(_buildIntelTab()),
-                        _refreshable(CandidateQuestionnairePanel(candidateId: c.id)),
+                        _refreshable(CandidateQuestionnairePanel(
+                          candidateId: c.id,
+                          sectionKey: _questionnaireKey,
+                        )),
                         _refreshable(CandidateSocialsPanel(candidate: c)),
                       ],
                     ),

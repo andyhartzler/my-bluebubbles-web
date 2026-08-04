@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/submission_review_model.dart';
 import '../../theme/moyd_brand.dart';
 import '../review/stance_visuals.dart';
+import 'review_text.dart';
 
 /// The Gemini verdict on a candidate, styled as a case ruling.
 ///
@@ -21,7 +22,23 @@ class VerdictBlock extends StatefulWidget {
   /// Optional rule-based score for the labeled comparison chip.
   final double? rulePct;
 
-  const VerdictBlock({super.key, required this.ai, this.rulePct});
+  /// The candidate's own stance per issue id ({field id: chosen option
+  /// label}), so a deduction can lead with the answer that cost the points
+  /// instead of only the scorer's paraphrase of it. Empty is survivable: the
+  /// row falls back to the quote.
+  final Map<String, String>? selectedOptions;
+
+  /// Superseded scoring runs for this submission, newest first. Empty on 73
+  /// of 74 scored candidates today, and empty renders nothing at all.
+  final List<AiScoreHistoryEntry> history;
+
+  const VerdictBlock({
+    super.key,
+    required this.ai,
+    this.rulePct,
+    this.selectedOptions,
+    this.history = const [],
+  });
 
   @override
   State<VerdictBlock> createState() => _VerdictBlockState();
@@ -30,6 +47,9 @@ class VerdictBlock extends StatefulWidget {
 class _VerdictBlockState extends State<VerdictBlock> {
   /// Ledger rows the user has flipped away from the width-based default.
   final Set<String> _userToggled = {};
+
+  /// Prior-scores disclosure, collapsed until asked for.
+  bool _historyOpen = false;
 
   /// Latched on the ledger's first layout: rows open by default on wide
   /// screens (the verdict renders full-width above the two-column flow, so
@@ -90,38 +110,93 @@ class _VerdictBlockState extends State<VerdictBlock> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+    return ReviewCard(
+      padding: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: ai.disqualified
-              ? _crimson.first.withValues(alpha: 0.45)
-              : cs.outlineVariant,
-        ),
-      ),
+      borderColor: ai.disqualified
+          ? _crimson.first.withValues(alpha: 0.45)
+          : cs.outlineVariant,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _banner(context),
+          if (ai.isProvisional) _provisionalBand(context),
           if (ai.disqualifiers.isNotEmpty) _indictments(context),
           if (ai.rationale.trim().isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
               child: Text(
                 ai.rationale.trim(),
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(height: 1.5),
+                style: ReviewText.body(context),
               ),
             ),
-          if (ai.overallScore < 100 && ai.deductions.isNotEmpty)
-            _deductions(context),
+          // The gate is the deductions themselves, nothing else. It used to
+          // also require overallScore < 100, which hid real itemized content
+          // from every candidate the scorer gave a 100 while still recording
+          // where points would have gone.
+          if (ai.deductions.isNotEmpty) _deductions(context),
           if (ai.perIssue.isNotEmpty) _ledger(context),
           _footer(context),
+          if (widget.history.isNotEmpty) _historyDisclosure(context),
+        ],
+      ),
+    );
+  }
+
+  // ── provisional basis band ───────────────────────────────────────────────
+
+  /// The live trust defect this page shipped with: a verdict computed from a
+  /// half-finished draft rendered identically to one computed from a
+  /// submitted questionnaire, with nothing on screen to tell them apart.
+  ///
+  /// Amber, not crimson. It must be unmissable, and it must not compete with
+  /// a DISQUALIFIED banner, which stays the loudest thing on the card. The
+  /// qualifiedFg/qualifiedBg pair is self-contained and AA in both themes.
+  Widget _provisionalBand(BuildContext context) {
+    final partial = ai.scoreBasis == 'partial_draft';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 12, 20, 12),
+      decoration: const BoxDecoration(
+        color: MoydBrand.qualifiedBg,
+        border: Border(
+          left: BorderSide(color: MoydBrand.qualifiedFg, width: 4),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded,
+                  size: 15, color: MoydBrand.qualifiedFg),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  partial
+                      ? 'SCORED FROM A PARTIAL DRAFT'
+                      : 'SCORED FROM AN UNFINISHED SUBMISSION',
+                  style: const TextStyle(
+                    color: MoydBrand.qualifiedFg,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'This verdict was computed before the candidate finished the '
+            'questionnaire (status: ${ai.sourceStatusLabel}). Treat the score '
+            'as provisional.',
+            style: const TextStyle(
+              color: MoydBrand.qualifiedFg,
+              fontSize: 12.5,
+              height: 1.4,
+            ),
+          ),
         ],
       ),
     );
@@ -267,14 +342,14 @@ class _VerdictBlockState extends State<VerdictBlock> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.gavel_rounded,
+                    const Icon(Icons.gavel_rounded,
                         size: 15, color: MoydBrand.opposeFg),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         '${_issueLabel(d.issueId).toUpperCase()}'
                         '${d.position.isNotEmpty ? '  ·  ${d.position}' : ''}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: MoydBrand.opposeFg,
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
@@ -288,7 +363,7 @@ class _VerdictBlockState extends State<VerdictBlock> {
                   const SizedBox(height: 8),
                   Text(
                     '“${d.quote.trim()}”',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: MoydBrand.opposeFg,
                       fontSize: 14.5,
                       fontStyle: FontStyle.italic,
@@ -321,22 +396,21 @@ class _VerdictBlockState extends State<VerdictBlock> {
   /// and the candidate's own words that cost them. Disqualified candidates
   /// render these below their indictments. Absent/empty deductions (older
   /// rows, 100-scorers) skip the block entirely.
+  /// The candidate's chosen option for a deduction's issue id, or null when
+  /// the id does not resolve to a question on this form.
+  String? _answerFor(String issueId) {
+    if (issueId.isEmpty) return null;
+    final v = widget.selectedOptions?[issueId]?.trim();
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
   Widget _deductions(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'WHERE THE POINTS WENT',
-            style: TextStyle(
-              color: cs.onSurfaceVariant,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.8,
-            ),
-          ),
+          Text('WHERE THE POINTS WENT', style: ReviewText.overline(context)),
           const SizedBox(height: 6),
           for (final d in ai.deductions)
             Padding(
@@ -369,32 +443,33 @@ class _VerdictBlockState extends State<VerdictBlock> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          d.label,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            color: cs.onSurface,
+                        Text(d.label, style: ReviewText.bodyStrong(context)),
+                        // The candidate's own stance, joined back by issue id.
+                        // The answer is the thing that actually cost the
+                        // points, and it was always in the submission; the
+                        // verdict just was not looking it up.
+                        if (_answerFor(d.issueId) != null)
+                          Text.rich(
+                            TextSpan(
+                              style: ReviewText.secondary(context),
+                              children: [
+                                const TextSpan(text: 'Their answer: '),
+                                TextSpan(
+                                  text: _answerFor(d.issueId),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
                         if (d.quote.trim().isNotEmpty)
                           Text(
                             '“${d.quote.trim()}”',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontStyle: FontStyle.italic,
-                              color: cs.onSurfaceVariant,
-                              height: 1.4,
-                            ),
+                            style: ReviewText.secondary(context)
+                                .copyWith(fontStyle: FontStyle.italic),
                           ),
-                        Text(
-                          d.explanation,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: cs.onSurfaceVariant,
-                            height: 1.4,
-                          ),
-                        ),
+                        Text(d.explanation,
+                            style: ReviewText.secondary(context)),
                       ],
                     ),
                   ),
@@ -409,7 +484,6 @@ class _VerdictBlockState extends State<VerdictBlock> {
   // ── per-issue ledger ─────────────────────────────────────────────────────
 
   Widget _ledger(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
       child: LayoutBuilder(builder: (context, c) {
@@ -428,15 +502,7 @@ class _VerdictBlockState extends State<VerdictBlock> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'ISSUE LEDGER',
-              style: TextStyle(
-                color: cs.onSurfaceVariant,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.8,
-              ),
-            ),
+            Text('ISSUE LEDGER', style: ReviewText.overline(context)),
             const SizedBox(height: 6),
             for (final issue in ai.perIssue)
               _ledgerRow(context, issue, narrow),
@@ -571,19 +637,78 @@ class _VerdictBlockState extends State<VerdictBlock> {
 
   // ── footer ───────────────────────────────────────────────────────────────
 
+  static const List<String> _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  /// "Jul 25" or "Jul 25, 2026". The date always carries its year in the
+  /// footer: a bare month/day silently ambiguates across scoring years, and
+  /// this corpus already spans a re-scoring campaign.
+  static String _fmtDate(DateTime d, {bool withYear = false}) {
+    final l = d.toLocal();
+    final base = '${_months[l.month - 1]} ${l.day}';
+    return withYear ? '$base, ${l.year}' : base;
+  }
+
+  /// Everything the scorer recorded about how this verdict was produced.
+  ///
+  /// The model id used to be suppressed here on the grounds that execs kept
+  /// asking about it. It is shown now because "show all the AI output" is the
+  /// instruction this page was rebuilt under, and a verdict whose provenance
+  /// is partly hidden is harder to trust than one where all of it is on the
+  /// table. `scorer_host` is the one field still withheld: a machine hostname
+  /// carries no decision value.
   Widget _footer(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // The raw model id is deliberately absent: it is an internal detail execs
-    // kept asking about. Recency and the rule-based cross-check are the facts
-    // that inform trust in the verdict. (ai.model stays on the data model.)
-    final bits = <String>[
-      if (widget.rulePct != null) 'Rule-based: ${widget.rulePct!.round()}%',
+    final rubric = ai.rubricVersion;
+    final bits = <({String text, IconData? icon})>[
+      if (widget.rulePct != null)
+        (text: 'Rule-based: ${widget.rulePct!.round()}%', icon: null),
       if (ai.scoredAt != null)
-        'Scored ${ai.scoredAt!.toLocal().month}/${ai.scoredAt!.toLocal().day}',
+        (text: 'Scored ${_fmtDate(ai.scoredAt!, withYear: true)}', icon: null),
+      if (ai.model != null && ai.model!.isNotEmpty)
+        (text: 'Model: ${ai.model}', icon: null),
+      // Null rubric is not a gap to hide. 73 of 77 rows predate rubric
+      // versioning, and saying so is what stops those scores being read as
+      // comparable with the four that carry one.
+      if (rubric != null && rubric.isNotEmpty)
+        (
+          text: 'Rubric ${rubric.length > 8 ? rubric.substring(0, 8) : rubric}',
+          icon: null
+        )
+      else
+        (text: 'Pre-rubric scoring run', icon: null),
+      if (ai.scoreBasis != null)
+        (
+          text: 'Basis: ${ai.scoreBasis!.replaceAll('_', ' ')}',
+          icon: null
+        ),
+      if (ai.answeredScoredRadios != null && ai.answeredKeyCount != null)
+        (
+          text: '${ai.answeredScoredRadios} scored answers · '
+              '${ai.answeredKeyCount} keys',
+          icon: null
+        ),
+      if (ai.promotedFromBasis != null)
+        (
+          text: 'Promoted from ${ai.promotedFromBasis!.replaceAll('_', ' ')}'
+              '${ai.promotedAt == null ? '' : ' ${_fmtDate(ai.promotedAt!)}'}',
+          icon: null
+        ),
+      if (ai.supersededCount > 0)
+        (
+          text: ai.supersededCount == 1
+              ? 'Re-scored once'
+              : 'Re-scored ${ai.supersededCount} times',
+          icon: null
+        ),
+      if (ai.reviewLocked)
+        (text: 'Review locked', icon: Icons.lock_outline),
     ];
     if (bits.isEmpty) return const SizedBox(height: 10);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
       child: Wrap(
         spacing: 6,
         runSpacing: 6,
@@ -595,15 +720,128 @@ class _VerdictBlockState extends State<VerdictBlock> {
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(color: cs.outlineVariant),
               ),
-              child: Text(
-                bit,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurfaceVariant,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (bit.icon != null) ...[
+                    Icon(bit.icon, size: 12, color: cs.onSurfaceVariant),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    bit.text,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  // ── prior scores ─────────────────────────────────────────────────────────
+
+  /// Superseded scoring runs, collapsed. One of 74 scored candidates has any,
+  /// so the caller renders this only when the list is non-empty and the
+  /// default page carries nothing here at all. A list, not a timeline: the
+  /// corpus does not support one.
+  Widget _historyDisclosure(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final rows = widget.history;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _historyOpen = !_historyOpen),
+            borderRadius: BorderRadius.circular(8),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 36),
+              child: Row(
+                children: [
+                  Icon(Icons.history, size: 14, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Prior scores (${rows.length})',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w700, color: cs.onSurface),
+                  ),
+                  const Spacer(),
+                  AnimatedRotation(
+                    turns: _historyOpen ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 160),
+                    child: Icon(Icons.expand_more,
+                        size: 18, color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 160),
+            sizeCurve: Curves.easeOut,
+            crossFadeState: _historyOpen
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [for (final h in rows) _historyRow(context, h)],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _historyRow(BuildContext context, AiScoreHistoryEntry h) {
+    final cs = Theme.of(context).colorScheme;
+    final fg = AlignmentVisuals.fg(h.overallScore.toDouble());
+    final bg = AlignmentVisuals.bg(h.overallScore.toDouble());
+    final suffix = <String>[
+      if (h.scoreBasis != null) h.scoreBasis!.replaceAll('_', ' '),
+      if (h.scoredAt != null) _fmtDate(h.scoredAt!, withYear: true),
+      if (h.archivedReason != null)
+        'archived: ${h.archivedReason}'
+      else if (h.applied)
+        'applied',
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '${h.overallScore}',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: fg,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              suffix.join(' · '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
+          ),
         ],
       ),
     );

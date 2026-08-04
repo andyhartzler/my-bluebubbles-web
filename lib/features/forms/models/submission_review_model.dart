@@ -333,6 +333,53 @@ class AiAlignmentScore {
   final String? model;
   final DateTime? scoredAt;
 
+  // ── provenance: what the scorer was looking at, and under which rules ──
+  // Every one of these existed on `endorsement_ai_scores` and was thrown away
+  // at parse time. `score_basis` and `source_status` are the load-bearing
+  // pair: a verdict computed from a partial draft is not the same claim as a
+  // verdict on a finished questionnaire, and until now the page presented
+  // them identically.
+
+  /// 'full_submission' or 'partial_draft'.
+  final String? scoreBasis;
+
+  /// The submission's status when the scorer read it: 'submitted',
+  /// 'in_progress', 'abandoned'.
+  final String? sourceStatus;
+
+  /// How many scored radio questions the candidate had answered.
+  final int? answeredScoredRadios;
+
+  /// How many answer keys the submission carried.
+  final int? answeredKeyCount;
+
+  /// Which rubric revision produced this score. Null on the 73 rows scored
+  /// before the rubric was versioned, which is exactly why it is shown: those
+  /// scores and the versioned ones are not comparable populations.
+  final String? rubricVersion;
+
+  /// Machine that ran the scorer. On the model, deliberately never rendered:
+  /// a hostname carries no decision value for a committee member.
+  final String? scorerHost;
+
+  final int? jobId;
+
+  /// Review lock (zero rows carry it today; the design exists for when the
+  /// chair starts freezing verdicts).
+  final bool reviewLocked;
+  final DateTime? reviewLockedAt;
+  final String? reviewLockedBy;
+
+  /// How many times this submission has been re-scored.
+  final int supersededCount;
+
+  /// Set when a partial-draft score was later promoted onto a finished
+  /// submission.
+  final String? promotedFromBasis;
+  final DateTime? promotedAt;
+
+  final String? candidateId;
+
   const AiAlignmentScore({
     required this.overallScore,
     required this.rationale,
@@ -342,9 +389,49 @@ class AiAlignmentScore {
     this.deductions = const [],
     this.model,
     this.scoredAt,
+    this.scoreBasis,
+    this.sourceStatus,
+    this.answeredScoredRadios,
+    this.answeredKeyCount,
+    this.rubricVersion,
+    this.scorerHost,
+    this.jobId,
+    this.reviewLocked = false,
+    this.reviewLockedAt,
+    this.reviewLockedBy,
+    this.supersededCount = 0,
+    this.promotedFromBasis,
+    this.promotedAt,
+    this.candidateId,
   });
 
   double get pct => overallScore.toDouble();
+
+  /// True when this verdict was computed from anything other than a finished,
+  /// submitted questionnaire. The one fact on this class a committee member
+  /// must not miss, so the verdict block bands it directly under the banner.
+  bool get isProvisional =>
+      (scoreBasis != null && scoreBasis != 'full_submission') ||
+      (sourceStatus != null && sourceStatus != 'submitted');
+
+  /// 'in progress' / 'abandoned' / the raw value, for the provisional band.
+  String get sourceStatusLabel =>
+      (sourceStatus ?? 'unknown').replaceAll('_', ' ');
+
+  static int? _asInt(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.round();
+    return int.tryParse(v.toString());
+  }
+
+  static String? _asText(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
+  static DateTime? _asDate(dynamic v) =>
+      v == null ? null : DateTime.tryParse(v.toString());
 
   /// Build from a `endorsement_ai_scores` row.
   static AiAlignmentScore? fromRow(Map<String, dynamic> row) {
@@ -393,8 +480,79 @@ class AiAlignmentScore {
       deductions: deds,
       model: row['model']?.toString(),
       scoredAt: scoredAt,
+      scoreBasis: _asText(row['score_basis']),
+      sourceStatus: _asText(row['source_status']),
+      answeredScoredRadios: _asInt(row['answered_scored_radios']),
+      answeredKeyCount: _asInt(row['answered_key_count']),
+      rubricVersion: _asText(row['rubric_version']),
+      scorerHost: _asText(row['scorer_host']),
+      jobId: _asInt(row['job_id']),
+      reviewLocked: row['review_locked'] == true,
+      reviewLockedAt: _asDate(row['review_locked_at']),
+      reviewLockedBy: _asText(row['review_locked_by']),
+      supersededCount: _asInt(row['superseded_count']) ?? 0,
+      promotedFromBasis: _asText(row['promoted_from_basis']),
+      promotedAt: _asDate(row['promoted_at']),
+      candidateId: _asText(row['candidate_id']),
     );
   }
+}
+
+/// One superseded scoring run from `public.endorsement_ai_score_history`.
+///
+/// Only 1 of 74 scored candidates has any history today, so absence is the
+/// default and the disclosure renders nothing at all when the list is empty.
+/// Deliberately thin: the corpus does not support a timeline, only a list.
+class AiScoreHistoryEntry {
+  final int overallScore;
+  final String? scoreBasis;
+  final DateTime? scoredAt;
+
+  /// Whether this run was the one written onto `endorsement_ai_scores`.
+  final bool applied;
+
+  /// Why the run was superseded, when the pipeline recorded a reason.
+  final String? archivedReason;
+
+  const AiScoreHistoryEntry({
+    required this.overallScore,
+    this.scoreBasis,
+    this.scoredAt,
+    this.applied = false,
+    this.archivedReason,
+  });
+
+  static AiScoreHistoryEntry? fromRow(Map<String, dynamic> row) {
+    final raw = row['overall_score'];
+    if (raw == null) return null;
+    final overall =
+        raw is num ? raw.round() : int.tryParse(raw.toString()) ?? 0;
+    final basis = row['score_basis']?.toString().trim();
+    final reason = row['archived_reason']?.toString().trim();
+    return AiScoreHistoryEntry(
+      overallScore: overall.clamp(0, 100),
+      scoreBasis: (basis == null || basis.isEmpty) ? null : basis,
+      scoredAt: DateTime.tryParse(row['scored_at']?.toString() ?? ''),
+      applied: row['applied'] == true,
+      archivedReason: (reason == null || reason.isEmpty) ? null : reason,
+    );
+  }
+}
+
+/// The free-text field that belongs to a single-select answer: the candidate's
+/// explanation (`<id>_explain` / `<id>_detail`) or their "other" write-in
+/// (`<id>_other`).
+///
+/// These used to be paired ONLY inside a detected policy grid, so in every
+/// other section they either vanished or surfaced as an orphan row with a raw
+/// field label and no question attached. The pairing now runs for every
+/// single-select in every section.
+class AnswerCompanion {
+  /// 'Their explanation' or 'Other'.
+  final String label;
+  final String text;
+
+  const AnswerCompanion({required this.label, required this.text});
 }
 
 /// A single stance question inside a policy-positions grid.
@@ -405,12 +563,16 @@ class PolicyPosition {
   final Stance stance;
   final String? explanation;
 
+  /// Which companion field the explanation came from (see [AnswerCompanion]).
+  final String explanationLabel;
+
   const PolicyPosition({
     required this.id,
     required this.question,
     required this.answerLabel,
     required this.stance,
     this.explanation,
+    this.explanationLabel = 'Their explanation',
   });
 }
 
@@ -421,10 +583,15 @@ class ReviewAnswer {
   final dynamic rawValue;
   final String displayValue;
 
+  /// The candidate's explanation or write-in for this answer, rendered
+  /// attached beneath the value rather than as a separate row.
+  final AnswerCompanion? companion;
+
   const ReviewAnswer({
     required this.field,
     required this.rawValue,
     required this.displayValue,
+    this.companion,
   });
 
   String get type => field.type;
@@ -473,6 +640,16 @@ class SubmissionReviewModel {
   final String? track; // "Young Dem" / "Partner Candidate"
   final String? topPriority;
 
+  /// `dob_is_young_dem`: derived off-schema by the intake and rendered nowhere
+  /// at all until now.
+  ///
+  /// Verified against production on 2026-08-04, because the number in the
+  /// design brief was wrong and it matters: 67 of the submissions carry the
+  /// key, but the value is a STRING, and only 9 of those 67 are 'true'. So
+  /// this is a rare positive flag, not a near-universal one, which is why it
+  /// renders only when true rather than as a present/absent field.
+  final bool youngDemByDob;
+
   // Documents.
   final ReviewFile? headshot;
   final ReviewFile? budgetFile;
@@ -511,6 +688,7 @@ class SubmissionReviewModel {
     this.selfFundedPct,
     this.track,
     this.topPriority,
+    this.youngDemByDob = false,
     this.headshot,
     this.budgetFile,
     this.signatureUrl,
@@ -524,6 +702,27 @@ class SubmissionReviewModel {
   /// All policy positions across every section, flattened.
   List<PolicyPosition> get allPolicyPositions =>
       sections.expand((s) => s.policyPositions).toList();
+
+  /// Every single-select answer as {field id: the option label the candidate
+  /// chose}, across policy grids AND ordinary rows.
+  ///
+  /// The AI deductions carry an `issue_id` that is exactly this field id, so
+  /// this map is what lets the verdict print the candidate's own stance beside
+  /// the points it cost them instead of just the scorer's quote.
+  Map<String, String> get selectedOptions {
+    final out = <String, String>{};
+    for (final s in sections) {
+      for (final p in s.policyPositions) {
+        if (p.answerLabel.trim().isNotEmpty) out[p.id] = p.answerLabel.trim();
+      }
+      for (final a in s.answers) {
+        if (!_singleSelectTypes.contains(a.type)) continue;
+        if (a.displayValue.trim().isEmpty) continue;
+        out[a.field.id] = a.displayValue.trim();
+      }
+    }
+    return out;
+  }
 
   /// Rounded 0..100 alignment percentage shown across the endorsement hub.
   /// Prefers the Gemini ([aiAlignment]) score; falls back to the rule-based
@@ -576,6 +775,12 @@ class SubmissionReviewModel {
 
   // ==================== construction ====================
 
+  /// Suffixes of the free-text field that belongs to a single-select answer,
+  /// in priority order. `_other` is here because the write-in for an "Other"
+  /// choice is the answer, and without it eight of them rendered as orphan
+  /// rows or vanished entirely.
+  static const List<String> _companionSuffixes = ['_explain', '_detail', '_other'];
+
   static const Set<String> _displayOnly = {'section_header', 'reference_block'};
   static const Set<String> _singleSelectTypes = {
     'radio',
@@ -600,6 +805,17 @@ class SubmissionReviewModel {
     'signature',
     'certify',
   };
+
+  /// Off-schema booleans arrive as a real bool, as 'true'/'yes', or as 1.
+  static bool _isTruthy(dynamic v) {
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    if (v is String) {
+      final s = v.trim().toLowerCase();
+      return s == 'true' || s == 'yes' || s == '1';
+    }
+    return false;
+  }
 
   static bool _isEmptyValue(dynamic v) {
     if (v == null) return true;
@@ -725,28 +941,52 @@ class SubmissionReviewModel {
       final policyPositions = <PolicyPosition>[];
       final consumed = <String>{};
 
+      // COMPANION PAIRING RUNS FOR EVERY SINGLE-SELECT, GRID OR NOT.
+      //
+      // It used to live inside the `isPolicyGrid` branch, which had two
+      // consequences. Explanations outside a grid became orphan rows carrying
+      // a raw field label and no question (party_history_detail,
+      // party_history_detail_r, ideology_other, education_other,
+      // religion_other, endorsements_received_other, endorsements_seeking_other
+      // all landed that way). And the grid threshold, a plain count of >= 4
+      // selects, silently controlled whether ANY explanation stayed attached:
+      // one skipped answer in a 4-select section flipped the whole section
+      // from grid to rows and the explanations came loose. The threshold still
+      // decides pills-vs-rows, but pairing no longer depends on it, so that
+      // flip now degrades gracefully instead of losing content.
+      final selectIds = {for (final f in selects) f.id};
+      final companions = <String, AnswerCompanion>{};
+      for (final f in selects) {
+        AnswerCompanion? found;
+        for (final suffix in _companionSuffixes) {
+          final key = '${f.id}$suffix';
+          // A companion key that is itself a question stays a question.
+          if (selectIds.contains(key)) continue;
+          // Consume whether or not it carries a value, so an empty companion
+          // never renders as a lone row either.
+          consumed.add(key);
+          if (found != null) continue;
+          final ev = data[key];
+          if (_isEmptyValue(ev)) continue;
+          found = AnswerCompanion(
+            label: suffix == '_other' ? 'Other' : 'Their explanation',
+            text: ev.toString(),
+          );
+        }
+        if (found != null) companions[f.id] = found;
+      }
+
       if (isPolicyGrid) {
         for (final f in selects) {
-          // Pair with an explanation field: <id>_explain or <id>_detail.
-          String? explanation;
-          for (final suffix in const ['_explain', '_detail']) {
-            final key = '${f.id}$suffix';
-            final ev = data[key];
-            if (!_isEmptyValue(ev)) {
-              explanation = ev.toString();
-              consumed.add(key);
-              break;
-            }
-            // Even when empty, consume so it never renders as a lone row.
-            if (bucket.fields.any((bf) => bf.id == key)) consumed.add(key);
-          }
           final raw = data[f.id];
+          final companion = companions[f.id];
           policyPositions.add(PolicyPosition(
             id: f.id,
             question: f.label,
             answerLabel: resolveDisplay(f, raw),
             stance: stanceFor(raw.toString()),
-            explanation: explanation,
+            explanation: companion?.text,
+            explanationLabel: companion?.label ?? 'Their explanation',
           ));
           consumed.add(f.id);
         }
@@ -760,6 +1000,7 @@ class SubmissionReviewModel {
           field: f,
           rawValue: raw,
           displayValue: resolveDisplay(f, raw),
+          companion: companions[f.id],
         ));
       }
 
@@ -869,6 +1110,7 @@ class SubmissionReviewModel {
       selfFundedPct: number('self_funded_amount'),
       track: track,
       topPriority: str('pos_top_priority'),
+      youngDemByDob: _isTruthy(data['dob_is_young_dem']),
       headshot: headshots.isNotEmpty ? headshots.first : null,
       budgetFile: budgets.isNotEmpty ? budgets.first : null,
       signatureUrl: str('signature'),

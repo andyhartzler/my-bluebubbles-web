@@ -489,7 +489,7 @@ class EventRepository {
       'attendee_name': eventName,
     });
     final registrationLink =
-        'https://events.moyoungdemocrats.org/events/$eventId/register?phone=${Uri.encodeComponent(phoneNumber)}&tid=$token';
+        'https://moyoungdemocrats.org/events/$eventId/register?phone=${Uri.encodeComponent(phoneNumber)}&tid=$token';
     await CRMMessageService.instance.sendRegistrationLink(
       phoneNumber: phoneNumber,
       eventName: eventName,
@@ -590,7 +590,7 @@ class EventRepository {
         'attendee_name': attendee.displayName,
       });
       final registrationLink =
-          'https://events.moyoungdemocrats.org/events/$eventId/register?phone=${Uri.encodeComponent(guestPhone)}&tid=$token';
+          'https://moyoungdemocrats.org/events/$eventId/register?phone=${Uri.encodeComponent(guestPhone)}&tid=$token';
       await CRMMessageService.instance.sendRegistrationLink(
         phoneNumber: guestPhone,
         eventName: attendee.displayName,

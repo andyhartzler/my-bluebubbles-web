@@ -342,7 +342,7 @@ async function createChapterMembershipForm(
     .update({ use_count: (template.use_count || 0) + 1 })
     .eq('id', template.id);
 
-  const formUrl = `https://forms.moyoungdemocrats.org/${finalSlug}`;
+  const formUrl = `https://moyoungdemocrats.org/forms/${finalSlug}`;
   return { formId: newForm.id, formSlug: finalSlug, formUrl: formUrl };
 }
 
@@ -663,7 +663,7 @@ serve(async (req) => {
           name: chapterName,
         });
         if (schoolName) params.set('school', schoolName);
-        membershipFormUrl = `https://forms.moyoungdemocrats.org/join-chapter?${params.toString()}`;
+        membershipFormUrl = `https://moyoungdemocrats.org/forms/join-chapter?${params.toString()}`;
       }
     }
 

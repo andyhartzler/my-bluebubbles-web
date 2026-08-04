@@ -90,9 +90,9 @@ const MOYD_CORE_FACTS = {
   digital_presence: {
     main_website: "moyoungdemocrats.org",
     crm: "moyd.app",
-    member_portal: "members.moyoungdemocrats.org",
-    forms: "forms.moyoungdemocrats.org",
-    jobs: "jobs.moyoungdemocrats.org"
+    member_portal: "moyoungdemocrats.org/members",
+    forms: "moyoungdemocrats.org/forms",
+    jobs: "moyoungdemocrats.org/jobs"
   }
 };
 // =============================================================================
