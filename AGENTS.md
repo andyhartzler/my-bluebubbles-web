@@ -966,6 +966,154 @@ real defect in this window was already fixed in git and is waiting on a hand
 deploy, and neither new shape has an emitter attributed to it, which for the
 `column "email"` line means unchecked rather than cleared.
 
+## READ FIFTH: the 02:25 UTC sweep, and an ignored issue that hides a project
+
+Swept the 24 hours to 2026-08-04 02:25 UTC. No code change anywhere this run.
+Read the overlap warning in the section above before quoting any number here,
+because at a two hour cadence it is now close to total: this window shares 22
+of its 24 hours with the one that closed at 00:20 UTC, and only 2 hours 5
+minutes of it is new observation. Nothing below is independent confirmation of
+anything above it.
+
+THE CENSUS TRAP, WHICH IS THE FINDING WORTH INHERITING
+The section above says to list the projects before claiming a set was quiet.
+That is necessary and it is not sufficient. A search for `is:unresolved`
+returns three issues, all in `supabase-platform`, and on that evidence a run
+would report the other seven projects silent. They were not.
+`endorsement-scorer` emitted 360 events in this window, roughly five times the
+whole of `supabase-platform`, and none of them appear in an unresolved search
+because ENDORSEMENT-SCORER-4 is set to ignored in Sentry.
+
+Ignored is not silent. Census by EVENT count per project rather than by issue
+status: an errors dataset aggregate over `project` with `count()` and an empty
+query shows both projects at once. Do not filter that query by `level` either.
+The first attempt here returned only `supabase-platform` at 55, because a
+NATURAL LANGUAGE query string ("all error events in the last 24 hours grouped
+by project") was rewritten by the tool into the filter `level:error`, and the
+rollups that carry ERROR level Postgres lines are themselves tagged
+`level=warning`. Be precise about the trigger: an actually empty query string
+was NOT rewritten when an auditor retried it, so the hazard is phrasing the
+request in prose, not the tool rewriting unconditionally. Two different
+filters, `is:unresolved` and `level:error`, each independently hid a real part
+of the picture.
+
+ENDORSEMENT-SCORER-4 is the expected n8n watchdog and is correctly ignored. It
+stays ignored. The point here is the method, not that issue.
+
+The event census reconciles exactly and is recorded so the next run can check
+whether it moved: `supabase-platform` 76, `endorsement-scorer` 360, and
+`website`, `flutter`, `mautic`, `moydforms`, `n8n` and `supabase-edge` at zero.
+The 76 splits 73 plus 2 plus 1 across SUPABASE-PLATFORM-1, -3 and -4. That 73
+read 72 when the sweep started and 73 twenty minutes later, so a census taken
+twice in one run will not match itself. The rolling window moves under you.
+
+SUPABASE-PLATFORM-1: EIGHT NEW EVENTS, ZERO NEW SHAPES
+`by_message` was read on all eight events after 00:20 UTC rather than sampled,
+per the method the sections above prescribe. Sixteen log lines: the filtered
+password FATAL 11 times across five events, `invalid input syntax for type
+uuid: "cron"` twice at 01:00 and 02:00, `unsupported frontend protocol N.N`
+twice and `no PostgreSQL user name specified in startup packet` once, the last
+two both inside the 01:35 rollup. Every one is a shape the sections above
+already enumerate.
+
+Specifically absent: `invalid input value for enum committee_type`,
+`column "email" does not exist`, `relation "public.forms" does not exist` and
+`column v.id does not exist` did not recur. That extends the silence on the ad
+hoc query family and it settles nothing, for exactly the conditionality reason
+the section above gives. Do not read it as those lines being resolved.
+
+The sponsors dup key burst is absent from this window only because its 00:00
+UTC cycle landed in the 00:05 rollup, which belongs to the previous window. It
+has not stopped. The two committed and undeployed defects, `1cdb96e` and
+`e79339b`, are unchanged at nine and eight days.
+
+SUPABASE-PLATFORM-4 HAS MOVED TO A DIFFERENT BUCKET
+This is the one genuinely new thing this run, and READ THIRD does not cover it.
+Every request in that section is against `meetings`. The single new request, at
+2026-08-04 02:03:37 UTC inside the 02:05 rollup, is not:
+
+    GET /storage/v1/object/public/events/event_611ce4aa-e5f1-4e64-8575-  400
+
+The path is truncated at that length in the rollup sample, so the object name
+is not recoverable from Sentry.
+
+The key shape is attributed and the emitter is not. `uploadEventImage` in
+`lib/services/crm/event_repository_impl.dart` writes
+`event_$eventId/<social_share or website_image>-<millis><ext>` into the
+`events` bucket and stores `getPublicUrl(path)` on the event row. The observed
+first path segment is CONSISTENT WITH that shape rather than confirmed to be
+it: the sample truncates in the middle of the UUID, at the fourth group, so the
+remaining characters were never observed. Do not upgrade that to a match.
+
+Record the scope of the writer survey, per the standard READ FOURTH sets,
+because "the key shape is attributed" is easy to inherit as "this is the only
+writer" and that is false. The `events` bucket has THREE writers across the two
+repos, and only the first mints an `event_` prefix:
+
+1. `uploadEventImage` in this repo, keys `event_<uuid>/...`, described above.
+2. `src/app/site-events/api/event-image/route.ts` in the sibling repo, a
+   service-role upload with keys `event-submissions/<millis>-<sanitized-name>`.
+3. `submitEventWithImage` in `src/app/site-members/lib/portal-api.ts`, keys
+   `member-events/<memberId>-<millis>-<index>.<ext>`.
+
+Writer 3 also carries the only in-repo DELETE against this bucket, a
+`storage.from('events').remove(...)` cleanup that runs when one upload in a
+batch fails. That is directly relevant to the deleted-object hypothesis below
+and it does not support it: the cleanup removes only the `member-events/` keys
+it just wrote in that same call, so it cannot delete an `event_` object. No
+code in either repo deletes an `event_` key.
+
+Both render paths read the stored URL verbatim rather than rebuilding it:
+`getStorageImageUrl` in the public `site-events` event page returns
+`image.url || image.storage_url`, and the members dashboard reaches
+`getPublicUrl` only when no stored URL field is present at all. So no code here
+constructs a wrong URL, and the 400 is about the object rather than the link.
+
+DO NOT TREAT THIS AS A PERMISSIONS PROBLEM, BECAUSE IT IS NOT ONE
+`events` is a public bucket. The pre-migration audit snapshot in
+`supabase/migrations/20260424_03_storage_rls.sql` records it as `public = t`,
+and that migration explicitly KEEPS the `Public can view event files` SELECT
+policy for `public` while dropping only the mislabelled write policies. A
+public read of this bucket is allowed by design and already works. There is
+nothing to widen, and the standing prohibition on widening a bucket flag or an
+RLS policy to clear a storage error is not even in tension here.
+
+WHAT IS NOT ESTABLISHED
+What the 400 stands for, and therefore whether the object exists. READ THIRD
+already warns against building a diagnosis on an assumed meaning for this
+status code, and that warning applies here unchanged. A stale row pointing at a
+deleted object, an upload that never landed, a malformed key, and a crawler
+replaying an old URL are all consistent with what Sentry shows, and the rollup
+sample carries only ip, method, path, status and timestamp, with no user agent
+and no authentication information to separate them. One request in 24 hours
+with 0 users impacted is weak evidence either way: a broken image on a live
+event page would be fetched repeatedly, which argues against a hot path and
+says nothing about a cold one. The source address is a single datacenter range
+address and is not reproduced here.
+
+Left alone deliberately on 2026-08-04. No code change: the shape of the URL is
+established, the emitter is not, and the two checks that would settle it are a
+storage listing under the `event_611ce4aa` prefix and the event row's stored
+image metadata, neither of which is reachable from this container. Do not
+resolve SUPABASE-PLATFORM-4, and do not "fix" a render path that is passing a
+stored value through correctly.
+
+THE DISCLOSURE TRADE, WEIGHED RATHER THAN ASSUMED
+READ THIRD says to weigh this every time instead of inheriting it, so: this
+repo is public and the sibling is private. Committed here are a truncated event
+UUID, the `events` bucket name, the `Public can view event files` policy name,
+and two render helper names in the private repo. Each is judged acceptable and
+not by default. The event ID is cut mid-UUID with at least twelve hex
+characters unrecoverable, and it names an object in a deliberately public
+bucket that is already served on a public event page, so it discloses nothing
+that a visitor to the site cannot see. The bucket and policy names are already
+committed in this repo's own `20260424_03_storage_rls.sql` audit snapshot, so
+naming them here adds no reach. The render helpers are display side functions
+rather than callable endpoints, which is the distinction READ FOURTH drew when
+it deliberately withheld RPC names, and that withholding still stands. The
+source address is not reproduced, no credential or raw upstream error text
+appears, and nothing here widens access to anything.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
