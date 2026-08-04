@@ -76,12 +76,35 @@ async function sendSentryEvent(opts: {
 }
 
 // The management API fronts the logs endpoint behind a CDN that intermittently
-// answers 5xx with an HTML error page. Retry those, and network-level failures,
-// before giving up on the window.
+// answers 5xx with an HTML error page, and throttles bursts with 429. Retry
+// both, and network-level failures, before giving up on the window.
 const LOGS_QUERY_ATTEMPTS = 3;
 const LOGS_RETRY_BASE_MS = 750;
+// A throttle clears on its own clock rather than on ours, so a 429 waits
+// longer than the 5xx backoff and honours the wait the server names. The
+// floor stops a zero or already elapsed Retry-After from becoming an instant
+// retry into the same throttle; the cap stops a long one from parking the run
+// into the next 5 minute cron tick.
+const THROTTLE_MIN_MS = 5_000;
+const THROTTLE_CAP_MS = 30_000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Retry-After is either a seconds count or an HTTP date. Returns null when the
+// header is absent or unparseable, so the caller can apply its own floor.
+function parseRetryAfter(header: string | null): number | null {
+  if (!header) return null;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) return seconds * 1000;
+  const until = Date.parse(header);
+  if (Number.isNaN(until)) return null;
+  return until - Date.now();
+}
+
+function throttleDelayMs(res: Response): number {
+  const requested = parseRetryAfter(res.headers.get("retry-after"));
+  return Math.min(Math.max(requested ?? 0, THROTTLE_MIN_MS), THROTTLE_CAP_MS);
+}
 
 // Carries the upstream body out of band so it stays out of the error message.
 // The message is the Sentry issue title, so it has to stay stable and short;
@@ -117,9 +140,16 @@ async function queryLogs<T>(sql: string, startIso: string, endIso: string): Prom
     }
     // Body must be consumed either way so the connection is not left open.
     const body = (await res.text()).slice(0, 300);
-    // 4xx is a bad token or a bad query: retrying cannot change the answer.
-    if (res.status < 500 || last) throw new LogsQueryError(res.status, attempt, body);
-    await sleep(LOGS_RETRY_BASE_MS * attempt);
+    // 429 is a throttle: the identical request succeeds once the window
+    // clears. Every other 4xx is a bad token or a bad query, where retrying
+    // cannot change the answer.
+    const retryable = res.status >= 500 || res.status === 429;
+    if (!retryable || last) throw new LogsQueryError(res.status, attempt, body);
+    // A 5xx is a transient CDN fault, and the linear backoff already suits it.
+    // A 429 is a throttle with its own window, so wait as the server asks.
+    await sleep(
+      res.status === 429 ? throttleDelayMs(res) : LOGS_RETRY_BASE_MS * attempt,
+    );
   }
 }
 
