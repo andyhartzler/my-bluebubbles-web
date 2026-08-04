@@ -675,11 +675,16 @@ class CandidateRepository {
       if (results.length < 5 &&
           firstName != null && firstName.isNotEmpty &&
           lastName != null && lastName.isNotEmpty) {
+        // public.members stores the whole name in one `name` column; there is
+        // no first_name and no last_name. Filtering on them raised 42703,
+        // PostgREST returned 400, and the catch below turned that into an
+        // empty list, so this fallback never matched anyone AND discarded any
+        // email match already collected above. Same shape findMemberByEmailOrName
+        // already uses against this table.
         final byName = await _client
             .from('members')
             .select('id,name,email,profile_pictures,executive_title,date_joined')
-            .ilike('first_name', firstName)
-            .ilike('last_name', lastName)
+            .ilike('name', '$firstName $lastName')
             .limit(5);
         for (final m in (byName as List).whereType<Map>()) {
           final mapped = m.map((k, v) => MapEntry(k.toString(), v));
