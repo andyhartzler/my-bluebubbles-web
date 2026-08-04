@@ -16,6 +16,7 @@ import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/services/services.dart';
 import 'package:collection/collection.dart';
 import 'package:defer_pointer/defer_pointer.dart';
+import 'package:dio/dio.dart' as dio;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -142,14 +143,42 @@ class MessagesViewState extends OptimizedState<MessagesView> {
     super.dispose();
   }
 
+  /// Set when the server answers the focus state endpoint with a 500 of its
+  /// own. Its Private API helper reports "Selector not found!" when it cannot
+  /// read Focus status, which most likely describes the server rather than one
+  /// recipient, since it repeats on every conversation opened. That inference
+  /// is why this disables the lookup for the whole session rather than for one
+  /// address. Each failed request files three Sentry events: the sentry_dio
+  /// FailedRequestInterceptor, ApiInterceptor's own log, and the catchError
+  /// below. Asking once per session is enough to notice a server that can
+  /// answer, and a reload clears this. Static because a new state object is
+  /// built for every conversation opened.
+  static bool _focusStateUnsupported = false;
+
+  /// True only for a 500 the server itself sent with a structured body.
+  /// ApiInterceptor resolves two 500s of its own making that must not count: a
+  /// timeout it forges as `type: timeout`, and a non-Map upstream body it wraps
+  /// as `type: Error`. Both are transient, and neither says the server lacks
+  /// the capability.
+  static bool _isServerError(dynamic data) =>
+      data is Map && data['error'] is Map && data['error']['type'] == 'Server Error';
+
   void getFocusState() {
     if (!ss.isMinMontereySync) return;
+    if (_focusStateUnsupported) return;
     final recipient = chat.participants.firstOrNull;
     if (recipient != null) {
       http.handleFocusState(recipient.address).then((response) {
         final status = response.data['data']['status'];
         controller.recipientNotifsSilenced.value = status != "none";
       }).catchError((error, stack) async {
+        // ApiInterceptor resolves an error response carrying a Map body rather
+        // than rethrowing it, so a 500 with a body arrives here as a raw
+        // Response by way of returnSuccessOrError. Only response-less failures
+        // still arrive as a DioException.
+        if (error is dio.Response && error.statusCode == 500 && _isServerError(error.data)) {
+          _focusStateUnsupported = true;
+        }
         Logger.error('Failed to get focus state!', error: error, trace: stack);
       });
     }
