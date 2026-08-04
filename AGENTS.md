@@ -1632,6 +1632,149 @@ endorsement vote, the identity of the executive whose session produced the
 FLUTTER-1 and FLUTTER-2 events, and the operational read on who is running the
 ad hoc statements. Those go to Andrew directly.
 
+## READ NINTH: the 11:31 UTC sweep, and provenance timing beats a grep negative
+
+Swept the 24 hours to 2026-08-04 11:31 UTC. No code change anywhere this run,
+and the reason is at the bottom rather than assumed at the top.
+
+Per the overlap warning in READ FOURTH: this window shares about 21 hours with
+the sweep that closed at 08:20 UTC, so only about 3 hours 11 minutes of it is
+new observation. Nothing below independently confirms anything above it.
+
+SCOPE OF THIS SWEEP
+`by_message` was read on all 13 SUPABASE-PLATFORM-1 events after 08:20 UTC,
+FATAL tagged ones included, per READ SEVENTH. The remaining 73 events fall in
+the window the previous two sweeps already decomposed. Two events returned an
+HTTP 500 from the Sentry API on first request and were re-fetched successfully;
+if that happens again, retry rather than classifying by title.
+
+THE METHOD THAT IS NEW, AND IT IS STRONGER THAN THE ONE ABOVE IT
+Every previous note on the ad hoc query family cleared our own code with a grep
+negative: the identifier appears nowhere, therefore no committed statement makes
+that reference. READ FOURTH is careful about how weak that is, because a
+deployed-only RPC is exactly what a repo search cannot see.
+
+This window supplies a better instrument for one line. At 09:24:33 UTC the
+rollup carried `relation "public.elections" does not exist`. The sibling repo
+DOES query a relation by that name, so the grep negative fails outright and an
+earlier reading would have called this a live defect.
+
+It is not, and the argument does not depend on a grep at all. Every reference to
+that relation in the sibling repo was INTRODUCED by a single commit, and that
+commit was authored at 09:44:50 UTC, 20 minutes AFTER the error fired. Code that
+did not exist in the tree cannot have been running in production. Provenance of
+the calling code, not presence of the identifier, is what settles it.
+
+Prefer this check when it is available. `git log --diff-filter=A` or a parent
+comparison on the calling file dates the CODE; a grep only tells you the state
+of the tree right now. The two disagree exactly when a repo is moving fast,
+which is when a sweep is most likely to be wrong.
+
+Be honest about its reach. It establishes that no DEPLOYED build of that repo
+emitted the line. It says nothing about a local checkout, a migration being
+applied by hand, or a psql session, which is the reading the timing actively
+supports.
+
+THE FAMILY THIS WINDOW, EIGHT LINES IN UNDER TWO HOURS
+    08:14:18  column "is_active" does not exist
+    08:16:50  column "user_id" does not exist
+    08:40:41  column "responses" does not exist
+    09:05:49  relation "public.opportunities" does not exist
+    09:24:33  relation "public.elections" does not exist
+    09:29:14  invalid input syntax for type uuid: "pl"
+    09:39:29  function "public.get_members_filtered(text,text,text,integer,integer)" does not exist
+    10:03:05  relation "public.donor_master" does not exist
+
+Three are cleared to the standard READ FOURTH sets, and each by a different
+instrument, which is worth keeping straight:
+
+- `public.elections`, by the provenance argument above.
+- `public.get_members_filtered`, by ARITY rather than by absence. A function of
+  that name is real and is defined in this repo's own migrations, taking two
+  array arguments. The failing call passes five scalars. A deployed caller does
+  not drift in arity; it either matches or fails on every execution. It also has
+  no caller in either repo.
+- `public.opportunities`, by grep, and the grep is clean: the sibling repo's
+  opportunities surface reads differently named tables, and every occurrence of
+  the word in this repo is documentation or UI copy, never a table name.
+
+`public.donor_master` is not a relation either repo names; the nearest real one
+differs. The three bare column names and the `"pl"` uuid are NOT cleared to that
+standard. No column level enumeration was done, `user_id` and `is_active` are
+common in both trees, and READ SIXTH's caveat about unqualified identifiers
+applies unchanged. No emitter is attributed to any of the four.
+
+The `"pl"` line deserves one note because it shares a message shape with a real
+committed defect. `invalid input syntax for type uuid: "cron"` is the hourly
+line that `1cdb96e` fixes and that is still undeployed. This one carries a
+different value, is a one off, and lands at 09:29 in the middle of the burst
+above. Do not merge the two on message shape; the value discriminates them.
+
+WHAT ELSE FIRED, ALL OF IT ALREADY ON THE RECORD
+- The hourly `uuid: "cron"` line at 09:00, 10:00 and 11:00. `1cdb96e` is
+  committed and undeployed at nine days.
+- The 32 line sponsors dup key burst is ABSENT from the new observation only
+  because no 6 hour boundary falls inside it. It has not stopped. `e79339b` is
+  committed and undeployed at eight days.
+- SUPABASE-PLATFORM-3 produced no new events. Its two are the 2026-08-03 15:35
+  and 15:45 pair READ SEVENTH already counted. `0d2963e` is committed and
+  undeployed at nine days. Do not count that pair a third time.
+- SUPABASE-PLATFORM-4 carried the 02:03:37 `events` bucket 400 and the 06:39:35
+  keyless bucket root GET, documented in full by READ FIFTH and READ EIGHTH.
+  Same occurrences, not recurrences. Do not resolve it.
+- The filtered password FATALs continue at the usual rate. Scan noise.
+
+THE FLUTTER PROJECT: FIVE EVENTS, ZERO NEW
+FLUTTER-2 last fired at 07:24:26 and its fix `2a90af9` landed at 08:44:37, so
+it has not fired since the fix. Handled, left alone, and deliberately not
+re-resolved. FLUTTER-1's three events are the same 07:25:04 occurrence READ
+EIGHTH classified as transport; they carry the same trace id as the FLUTTER-2
+event 38 seconds earlier, so one session produced both. FLUTTER-8 fired once
+and is the dead `messages.moydchat.org` host that `dd2a052` predicted would
+regress. Nothing to do for any of the three.
+
+ENDORSEMENT-SCORER-4 is the expected n8n watchdog at 360 events, still ignored,
+stays ignored. `website`, `mautic`, `moydforms`, `n8n` and `supabase-edge` were
+silent, verified by event count per project and not by an issue status filter,
+per READ FIFTH.
+
+THE BRANCH REF TRAP, FIFTH RUN RUNNING, PLUS A NEW WAY TO CAUSE IT
+Both repos again presented a stale named branch with `HEAD` detached at the true
+tip: this repo's `master` at `5d8a5b0` against a real `f95819a`, and the
+sibling's `main` at `77d879f` against a real `91d368e`. Expected now, per READ
+SECOND.
+
+The new part is self inflicted and worth recording because it is easy to repeat.
+The repair was run as a single shell line of the form
+`cd repoA && git checkout -B main HEAD; echo ...; git checkout -B master HEAD`,
+intending the second half to apply to repoB. There was no second `cd`. Both
+commands ran in repoA, which left the sibling carrying a bogus `master` branch
+at its own tip and left THIS repo unrepaired, while the output looked like
+success. Bash tool cwd also persists between calls and was reset to `/home/user`
+by an unrelated command in between, so reasoning about "the current repo" was
+wrong twice for two different reasons.
+
+Use `git -C <path>` for every git command in a two repo container. Do not rely
+on `cd` persisting, and do not chain two repos' repairs in one line.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Weighed rather than inherited.
+
+Named above: the relation names `public.elections`, `public.opportunities` and
+`public.donor_master`, none of which exist as written, so they describe nothing
+real; the function name `public.get_members_filtered`, which is already
+committed in this repo's own migrations, so naming it adds no reach; and four
+bare column names, which are common words.
+
+Deliberately withheld: the sibling repo's real table names behind its
+opportunities surface, since the finding holds without them; the identity of the
+executive whose session produced the FLUTTER events; the state of the live
+endorsement vote; and the operational read on who is running the ad hoc
+statements. Those go to Andrew directly.
+
+No credential, no DSN, no source address, no policy body and no raw upstream
+error appears, and nothing here widens access to anything.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
