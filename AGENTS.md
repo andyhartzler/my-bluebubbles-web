@@ -2246,6 +2246,137 @@ statements and the storage probes. No credential, no DSN, no source address, no
 policy body and no raw upstream error appears, and nothing here widens access to
 anything.
 
+## READ THIRTEENTH: the 18:20 UTC sweep, one new identifier, and the deploy blocker re-checked
+
+Swept the 24 hours to 2026-08-04 18:20 UTC. No code change: nothing in the new
+observation is attributable to committed code in either repo. Short by design,
+per READ TWELFTH.
+
+Per the overlap warning in READ FOURTH: this window shares about 22 hours with
+the sweep that closed at 16:20 UTC, so only about 2 hours of it is new
+observation. Nothing below independently confirms anything above it.
+
+SCOPE AND FULL DECOMPOSITION OF THE NEW SLICE
+`by_message` read on all 7 SUPABASE-PLATFORM-1 events after 16:20 UTC, FATAL
+tagged ones included, per READ SEVENTH. Forty one log lines, which reconciles
+against the sum of the seven per event `count` fields:
+
+    32  duplicate key value violates unique constraint "?"   the 18:00 cycle
+     6  password authentication failed for user "?"          FATAL, filtered
+     2  invalid input syntax for type uuid: "?"              17:00 and 18:00
+     1  column "is_public" does not exist                    18:12:26
+
+The password total is the usual `by_severity` residual and not a direct read,
+per the standing caveat in READ FOURTH. The two malformed startup packet
+families and the SASL Terminate line are all absent from this window; the only
+probe shape present is the password family, whose attribution to scan traffic is
+INFERRED and not established, per READ FIRST.
+
+THE ONE NEW IDENTIFIER, AND WHAT THE SHAPE ARGUMENT ACTUALLY BUYS
+`is_public` is unlike the rest of the ad hoc family in one respect worth
+recording: it is a REAL committed column, so the usual grep negative does not
+apply. Enumerate every occurrence rather than the two that make the argument,
+because the next run will grep this and should not have to wonder. It sits on
+`campaign_templates` in the policy body in
+`migrations_manual/20260721_rls_initplan_wrap.sql` and in that file's ROLLBACK
+twin; the CRM's form templates service carries it in the INSERT and UPDATE
+payloads it sends to `form_templates`; the matching Dart model reads it in
+`fromJson` and writes it in `toJson`; and the sibling repo declares it on a form
+template interface that has no query call site anywhere in that tree.
+
+What the message shape rules out is the two applications' data layers, and that
+is all it rules out. Both apps reach Postgres through PostgREST, and a PostgREST
+filter or order renders the TABLE QUALIFIED form, which is exactly what READ
+EIGHTH's `column members.first_name does not exist` line looked like. The
+observed line is bare and quoted, and no read path in either repo filters or
+orders on this column at all. The write payloads cannot reach Postgres with an
+unknown key either, but not for the reason a first draft of this note gave: it
+is not that Postgres would name the relation, it is that PostgREST rejects the
+key against its schema cache as PGRST204 and emits NO Postgres log line at all.
+The model methods parse returned rows and never reach SQL. The `flutter` project
+also emitted nothing near 18:12, its newest event being 07:24:26, which is READ
+EIGHTH's discriminator and points the same way.
+
+Do NOT read that as "not ours", which is the overclaim an adversarial auditor
+caught in the first draft of this section. Two channels produce the bare
+unqualified form and neither is hand typing: a deployed only RPC or function
+body carrying an unqualified `is_public` reference, which is precisely the
+emitter READ FIRST and READ FOURTH say a repo search cannot see, and a policy,
+view or trigger being created against a table lacking the column. This repo
+carries a committed UNQUALIFIED reference of exactly that kind, in the
+hand applied migration named above, so READ SIXTH's standard, that no committed
+statement makes the QUALIFIED reference, does not clear this line the way it
+cleared earlier ones.
+
+So the honest position is READ SIXTH's: not either app's data layer, emitter
+unattributed. Hand iteration remains the best fit given the company it keeps,
+and it is an inference. Nothing was changed, and the standing instruction not to
+change a working query to make one of these go away applies unchanged.
+
+NOTHING ELSE FIRED THAT IS NOT ALREADY HANDLED
+- SUPABASE-PLATFORM-4's three events are the 02:05, 06:45 and 13:00 rollups
+  carrying the 02:03:37, 06:39:35 and 12:55:16 requests that READ FIFTH, READ
+  EIGHTH and READ ELEVENTH document in full. Same occurrences, not recurrences.
+  Do not count them again and do not resolve the issue.
+- SUPABASE-PLATFORM-3's only event is the 12:10:02 429. `285a05f` landed at
+  12:43:21, after it, so it has not fired since its fix was committed.
+- FLUTTER-2's only event is 07:24:26 and `2a90af9` landed 08:44:37, so it has
+  not fired since its fix. FLUTTER-1's three events are the same 07:25:04
+  transport occurrence inside the protected endorsement surface. FLUTTER-8 is
+  the dead `messages.moydchat.org` host per `dd2a052`. None was re-resolved.
+- ENDORSEMENT-SCORER-4 is the expected n8n watchdog at 359 events, correctly
+  ignored, and it stays ignored.
+
+THE CENSUS, CROSS FOOTED ON BOTH AXES PER READ TWELFTH
+
+    by project   endorsement-scorer 359, supabase-platform 102, flutter 5  = 466
+    by issue     ENDORSEMENT-SCORER-4 359                                  = 359
+                 SUPABASE-PLATFORM-1 98, -4 3, -3 1                        = 102
+                 FLUTTER-1 3, FLUTTER-8 1, FLUTTER-2 1                     =   5
+                                                                             466
+
+`website`, `mautic`, `moydforms`, `n8n` and `supabase-edge` at zero. The issue
+list was queried with NO status filter per READ EIGHTH, which is how the ignored
+watchdog and the two resolved `flutter` issues stayed visible. Read READ
+TWELFTH's caveat on what the equality does and does not buy before quoting it.
+
+FOUR FIXES COMMITTED AND UNDEPLOYED
+`1cdb96e` at 9 days, `e79339b` at 8, `0d2963e` at 4, and `285a05f` at under 6
+hours. Computed from `git show -s --format=%cI` rather than carried forward. All
+four are hand deploy work per READ FIRST.
+
+THE DEPLOY BLOCKER IS UNCHANGED, AND WAS RE-CHECKED RATHER THAN INHERITED
+READ TWELFTH says network policy differs per run and to test rather than
+inherit, so: `npm ping` answers PONG from the registry in about 340 ms, which
+means the CLI is still installable in this container. There is still no Supabase
+access token. Nothing matching `SUPABASE`, `PROJECT_REF` or a Supabase key
+prefix exists in the environment. The single item ask in READ TWELFTH stands
+unchanged, and it is the whole reason four fixes are sitting undeployed.
+
+Record the absence and stop there. An earlier draft went on to inventory what
+credential the container DOES carry, which is a new fact about the pipeline that
+serves nobody but someone probing it, and the finding does not need it.
+
+THE BRANCH REF TRAP, SEVENTH RUN
+Both repos again presented a stale named branch with `HEAD` detached at the true
+remote tip: this repo's `master` at `5d8a5b0` against a real `ce6d895`, and the
+sibling's `main` at `77d879f` against a real `1f2bc35`. Repaired with
+`git -C <path> checkout -B <branch> HEAD`, using `git -C` for every command per
+READ NINTH.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public. Named above: the `form_templates` and `campaign_templates`
+tables, the `is_public` column, and the migrations_manual path holding the
+policy. All are already committed in this repo's own Dart sources and migration
+files, so naming them adds no reach; the policy BODY is not reproduced, only the
+file it lives in. The sibling repo's form template interface is described rather
+than named, per the practice READ FOURTH set for private repo internals, and no
+credential the container carries is inventoried, per the paragraph above. No
+credential, no DSN, no source address and no raw upstream
+error appears, and nothing here widens access to anything. Withheld per the
+practice READ SIXTH set: the state of the live endorsement vote, and the
+operational read on who is running the ad hoc statements.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
