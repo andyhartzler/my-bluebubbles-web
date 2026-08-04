@@ -1441,6 +1441,173 @@ practice READ SIXTH set: the state of any live endorsement vote, and the
 operational read on who is running the ad hoc statements. Both go to Andrew
 directly.
 
+## READ EIGHTH: the 08:20 UTC sweep, and the resolved-issue blind spot that hid a real defect
+
+Swept the 24 hours to 2026-08-04 08:20 UTC.
+
+Per the overlap warning in READ FOURTH: this window shares about 22 hours with
+the sweep that closed at 06:25 UTC, so only about 1 hour 55 minutes of it is
+new observation. Nothing below independently confirms anything above it.
+
+THE CENSUS TRAP READ FIFTH DESCRIBED IS WORSE THAN `is:ignored`
+READ FIFTH established that filtering `is:unresolved` hides a whole project
+behind one ignored issue. This run found the same trap has a second door:
+RESOLVED issues that are still firing. An unfiltered issue query over 24h
+returned SEVEN issues where `is:unresolved` returned four. The two extra were
+both in `flutter` and both marked resolved:
+
+    FLUTTER-8  resolved  last seen 08:22 UTC  (227 occurrences, 8 users)
+    FLUTTER-2  resolved  last seen 07:24 UTC  (1 event this window)
+
+FLUTTER-2 carried the only real application defect found this run. A sweep
+that reads `is:unresolved` would have shipped nothing. Query issues with NO
+status filter and reconcile against the per-project census.
+
+THE DEFECT: A LIVE QUERY FILTERS ON TWO COLUMNS THAT DO NOT EXIST
+`CandidateRepository.findPossibleMemberMatches` name fallback issued
+
+    from('members').ilike('first_name', fn).ilike('last_name', ln)
+
+against `public.members`, which stores the whole name in a single `name`
+column. Postgres raised `column members.first_name does not exist`, PostgREST
+returned 400, and the function's own catch turned that into `return []`.
+
+The correlation is to the second and is the reason this is attributed rather
+than guessed: the FLUTTER-2 event is timestamped 2026-08-04T07:24:26Z with tag
+`crm.section=candidates`, and the SUPABASE-PLATFORM-1 rollup carries
+`column members.first_name does not exist` at 07:24:26.445+00. Same second,
+same executive session.
+
+Evidence the columns do not exist, none of it from the error text alone:
+`MemberRepository.listingColumns` in `member_repository.dart` enumerates the
+table and holds `name` with no first/last; no migration in
+`supabase/migrations/` adds them; the roster ingest edge function
+`process-membership-roster` writes a single composed `name`; and the sibling
+`findMemberByEmailOrName`, in `candidate_repository.dart` itself, already
+name-matches with `.ilike('name', '$fn $ln')`. The one `first_name` select
+elsewhere in `candidate_repository.dart` targets `legislation_legislators`,
+not `members`.
+
+WHY NOBODY REPORTED IT
+The correct sibling is DEAD CODE. `findMemberByEmailOrName` has no callers
+anywhere in `lib/`. The broken one is the live path, reached from
+`_possibleMatchPanel` in `candidate_detail_screen.dart`. On the 400 the panel
+renders "No matching MOYD member found by name or email.", which is a
+confident false negative rather than an error, so it looks like a true answer.
+
+Worse than a missing fallback: the throw escapes AFTER the email lookup has
+already appended its hits to `results`, so a candidate whose email DID match a
+member still rendered as no match. The email path was collateral.
+
+Fixed by pointing the filter at `name`. The statement, the select list, the
+limit and the dedupe are unchanged.
+
+WHAT WAS DELIBERATELY NOT FIXED
+The catch still returns `[]` on any failure, discarding partial email results.
+That is a second and smaller defect, it is pre-existing, and it is not what
+fired. One issue per commit.
+
+DO NOT WRITE `Fixes FLUTTER-2`
+Same trap as SUPABASE-PLATFORM-1. Per `292da5a`, FLUTTER-2 is a catch-all:
+every SentryHttpClientError carries the same SDK frames, so Sentry buckets all
+failed HTTP requests together regardless of URL or status. The group still
+holds unfixed 403s on `get_fec_spending_by_purpose` and
+`get_fec_recent_expenditures` that need a grant change made by hand. Closing
+the group would hide them. Use `Refs`.
+
+FLUTTER-1 IS NOT A DEFECT AND IS IN THE PROTECTED SURFACE
+Three events at 07:25:04, all one Mobile Safari session, against THREE
+different tables: `endorsement_votes`, `candidates` and `endorsement_decisions`.
+Three tables failing in the same second is transport, not a query defect.
+`Load failed` is Safari's generic fetch failure and the mechanism tag is
+`SentryHttpClient`, which captures every failed request independently of app
+handling. The app already does the right thing: `load()` catches, reports
+deliberately, sets `VoteLoadState.failed` so the board shows a retry card
+instead of a fully populated board on which nobody has voted, and re-subscribes
+so a later channel join self-heals. Nothing to fix, and it sits inside the
+endorsement voting surface, so nothing may ship there autonomously anyway.
+
+SUPABASE-PLATFORM-1: TWELVE ROLLUPS READ, ZERO NEW FAMILIES
+Read `by_message` on all twelve rollups after 06:25, FATAL-tagged included, per
+READ FOURTH. Every line falls in a family already recorded: the ad hoc hand SQL
+family, the filtered password FATALs, and the two undeployed fixes. New
+IDENTIFIERS, not new shapes: `user_id`, `is_active`, `s.fields`, `claim_url`,
+`fs.form_schema_id`, `m.first_name`, `members.first_name`,
+`relation "public.legislators"`, `syntax error at or near "desc"`, and the uuid
+literals `999` and `SOMEID`. One is arguably new in kind and is recorded for
+the next run rather than acted on: `cannot get array length of a non-array` at
+07:59:00, which is a jsonb/array function error rather than a missing column or
+a syntax slip.
+
+`members.first_name` is the exception that matters: it is the ONLY line in that
+family this run traced to committed application code rather than to somebody
+typing SQL. Do not assume the whole family is hand iteration. Check the
+timestamp against the `flutter` project before classifying.
+
+BOTH UNDEPLOYED FIXES STILL FIRING ON SCHEDULE, PER READ FIRST
+`invalid input syntax for type uuid: "cron"` landed at 07:00:05 and 08:00:08,
+hourly on the hour, so `1cdb96e` is still not deployed at nine days.
+`duplicate key value violates unique constraint "legislation_bill_sponsors_unique"`
+landed 32 times at 06:00:32, unchanged size, so `e79339b` is still not deployed
+at eight days. SUPABASE-PLATFORM-3 produced NO new events; its two events this
+window are the 2026-08-03 15:35 and 15:45 pair READ SEVENTH already counted,
+and both still carry the pre-fix `Error: ` prefix, so `0d2963e` is still not
+deployed at nine days. Do not count that pair twice.
+
+SUPABASE-PLATFORM-4: A SECOND SHAPE, AND THIS ONE IS NOT OURS
+READ FIFTH documents a 400 on `/storage/v1/object/public/events/event_611ce4aa-`.
+The new event at 06:39:35 UTC is a DIFFERENT request from a different source
+address:
+
+    GET /storage/v1/object/public/events/    400
+
+No object key at all, just the bucket root with a trailing slash. None of the
+three `events` writers in READ FIFTH can produce a keyless path, and neither
+render path builds one. A keyless object GET is malformed and Supabase answers
+400 regardless of bucket permissions, so this needs no permission reasoning and
+it is not evidence about the 02:03:37 request. Left alone. Do not resolve
+SUPABASE-PLATFORM-4 and do not widen anything.
+
+FLUTTER-8 REGRESSED EXACTLY AS `dd2a052` PREDICTED
+Firing again at 08:22:23, `in_foreground: false`, lifecycle `hidden`.
+`dd2a052` said in as many words that FLUTTER-8 would regress on the next
+contact fetch and deliberately did not auto-close it, because the residual
+event is one per fetch from the shared `ApiInterceptor` and the real repair is
+that `messages.moydchat.org` is dead, which is infrastructure. Someone resolved
+it anyway. Nothing to do in this repo. Do not re-fix it and do not re-resolve it.
+
+ENDORSEMENT-SCORER-4 is the expected n8n watchdog at 360 events, still ignored,
+stays ignored.
+
+THE CONTAINER HAD NO FLUTTER AND NO DART
+Neither binary exists on this image and there is no pub cache. The verify gate
+is not skippable, so the SDK was installed from the URL `netlify-build.sh`
+already uses, pinned to 3.41.8. It resolved to revision 02085feb3f with Dart
+3.11.5, matching the deployed build's own tags exactly. Budget about 15s for a
+1.4G download plus extraction, and `flutter pub get` before `flutter analyze`.
+`pub get` rewrites five generated plugin registrant files under `linux/`,
+`macos/` and `windows/`; discard them before committing. Running the tool as
+root also needs `git config --global --add safe.directory` on the SDK path.
+
+BOTH LOCAL BRANCH REFS WERE STALE AGAIN, THE FOURTH RUN RUNNING
+`my-bluebubbles-web` local `master` was 11 commits behind `origin/master`, and
+`moyoungdemocrats` local `main` was 13 behind `origin/main`. Both containers
+started on a detached HEAD. Fetch and hard reset to the remote ref before
+reading anything, and re-read READ SECOND.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public. Named above: the `members` table and its `name`,
+`first_name` and `last_name` columns, and the `events` bucket. All three are
+already committed here, `members` and its columns throughout
+`member_repository.dart` and `candidate_repository.dart`, and the bucket in
+READ FIFTH. No credential, no DSN, no source address, no policy body and no raw
+upstream error appears, and nothing here widens access to anything. The storage
+source address is deliberately not reproduced, per READ FIFTH. Deliberately not
+written down, per the practice READ SIXTH set: the state of the live
+endorsement vote, the identity of the executive whose session produced the
+FLUTTER-1 and FLUTTER-2 events, and the operational read on who is running the
+ad hoc statements. Those go to Andrew directly.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
