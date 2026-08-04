@@ -5423,3 +5423,108 @@ appears, and nothing here widens access to anything. Withheld per the practice
 READ SIXTH set: the state of the live endorsement vote, the identity of the
 executive whose session produced all six `flutter` issues, and the operational
 read on who is running the ad hoc statements.
+
+## READ FIFTEENTH: the 22:20 UTC sweep, a quiet slice, and a 404 shape recorded rather than fixed
+
+Swept the 24 hours to 2026-08-04 22:20 UTC. No code change: nothing in the
+genuinely new observation is a defect. Short by design, per READ TWELFTH.
+
+Per the overlap warning in READ FOURTH: this window shares 22 hours with the
+sweep that closed at 20:20 UTC, so only 2 hours is new observation. Nothing
+below independently confirms anything above it.
+
+FULL DECOMPOSITION OF THE NEW SLICE
+`by_message` read on all 6 SUPABASE-PLATFORM-1 events after 20:20 UTC, FATAL
+tagged ones included, per READ SEVENTH. Eight log lines, reconciling against the
+sum of the six per event `count` fields:
+
+    6  password authentication failed for user "?"   FATAL, filtered
+    2  invalid input syntax for type uuid: "cron"    21:00:07 and 22:00:05
+
+The password total is the usual `by_severity` residual and not a direct read,
+per the standing caveat in READ FOURTH. The malformed startup packet families
+and the SASL Terminate line are absent; the password family is the only probe
+shape this slice. The ad hoc hand SQL family produced NOTHING, which settles
+nothing, for the conditionality reason READ FOURTH gives. The 32 line sponsors
+burst is absent only because no 6 hour boundary falls inside 20:20 to 22:20.
+
+THE ONE THING THE PREVIOUS SWEEP MISSED, AND WHY IT IS STILL NOT FIXED
+READ FOURTEENTH decomposes the focus endpoint failure as a 500 carrying
+"Selector not found!". There is a SECOND shape in the same group that it does
+not mention, inside its own window: at 19:17:58 UTC the server answered
+`GET /api/v1/handle/57564/focus` with 404 and a body of `Handle not found!`,
+filing a FLUTTER-8 event and a FLUTTER-B event.
+
+The mechanism is established rather than guessed. `getFocusState` passes
+`chat.participants.first.address` verbatim, and `57564` is a five digit SMS
+shortcode rather than a phone address, so the server's own handle table has no
+row for it and answers 404. No identifier is being constructed wrongly; the
+lookup simply cannot succeed for that recipient.
+
+`6ff6a45` does not cover it and should not: its flag arms only on a 500 whose
+body carries `type: Server Error`, because that describes the SERVER and
+justifies disabling the lookup session wide. A 404 describes ONE recipient, so
+the same flag would be wrong and a per address negative cache would be the
+correct shape.
+
+Not built, deliberately. A search of the full 14 day retention returns exactly
+two events, which is this ONE request, so the residual is one chat opened once
+rather than a recurring cost. Adding session state keyed by address to absorb
+two events in two weeks is speculative complexity. Recorded so the next run
+recognises the shape instead of rediscovering it, and so that if it ever
+becomes frequent the fix is already specified.
+
+THE CENSUS, CROSS FOOTED ON BOTH AXES PER READ TWELFTH
+
+    by project   endorsement-scorer 359, supabase-platform 108, flutter 38 = 505
+    by issue     ENDORSEMENT-SCORER-4 359                                  = 359
+                 SUPABASE-PLATFORM-1 104, -4 3, -3 1                       = 108
+                 FLUTTER-8 11, -B 10, -X 9, -1 3, -5 2, -Y 1, -6 1, -2 1   =  38
+                                                                             505
+
+`website`, `mautic`, `moydforms`, `n8n` and `supabase-edge` at zero. Queried
+with NO status filter per READ EIGHTH. Read READ TWELFTH's caveat on what the
+equality does and does not buy: these totals are identical to the 20:20 sweep's,
+and that is close to guaranteed by a 22 hour overlap rather than corroboration.
+
+NOTHING FIRED THAT IS NOT ALREADY HANDLED
+- The newest `flutter` event of any kind is 19:34:33, which is 76 minutes BEFORE
+  `6ff6a45` landed at 20:50:30. So none of FLUTTER-8, -B or -X has fired since
+  the fix. Do not read that as the fix being confirmed in production: no CRM
+  session has opened a conversation in that window either, so the quiet is
+  equally well explained by nobody using it. None was resolved.
+- FLUTTER-Y and FLUTTER-6 are the `RenderBox was not laid out` pair with zero
+  first party frames, left alone per READ FOURTEENTH. FLUTTER-1 and FLUTTER-5
+  are browser transport. FLUTTER-2 last fired 07:24:26 and `2a90af9` landed
+  08:44:37.
+- SUPABASE-PLATFORM-3's only event is the 12:10:02 429; `285a05f` landed at
+  12:43:21, after it. SUPABASE-PLATFORM-4's three events are the 02:03:37,
+  06:39:35 and 12:55:16 requests READ FIFTH, READ EIGHTH and READ ELEVENTH
+  document in full. Same occurrences, not recurrences. Do not resolve either.
+- ENDORSEMENT-SCORER-4 is the expected n8n watchdog, correctly ignored.
+
+FOUR FIXES COMMITTED AND UNDEPLOYED
+Computed from `git show -s --format=%cI`, not carried forward: `1cdb96e` at 9
+days, `e79339b` at 8, `0d2963e` at 4, `285a05f` at under 10 hours. All four are
+hand deploy work per READ FIRST. Re-checked rather than inherited, per READ
+TWELFTH: nothing matching `SUPABASE` or `PROJECT_REF` is in this container's
+environment, so the single item ask stands unchanged. The hourly uuid line
+firing at 21:00 and 22:00 today is `1cdb96e` still not deployed.
+
+THE BRANCH REF TRAP, EIGHTH RUN
+Both repos again presented a stale named branch with `HEAD` detached at the true
+remote tip: this repo's `master` at `5d8a5b0` against a real `6dcfca5`, and the
+sibling's `main` at `77d879f` against a real `df8c8d9`. Repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH, and `git ls-remote`
+re-run immediately before committing per READ FOURTEENTH.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public. Named above: the focus endpoint path shape, the host, and
+the upstream BlueBubbles server strings, all already published verbatim in this
+file by READ FOURTEENTH. The shortcode `57564` is a public commercial SMS sender
+ID rather than anything identifying a person, and no recipient phone number is
+reproduced. No credential, no DSN, no probe source address and no policy body
+appears, and nothing here widens access to anything. Withheld per the practice
+READ SIXTH set: the state of the live endorsement vote, the identity of the
+executive in the `flutter` session, and the operational read on who is running
+the ad hoc statements.
