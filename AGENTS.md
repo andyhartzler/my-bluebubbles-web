@@ -786,6 +786,186 @@ has a Sentry project and can still fire. A census that does not know its own
 denominator is not a census; list the projects before claiming a set was
 quiet.
 
+### The 2026-08-04 window: the method held, and an inherited guess survived a test
+
+Swept the same way as the 74 event sweep above: `by_message` read on all 71
+events in the 24 hours to 2026-08-04 00:20 UTC, never on a sample. The per
+shape numeric totals sum to 164, the password residual is 83, and 164 plus 83
+is 247, which equals the sum of every in window event `count` field. The same
+caveat as before applies unchanged and is the reason this is a reconciliation
+rather than a proof: shape 1 is a residual of `by_severity` and not a direct
+read, because Sentry filters that message, so that component cannot fail
+arithmetically. Completeness rests on the key sweep and the arithmetic
+together.
+
+Eight shapes again, but not the same eight, and the difference is the useful
+part.
+
+Unchanged and still firing at an unchanged rate, both committed and both
+undeployed, which is the whole finding of this window:
+
+- `duplicate key value violates unique constraint "?"`, 128 lines, exactly 32
+  in each of four cycles at 00, 06, 12 and 18 UTC. Fixed in `e79339b`.
+- `invalid input syntax for type uuid: "?"`, 23 lines, once an hour. Fixed in
+  `1cdb96e`.
+
+Both counts are identical to the previous window, and that is much weaker
+evidence than it sounds, so do not quote it as confirmation. The two windows
+OVERLAP. The previous one ran 2026-08-02 20:05 to 2026-08-03 20:05 and this one
+runs 2026-08-03 00:20 to 2026-08-04 00:20, which is 19 hours 45 minutes of
+shared ground and only 4 hours 15 minutes of genuinely new observation. Three
+of the four dup key cycles, 96 of the 128 lines, and about 19 of the 23 uuid
+lines are the SAME log lines counted twice. Identical totals are therefore
+close to guaranteed by construction. The real new data is one 32 line cycle at
+2026-08-04 00:00 and about four uuid lines.
+
+Whoever writes the next one of these: a rolling 24 hour window against a note
+written 4 hours ago mostly re-measures the previous measurement. State the
+overlap explicitly or the numbers will read as independent agreement when they
+are not.
+
+`1cdb96e` landed on 2026-07-26 and `e79339b` on 2026-07-27, nine and eight days
+before this window closed, and neither emitter has changed behaviour across any
+of it. That part does rest on the full nine days rather than on this window, so
+it survives the overlap. Nothing here adds a new mechanism for either; it adds
+duration.
+
+Scan noise, unchanged in character: the filtered password FATAL at 83 lines,
+`unsupported frontend protocol N.N` at 8 lines, and `no PostgreSQL user name
+specified in startup packet` at 2 lines. The protocol values seen this window
+are `65363.19778`, `255.255`, `0.0` and `16.0`, which is the same set the
+section above already lists and adds nothing new. That is not evidence the set
+is closed, and the instruction above not to treat any list of them as
+exhaustive still stands.
+
+`invalid input value for enum committee_type: "?"` appears once, at
+2026-08-03 00:40:04 UTC. That is the SAME occurrence already recorded in the
+section above, not a recurrence: it sits inside the 00:45 rollup, which falls
+in both windows. It has not fired again in the day since. Do not count it
+twice.
+
+THE TEST OF THE INHERITED GUESS, WHICH IS WHY THIS SECTION EXISTS
+Nothing was falsified. A prediction was tested and it held, which is a weaker
+and more ordinary result, and the section is worth reading for how little it
+proves as much as for what it found.
+
+The section above recorded shapes 7 and 8 as a hand query pair and said
+explicitly: if they recur on a schedule, revisit that inference rather than
+inherit it. That test has now been run and the inference survives, but only
+because of what did NOT happen.
+
+`operator does not exist: text = integer` did not appear at all. Its key is
+absent from all 71 events. Be exact about what that buys, on two axes rather
+than one.
+
+On schedule: this window adds only 4 hours 15 minutes of new observation, per
+the overlap above, so it does not on its own clear a daily emitter. What does
+is the continuous silence since the single occurrence at 2026-08-02 21:30:53,
+which is about 26.8 hours across the two windows together. Make that combined
+argument explicitly, because neither window makes it alone.
+
+On conditionality, which is the axis the first draft of this note missed
+entirely: even 26.8 hours of silence only rules out a job that executes the
+offending statement on EVERY tick. A daily or faster job that reaches the
+statement on a data dependent branch can stay silent indefinitely and then fire
+once. The committee_type finding above is exactly that shape. So silence
+narrows the field and settles nothing.
+
+The `column ... does not exist` family did recur, but NOT as the same line.
+The previous window carried `column v.id does not exist`, qualified by an
+alias and unquoted. This window carries `column "email" does not exist`,
+unqualified and quoted, which is a different statement and not a repeat of the
+same one. Postgres renders those two forms differently, so the distinction is
+readable from the message alone.
+
+And a family appears that no earlier section records at all:
+`relation "public.forms" does not exist`, once, at 2026-08-03 23:51:39 UTC.
+The `column "email"` line lands 13.9 seconds later at 23:51:53, in the same
+rollup window.
+
+So the pattern is a changing set of one-off schema errors rather than a fixed
+set repeating, which is what ad hoc querying looks like and is not what any
+scheduled job looks like. Two different bad identifiers fourteen seconds apart,
+at 23:51 UTC, on no boundary, is somebody iterating on a query by hand. That
+remains an inference from timing and message shape. It is now a better
+supported one than when it was written, because the prediction it made was
+tested and held.
+
+WHAT IS CHECKED, AND WHAT IS ONLY INFERRED
+The two new lines are NOT equally well established. An earlier draft of this
+note ran them together under a heading claiming both were checked. They were
+not. Keep them apart.
+
+The `relation "public.forms"` line is checked. There is no table named `forms`
+in either repo. Enumerating every `.from('...')` call in both gives eight
+distinct form tables: the website uses `form_schemas`, `form_submissions`,
+`form_analytics`, `form_field_analytics`, `form_files` and `form_events`, and
+the CRM uses all of those except `form_files`, plus `form_drafts` and
+`form_templates`. None is `forms`. Read the scope of that sweep correctly,
+because it is narrower than "every table reference" in two ways.
+
+It matches string literals, so it misses a `.from()` whose target is a
+variable, and those exist here: `quickLinksTable`, `_boardsTable`,
+`_connectionsTable`, `_nodesTable`, `_emailTable`, `_universalLayoutTable`,
+`_applicantView`, `_fieldView`, `targetTable` in `meeting_repository.dart`,
+`source` in `member_repository.dart`, which iterates
+`_dashboardMetricsSources`, and the several separate constants each named
+`_table`. All were resolved to their literals and none is `forms`. Read that
+as the set found rather than as a closed one, which is the same caveat this
+paragraph is making about the grep. Storage bucket name variables are left out
+on purpose: a bucket is not a relation and cannot raise this error.
+
+One trap if you repeat that check: a naive grep for `.from(<identifier>)` in
+Dart also matches `List.from`, `Map.from` and `Set.from`, which are language
+constructors and not database calls. They are the large majority of the
+apparent hits and they resolve to nothing. Do not read that noise as unaudited
+table access.
+
+It also covers only `.from()`, so it misses RPC paths. The website reaches
+`form_drafts` through SECURITY DEFINER RPCs called from its site-forms draft
+hook rather than through `.from()`, so the per repo split above describes
+`.from()` calls and is not a complete map. Neither gap moves the conclusion,
+since `form_drafts` is still not `forms`, but a future run should not repeat
+the phrase "every table reference" for a literal grep.
+
+The RPC names and the file path are deliberately not written down here. This
+repo is public and the sibling is not; the methodological point survives
+without naming callable endpoints of the other system, so it is not named.
+
+The `'forms'` string literals in `quick_links_screen.dart` and
+`quick_links_dialog.dart`, nine instances across eight lines, are the quick
+links category value. Be exact about them rather than waving them away: that
+value IS written to SQL, as `quick_links.category` data in
+`quick_links_repository.dart`, and it is ordered on there too. What it never is
+is a relation identifier, and only a relation identifier can raise this error.
+A bound data value cannot.
+
+The `column "email"` line is NOT checked to that standard. No column level
+enumeration was done at all. The sweep above is over table names, which gives
+this line no cover whatever, and `email` columns are common in both repos. So
+the honest position is that no emitter has been attributed to it, not that none
+exists.
+
+The rate argument covers both lines, and it is weaker than it first looks. A
+planner error is raised on every execution of the offending statement, so a
+statement in a hot path would fire far more than once a day. That reasoning
+does not reach a cold one. An admin only screen opened once, a one off
+migration, a branch taken only on an error, or any daily job all produce
+exactly one line a day. This file's own committed emitters make the point:
+the uuid line fires once an hour and the dup key burst four times a day. So
+the rate makes a hot path unlikely and says nothing about a cold path.
+
+That leaves an open question rather than a closed one, and the next run should
+inherit it as open. One instruction here is safe either way and is the only one
+worth treating as firm: do not change a working query to make one of these go
+away. If either line recurs, the check that was skipped this time is a column
+level search for the offending identifier.
+
+Left alone deliberately on 2026-08-04. No code change anywhere this run: every
+real defect in this window was already fixed in git and is waiting on a hand
+deploy, and neither new shape has an emitter attributed to it, which for the
+`column "email"` line means unchecked rather than cleared.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
