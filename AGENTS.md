@@ -1114,6 +1114,173 @@ it deliberately withheld RPC names, and that withholding still stands. The
 source address is not reproduced, no credential or raw upstream error text
 appears, and nothing here widens access to anything.
 
+## READ SIXTH: the 04:20 UTC sweep, and the ad hoc query family becomes readable
+
+Swept the 24 hours to 2026-08-04 04:20 UTC. No code change anywhere this run.
+The reason is at the bottom of this section rather than assumed at the top.
+
+Read the overlap warning in READ FOURTH before quoting any number here. At a two
+hour cadence the overlap is now almost total: this window shares about 22 of its
+24 hours with the sweep that closed at 02:25 UTC, and roughly 1 hour 55 minutes
+of it is new observation. Nothing below is independent confirmation of anything
+above it.
+
+THE SCOPE OF THIS SWEEP, WHICH IS NARROWER THAN THE TWO ABOVE
+READ FOURTH prescribes reading `by_message` on every event in the window rather
+than on a sample, and it is right. This run did not do that, so do not read the
+section below as a decomposition of the kind the 74 and 71 event sweeps
+produced. It read `by_message` on 4 of the 75 events.
+
+What those 4 were chosen to cover is the part that makes the result usable.
+Every ERROR level rollup in the window that is NOT a `:05` rollup was read:
+04:15, 03:25 and 23:55, all three of them. Every previously undocumented shape
+in this family has arrived in exactly that kind of event, because the hourly
+uuid line and the four times daily dup key burst both land on `:05` rollups. One
+of those bursts, 00:05, was read as a control and is unchanged at 32 dup key
+lines plus 1 uuid line. The remaining 71 events were classified by title and
+timestamp against shapes READ FOURTH already enumerates. 4 read plus 71
+classified is the full 75; an earlier draft of this paragraph said 70 and did
+not reconcile, which in a note about coverage is the exact error READ FOURTH
+warns about.
+
+State the hole this leaves, because it is a real one. Events tagged as including
+FATAL were not read, and those events carry ERROR lines as well as scan noise:
+the 12:05 burst is titled `includes FATAL` and certainly contains that cycle's 32
+dup key lines. So a genuinely new ERROR shape sitting inside a FATAL tagged
+rollup would be invisible to this sweep. That is a weaker guarantee than the two
+sweeps above give, it is recorded as weaker, and a run that needs completeness
+should redo the full sweep rather than inherit this one.
+
+THE DENSEST BURST THIS FAMILY HAS PRODUCED
+Six ERROR lines inside one 5 minute window, 2026-08-04 04:09:02 to 04:14:01 UTC,
+carried by the 04:15 rollup:
+
+    operator does not exist: text = uuid    2   (04:13:45, 04:13:27)
+    column d.decision does not exist        1   (04:13:33)
+    column d.form_id does not exist         1   (04:09:49)
+    column fs.is_active does not exist      1   (04:09:56)
+    column s.form_schema_id does not exist  1   (no timestamp, see below)
+
+The five timestamps come from the rollup `sample`, which carries only five
+entries. `s.form_schema_id` is present as a `by_message` key and the counts
+reconcile to six, so the line is real, but its timestamp was never observed. Do
+not infer where in the window it fell.
+
+Plus one more 48 minutes earlier, in the 03:25 rollup: `column "full_name" does
+not exist`, at 03:21:27, unqualified and quoted.
+
+Every previous appearance of this family was one or two lines. Six inside four
+minutes, all of them different, is a change in density rather than in kind.
+
+WHAT IS ACTUALLY NEW: THE MISMATCH IS NOW READABLE FROM THE IDENTIFIERS
+Every earlier note on this family rested on timing and message shape, and said
+so. This window is the first where the identifiers themselves carry the
+argument, because for two of them this repo's own committed migrations name the
+correct column:
+
+- `s.form_schema_id`. The real column on `form_submissions` is `form_id`. Two
+  committed policies in `20260422_00_endorsement_questionnaire_link.sql` and
+  `20260422_05_rls_phase2.sql` both join on it. The string `form_schema_id`
+  appeared nowhere in either repo before this note was written. Grep it now and
+  you will hit this section. For the clean negative, read `AGENTS.md` at the
+  PARENT of the commit that introduced READ SIXTH; do not use `HEAD~1`, which
+  stops being that commit as soon as the next sweep appends its own section.
+  The same caveat applies to `public.forms` in READ FOURTH.
+- `fs.is_active`. The real column on `form_schemas` is `status`; the committed
+  `form_submissions_public_insert_active` policy tests `fs.status = 'active'`.
+  There is no `is_active` on `form_schemas` anywhere in either repo.
+- and from the previous window, `relation "public.forms"`, where the real tables
+  are `form_schemas` and `form_submissions`, per the eight table enumeration in
+  READ FOURTH.
+
+That is a consistent signature rather than three coincidences: each wrong name
+is the plausible guess for the right one. `form_schema_id` for `form_id`,
+`is_active` for `status`, `forms` for `form_schemas`. Code that shipped against
+this schema does not guess; it either matches or fails on every execution.
+
+WHY IT IS NOT EITHER APP'S DATA LAYER, AND WHAT THAT DOES NOT MEAN
+The aliases are the second half of it. `d`, `fs` and `s` are hand chosen short
+aliases on a multi table join. Both applications reach Postgres through
+PostgREST, the website through supabase-js and the CRM through the
+`supabase_flutter` Dart client, and PostgREST does not emit that form. So the
+statements are raw SQL from something that is not either app's data layer.
+
+Be careful about how far that goes, because it is narrower than "not this repo".
+What it rules out is the two applications' data layers. It does not identify who
+IS emitting, and one candidate is closer to home than the others: this repo
+itself ships direct to Postgres psycopg scripts with hand written SQL in exactly
+this style, including single letter aliases, under `scripts/voter_file/`. A
+session adapted from that established workflow would produce precisely the shape
+observed. A psql or SQL editor session, a migration being drafted by hand, the
+`endorsement-scorer` service and an n8n workflow are all equally consistent, and
+none of them is reachable from this container. `endorsement-scorer` was checked
+and is not reporting SQL errors of its own: its only Sentry issue in this window
+is the ignored n8n watchdog, at 359 events. That is an absence of evidence and
+not evidence of absence, since a service need not report its database errors.
+
+The literal failing statements are still attributable to no code in either repo,
+but state that precisely, because the loose version of it is false. It is NOT
+that these identifiers exist nowhere in either tree. Several of the bare names
+do exist: `form_id` is the real column this section documents, `is_active` sits
+on several unrelated tables in both repos, and `full_name` is common in both.
+What no committed statement in either tree does is make these QUALIFIED
+references, the column on that particular table. That combination is what rules
+the repos out, and nothing weaker does. The psycopg point does not weaken it
+either; it widens the set of humans and scripts that could have typed them.
+
+Alias `d` on `decision` and `form_id` is most likely `endorsement_decisions`.
+Nothing was changed for those two lines and nothing should be: a SELECT that
+fails on a guessed column name never reaches execution, so it neither reads nor
+writes a row.
+
+WHAT IS NOT ESTABLISHED
+Who is running these, and whether the six lines at 04:09 to 04:13 are one
+session or several. The rollup carries message, severity and timestamp only,
+with no client address, user or application name, so the events cannot be
+attributed from Sentry and the code is not in this container. The reasoning that
+this is hand iteration is now better supported than it was, but it is still an
+inference from identifiers, aliases and burst timing, not an attribution.
+
+The `column "full_name"` line is unchecked to the standard READ FOURTH set for
+`column "email"`: no column level enumeration was done, and `full_name` is
+common in both repos. No emitter is attributed to it.
+
+Left alone deliberately on 2026-08-04. No code change: no committed statement in
+either repo makes any of these qualified references, per the precision note
+above, so there is nothing here to fix, and the standing instruction not to
+change a working query to make one of these go away applies unchanged. The two real defects in this window, `1cdb96e` and `e79339b`, are
+still committed and undeployed at nine and eight days, and both are hand deploy
+work per READ FIRST. `0d2963e` is in the same state, which is why
+SUPABASE-PLATFORM-3 fired again at 2026-08-03 15:45.
+
+SUPABASE-PLATFORM-4 carried exactly one request this window, the 02:03:37 UTC
+`events` bucket 400 that READ FIFTH already documents in full. Same occurrence,
+not a recurrence. Do not count it twice and do not resolve the issue.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public. Count what is actually named above rather than waving at
+it, which is what the first draft of this paragraph did wrong: three table names
+(`form_schemas`, `form_submissions`, `endorsement_decisions`), two real column
+names (`form_id`, `status`), one policy name
+(`form_submissions_public_insert_active`) and one script directory
+(`scripts/voter_file/`). All seven are already committed in this repo's own
+migrations, Dart sources or tree, so naming them here adds no reach.
+
+Most of the failed identifiers describe nothing real, since they name columns
+that do not exist. Do not state that as a blanket rule, because it is not one:
+`full_name` is a real and common column in both repos, and it is only the
+absence of a table qualifier on that line that leaves it uninformative.
+
+Deliberately NOT written down here, and this is a change of practice worth
+inheriting rather than an oversight: the state of any live endorsement vote, and
+the operational read on who might be running these statements. This file is
+public and the unattributed party can read it too, so anything that amounts to
+telling them what has been noticed goes to Andrew directly instead. Record the
+log lines, not the surveillance.
+
+No source address, no credential, no RPC name, no database DSN and no raw
+upstream error text appears, and nothing here widens access to anything.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
