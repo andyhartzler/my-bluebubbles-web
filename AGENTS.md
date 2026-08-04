@@ -1775,6 +1775,180 @@ statements. Those go to Andrew directly.
 No credential, no DSN, no source address, no policy body and no raw upstream
 error appears, and nothing here widens access to anything.
 
+## READ TENTH: the 12:27 UTC sweep, a 429 in the relay, and a permission burst that must not be granted away
+
+Swept the 24 hours to 2026-08-04 12:27 UTC. One code change this run, `285a05f`,
+described below.
+
+Per the overlap warning in READ FOURTH: this window shares about 23 of its 24
+hours with the sweep that closed at 11:31 UTC, so only about 56 minutes of it is
+new observation. That is the narrowest new slice any of these sweeps has had.
+Nothing below independently confirms anything above it, and the two genuinely new
+findings both landed inside that 56 minutes.
+
+SUPABASE-PLATFORM-3 HAS A SECOND UPSTREAM FAILURE MODE, AND IT IS FIXED IN GIT
+Every prior note on this group describes one shape, the CDN 502. There are now
+two. Enumerated over the full 14 day range rather than incremented, per READ
+FIRST, the group holds 15 events: 14 of the 502 shape from 2026-07-24 07:05
+through 2026-08-03 15:45, and one new event at 2026-08-04 12:10:02 reading
+
+    logs query failed 429: {"message":"ThrottlerException: Too Many Requests"}
+
+14 plus 1 reconciles against the issue's own Occurrences field of 15.
+
+`0d2963e` added the retry loop for the 502s and classified every 4xx as non
+retryable, with the comment "4xx is a bad token or a bad query: retrying cannot
+change the answer." That is right for 400, 401, 403 and 404 and wrong for 429,
+which is the one 4xx where the identical request succeeds once the window
+clears. So the single throttle short circuited the loop on attempt 1 and killed
+the run. Fixed in `285a05f`: 429 joins 5xx as retryable and waits on
+`Retry-After`, floored at 5s so a zero or stale value cannot become an instant
+retry back into the same throttle, capped at 30s so it cannot park the run into
+the next cron tick.
+
+Two things about that commit worth inheriting rather than rediscovering.
+
+The first version routed 5xx through `Retry-After` too, and an adversarial
+auditor killed it: a CDN error page carrying `Retry-After: 0` would have
+collapsed the linear backoff to an immediate retry and regressed exactly what
+`0d2963e` was written to produce. The shipped version reads the header only when
+`res.status === 429`. When you widen a retry classification, check what else you
+just put on the new code path.
+
+The three concurrent `queryLogs` calls under `Promise.all` are a plausible cause
+of being throttled at all, and were deliberately NOT changed, because sequencing
+them is a behaviour change beyond this issue. The escalation trigger is defined:
+if 429s recur AFTER this deploys, identifiable by a 429 status event carrying 3
+attempts, that recurrence is the evidence the fan out is the mechanism and
+sequencing becomes the next change. Note the discriminator carefully, because the
+`after N attempt(s)` wording alone is not one: it already shipped in `0d2963e`.
+
+This is undeployed like everything else under `supabase/functions`, per READ
+FIRST, and the 12:10 event still carries the pre fix `Error: ` prefix and the pre
+fix `${status}: ${body}` shape, so a pre `0d2963e` build was still serving as of
+12:10:02 today. That extends the build drift finding, which READ FIRST scoped
+only as far as 2026-08-03 15:45, to today.
+
+VERIFYING A DENO FILE IN A CONTAINER WITH NO DENO
+There is no `deno` binary on this image and `deno.land` is blocked by the
+container network policy, which answers 403 to CONNECT. `flutter analyze` is not
+a substitute and is not a gate here, because it does not read TypeScript under
+`supabase/functions`; installing the 1.4G SDK as READ EIGHTH describes would have
+verified nothing about this diff.
+
+What worked, and is cheap to repeat: a DIFFERENTIAL type check. `npx tsc` is
+available, and running it over the file at HEAD and over the working tree gives
+byte identical diagnostic sets, 8 in each, all of them `Cannot find name 'Deno'`
+and the remote `esm.sh` import. Deno noise cancels out and any new diagnostic
+would stand out. The delay logic was then extracted into plain node and unit
+tested across 17 cases, including the 5xx assertions that prove the untouched
+path really is untouched. Prefer this over skipping the gate, and over claiming a
+gate that does not apply to the file you changed.
+
+THE NEW SHAPE IN SUPABASE-PLATFORM-1, AND THE FIX THAT MUST NEVER BE MADE
+The 12:15 rollup, window 12:04:02 to 12:14:02, carries 18 ERROR lines. Twelve of
+them are `permission denied for function <name>`, and they land in a tight run
+around 12:13:35 at roughly 98 ms spacing. Alongside them sits one
+`insufficient_privilege: staff role required`, which is a `RAISE EXCEPTION` from
+the body of a stats RPC in `supabase/migrations_manual/20260722_stats_rpcs.sql`
+guarding on `public.is_staff()`. The remaining lines are three `column reference
+"?" is ambiguous`, one `field name must not be null`, and one `canceling
+statement due to statement timeout`.
+
+THE FIX THAT MUST NEVER BE MADE
+Do not GRANT EXECUTE on these functions to make this go away. This is the
+standing prohibition in the run instructions and in READ THIRD, and here it has
+teeth: the denied set is the `count_*` and `get_*_filtered` admin family defined
+in this repo's own campaign and segment builder migrations, and it reads members,
+donors, subscribers and event attendees. Granting it to `authenticated` would
+expose the entire member and donor file to every logged in user. A permission
+denied on these is very likely the system working correctly.
+
+WHY IT IS PROBABLY NOT A USER FACING BREAK, STATED AS THE INFERENCE IT IS
+The two error classes together are the informative part. `permission denied for
+function` is refused at the GRANT, before execution. `insufficient_privilege:
+staff role required` means that one function DID execute and then failed its own
+`is_staff()` guard. A caller with no privilege anywhere produces only the first
+kind. So the caller is authenticated and not staff, and holds EXECUTE on some of
+these and not others.
+
+That, plus regular ~98 ms spacing across a systematic walk of paired `count_` and
+`get_` functions, is what a permissions smoke test or audit script looks like,
+not what a screen loading looks like. It is an inference from timing and error
+mix, not an attribution, and the rollup carries no client address, user or
+application name, so it cannot be attributed from Sentry.
+
+Scope the code check honestly, because it is narrower than a clean negative. A
+grep of `lib/` and of the sibling repo's `src/` finds NO caller for any of the
+denied `count_*`/`get_*_filtered` names. The one exception is `search_donors_v3`,
+which IS called from `mec_repository.dart` and which `20260427_11_donor_search_
+security_definer.sql` grants to `authenticated`. If a real executive session hit
+that denial, MEC research is broken for them, and that possibility is NOT
+excluded by anything here. What argues against it is the company the line keeps:
+a screen that needed donor search would not also call `get_available_api_key`,
+which nothing but edge functions call. Left as an open question rather than a
+closed one.
+
+Nothing was changed for any of these lines.
+
+WHAT ELSE FIRED, ALL OF IT ALREADY ON THE RECORD
+- The 12:05 rollup is the 12:00 UTC cycle, read directly and unchanged: 32
+  `legislation_bill_sponsors_unique` dup key lines plus 1 hourly uuid line, 33
+  total. `e79339b` and `1cdb96e` are committed and undeployed at eight and nine
+  days.
+- SUPABASE-PLATFORM-4 carried the 02:03:37 `events` bucket 400 and the 06:39:35
+  keyless bucket root GET, both documented in full by READ FIFTH and READ EIGHTH.
+  Same occurrences, not recurrences. Do not count them again and do not resolve.
+- FLUTTER-2 last fired 07:24:26 and its fix `2a90af9` landed 08:44:37, so it has
+  not fired since the fix. Handled, left alone, deliberately not re-resolved.
+- FLUTTER-1's three events are the same 07:25:04 transport occurrence, in the
+  protected endorsement surface. FLUTTER-8 is the dead `messages.moydchat.org`
+  host per `dd2a052`. Nothing to do for either.
+- The filtered password FATALs continue at the usual rate. Scan noise.
+
+THE CENSUS
+By event count per project, per READ FIFTH, not by an issue status filter:
+`endorsement-scorer` 360, `supabase-platform` 96, `flutter` 5, and `website`,
+`mautic`, `moydforms`, `n8n` and `supabase-edge` at zero. `endorsement-scorer` is
+the expected n8n watchdog, correctly ignored, and it stays ignored. Note the
+issue list was queried with NO status filter, per READ EIGHTH, which is how the
+two resolved `flutter` issues stayed visible.
+
+THE SENTRY API 500s READ NINTH WARNED ABOUT ARE REAL
+Two `search_issue_events` calls returned HTTP 500 and one `search_events` call
+timed out at 60s. All succeeded on retry with a differently shaped query. Retry
+rather than classifying by title, exactly as READ NINTH says.
+
+THE BRANCH REF TRAP, SIXTH RUN RUNNING
+Both repos again presented a stale named branch with `HEAD` detached at the true
+tip: this repo's `master` at `5d8a5b0` against a real `b9ae4c5`, and the
+sibling's `main` at `77d879f` against a real `f1ef9ab`. Repaired with
+`git -C <path> checkout -B <branch> HEAD`, using `git -C` for every command per
+READ NINTH's self inflicted lesson. This is no longer worth treating as a
+surprise.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Weighed rather than inherited.
+
+Named above: the `count_*` and `get_*_filtered` admin RPC family, the stats RPC
+guard string `insufficient_privilege: staff role required`, the
+`migrations_manual/20260722_stats_rpcs.sql` path, `public.is_staff()`,
+`search_donors_v3` and `20260427_11_donor_search_security_definer.sql`. Every one
+is already committed in this repo's own migrations and Dart sources, so naming
+them adds no reach. The individual function names are deliberately NOT
+enumerated: the family name carries the finding and the instruction not to grant,
+and a ready made list of admin endpoints that currently refuse an authenticated
+caller is the one thing here that would be more useful to someone probing than to
+the next run.
+
+Deliberately withheld, per the practice READ SIXTH set: the state of the live
+endorsement vote, the identity of any executive in the FLUTTER events, and the
+operational read on who is running the ad hoc statements and the RPC walk. Those
+go to Andrew directly.
+
+No credential, no DSN, no source address, no policy body and no raw upstream
+error appears, and nothing here widens access to anything.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Architecture Analysis](#architecture-analysis)
