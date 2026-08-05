@@ -7908,3 +7908,378 @@ raw upstream error appears, and nothing here widens access to anything. Withheld
 the practice READ SIXTH set: the state of the live endorsement vote, any operational
 read on production sessions, and anything describing this container's own reporting
 or credential tooling, which READ EIGHTEENTH records as a BLOCKER class.
+
+## READ TWENTY-FIFTH: the 18:21 UTC sweep, a second evidenced boundary miss, and the asymmetry that makes a miss harder to observe than a hit
+
+Swept the 24 hours to 2026-08-05 18:21 UTC. No code change beyond this note: nothing
+in the genuinely new observation is a defect. Short by design, per READ TWELFTH.
+
+Per the overlap warning in READ FOURTH: this window shares about 22 hours with the
+sweep that closed at 16:20 UTC, so only about 2 hours is new observation. Nothing
+below independently confirms anything above it.
+
+Carve out the watchdog the way READ EIGHTEENTH insists rather than writing "nothing
+else fired". ENDORSEMENT-SCORER-4 reads 359 on both axes, and a FLAT rolling 24 hour
+count of a periodic emitter means events kept landing as old ones aged out. It is
+correctly ignored, so it is excluded on purpose, not absent.
+
+FULL DECOMPOSITION OF THE NEW SLICE
+`by_message` read on all 3 SUPABASE-PLATFORM-1 events after 16:20 UTC, FATAL tagged
+ones included, per READ SEVENTH. Thirty eight log lines, reconciling against the sum
+of the three per event `count` fields:
+
+    16:30:06 rollup, window 16:24:04.751 to 16:29:02.810
+        2  unsupported frontend protocol N.N     FATAL, values 255.255 and 0.0
+        1  no PostgreSQL user name specified in startup packet   FATAL
+    16:50:07 rollup, window 16:44:04.781 to 16:49:02.727
+        3  password authentication failed for user "?"   FATAL, filtered
+    18:05:10 rollup, window 17:59:03.827 to 18:04:03.886
+       32  duplicate key value violates unique constraint "?"   the 18:00 cycle
+
+The 16:30:06 rollup is NOT new. READ TWENTY-FOURTH read it in full as a post close
+observation, deliberately outside its own counts, and its three lines are identical.
+It falls inside this window, so it is counted here for the first and only time. Same
+occurrence, counted once, and flagged so a future reader does not have to reconcile
+the two sections unaided.
+
+The password total is the usual `by_severity` residual and not a direct read, per the
+standing caveat in READ FOURTH. Split the probe shapes rather than lumping them, per
+READ TWELFTH. FOUR probe families are on the record, not three: READ FOURTH enumerates
+the protocol and no-username families as shapes 4 and 5 alongside the password family
+as shape 1, and READ ELEVENTH adds the SASL Terminate line as a fourth, explicitly not
+with the password failures. Three of the four appear in this slice and the SASL line
+does not. Attribution differs across them and that difference is load bearing, and it does not
+split two against two. The PROTOCOL family alone is established scan traffic, by READ
+FIRST's byte decoding of the version halves. The no-username line has no bytes to
+decode: READ FIRST calls that packet structurally valid and says the unscrubbed source
+addresses are what would confirm it, so it is not established to the same standard. The
+password family's attribution to that same traffic is INFERRED and not established,
+which READ FIRST states and which no sweep since has overturned. Do not upgrade that to
+a claim that every sweep preserved it: READ FOURTH labels shape 1 flatly as scan noise,
+and READ NINTH, TENTH and SIXTEENTH each call the password family scan noise flatly
+with no caveat attached. READ SEVENTH and READ EIGHTH are a separate and weaker case
+worth keeping straight rather than padding the list with: they mention the filtered
+password FATALs without attributing them to scan traffic at all, so they omit the
+caveat without lumping. Never overturned is the accurate form.
+
+The ad hoc hand SQL family that READ SEVENTEENTH attributes to Andrew's own membership
+audit produced NOTHING, which settles nothing, for the conditionality reason READ
+FOURTH gives.
+
+THE 18:00 BOUNDARY IS THE SECOND EVIDENCED MISS
+The counting rule is READ TWENTY-FIRST's: count a boundary only when a
+SUPABASE-PLATFORM-1 rollup's `window_start` to `window_end` covers it.
+
+Be exact about the provenance of the test, because pre-registration does real work in
+this file and an earlier draft of this section invented some. READ TWENTY-SECOND
+registered 13:00 and 14:00; READ TWENTY-THIRD re-registered 15:00 and 16:00; READ
+TWENTY-FOURTH RAN that test, reported the count standing at one, and did NOT
+re-register anything. So the 17:00 and 18:00 boundaries were not pre-registered by any
+prior section. What is inherited is the RULE, not these two boundaries, and this is a
+standing rule applied to the next boundaries rather than a registered prediction.
+
+17:00 does not qualify. No rollup exists between 16:50:07 and 18:05:10, so that
+boundary has no covering window and is uninformative.
+
+18:00 DOES qualify, and it is a miss. The 18:05:10 rollup's window is 17:59:03.827 to
+18:04:03.886, so it covers 18:00. Its `by_message` carries ONE key, the normalized
+duplicate key message at 32; `count` is 32 and `by_severity` is ERROR 32. There is no
+uuid line in it.
+
+Three relay side and query side artefacts are excluded by the event's own fields, the
+way READ TWENTY-SECOND excluded them at 12:00. One key against the 15 key cap, so no
+tally truncation. 32 rows against `limit 200`, so no row truncation. A returned row set
+at all, so the postgres query did not fail silently into the `[]` that would have
+produced no event. The control is in the same tally: the sponsors burst is at an
+unchanged 32 lines in that same five minute window, so the same query in the same
+window still sees the OTHER undeployed fix's emitter at full size, and a dead relay or
+a failed query is all-or-nothing against the whole window and cannot take one emitter
+while leaving the other.
+
+TWO artefacts are NOT excluded, and READ TWENTY-SECOND is explicit about both, so do
+not inherit the phrase "every artefact" that an earlier draft of this section used.
+The line could have fallen outside the window: every occurrence in this file carrying
+a recorded second lands between HH:00:04 and HH:00:10, and this window opens 56 seconds
+before the hour and closes four minutes after it, so no recorded offset falls outside
+it, but READ TWENTY-SECOND calls that a regularity rather than a proof and says in as
+many words that it is not the same as none ever could. And per-line loss in the
+ingestion pipeline ABOVE `postgres_logs` delivers 32 rows while dropping a
+thirty-third; the control is silent about that, because it happens upstream of the
+query.
+
+So state it with the interval attached, because the interval is the claim: at the 18:00
+boundary the hourly uuid line was not written to `postgres_logs` inside 17:59:03.827
+to 18:04:03.886. Per READ TWENTY-SECOND, "not written to `postgres_logs`" does not
+license "the emitter did not write it".
+
+THE LAST CAPTURED OCCURRENCE, RE-READ RATHER THAN INHERITED
+Per READ FOURTEENTH, the 06:05:03 rollup was re-read from its own extras this run. It
+carries four `by_message` keys reconciling to its `count` of 36: the duplicate key
+message at 32, `invalid input syntax for type uuid: "?"` at 1, `column "?" does not
+exist` at 2 and `aggregate functions are not allowed in GROUP BY` at 1. Its window is
+05:59:06.009 to 06:04:01.762, so it covers 06:00 and it is an evidenced HIT.
+
+Scope the sequence to the tracked test rather than to boundaries in general, which is
+where an earlier draft of this section overreached. Among the SIX HOUR cycle
+boundaries, which are the ones this test has been able to read, it now goes 06:00 hit,
+12:00 miss, 18:00 miss: two consecutive evidenced misses with no evidenced hit between
+them, and about 12 hours 20 minutes since the last capture. That is NOT a complete list
+of evidenced boundaries in this window. The sections above record captured uuid lines
+at roughly nine hourly boundaries inside it, from 19:00 and 20:00 on 2026-08-04 in READ
+FOURTEENTH through 05:00 in READ NINETEENTH. Those are inherited rather than re-read
+this run, and they matter here because they are counterexamples to the mechanism
+paragraph below.
+
+The pre-registered threshold is three or four consecutive evidenced boundaries. It is
+NOT met at two, and READ TWENTY-FIRST catalogues at length what it costs to write the
+conclusion into a heading before the evidence argues it up. Do not conclude the emitter
+has stopped. What changed is that the count went from one to two, consecutive, against
+a re-verified hit.
+
+A HIT IS SELF EVIDENCING AND A MISS IS NOT, WHICH IS THE ASYMMETRY THAT MATTERS
+An earlier draft of this section claimed the test cannot advance faster than every six
+hours, and put that in its heading as a mechanism. An adversarial auditor falsified it,
+and the correction is more useful than the claim was.
+
+The relay emits a postgres rollup only under `if (pgRows.length > 0)`. What an earlier
+draft got wrong is the word ELSE: it wrote that a boundary is observable only when
+something ELSE was logged in the window, which quietly assumes the emitter is silent
+and then uses that assumption to prove the boundary unobservable. The uuid line is
+itself a row. If the emitter fires at 19:00, its own line makes `pgRows` non-empty, the
+19:05 rollup covers 19:00, and the boundary is an evidenced HIT with no other traffic
+required. That is exactly how the roughly nine hourly captures cited above were
+observed, so the "exactly the six hour boundaries" claim is contradicted by this
+window's own record.
+
+The true asymmetry is weaker and one sided:
+
+- A HIT is self evidencing at ANY hourly boundary, in the sense that it needs no other
+  traffic. It still needs everything else in the reporting path to work: the relay run
+  has to happen, the postgres query has to not fail silently into the `[]` that READ
+  TWENTY-FIRST records the `.catch` substituting on that query SPECIFICALLY, the row has
+  to survive `limit 200` and any per-line ingestion loss, and the ingest has to not
+  return null. Every one is a path this file already documents, and they do NOT all cut
+  the same way. The three whole-rollup paths cost a hit and a miss alike, but they are
+  not equally bad and an earlier draft called all three outright suppression. The run
+  not happening is the mildest: per READ FIRST's watermark the next run re-reads the
+  same span under the 60 minute cap, so the observation is DELAYED past a sweep rather
+  than lost. The 16:30:06 rollup illustrates the delay half only, and only in the
+  simpler post close form: it reached this section because it landed after READ
+  TWENTY-FOURTH's window closed, not because any run was skipped and caught up. That
+  rollup's window is a clean five minutes, which READ TWENTY-FOURTH itself reads as
+  consistent with the watermark having KEPT PACE, so do not cite it as evidence of the
+  re-read mechanism. The silent `[]` and the null ingest do
+  suppress it, because the watermark advances regardless and the span is gone. The two
+  row-level paths are worse than symmetric: `limit 200` truncation and per-line
+  ingestion loss remove the uuid row while the rest of the window still emits, which
+  turns a real HIT into a false MISS and corrupts the consecutive count this section
+  tracks. That is the same asymmetry the 18:00 paragraph above describes when it notes
+  that per-line loss delivers 32 rows while dropping a thirty-third.
+- A MISS needs some OTHER row in the covering window, because a boundary with no uuid
+  line and no other traffic produces no rollup at all and is simply uninformative. At
+  00, 06, 12 and 18 the 32 line sponsors burst supplies that other row. At the other
+  twenty boundaries nothing does reliably, though coincident traffic sometimes supplies
+  it: probe traffic lands at arbitrary offsets, READ TWENTY-THIRD's protocol line at
+  13:07:25 and this window's 16:28:53 burst, so one can happen to fall in a window
+  covering an hour boundary. Say sometimes rather than often, and scope it correctly:
+  the window as a whole had roughly twelve of its twenty four hourly boundaries
+  covered, per the paragraphs above. The uncovered stretch is 07:00 to 17:00 EXCEPT
+  12:00, and that exception is not a quibble, since the 12:05:07 rollup covering 12:00
+  is the very evidenced miss this section's sequence rests on. Rollups do exist
+  elsewhere in that stretch, at about 08:15, 13:10, 16:30 and 16:50; none of their
+  windows covers an hour boundary. Do not cite READ FIRST's 56 to 285 second spread for this, which
+  an earlier draft did: those ten offsets are the PASSWORD family's, sampled to rule out
+  pg_cron, and that is the family this section has just finished separating out as
+  inferred rather than established. Note also that the 16:28:53 burst is two protocol
+  lines plus a no-username line rather than a pure protocol data point; the two are
+  separate families, per the split above.
+
+So the MISS side of this test is reliably readable only on the six hour cycle, and
+that is a non-guarantee elsewhere rather than an impossibility. Do NOT tell a future
+run to expect the intervening sweeps to add nothing. They can add a HIT at any hourly
+boundary, and a hit resets the consecutive count to zero, which is the single most
+decisive thing this test could turn up. Keep checking every sweep.
+
+The next boundary at which a miss would be readable is 00:00, then 06:00. Readable IF
+the relay behaves and the burst still fires, which is not a guarantee and must not be
+written as one: READ FOURTH's standing rule is not to read an emitter's cadence as a
+guarantee and then treat a gap as a fix, this window alone carries long stretches with
+no rollup at all, and a hand deploy of `e79339b` before 00:00 could remove the burst,
+which is the very interaction the paragraph below describes.
+
+One interaction worth seeing before it surprises somebody: deploying `e79339b` may
+remove the sponsors burst, which is what makes the miss side of this test readable.
+Whether it does depends on which of the two branches READ TWENTY-SECOND lays out is
+real. On the clean branch the ON CONFLICT target matches a real unique index, the burst
+stops, the covering row disappears and the miss observation loses its instrument, so
+silence would become uninformative and only the self evidencing hit would remain. On
+the mismatch branch the statement raises `42P10` instead, on the same six hour
+schedule, which still supplies a covering row and leaves this test working. Do not
+carry across the VOLUME: `42P10` is raised at plan time on each execution rather than
+once per colliding row, so whether it arrives 32 times or once a cycle depends on how
+the statement is batched, and READ TWENTY-SECOND makes no volume claim. Only the
+covering row matters here, and one is enough. That constraint's exact column coverage has never been confirmed, so which
+branch applies is not known from here. Neither is a reason to hold the deploy. Both are
+a reason to read the cron schedule directly rather than keep inferring from the log.
+
+WHAT NEEDS ANDREW, AND IT IS STILL ONE LOOK
+Unchanged from READ TWENTY-FOURTH, and read the ambiguity the right way round. If
+`sync-google-calendar` was hand deployed, the error stopped because `1cdb96e` fixed it,
+and that is good. If its hourly cron job is disabled or failing to start, the error
+stopped because the Google Calendar sync is no longer running, and a silent feature
+outage looks EXACTLY like a fixed bug from here. An error going quiet is not by itself
+good news. Nothing in this container can tell those apart. Treat `1cdb96e` as OPEN and
+leave its day count running, per READ TWENTY-FIRST.
+
+DAY COUNTS, RECOMPUTED AND NOT CARRIED FORWARD
+With `git show -s --format=%cI` and FLOORED against the 18:21 close, per READ TWELFTH:
+`1cdb96e` at 10 days, `e79339b` at 9, `0d2963e` at 5, `285a05f` at 1. None crossed a
+boundary since the 16:20 sweep.
+
+`e79339b` is confirmed still undeployed from direct evidence rather than inferred from
+silence: the 18:00 cycle carried exactly 32 lines, unchanged size, and no `42P10`,
+which per READ TWENTY-SECOND is inconsistent with a deployed copy on either branch.
+
+The blocker was re-checked rather than inherited, per READ TWELFTH: nothing matching
+`SUPABASE` or `PROJECT_REF` is in this container's environment. Record the absence and
+stop there, per READ THIRTEENTH. READ SEVENTEENTH's sharper version of the ask stands
+for all four.
+
+NOTHING ELSE FIRED, THE WATCHDOG ASIDE
+Every other issue's newest event predates the new slice, so all are the same
+occurrences the sections above document rather than recurrences, and none was resolved
+or re-resolved.
+
+The newest `flutter` event of any kind is still 2026-08-04 19:34:33, which is 76
+minutes BEFORE `6ff6a45` landed at 20:50:30, so FLUTTER-8, -B and -X have not fired
+since that fix. Do not read that as the fix confirmed in production: Sentry cannot tell
+a working fix from an unused app, since both emit nothing, per READ NINETEENTH. That
+quiet now stands at about 22 hours 46 minutes. FLUTTER-Y and FLUTTER-6 are the
+`RenderBox was not laid out` pair with zero first party frames, left alone per READ
+FOURTEENTH. FLUTTER-5 is browser transport. MAUTIC-H's three are the probe POSTs READ
+SIXTEENTH records, against a deliberately probe shaped address, and there is no droplet
+access anyway. SUPABASE-PLATFORM-3 and -4 both carry no in window event, having aged
+out at the 12:24 and 14:26 sweeps; neither was fixed and neither should be resolved.
+
+THE CENSUS, CROSS FOOTED ON BOTH AXES PER READ TWELFTH
+
+    by project   endorsement-scorer 359, supabase-platform 61, flutter 33,
+                 mautic 3                                                  = 456
+    by issue     ENDORSEMENT-SCORER-4 359                                  = 359
+                 SUPABASE-PLATFORM-1 61                                    =  61
+                 FLUTTER-B 10, -8 10, -X 9, -5 2, -Y 1, -6 1               =  33
+                 MAUTIC-H 3                                                =   3
+                                                                             456
+
+Both axes agree exactly. `website`, `moydforms`, `n8n` and `supabase-edge` at zero.
+Queried with NO status filter per READ EIGHTH, which is how the ignored watchdog and
+the two resolved `flutter` issues stayed visible. Read READ TWELFTH's caveat on what
+the equality does and does not buy, and note it buys nothing about the cron question
+above: a census of what arrived cannot detect what was never sent.
+
+`supabase-platform` is wholly SUPABASE-PLATFORM-1 for the third sweep running.
+
+The resolved issues still carrying in window events are FLUTTER-8 and FLUTTER-5, both
+set resolved by somebody else. Neither status was touched by this run, per READ EIGHTH.
+They ARE resolved, by someone else; what this run declined to do is touch a status.
+
+THE BRANCH REF TRAP, DELIBERATELY UNNUMBERED
+Both repos again presented a stale named branch with `HEAD` detached at the true remote
+tip: this repo's `master` at `5d8a5b0` against a real `29c4322`, and the sibling's
+`main` at `77d879f` against a real `308ef92`. That is the same stale PAIR READ
+EIGHTEENTH enumerates. The check was run in the form READ TWENTY-SECOND prescribes
+after its own false pass, with the local side being the NAMED BRANCH and not `HEAD`;
+the wrong form would have compared the detached tip with itself and returned clean.
+Repaired with `git -C <path> checkout -B <branch> HEAD` per READ NINTH, and
+`git ls-remote` re-run immediately before committing per READ FOURTEENTH.
+
+No ordinal is quoted, per READ TWENTY-FOURTH: the recount from bites recorded in this
+file was not run this sweep, and shipping an incremented number the section itself
+declares unverified is the drift READ NINETEENTH warns about. This is one more bite.
+
+ONE CONTAINER NOTE
+The Bash tool's cwd persists between calls, which READ NINTH records after it cost that
+run a mis-targeted repair. It bit again here in the harmless direction: a plain
+`cd my-bluebubbles-web` failed with "No such file or directory" because an earlier call
+had already left the shell inside that directory. Use absolute paths and `git -C`, and
+read that error as cwd drift rather than as a missing repo.
+
+WHAT THE AUDITOR CAUGHT, BECAUSE THE PATTERN IS THE POINT
+The first draft of this section was returned NOT CLEAN with a BLOCKER, and it was a
+failure mode this file already names: a conclusion written into a HEADING slightly past
+what was checked. Count that the way READ NINETEENTH says to, from failures actually
+recorded here rather than by incrementing, because READ TWENTY-FIRST caught an earlier
+draft inflating this same tally and said that inflating it to make a tidier lesson is
+the same reflex as inflating the evidence. Caught heading failures are READ TWENTIETH,
+READ TWENTY-FIRST and this section: THREE, and not consecutive. READ TWENTY-SECOND's
+caught BLOCKER was the branch check, READ TWENTY-THIRD records a heading temptation
+resisted rather than a heading failure, though it does record caught failures of other
+kinds, and READ TWENTY-FOURTH records no caught failure at all, so there is no streak
+to claim. The heading claimed the test "CANNOT
+ADVANCE FASTER THAN EVERY SIX HOURS" and the body argued it as a mechanism, when the
+evidence supports only a non-guarantee, and this window's own record contains roughly
+nine counterexamples. The same pass also caught an invented pre-registration attributed
+to READ TWENTY-FOURTH, an "every artefact excluded" claim attributed to a section that
+explicitly says two are not, a miscounted probe family denominator, two omissions from
+the disclosure enumeration, and a cover citation naming the wrong publishing section.
+
+Every one of those is a checkable fact asserted a little past what had been checked,
+and every one is a class this file already names. Writing the narrow claim first and
+letting the evidence argue it up remains the whole discipline, and the heading is where
+it costs something, because the heading is what the next run skims.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Enumerated rather than waved at, per
+READ EIGHTEENTH, and this is a claim to CHECK rather than a habit. Re-derive it against
+the body rather than listing what you remember putting there; the first draft of this
+section omitted two entries and an auditor found both.
+
+Named above: the commits `1cdb96e`, `e79339b`, `0d2963e`, `285a05f` and `6ff6a45`; the
+function `sync-google-calendar` and the command `supabase functions list`; the
+SQLSTATE `42P10` and the `ON CONFLICT` clause it is raised against, listed together per
+READ TWENTY-SECOND's precedent; the relay
+internals `window_start`, `window_end`, `by_message`, `by_severity`, `count`, `pgRows`,
+`postgres_logs` and the `limit 200` and 15 key caps; `pg_cron`, published here since
+READ FIRST; the issue ids and project names;
+the git commands `git ls-remote`, `git rev-parse`, `git checkout -B` and
+`git show -s --format=%cI`; the stale refs `5d8a5b0` and `77d879f`; this repo's real
+tip `29c4322`; the sibling's real tip `308ef92`; the env var name patterns `SUPABASE`
+and `PROJECT_REF`; the word droplet, in the note that there is no droplet access; and
+the third party name Google Calendar, already carried in the committed name of the
+function above; and from the container note, the Bash tool, the `cd` and `git -C`
+commands, this repo's own directory name and the shell string "No such file or
+directory". Split that last group by cover rather than clearing it in one phrase, which
+an earlier draft did wrongly. The Bash tool, `cd`, `git -C` and this repo's directory
+name are generic tooling already published by READ SECOND and READ NINTH. The shell
+string "No such file or directory" appears NOWHERE earlier in this file, so prior
+publication is not its cover and this is a deliberate FIRST publication: it is a
+standard POSIX error string that names no path of ours, since the path it was raised
+against is this repo's own already published directory name. The group is enumerated at
+all because a re-audit found it missing from a paragraph professing to re-derive against
+the body, and the false cover was then found by a third. Every one already appears in this file or is committed in this public
+repo's own tree, with two carve outs stated rather than swept in. `29c4322` is this
+PUBLIC repo's own current tip and is therefore already readable by anyone who can read
+this sentence. `308ef92` is the private sibling's tip, and its cover is the deliberate
+FIRST PUBLICATION in READ TWENTIETH, which recorded it as such precisely because
+"already published" was not then available; READ TWENTY-FIRST, TWENTY-SECOND,
+TWENTY-THIRD and TWENTY-FOURTH each name it under that cover rather than supplying it.
+Getting that
+chain backwards is the inverted cover check READ SEVENTEENTH and READ TWENTY-FIRST both
+record as caught defects, and an earlier draft of this paragraph got it backwards.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT here is the uuid message shape, the
+normalized duplicate key message, `password authentication failed for user "?"`, the
+protocol values 255.255 and 0.0, `no PostgreSQL user name specified in startup packet`,
+`column "?" does not exist`, `aggregate functions are not allowed in GROUP BY` and the
+string `RenderBox was not laid out`. Every one is published in this file from READ
+FIRST, READ FOURTEENTH and READ NINETEENTH onward. None of the new slice's lines names
+a table, column, row, person or address. The probe source address is not reproduced,
+per READ FIFTH, and neither is the recipient phone number that appears in the FLUTTER-8
+title, per READ FOURTEENTH. The `flutter` events read this run carry an executive's
+name, email address and IP; none is reproduced, per the practice READ SIXTH set.
+
+No credential, no DSN, no probe source address, no policy body, no RPC name and no raw
+upstream error appears, and nothing here widens access to anything. Withheld per the
+practice READ SIXTH set: the state of the live endorsement vote, any operational read
+on production sessions, and anything describing this container's own reporting or
+credential tooling, which READ EIGHTEENTH records as a BLOCKER class.
