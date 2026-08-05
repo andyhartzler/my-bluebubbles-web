@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
   // --- Load member ---------------------------------------------------------
   const { data: member, error: memErr } = await supabase
     .from("members")
-    .select("id, name, email, date_of_birth, birth_year, in_school, school_name, desire_to_lead, committee, slack_user_id")
+    .select("id, name, email, date_of_birth, birth_year, in_school, school_name, education_level, desire_to_lead, committee, slack_user_id")
     .eq("id", memberId)
     .maybeSingle();
   if (memErr) return json({ error: "member lookup failed", detail: memErr.message }, 500);
@@ -133,6 +133,42 @@ Deno.serve(async (req) => {
   }
   const branch: string = String(branchData);
 
+  // --- ALREADY ONBOARDED? --------------------------------------------------
+  // This probe used to sit further down, inside the eligible path, which meant
+  // the duplicate-send guard protected the welcome and ONLY the welcome. The
+  // caller (the website's membership route) fires this function unconditionally
+  // after every submission, including the existing-member update path, so a
+  // too-young or aged-out member who resubmitted the form was told they were
+  // too young or too old again, every single time, with nothing recorded
+  // anywhere to say it had already been said. It sits above the branch now so
+  // that every email this function can send is covered by one guard.
+  //
+  // A row is written only when an email really reached the MEMBER, which means
+  // live mode: in test mode the mail goes to ONBOARDING_TEST_EMAIL, so the
+  // member has not been told anything and must not be marked as though they
+  // had. Rows are marked done and never deleted, so the probe covers the whole
+  // history rather than the open tasks.
+  const { data: priorTasks, error: priorErr } = await supabase
+    .from("onboarding_tasks")
+    .select("id")
+    .eq("member_id", memberId)
+    .limit(1);
+  if (priorErr) {
+    // Fail closed for the same reason as the age gate: unable to tell is not a
+    // licence to send a duplicate.
+    return json({ error: "onboarding history probe failed, nothing sent", detail: priorErr.message, member_id: memberId }, 502);
+  }
+  const alreadyOnboarded = Boolean(priorTasks && priorTasks.length);
+
+  if (alreadyOnboarded) {
+    return json({
+      ok: true,
+      plan: { mode, member_id: memberId, age_branch: branch, email_actually_to: null },
+      actions: ["already onboarded (onboarding_tasks rows exist for this member): no email, no Slack writes, no new tasks"],
+      email_msg_id: null,
+    });
+  }
+
   if (branch !== "eligible") {
     // Too young or aged out: send the branch email only. No Slack, no committee
     // adds, no follow-up tasks.
@@ -173,6 +209,26 @@ Deno.serve(async (req) => {
       }
     }
     actions.push("Slack SKIPPED and no follow-up tasks enqueued (age-gated)");
+
+    // Record that this member has now been told, so a resubmission does not
+    // tell them again. done=true and no run_after, so the followups drainer
+    // (done=false AND run_after <= now) can never pick it up: it is a receipt,
+    // not a scheduled send. Live only, for the reason given at the probe above.
+    if (mode === "live" && emailResult) {
+      const { error: receiptErr } = await supabase.from("onboarding_tasks").insert({
+        member_id: memberId,
+        task_type: "age_branch_notified",
+        done: true,
+        meta: { branch, email: realEmail, subject: ageEmail.subject, message_id: emailResult.id },
+      });
+      if (receiptErr) {
+        // Loud, not fatal: the member has had their email, and swallowing this
+        // is how a second copy gets sent tomorrow with nobody the wiser.
+        console.error("failed to record age-branch receipt for", memberId, receiptErr.message);
+        actions.push(`WARNING: age-branch receipt not recorded (${receiptErr.message}); a resubmission could send this again`);
+      }
+    }
+
     return json({ ok: true, plan, actions, email_msg_id: emailResult?.id ?? null });
   }
 
@@ -212,33 +268,9 @@ Deno.serve(async (req) => {
   const actions: string[] = [];
   let emailResult: { id: string; threadId: string } | null = null;
 
-  // --- 0. Already onboarded? -----------------------------------------------
-  // The two follow-up tasks are enqueued together with the welcome, and only in
-  // live mode, so the existence of ANY onboarding_tasks row for this member is
-  // the record that they have already been welcomed. The website form upserts
-  // members on email and calls this unconditionally, so a returning member who
-  // re-submits would otherwise receive a second "Welcome Aboard!" and a second
-  // reminder cycle. Two details matter: the probe covers the member's whole task
-  // history (rows are marked done, never deleted, so filtering on done=false
-  // went blind as soon as the first cycle finished), and it runs BEFORE the send.
-  const { data: priorTasks, error: priorErr } = await supabase
-    .from("onboarding_tasks")
-    .select("id")
-    .eq("member_id", memberId)
-    .limit(1);
-  if (priorErr) {
-    // Fail closed for the same reason as the age gate: unable to tell is not a
-    // licence to send a duplicate.
-    return json({ error: "onboarding history probe failed, nothing sent", detail: priorErr.message, plan }, 502);
-  }
-  if (priorTasks && priorTasks.length) {
-    return json({
-      ok: true,
-      plan: { ...plan, email_actually_to: null },
-      actions: ["already onboarded (onboarding_tasks rows exist for this member): no email, no Slack writes, no new tasks"],
-      email_msg_id: null,
-    });
-  }
+  // The "already onboarded?" probe that used to sit here now runs above the age
+  // branch, so it covers the too-young and aged-out emails as well as this one.
+  // Reaching this line means it found no task history for this member.
 
   // --- 1. Welcome email ----------------------------------------------------
   if (mode === "dry_run") {

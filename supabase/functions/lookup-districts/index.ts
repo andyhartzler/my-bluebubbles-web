@@ -318,13 +318,22 @@ function parseAddress(address: string | null, county: string | null): ParsedAddr
 interface DistrictResult {
   senate: string | null;
   house: string | null;
+  congressional: string | null;
   error?: string;
   matchedAddress?: string;
 }
 
+// The congressional layer was missing, so congressional_district was never
+// written by this function at all: a member created through the membership form
+// had it NULL permanently, even on a lookup that otherwise succeeded. The two
+// state legislative layers were being requested and parsed and the federal one
+// simply was not asked for.
+const CENSUS_LAYERS =
+  "2024 State Legislative Districts - Upper,2024 State Legislative Districts - Lower,119th Congressional Districts";
+
 async function lookupDistricts(parsed: ParsedAddress): Promise<DistrictResult> {
   if (!parsed.city && !parsed.zip) {
-    return { senate: null, house: null, error: "Insufficient address information" };
+    return { senate: null, house: null, congressional: null, error: "Insufficient address information" };
   }
 
   let url: string;
@@ -333,7 +342,7 @@ async function lookupDistricts(parsed: ParsedAddress): Promise<DistrictResult> {
     const params = new URLSearchParams({
       benchmark: "Public_AR_Current",
       vintage: "Current_Current",
-      layers: "2024 State Legislative Districts - Upper,2024 State Legislative Districts - Lower",
+      layers: CENSUS_LAYERS,
       format: "json",
       state: parsed.state,
     });
@@ -347,7 +356,7 @@ async function lookupDistricts(parsed: ParsedAddress): Promise<DistrictResult> {
       address: address,
       benchmark: "Public_AR_Current",
       vintage: "Current_Current",
-      layers: "2024 State Legislative Districts - Upper,2024 State Legislative Districts - Lower",
+      layers: CENSUS_LAYERS,
       format: "json",
     });
     url = `https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress?${params.toString()}`;
@@ -356,22 +365,23 @@ async function lookupDistricts(parsed: ParsedAddress): Promise<DistrictResult> {
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      return { senate: null, house: null, error: `API error: ${response.status}` };
+      return { senate: null, house: null, congressional: null, error: `API error: ${response.status}` };
     }
 
     const data = await response.json();
     const matches = data?.result?.addressMatches;
     if (!matches || matches.length === 0) {
-      return { senate: null, house: null, error: "No address match found" };
+      return { senate: null, house: null, congressional: null, error: "No address match found" };
     }
 
     const geographies = matches[0]?.geographies;
     if (!geographies) {
-      return { senate: null, house: null, error: "No geography data returned" };
+      return { senate: null, house: null, congressional: null, error: "No geography data returned" };
     }
 
     let senate: string | null = null;
     let house: string | null = null;
+    let congressional: string | null = null;
 
     const upperDistricts = geographies["2024 State Legislative Districts - Upper"];
     if (upperDistricts && upperDistricts.length > 0) {
@@ -385,10 +395,19 @@ async function lookupDistricts(parsed: ParsedAddress): Promise<DistrictResult> {
       house = raw ? raw.replace(/^0+/, "") : null;
     }
 
+    // Stored as "CD-5" to match the 379 existing rows, which came from
+    // imports rather than from this function.
+    const cdDistricts = geographies["119th Congressional Districts"];
+    if (cdDistricts && cdDistricts.length > 0) {
+      const raw = cdDistricts[0].CD119;
+      const num = raw ? String(raw).replace(/^0+/, "") : null;
+      congressional = num ? `CD-${num}` : null;
+    }
+
     const matchedAddress = matches[0]?.matchedAddress || null;
-    return { senate, house, matchedAddress };
+    return { senate, house, congressional, matchedAddress };
   } catch (err: any) {
-    return { senate: null, house: null, error: `Fetch error: ${err.message}` };
+    return { senate: null, house: null, congressional: null, error: `Fetch error: ${err.message}` };
   }
 }
 
@@ -420,7 +439,7 @@ serve(async (req) => {
     } else {
       let query = supabase.from("members").select("id").not("address", "is", null);
       if (!overwrite) {
-        query = query.or("senate_district.is.null,house_district.is.null");
+        query = query.or("senate_district.is.null,house_district.is.null,congressional_district.is.null");
       }
       const { data: members, error } = await query.limit(batchSize);
       if (error) throw new Error(`Failed to fetch members: ${error.message}`);
@@ -436,7 +455,7 @@ serve(async (req) => {
 
     const { data: members, error: fetchError } = await supabase
       .from("members")
-      .select("id, name, address, county, senate_district, house_district")
+      .select("id, name, address, county, senate_district, house_district, congressional_district")
       .in("id", targetMemberIds);
 
     if (fetchError) throw new Error(`Failed to fetch member details: ${fetchError.message}`);
@@ -449,7 +468,7 @@ serve(async (req) => {
       parsed: ParsedAddress;
       lookup: DistrictResult;
       updated: boolean;
-      previousDistricts: { senate: string | null; house: string | null };
+      previousDistricts: { senate: string | null; house: string | null; congressional: string | null };
     }
 
     const results: ProcessResult[] = [];
@@ -464,9 +483,13 @@ serve(async (req) => {
           originalAddress: member.address,
           county: member.county,
           parsed,
-          lookup: { senate: null, house: null, error: "Could not parse address" },
+          lookup: { senate: null, house: null, congressional: null, error: "Could not parse address" },
           updated: false,
-          previousDistricts: { senate: member.senate_district, house: member.house_district },
+          previousDistricts: {
+            senate: member.senate_district,
+            house: member.house_district,
+            congressional: member.congressional_district,
+          },
         });
         continue;
       }
@@ -474,13 +497,16 @@ serve(async (req) => {
       const lookup = await lookupDistricts(parsed);
 
       let updated = false;
-      if (!dryRun && (lookup.senate || lookup.house)) {
+      if (!dryRun && (lookup.senate || lookup.house || lookup.congressional)) {
         const updates: Record<string, string> = {};
         if (lookup.senate && (overwrite || !member.senate_district)) {
           updates.senate_district = lookup.senate;
         }
         if (lookup.house && (overwrite || !member.house_district)) {
           updates.house_district = lookup.house;
+        }
+        if (lookup.congressional && (overwrite || !member.congressional_district)) {
+          updates.congressional_district = lookup.congressional;
         }
 
         if (Object.keys(updates).length > 0) {
@@ -500,7 +526,11 @@ serve(async (req) => {
         parsed,
         lookup,
         updated,
-        previousDistricts: { senate: member.senate_district, house: member.house_district },
+        previousDistricts: {
+          senate: member.senate_district,
+          house: member.house_district,
+          congressional: member.congressional_district,
+        },
       });
 
       await new Promise(resolve => setTimeout(resolve, 100));

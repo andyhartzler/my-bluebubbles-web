@@ -116,6 +116,7 @@ export interface MemberRow {
   birth_year: number | null;
   in_school: string | null;
   school_name: string | null;
+  education_level: string | null;
   desire_to_lead: string | null;
   committee: string[] | null;
   slack_user_id: string | null;
@@ -132,9 +133,25 @@ export function firstNameOf(name: string | null): string {
 export function computeVariant(m: MemberRow): Variant {
   const inSchool = (m.in_school || "").trim().toLowerCase();
   if (inSchool === "yes") {
+    // ASK THE ANSWER BEFORE GUESSING AT IT. The membership form has a
+    // dedicated education_level question whose first option is literally
+    // "I'm currently in high school", and it was being ignored in favour of a
+    // regex over the free-text school name. That regex is confidently wrong on
+    // ordinary inputs: "Grain Valley High" has no "School" so it does not match
+    // \bhigh\s*school\b, and "Warrensburg Middle School" matches nothing at
+    // all, so a 16 year old and a 14 year old were both branded college
+    // students. In live mode that is not cosmetic, it sends them the College
+    // welcome and files them into the College Democrats Slack channel and the
+    // mapped Google Group. Two real members, one of them a middle schooler,
+    // are wrong under the old rule today.
+    const education = (m.education_level || "").toLowerCase();
+    if (education.includes("currently in high school")) return "high_school";
+
     const school = m.school_name || "";
     const committees = (m.committee || []).join(" ");
-    if (/\b(high\s*school|hs|academy)\b/i.test(school)) return "high_school";
+    // "High" without "School" is the common case in Missouri school names, and
+    // "Middle"/"Junior" schools are unambiguously not college.
+    if (/\b(high|hs|academy|middle|junior\s*high|prep(aratory)?)\b/i.test(school)) return "high_school";
     // Fallbacks when the school name is blank or ambiguous.
     if (/high\s*school/i.test(committees)) return "high_school";
     return "college";
@@ -183,26 +200,37 @@ export function targetChannels(m: MemberRow, variant: Variant): string[] {
 // navy pill CTA with a VML fallback for Outlook, hairline sign-off, social row,
 // paid-for banner.
 //
-// Two deliberate departures from that reference:
-//   1. Dark mode. The reference has none: it hardcodes a white card with
-//      #333333 and #263351 text, which force-inverting clients wreck. This
-//      declares color-scheme and carries a prefers-color-scheme block. An
-//      earlier pass deleted that block and pinned the emails "light only" on the
-//      grounds that the reference has no dark rules, which is true but is not
-//      the brief: the dark block changes NOTHING about how the email renders in
-//      a light client, so the likeness to the endorsement invitation is intact
-//      either way, and without it a dark-theme client is left to invert a
-//      hardcoded white card by algorithm. Readability in both schemes is a
-//      standing rule here. Do not delete it again.
-//   2. The footer band (social icons + paid-for disclaimer) keeps a LIGHT
-//      background in dark mode. paid-for-banner.png is a transparent PNG whose
-//      ink is dark (mean luminance 107 of 255), so on a dark card it is
-//      unreadable. It is a filed compliance asset and must stay the image, so
-//      the background is what gives way, not the asset. That protection lives in
-//      a <style> rule, which the Gmail app strips on non-Gmail accounts, so both
-//      plate cells also carry bgcolor="#f3f6fb" as an HTML attribute: a
-//      presentational attribute survives style stripping and client-side
-//      inverters treat it more conservatively than an inline background-color.
+// NO DARK MODE. THIS WAS SETTLED BY THE OWNER LOOKING AT THE RENDERED EMAIL,
+// so do not re-derive it from first principles and re-add the block. It has now
+// been added, removed, re-added and removed again, which is the actual cost of
+// treating this as an open engineering question.
+//
+// The history, because the argument FOR dark mode is genuinely reasonable and
+// will occur to the next person too. A prefers-color-scheme block was added on
+// the grounds that a hardcoded white card gets force-inverted by algorithm in a
+// dark client, and that the block changes nothing in a light client so the
+// likeness to the endorsement invitation survives either way. Both halves of
+// that are true. It still produced the wrong result: Andrew opened the samples
+// in a dark-mode client, saw a #0f1420 page behind a #1a2130 card, and rejected
+// it. The brief was "make it look like the candidate endorsement email", and
+// that email is #eef2f7 behind a white card in every client, with no
+// colour-scheme rules at all.
+//
+// So the emails now declare "light only" and carry no dark rules. That asks the
+// client not to invert rather than shipping a second, darker design.
+//
+// One supporting fact worth keeping, because it argues the same way: the footer
+// band holds paid-for-banner.png, which is a TRANSPARENT png whose ink is dark
+// (mean luminance 107 of 255). On any dark card the filed compliance disclaimer
+// is unreadable. Staying light everywhere is what keeps that asset legible,
+// which is a compliance reason and not only an aesthetic one.
+//
+// The one thing kept from the dark-mode pass is MID_BLUE. It was darkened from
+// the reference's #2f7fc1 to #2b73b0. That is not cosmetic: on the white card
+// the reference blue measures 4.26:1 and FAILS the 4.5:1 floor for the 12px
+// eyebrow and the body links, while #2b73b0 measures 5.02:1 and passes. The
+// hues are indistinguishable side by side. Contrast wins over exact likeness on
+// that one value, deliberately.
 // ============================================================================
 function escapeHtml(s: string): string {
   return s
@@ -264,12 +292,11 @@ function shell(r: Rendered): string {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="x-apple-disable-message-reformatting">
-<meta name="color-scheme" content="light dark">
-<meta name="supported-color-schemes" content="light dark">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
 <title>Missouri Young Democrats</title>
 <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
 <style>
-:root{color-scheme:light dark;supported-color-schemes:light dark}
 body{margin:0!important;padding:0!important;width:100%!important}
 table{border-collapse:collapse}
 img{border:0;line-height:100%;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic}
@@ -278,18 +305,6 @@ a{text-decoration:none}
 .container{width:100%!important}
 .px{padding-left:24px!important;padding-right:24px!important}
 .btn a{display:block!important}
-}
-@media (prefers-color-scheme:dark){
-.page{background-color:#0f1420!important}
-.card{background-color:#1a2130!important}
-.tx{color:#dfe4ee!important}
-.hd{color:#aebfe2!important}
-.eyebrow{color:#7fb4e4!important}
-.mut{color:#9aa5ba!important}
-.rule{border-top-color:#39435c!important}
-.lnk{color:#8ec4f0!important}
-.cta{background-color:#3f74c4!important;color:#ffffff!important}
-.plate{background-color:#f3f6fb!important}
 }
 </style></head>
 <body style="margin:0;padding:0;background-color:${PAGE_BG};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
@@ -330,7 +345,7 @@ ${r.signoff}<br>
 
 </td></tr>
 
-<tr><td class="plate" bgcolor="#f3f6fb" style="background-color:#ffffff;padding:6px 40px 26px 40px;text-align:center;">
+<tr><td class="plate" style="background-color:#ffffff;padding:6px 40px 26px 40px;text-align:center;">
 <a href="https://www.facebook.com/MOyoungdemocrats" target="_blank" style="display:inline-block;margin:0 5px;"><img src="https://email.moyd.app/media/images/facebook-circle-256.png" width="32" height="32" alt="Facebook" style="display:inline-block;width:32px;height:32px;"></a>
 <a href="${INSTAGRAM}" target="_blank" style="display:inline-block;margin:0 5px;"><img src="https://email.moyd.app/media/images/instagram-circle-256_2.png" width="32" height="32" alt="Instagram" style="display:inline-block;width:32px;height:32px;"></a>
 <a href="https://threads.net/moyoungdemocrats" target="_blank" style="display:inline-block;margin:0 5px;"><img src="https://email.moyd.app/media/images/threadsss-circle-256.png" width="32" height="32" alt="Threads" style="display:inline-block;width:32px;height:32px;"></a>
@@ -339,7 +354,7 @@ ${r.signoff}<br>
 <a href="https://www.reddit.com/user/moyoungdemocrats" target="_blank" style="display:inline-block;margin:0 5px;"><img src="https://email.moyd.app/media/images/reddit-circle-256_1.png" width="32" height="32" alt="Reddit" style="display:inline-block;width:32px;height:32px;"></a>
 </td></tr>
 
-<tr><td class="plate" bgcolor="#f3f6fb" style="background-color:#ffffff;padding:0 40px 30px 40px;text-align:center;font-size:0;line-height:0;">
+<tr><td class="plate" style="background-color:#ffffff;padding:0 40px 30px 40px;text-align:center;font-size:0;line-height:0;">
 <img src="https://email.moyd.app/media/images/paid-for-banner.png" width="300" alt="Paid for by Missouri Young Democrats" style="display:inline-block;width:300px;max-width:80%;height:auto;font-size:13px;line-height:1.4;color:#4b5563;">
 </td></tr>
 
@@ -400,7 +415,7 @@ function plainOf(r: Rendered): string {
 function generalBody(): string {
   return [
     P(`Thanks for completing the interest form and welcome to Missouri Young Democrats! We're so glad you're here.`),
-    P(`If there's a project or issue you're passionate about, whether it's climate justice, abortion rights, affordable housing, or something happening in your hometown, we want to help you take action. As a member-driven organization, you shape what we work on, how we show up, and the direction this movement takes. You are the leaders of your communities, and together we'll lead Missouri into a more just, inclusive, and hopeful future.`),
+    P(`We are a member-driven organization, so you shape what we work on, how we show up, and the direction this movement takes. You are the leaders of your communities, and together we'll lead Missouri into a more just, inclusive, and hopeful future.`),
     P(`How to get plugged in:`),
     H("&#128172;", "Join the Slack"),
     P(`We use Slack as our digital organizing HQ. You can ${A(SLACK_JOIN, "click here to join our Slack workspace")} and start connecting with other members across Missouri. If you've already received an invite, check your inbox and accept it. Once you're in, say hi in #general!`),
@@ -422,7 +437,7 @@ function generalBody(): string {
 function collegeBody(): string {
   return [
     P(`Thanks for completing the interest form and welcome to Missouri Young Democrats! We're so glad you're here.`),
-    P(`If there's a project or issue you're passionate about, whether it's climate justice, abortion rights, affordable housing, or something happening on your campus or in your hometown, we want to help you take action. As a member-driven organization, you shape what we work on, how we show up, and the direction this movement takes. You are the leaders of your campuses, and together we'll lead Missouri into a more just, inclusive, and hopeful future.`),
+    P(`We are a member-driven organization, so you shape what we work on, how we show up, and the direction this movement takes. You are the leaders of your campuses, and together we'll lead Missouri into a more just, inclusive, and hopeful future.`),
     P(`How to get plugged in:`),
     H("&#128172;", "Join the Slack"),
     P(`We use Slack as our digital organizing HQ. You can ${A(SLACK_JOIN, "click here to join our Slack workspace")} and start connecting with other members across Missouri. If you've already received an invite, check your inbox and accept it. Once you're in, say hi in #general and join the #college-democrats channel to connect with other college chapter members statewide!`),
@@ -451,7 +466,7 @@ function collegeBody(): string {
 function highSchoolBody(): string {
   return [
     P(`Thanks for completing the interest form and welcome to Missouri Young Democrats! We're so glad you're here.`),
-    P(`If there's a project or issue you're passionate about, whether it's climate justice, abortion rights, affordable housing, or something happening at your school or in your hometown, we want to help you take action. As a member-driven organization, you shape what we work on, how we show up, and the direction this movement takes. You are the leaders of your schools, and together we'll lead Missouri into a more just, inclusive, and hopeful future.`),
+    P(`We are a member-driven organization, so you shape what we work on, how we show up, and the direction this movement takes. You are the leaders of your schools, and together we'll lead Missouri into a more just, inclusive, and hopeful future.`),
     P(`How to get plugged in:`),
     H("&#128172;", "Join the Slack"),
     P(`We use Slack as our digital organizing HQ. You can ${A(SLACK_JOIN, "click here to join our Slack workspace")} and start connecting with other members across Missouri. If you've already received an invite, check your inbox and accept it. Once you're in, say hi in #general and join the #high-school-democrats channel to connect with other high school members statewide!`),
