@@ -5669,3 +5669,205 @@ endorsement vote, and the operational read on who is running the harness. Those
 went to Andrew directly. No credential, no DSN, no source address, no policy
 body and no raw upstream error appears, and nothing here widens access to
 anything.
+
+## READ SEVENTEENTH: the 02:20 UTC sweep, and the prober is identified from its own commits
+
+Swept the 24 hours to 2026-08-05 02:20 UTC. No code change: nothing in the
+genuinely new observation is a defect, and the one thing that changed is an
+attribution rather than a mechanism.
+
+Per the overlap warning in READ FOURTH: this window shares 22 hours with the
+sweep that closed at 00:20 UTC, so only 2 hours is new observation. Everything
+below lands inside that slice.
+
+THE AD HOC SQL FAMILY IS ANDREW'S OWN MEMBERSHIP AUDIT
+Every section from READ SIXTH onward carries this family as unattributed, read
+as hand iteration from identifiers, aliases and burst timing, and each says
+plainly that it is an inference. READ SIXTEENTH got as far as the emitter
+labelling its own output and offered "an audit of the member intake work" as a
+hypothesis for the next run to TEST rather than inherit. That test has now been
+run and the hypothesis holds.
+
+The decisive evidence is the commits' own prose, which no earlier sweep thought
+to read for this purpose. `1b7d10d` in the sibling repo says verbatim that its
+migrations were "applied to production while auditing the membership signup
+path", and `2490cd7` in this repo describes its defects as found the same way.
+The emitter says who it is in git, not only in the log.
+
+Three further strands corroborate, and they matter because each is a content
+match rather than a coincidence of clock:
+
+1. The 01:24 to 01:29 rollup carries a probe line reporting that a duplicate
+   was refused by a case insensitive unique constraint on the member email.
+   READ SIXTEENTH records the opposite state two hours earlier: a plain byte
+   comparison index, which is exactly why the duplicate it observed SUCCEEDED.
+   `1b7d10d` ships the migration that creates the case insensitive one, and
+   that migration's own filename timestamp is 01:26:31, INSIDE the probe
+   rollup window and seventeen minutes before the commit carrying it was
+   published. State what that establishes and no more: the constraint was
+   applied before it was tripped, and the probe was exercising a schema that
+   did not exist in any published commit at the time. A filename timestamp is
+   file creation time rather than proven apply time, and the rollup window
+   fixes the trip only to within five minutes, so do not compute a gap from
+   the two.
+2. The probe's two INSERT_SUCCEEDED lines both report linking to an existing
+   auth account, which is the exact mechanism `1b7d10d` describes rescuing,
+   and `column "state_house_district" does not exist` at 01:13:22 sits inside
+   the district work `2490cd7` landed at 01:35:13.
+3. READ SIXTEENTH's `A_FAILED 23503` and `C_FAILED 23502` probes, both real
+   failures at the time, are the two defects `1b7d10d` and `1f2bc35` fix. The
+   probes in THIS window report those same paths passing.
+
+Be exact about what each strand does and does not carry, because the first
+draft of this section overstated it and an auditor caught it. The constraint
+name ALONE identifies nobody: Postgres reports it in the 23505 error to any
+client that trips it, so it establishes only that the migration was live before
+01:29. It is the conjunction that attributes the session, and the schema state
+is a timing fact rather than a replacement for one. What makes the conjunction
+strong is that the self labelled harness, the freshly applied schema, the
+probed defects and the commit prose all point one way.
+
+Scope it correctly rather than over reading it: this attributes THIS session
+and the READ SIXTEENTH session. It does not retroactively attribute every
+`column ... does not exist` line since READ SIXTH, and a future run should not
+treat the family as pre cleared. What it retires is the standing worry about an
+unattributed party holding write access to the member file. It does not retire
+the standing method.
+
+ANDREW IS DEPLOYING EDGE FUNCTIONS BY HAND AGAIN, WHICH CHANGES THE ASK
+`2490cd7` states in its own message that `member-onboard`, `onboarding-followups`
+and `lookup-districts` were deployed and re exercised. READ FIRST's hazard is
+unchanged and so is the bulk deploy prohibition, but the practical consequence
+is that the blocker recorded in READ TWELFTH and READ THIRTEENTH is no longer
+the only route. The triage container still has no `SUPABASE_ACCESS_TOKEN`, re
+checked this run, so THIS agent still cannot deploy. The missing binary is NOT
+part of the blocker and a draft of this section wrongly listed it as one:
+READ TWELFTH settled that, and it was re tested rather than inherited, `npm
+ping` answering PONG in 173 ms, so the CLI remains installable in seconds. The
+blocker is exactly one thing and it is the token. Andrew evidently can deploy
+and is. The ask is therefore no longer only for a token; it
+is that three fixes are still sitting undeployed while he is already in there
+deploying neighbours of them.
+
+FULL DECOMPOSITION OF THE NEW SLICE
+`by_message` read on all 10 SUPABASE-PLATFORM-1 events after 00:20 UTC, FATAL
+tagged ones included, per READ SEVENTH. Nineteen log lines, reconciling against
+the sum of the ten per event `count` fields:
+
+     9  the ad hoc family, now attributed as above (ERROR)
+     6  password authentication failed for user "?"   FATAL, filtered
+     2  invalid input syntax for type uuid: "?"       01:00:08 and 02:00:05
+     1  canceling statement due to statement timeout  00:21:51
+     1  a probe harness status line reporting a pass
+
+The password total is the usual `by_severity` residual and not a direct read,
+per the standing caveat in READ FOURTH. The malformed startup packet families
+and the SASL Terminate line are absent; the password family is the only probe
+shape this slice.
+
+The nine ad hoc lines: `column s.fields`, `column s.form_data`,
+`column "state_house_district"`, `column "submitted_at"`, `column "ordinality"`,
+`"array_agg" is an aggregate function`, `column "name"`,
+`column m.mautic_contact_id` and `column "phone_e164"`. Two of those name real
+committed columns, `phone_e164` on the CRM member model and `name` on `members`,
+so the grep negative does not clear them and READ THIRTEENTH's caveat applies;
+what places them in this family is the bare unqualified form, which PostgREST
+does not emit, plus the attribution above. Nothing was changed for any of them
+and nothing should be.
+
+`canceling statement due to statement timeout` recurs from READ TENTH. The
+rollup carries no statement text, so it is not attributable from Sentry, and one
+line is not a basis for action. Recorded, not acted on.
+
+BOTH LONG STANDING UNDEPLOYED FIXES CONFIRMED STILL UNDEPLOYED, DIRECTLY
+Not inferred from silence. The 00:00 UTC cycle carried exactly 32
+`legislation_bill_sponsors_unique` lines, unchanged size, so `e79339b` is not
+deployed. The hourly uuid line fired at 01:00:08 and 02:00:05, so `1cdb96e` is
+not deployed.
+
+Day counts as of the 02:20 UTC window close, FLOORED, which is the convention
+READ TWELFTH established and which the first draft of this section got wrong in
+three places by rounding up: `1cdb96e` at 9 days, `e79339b` at 8, `0d2963e` at
+4, `285a05f` at under 14 hours. Compute these with `git show -s --format=%cI`
+and floor them. Do not carry a previous section's figure forward, and do not
+round: an age that reads 9 in one sweep and 10 in a sweep two hours later, with
+no new commit in between, is arithmetic drift rather than elapsed time.
+
+NOTHING ELSE FIRED THAT IS NOT ALREADY HANDLED
+- The newest `flutter` event of any kind is 19:34:33 on 08-04, which is 76
+  minutes BEFORE `6ff6a45` landed at 20:50:30. So FLUTTER-8, -B and -X have not
+  fired since the fix. Do not read that as the fix confirmed in production: no
+  CRM session has opened a conversation since either, so the quiet is equally
+  well explained by nobody using it. None was re-resolved.
+- FLUTTER-Y and FLUTTER-6 are the `RenderBox was not laid out` pair with zero
+  first party frames, left alone per READ FOURTEENTH. FLUTTER-1 and FLUTTER-5
+  are browser transport. FLUTTER-2's fix `2a90af9` landed 08-04 08:44:37.
+- SUPABASE-PLATFORM-3's only event is the 12:10:02 429; `285a05f` landed at
+  12:43:21, after it. SUPABASE-PLATFORM-4's two in window events are the 06:39:35
+  keyless bucket root GET that READ EIGHTH documents and the 12:55:16
+  `form-uploads` probe that READ ELEVENTH documents. The 02:03:37 request READ
+  FIFTH covers has now aged out of the 24 hour window; do not cite READ FIFTH
+  for this window's pair. Do not resolve either issue.
+- MAUTIC-H is three probe harness POSTs at 00:05:35 and 00:05:47 using
+  `@example.com` addresses, the same occurrences READ SIXTEENTH recorded, not
+  recurrences. Mautic's own duplicate handling refusing a deliberately duplicated
+  probe contact is the system working. No droplet access and nothing to fix.
+- ENDORSEMENT-SCORER-4 is the expected n8n watchdog, correctly ignored.
+
+THE CENSUS, CROSS FOOTED ON BOTH AXES PER READ TWELFTH
+
+    by project   endorsement-scorer 359, supabase-platform 113, flutter 38,
+                 mautic 3                                                  = 513
+    by issue     ENDORSEMENT-SCORER-4 359                                  = 359
+                 SUPABASE-PLATFORM-1 110, -4 2, -3 1                       = 113
+                 FLUTTER-8 11, -B 10, -X 9, -1 3, -5 2, -Y 1, -6 1, -2 1   =  38
+                 MAUTIC-H 3                                                =   3
+                                                                             513
+
+`website`, `moydforms`, `n8n` and `supabase-edge` at zero. `website` being at
+zero is worth one line rather than none, because Andrew landed three commits in
+the sibling repo inside the two hour slice and none produced an error event.
+Queried with NO status filter per READ EIGHTH. Read READ TWELFTH's caveat on
+what the equality does and does not buy.
+
+THE BRANCH REF TRAP, TENTH RUN
+Both repos again presented a stale named branch with `HEAD` detached at the true
+remote tip: this repo's `master` at `5d8a5b0` against a real `2490cd7`, and the
+sibling's `main` at `77d879f` against a real `1b7d10d`. Repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH, and `git ls-remote`
+re-run immediately before committing per READ FOURTEENTH.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. This window is the first where
+the log lines themselves carry personal data, so this check did real work rather
+than confirming a habit, and it caught two things in the first draft.
+
+First, the probe output includes a member email address at a named university, a
+second member email at a consumer domain, and the `member_id` and `user_id`
+UUIDs of a real person. NONE is reproduced above, and the probe lines are
+described by what they report rather than quoted. That is a change from the
+practice of quoting log lines verbatim, and it is deliberate: the emitter
+started putting member identifiers in its own messages, so verbatim quoting
+stopped being safe. A future run reading these rollups should assume the same
+and check before pasting.
+
+Second, and this is the one worth inheriting as a method rather than a fact: the
+first draft named the new unique constraint outright and justified it as
+"already committed in the sibling repo". That justification is INVERTED. The
+sibling is private, so "already in the sibling repo" is an argument for
+withholding, not for publishing. The constraint name exists nowhere public, and
+READ ELEVENTH set the precedent of withholding a private repo constraint name in
+exactly this situation because the finding survives without it. It survives here
+too, which is why the strand above describes the constraint rather than naming
+it. Before citing prior publication as cover, check WHICH repo published it.
+
+Named above and checked one at a time rather than waved through: the edge
+functions `member-onboard`, `onboarding-followups` and `lookup-districts`, which
+are already public in THIS repo's own tree and named in `2490cd7`'s message;
+the `members` table and its `email`, `name` and `phone_e164` columns, already
+named here by READ EIGHTH and READ ELEVENTH; and `legislation_bill_sponsors_unique`,
+already published here since READ FIRST. No credential, no DSN, no probe source
+address, no policy body, no migration filename and no raw upstream error
+appears, and nothing here widens access to anything. Withheld per the practice
+READ SIXTH set: the state of the live endorsement vote, and anything amounting
+to an operational read on production sessions. Those go to Andrew directly.
