@@ -44,9 +44,12 @@ import { handleCors, corsHeaders } from "../_shared/cors.ts";
 import {
   getMode, testEmail, buildWelcomeEmail, buildTooYoungEmail, buildAgedOutEmail,
   sendGmail, computeVariant, targetChannels, caucusChannel,
-  committeeChannels, firstNameOf, slackLookupByEmail, slackInvite,
+  committeeChannels, firstNameOf, slackInvite,
   slackWorkspaceInvite, EMAIL_RE, DEFAULT_CHANNELS, WORKSPACE_TEAM_ID,
   groupTargets, addMemberToGroup,
+  confirmSlackUserId, ensureSlackUserMapping, recordChannelInvite,
+  slackPostMessage, slackDmByEmail, chairsForVariant, buildInternalNotice,
+  NOTIFY_CHANNEL,
   type MemberRow, type Variant, type BuiltEmail,
 } from "../_shared/onboarding.ts";
 
@@ -298,15 +301,17 @@ Deno.serve(async (req) => {
   //   b) channel adds, which need the member to already be in Slack (user id).
   // The shared join link is in the email either way, and the followup poller
   // adds them to channels once they appear.
-  let slackUserId: string | null = m.slack_user_id;
+  let slackUserId: string | null = null;
   if (mode === "live") {
     if (!SLACK_BOT_TOKEN) {
       actions.push("LIVE: SLACK_BOT_TOKEN missing, skipped Slack workspace invite and channel adds");
     } else {
-      if (!slackUserId) {
-        const look = await slackLookupByEmail(realEmail, SLACK_BOT_TOKEN);
-        if (look.found) slackUserId = look.userId!;
-      }
+      // ALWAYS confirm by fresh lookup, exactly as the zap did. The stored
+      // members.slack_user_id is used only when the lookup fails for a reason
+      // other than "not in Slack". See confirmSlackUserId.
+      const confirmed = await confirmSlackUserId(realEmail, m.slack_user_id, SLACK_BOT_TOKEN);
+      slackUserId = confirmed.userId;
+      actions.push(`LIVE: slack id for ${realEmail} = ${slackUserId ?? "none"} (${confirmed.via})`);
       if (!slackUserId) {
         const inv = await slackWorkspaceInvite(realEmail, DEFAULT_CHANNELS, SLACK_BOT_TOKEN);
         actions.push(
@@ -317,9 +322,22 @@ Deno.serve(async (req) => {
         }
       }
       if (slackUserId) {
+        // Link the Slack account to the member row BEFORE logging anything:
+        // slack_channel_membership_log.slack_user_id has a foreign key to
+        // slack_user_mapping, so the log row cannot exist without it. This is
+        // also the only point at signup where that linkage gets made at all.
+        const map = await ensureSlackUserMapping(supabase, memberId, slackUserId, realEmail);
+        if (!map.ok) actions.push(`LIVE: slack_user_mapping upsert failed (${map.error}); channel invites will not be logged`);
         for (const ch of targets) {
           const r = await slackInvite(ch, slackUserId, SLACK_BOT_TOKEN);
           actions.push(`LIVE: conversations.invite ${ch} <- ${slackUserId}: ${r.success ? "ok" : r.error}`);
+          if (map.ok) {
+            await recordChannelInvite(supabase, {
+              memberId, slackUserId, channelId: ch,
+              success: r.success, error: r.error ?? null,
+              metadata: { stage: "member-onboard", variant },
+            });
+          }
         }
         // Google Group parity: add the member email to each mapped group.
         // Idempotent (already-a-member is a no-op).
@@ -331,9 +349,21 @@ Deno.serve(async (req) => {
       } else {
         actions.push("LIVE: member not yet in Slack, channel adds + group adds deferred to followup");
       }
+
+      // --- Tell the organisation. Nothing else does. ------------------------
+      const notice = buildInternalNotice({
+        name: m.name || realEmail, email: realEmail, variant,
+        committees: m.committee || [], channels: targets,
+      });
+      const posted = await slackPostMessage(NOTIFY_CHANNEL, notice, SLACK_BOT_TOKEN);
+      actions.push(`LIVE: chat.postMessage ${NOTIFY_CHANNEL}: ${posted.ok ? "ok" : posted.error}`);
+      for (const chair of chairsForVariant(variant)) {
+        const dm = await slackDmByEmail(chair, notice, SLACK_BOT_TOKEN);
+        actions.push(`LIVE: chair DM ${chair}: ${dm.ok ? "ok" : dm.error}`);
+      }
     }
   } else {
-    actions.push(`${mode.toUpperCase()}: Slack writes SKIPPED. Would add ${slackUserId ? slackUserId : "member (once joined)"} to channels: ${targets.join(", ")}`);
+    actions.push(`${mode.toUpperCase()}: Slack writes SKIPPED. Would confirm the member's Slack id by users.lookupByEmail (stored id ${m.slack_user_id ?? "none"} is not trusted) and add them to channels: ${targets.join(", ")}`);
     if (groupAdds.length) actions.push(`${mode.toUpperCase()}: Google Group writes SKIPPED. Would add ${realEmail} to groups: ${groupAdds.map((x) => x.group).join(", ")}`);
   }
 

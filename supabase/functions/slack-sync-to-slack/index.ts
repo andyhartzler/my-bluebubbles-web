@@ -115,9 +115,19 @@ async function removeFromChannel(channelId, userId, slackToken) {
   };
 }
 // Process pending membership changes
+// ============================================================================
+// THE DISPATCH GATE. This filter is the only thing standing between a schedule
+// and a nine month backlog of committee changes from November 2025, every one
+// of which is a push notification to a real human. Rows are sendable ONLY when
+// sync_committees_to_slack stamped them dispatch='approved' at insert time,
+// which it does for changes made from 2026-08-05 onward. Everything older
+// carries dispatch NULL and is inert by construction, with no date cutoff for
+// anyone to maintain.
+// Do not relax this to "success = false" alone. That was the pre-gate query,
+// and the first unguarded call would have fired 50 conversations.invite calls.
+// ============================================================================
 async function processPendingChanges(supabase, slackToken) {
-  // Get all pending changes (where success = false)
-  const { data: pendingChanges, error: fetchError } = await supabase.from("slack_channel_membership_log").select("*").eq("success", false).eq("source", "supabase_trigger").order("created_at", {
+  const { data: pendingChanges, error: fetchError } = await supabase.from("slack_channel_membership_log").select("*").eq("success", false).eq("source", "supabase_trigger").eq("dispatch", "approved").order("created_at", {
     ascending: true
   }).limit(50); // Process in batches
   if (fetchError) {
@@ -148,9 +158,15 @@ async function processPendingChanges(supabase, slackToken) {
         console.error("Unknown action:", change.action);
         continue;
       }
-      // Update the log entry
+      // Update the log entry. dispatch moves to 'executed' whether or not Slack
+      // accepted it: an attempt has been made, and leaving a failed row at
+      // 'approved' would re-invite the same person every ten minutes forever.
+      // Slack's invite failures are overwhelmingly permanent (user_not_found,
+      // channel_not_found, deactivated account), so one attempt is the right
+      // number, and error_message records what happened.
       await supabase.from("slack_channel_membership_log").update({
         success: result.success,
+        dispatch: "executed",
         error_message: result.error || null,
         metadata: {
           ...change.metadata,
@@ -169,9 +185,11 @@ async function processPendingChanges(supabase, slackToken) {
     } catch (error) {
       console.error("Error processing change:", error);
       errors++;
-      // Update log with error
+      // Update log with error. Same reasoning as above: mark it attempted so a
+      // thrown error cannot become an every-ten-minutes retry loop.
       await supabase.from("slack_channel_membership_log").update({
         success: false,
+        dispatch: "executed",
         error_message: error.message
       }).eq("id", change.id);
     }

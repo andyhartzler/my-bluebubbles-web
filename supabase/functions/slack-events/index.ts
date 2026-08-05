@@ -468,11 +468,30 @@ serve(async (req)=>{
     const timestamp = req.headers.get("x-slack-request-timestamp");
     const signature = req.headers.get("x-slack-signature");
     const body = await req.text();
-    // Verify timestamp
-    if (timestamp) {
+    // Verify signature and timestamp. UNCONDITIONALLY.
+    //
+    // Both checks used to be wrapped in `if (timestamp)` / `if (signature &&
+    // timestamp)`, so OMITTING the headers SKIPPED verification instead of
+    // failing it. This endpoint mutates members.committee, and the CRM derives
+    // its access gate from that array, so an unsigned caller could hand itself
+    // committee membership. Missing headers are now a 401, which is what the
+    // absent-proof case has to be.
+    if (!signature || !timestamp) {
+      console.error("Slack request missing signature or timestamp headers");
+      return new Response(JSON.stringify({
+        error: "Missing Slack signature headers"
+      }), {
+        status: 401,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
+      });
+    }
+    {
       const now = Math.floor(Date.now() / 1000);
       const requestTime = parseInt(timestamp);
-      if (Math.abs(now - requestTime) > 60 * 5) {
+      if (!Number.isFinite(requestTime) || Math.abs(now - requestTime) > 60 * 5) {
         return new Response(JSON.stringify({
           error: "Request too old"
         }), {
@@ -484,8 +503,7 @@ serve(async (req)=>{
         });
       }
     }
-    // Verify signature
-    if (signature && timestamp) {
+    {
       const isValid = await verifySlackSignature(body, timestamp, signature, slackSigningSecret);
       if (!isValid) {
         console.error("Invalid Slack signature");

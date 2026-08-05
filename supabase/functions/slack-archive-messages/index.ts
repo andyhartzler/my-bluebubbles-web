@@ -7,7 +7,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret"
 };
 // Fetch message history from a channel
 async function fetchChannelHistory(channelId, slackToken, oldest, latest) {
@@ -143,7 +143,22 @@ async function updateArchiveStatus(channelId, lastTs, totalArchived, supabase) {
 // Wave 2 access-audit 2026-04-24: gate on authenticated user.
 // This fn is invoked from Dart (slack_management_repository.dart) with the
 // user's JWT via the anon client — must validate here.
+//
+// SECOND DOOR, 2026-08-05: pg_cron job 7 posts a SERVICE-ROLE JWT, which is not
+// a user JWT, so auth.getUser rejects it and the member lookup below can never
+// succeed. That job has returned 401 on every run since the gate was deployed
+// on 2026-04-24, and cron.job_run_details reports 'succeeded' throughout
+// because pg_net's ENQUEUE succeeded, not the HTTP call. 12 of 13 channels have
+// a frozen last-archive date and the CRM Channels tab renders the result, so
+// this is user-visible. The gate itself is right for the CRM's manual button;
+// only the machine caller needs another way in, and it is the same x-cron-secret
+// path onboarding-followups already uses on job 94.
 async function requireAuthenticatedUser(req, supabaseUrl, supabaseAnonKey, supabaseServiceKey) {
+  const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
+  const presented = req.headers.get("x-cron-secret") ?? "";
+  if (cronSecret && presented && presented === cronSecret) {
+    return { userId: null, actorRole: "service_role" };
+  }
   const authHeader = req.headers.get("Authorization") ?? "";
   const jwt = authHeader.replace(/^Bearer /i, "").trim();
   if (!jwt) {
@@ -207,7 +222,7 @@ serve(async (req)=>{
     supabase.from("audit_log").insert({
       action: "EDGE_FN",
       actor_id: actorId,
-      actor_role: "authenticated",
+      actor_role: gate.actorRole ?? "authenticated",
       schema_name: "public",
       table_name: "edge_fn:slack-archive-messages",
       row_id: null,

@@ -26,45 +26,60 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// US State mapping for normalization
-const STATE_CODES: Record<string, string> = {
-  "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
-  "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE",
-  "florida": "FL", "georgia": "GA", "hawaii": "HI", "idaho": "ID",
-  "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS",
-  "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD",
-  "massachusetts": "MA", "michigan": "MI", "minnesota": "MN", "mississippi": "MS",
-  "missouri": "MO", "montana": "MT", "nebraska": "NE", "nevada": "NV",
-  "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY",
-  "north carolina": "NC", "north dakota": "ND", "ohio": "OH", "oklahoma": "OK",
-  "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC",
-  "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT",
-  "vermont": "VT", "virginia": "VA", "washington": "WA", "west virginia": "WV",
-  "wisconsin": "WI", "wyoming": "WY", "district of columbia": "DC"
+// ============================================================================
+// US state normalization for Mautic.
+//
+// MAUTIC WANTS THE FULL NAME, NOT THE CODE. This function used to normalize
+// "Missouri" DOWN to "MO", and every payload carrying a state came back
+// HTTP 400 "state: The selected choice is invalid". Verified on the running
+// instance 2026-08-05: mautic.lead_fields.state has type `region`, whose
+// accepted choices are the values in
+// docroot/app/bundles/CoreBundle/Assets/json/regions.json, and the United
+// States entry there is a list of full state names ("Alabama", "Alaska",
+// "Missouri", ...). "MO" is not in that list, so Mautic rejects it.
+//
+// So the map runs the other way now: any input, code or name, resolves to the
+// exact spelling Mautic accepts. Anything unrecognized returns null and the
+// field is omitted, which is what kept the member sync alive while the
+// subscriber sync was failing.
+// ============================================================================
+const STATE_NAMES: Record<string, string> = {
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas",
+  CA: "California", CO: "Colorado", CT: "Connecticut", DE: "Delaware",
+  FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho",
+  IL: "Illinois", IN: "Indiana", IA: "Iowa", KS: "Kansas",
+  KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland",
+  MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi",
+  MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada",
+  NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico", NY: "New York",
+  NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma",
+  OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina",
+  SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah",
+  VT: "Vermont", VA: "Virginia", WA: "Washington", WV: "West Virginia",
+  WI: "Wisconsin", WY: "Wyoming", DC: "District of Columbia",
 };
 
-const VALID_STATE_CODES = new Set(Object.values(STATE_CODES));
+// name (lowercased) -> the exact spelling Mautic accepts
+const STATE_BY_NAME: Record<string, string> = Object.fromEntries(
+  Object.values(STATE_NAMES).map((n) => [n.toLowerCase(), n]),
+);
 
 function normalizeState(state: string | null | undefined): string | null {
   if (!state) return null;
-  
+
   const cleaned = state.trim();
   if (!cleaned) return null;
-  
+
   if (cleaned.length === 2) {
-    const upper = cleaned.toUpperCase();
-    if (VALID_STATE_CODES.has(upper)) {
-      return upper;
-    }
+    const name = STATE_NAMES[cleaned.toUpperCase()];
+    if (name) return name;
     console.warn(`Invalid 2-letter state code: ${cleaned}`);
     return null;
   }
-  
-  const code = STATE_CODES[cleaned.toLowerCase()];
-  if (code) {
-    return code;
-  }
-  
+
+  const name = STATE_BY_NAME[cleaned.toLowerCase()];
+  if (name) return name;
+
   console.warn(`Could not normalize state: ${cleaned}`);
   return null;
 }
@@ -258,18 +273,31 @@ function mapMemberToMautic(member: any): any {
     lastname,
     email: member.email,
     country: "United States",
+    // The one legacy zap side effect with real substance. Six state=on zaps
+    // fired off this form and nothing replaced them; five of the six are
+    // genuinely gone with no owner asking for them (a Google Contact, a
+    // district spreadsheet superseded by the district triggers, a student
+    // spreadsheet whose only purpose was the chair alert that member-onboard
+    // now sends properly, a Notion mirror and an attendance sheet). This one is
+    // different: the payload is a raw row with no tag or segment field, so
+    // every member has been landing in Mautic untagged and indistinguishable
+    // from a newsletter subscriber. The MailChimp zap tagged them 'Member'.
+    // Verified against the live instance 2026-08-05: the tag is accepted on
+    // POST /api/contacts/new (HTTP 201) and tag id 2 'Member' already exists.
+    // Subscribers deliberately do NOT get this; that is the whole distinction.
+    tags: ["Member"],
   };
-  
+
   if (member.phone_e164 || member.phone) {
     mapped.phone = member.phone_e164 || member.phone;
     mapped.mobile = member.phone_e164 || member.phone;
   }
   if (member.address) mapped.address1 = member.address;
   if (member.city) mapped.city = member.city;
-  
+
   const normalizedState = normalizeState(member.state);
   if (normalizedState) mapped.state = normalizedState;
-  
+
   if (member.zip_code) mapped.zipcode = member.zip_code;
   if (member.county) mapped.county = member.county;
   if (member.congressional_district) mapped.congressional_district = member.congressional_district;

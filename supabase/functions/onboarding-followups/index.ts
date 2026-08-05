@@ -30,6 +30,7 @@ import { handleCors, corsHeaders } from "../_shared/cors.ts";
 import {
   getMode, testEmail, buildReminderEmail, sendGmail,
   slackLookupByEmail, slackInvite, EMAIL_RE, groupTargets, addMemberToGroup,
+  ensureSlackUserMapping, recordChannelInvite,
   type Variant,
 } from "../_shared/onboarding.ts";
 
@@ -125,10 +126,26 @@ Deno.serve(async (req) => {
 
     if (t.task_type === "slack_channel_sync") {
       if (mode === "live" && inSlack && slackUserId && SLACK_BOT_TOKEN) {
+        // Link the Slack account to the member row first: the membership log's
+        // slack_user_id is a foreign key to slack_user_mapping, so nothing can
+        // be recorded without it. This is the same write member-onboard makes;
+        // it is repeated here because this path reaches members who were not in
+        // Slack when they were welcomed, which is most of them.
+        const map = t.member_id
+          ? await ensureSlackUserMapping(supabase, t.member_id, slackUserId, email)
+          : { ok: false, error: "task has no member_id" };
+        if (!map.ok) log.mapping = `slack_user_mapping not written: ${map.error}`;
         const invited: string[] = [];
         for (const ch of targets) {
           const r = await slackInvite(ch, slackUserId, SLACK_BOT_TOKEN);
           invited.push(`${ch}:${r.success ? "ok" : r.error}`);
+          if (map.ok && t.member_id) {
+            await recordChannelInvite(supabase, {
+              memberId: t.member_id, slackUserId, channelId: ch,
+              success: r.success, error: r.error ?? null,
+              metadata: { stage: "onboarding-followups", variant, task_id: t.id },
+            });
+          }
         }
         // Google Group parity: add member email to each mapped group (idempotent).
         const groupAdds = groupTargets(targets);

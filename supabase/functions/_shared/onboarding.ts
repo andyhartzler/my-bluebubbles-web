@@ -55,15 +55,14 @@ export function testEmail(): string {
 // --- Gmail identity ----------------------------------------------------------
 const IMPERSONATE = "andrew@moyoungdemocrats.org"; // token is always minted for andrew@
 export const INFO_FROM = "info@moyoungdemocrats.org";   // verified send-as alias on andrew@
-export const ANDREW_FROM = "andrew@moyoungdemocrats.org";
 
-// The From display name follows the From address. The n8n Gmail nodes set
-// senderName "Missouri Young Democrats" on the welcome/reminder mails and
-// "Andrew Hartzler" on the two age-branch mails; a single hardcoded display
-// name would have shown the org name where n8n showed Andrew's.
+// EVERY email from this cascade sends as info@moyoungdemocrats.org with the
+// display name "Missouri Young Democrats". Andrew asked for that explicitly on
+// 2026-08-05. It is a change from n8n, which sent the two age-branch mails as
+// Andrew personally; that is why an ANDREW_FROM constant used to exist here and
+// why it is now gone. Do not reintroduce a second sender identity.
 const SENDER_NAMES: Record<string, string> = {
   [INFO_FROM]: "Missouri Young Democrats",
-  [ANDREW_FROM]: "Andrew Hartzler",
 };
 
 // --- Links referenced in the copy --------------------------------------------
@@ -196,7 +195,7 @@ export function targetChannels(m: MemberRow, variant: Variant): string[] {
 //
 // The visual template is the candidate endorsement invitation
 // (moyd-endorsement-campaign/endorsement_email_template.html), reproduced as
-// table-and-inline-style email HTML: cover banner, eyebrow, navy greeting, body,
+// table-and-inline-style email HTML: cover banner, navy greeting, body,
 // navy pill CTA with a VML fallback for Outlook, hairline sign-off, social row,
 // paid-for banner.
 //
@@ -228,7 +227,7 @@ export function targetChannels(m: MemberRow, variant: Variant): string[] {
 // The one thing kept from the dark-mode pass is MID_BLUE. It was darkened from
 // the reference's #2f7fc1 to #2b73b0. That is not cosmetic: on the white card
 // the reference blue measures 4.26:1 and FAILS the 4.5:1 floor for the 12px
-// eyebrow and the body links, while #2b73b0 measures 5.02:1 and passes. The
+// body links, while #2b73b0 measures 5.02:1 and passes. The
 // hues are indistinguishable side by side. Contrast wins over exact likeness on
 // that one value, deliberately.
 // ============================================================================
@@ -256,7 +255,7 @@ export const EMAIL_RE = /^[^\s<>"',;:\r\n]+@[^\s<>"',;:\r\n]+\.[^\s<>"',;:\r\n]+
 const NAVY = "#263351";
 const BODY_TX = "#333333";
 // 5.02:1 on the white card. The endorsement reference uses #2f7fc1, which
-// measures 4.26:1 and misses the 4.5:1 floor: it carries both the 12px eyebrow
+// measures 4.26:1 and misses the 4.5:1 floor, and it carries the body
 // and every 16px body link, and body links are new here (the reference has
 // none), so the darker blue is used throughout. Visually near-identical.
 const MID_BLUE = "#2b73b0";
@@ -275,7 +274,6 @@ const H = (emoji: string, title: string) =>
 
 interface Rendered {
   preheader: string;
-  eyebrow: string;   // uppercase kicker, the one line that varies per email type
   // "Hi Andrew!", RAW. Escaping happens once, inside shell(), on the HTML path
   // only. Escaping it here instead leaked "Hi D&#39;Angelo!" verbatim into the
   // text/plain part, which plainOf() emits without decoding.
@@ -319,7 +317,6 @@ a{text-decoration:none}
 
 <tr><td class="px" style="padding:36px 44px 30px 44px;">
 
-<div class="eyebrow" style="color:${MID_BLUE};font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin:0 0 12px 0;">${r.eyebrow}</div>
 
 <p class="hd" style="color:${NAVY};font-size:20px;line-height:1.5;margin:0 0 20px 0;font-weight:700;">${escapeHtml(r.greeting)}</p>
 
@@ -425,7 +422,7 @@ function generalBody(): string {
     P(`${A(PORTAL, "Head here")} to access your Missouri Young Democrats member hub. You can add your membership card to Apple or Google Wallet, review meeting minutes, see opportunities to volunteer and get involved, and view resources and governing documents.`),
     H("&#128276;", "Stay in the loop"),
     P(`Be sure to download the Slack app and turn on notifications so you don't miss out. We'll be sharing updates about statewide actions, training opportunities, and ways to get involved. We'll also post a poll soon to pick the best time for our recurring monthly meeting.`),
-    H("&#128577;", "Get more involved"),
+    H("&#128153;", "Get more involved"),
     P(`To get more involved in our statewide organization, the best route is to join a committee via their Slack channel and introduce yourself to the chair and co-chair. We have committees focused on communications, fundraising, policy advocacy, political affairs, membership outreach, and more. Find the one that matches your interests and jump in!`),
     P(`Together, we are building something powerful and I can't wait to see what we'll do with this momentum. Whether you want to lead, learn, or just get involved, we're glad you're with us.`),
     P(`If you ever have questions or want to hop on a call, DM me in Slack, call or text 816-898-3612, or reply to this email.`),
@@ -454,7 +451,7 @@ function collegeBody(): string {
     P(`${A(PORTAL, "Head here")} to access your Missouri Young Democrats member hub. You can add your membership card to Apple or Google Wallet, review meeting minutes, see opportunities to volunteer and get involved, and view resources and governing documents.`),
     H("&#128276;", "Stay in the loop"),
     P(`Be sure to download the Slack app and turn on notifications so you don't miss out. We'll be sharing updates about statewide actions, training opportunities, and ways to get involved. We'll also post a poll soon to pick the best time for our recurring college caucus call.`),
-    H("&#128577;", "Get more involved"),
+    H("&#128153;", "Get more involved"),
     P(`To get more involved in our statewide organization, the best route is to join a committee via their Slack channel and introduce yourself to the chair and co-chair. We have committees focused on communications, fundraising, policy advocacy, political affairs, membership outreach, and more. Find the one that matches your interests and jump in!`),
     P(`Together, we are building something powerful and I can't wait to see what we'll do with this momentum. Whether you want to lead, learn, or just get involved, we're glad you're with us.`),
     P(`If you ever have questions or want to hop on a call, DM me in Slack, call or text 816-898-3612, or reply to this email.`),
@@ -478,7 +475,7 @@ function highSchoolBody(): string {
     P(`${A(PORTAL, "Head here")} to access your Missouri Young Democrats member hub. You can add your membership card to Apple or Google Wallet, review meeting minutes, see opportunities to volunteer and get involved, and view resources and governing documents.`),
     H("&#128276;", "Stay in the loop"),
     P(`Be sure to download the Slack app and turn on notifications so you don't miss out. We'll be sharing updates about statewide actions, training opportunities, and ways to get involved. We'll also post a poll soon to pick the best time for our recurring high school caucus call.`),
-    H("&#128577;", "Get more involved"),
+    H("&#128153;", "Get more involved"),
     P(`To get more involved in our statewide organization, the best route is to join a committee via their Slack channel and introduce yourself to the chair and co-chair. We have committees focused on communications, fundraising, policy advocacy, political affairs, membership outreach, and more. Find the one that matches your interests and jump in!`),
     P(`Together, we are building something powerful and I can't wait to see what we'll do with this momentum. Whether you want to lead, learn, or just get involved, we're glad you're with us.`),
     P(`If you ever have questions or want to hop on a call, DM me in Slack, call or text 816-898-3612, or reply to this email.`),
@@ -570,7 +567,6 @@ function build(r: Rendered): { html: string; text: string } {
 export function buildTooYoungEmail(first: string): BuiltEmail {
   const r: Rendered = {
     preheader: `Missouri Young Democrats membership opens at ${AGE_MIN_WORD}. Here is how to stay engaged until then.`,
-    eyebrow: "Missouri Young Democrats &middot; Membership",
     greeting: `Hi ${first}!`,
     body: tooYoungBody(),
     ctaText: "Follow us on Instagram",
@@ -580,15 +576,18 @@ export function buildTooYoungEmail(first: string): BuiltEmail {
   return {
     subject: "We can't wait to welcome you to Missouri Young Democrats!",
     ...build(r),
+    // The zap CC'd info@ on both age-branch emails. Without it nobody inside
+    // MOYD ever learns that an applicant was turned away, which is the one
+    // outcome somebody may want to review by hand.
     cc: [INFO_FROM],
-    from: ANDREW_FROM, // n8n sent both age mails as Andrew personally, with no Reply-To
+    from: INFO_FROM,
+    replyTo: INFO_FROM,
   };
 }
 
 export function buildAgedOutEmail(first: string): BuiltEmail {
   const r: Rendered = {
     preheader: `Missouri Young Democrats serves ${AGE_SENTENCE}. Here are ways to stay involved.`,
-    eyebrow: "Missouri Young Democrats &middot; Thank you",
     greeting: `Hi ${first}!`,
     body: agedOutBody(),
     ctaText: "Support Young Democrats",
@@ -598,22 +597,13 @@ export function buildAgedOutEmail(first: string): BuiltEmail {
   return {
     subject: "Thank you for your interest in Missouri Young Democrats!",
     ...build(r),
-    cc: [INFO_FROM],
-    from: ANDREW_FROM,
+    cc: [INFO_FROM], // see buildTooYoungEmail
+    from: INFO_FROM,
+    replyTo: INFO_FROM,
   };
 }
 
-const EYEBROW_WELCOME: Record<Variant, string> = {
-  general: "New Member &middot; Welcome Aboard",
-  college: "College Democrats &middot; Welcome Aboard",
-  high_school: "High School Democrats &middot; Welcome Aboard",
-};
 
-const EYEBROW_REMINDER: Record<Variant, string> = {
-  general: "Missouri Young Democrats &middot; Join us on Slack",
-  college: "College Democrats &middot; Join us on Slack",
-  high_school: "High School Democrats &middot; Join us on Slack",
-};
 
 const WELCOME_BODY: Record<Variant, () => string> = {
   general: generalBody, college: collegeBody, high_school: highSchoolBody,
@@ -630,7 +620,6 @@ const CC_FOR: Record<Variant, string[]> = {
 export function buildWelcomeEmail(variant: Variant, first: string): BuiltEmail {
   const r: Rendered = {
     preheader: "Welcome to Missouri Young Democrats. Here is how to get plugged in.",
-    eyebrow: EYEBROW_WELCOME[variant],
     greeting: `Hi ${first}!`,
     body: WELCOME_BODY[variant](),
     ctaText: "Join our Slack workspace",
@@ -649,7 +638,6 @@ export function buildWelcomeEmail(variant: Variant, first: string): BuiltEmail {
 export function buildReminderEmail(variant: Variant, first: string): BuiltEmail {
   const r: Rendered = {
     preheader: "You haven't joined our Slack workspace yet.",
-    eyebrow: EYEBROW_REMINDER[variant],
     greeting: `Hi ${first}!`,
     body: REMINDER_BODY[variant](),
     ctaText: "Join our Slack workspace",
@@ -661,6 +649,9 @@ export function buildReminderEmail(variant: Variant, first: string): BuiltEmail 
     // reminder indistinguishable from the original welcome in the inbox.
     subject: "Don't forget to join us on Slack!",
     ...build(r),
+    // The zap CC'd the college / high school officers on their reminders. This
+    // key used to be followed immediately by `cc: []`, and the second one won,
+    // so every reminder shipped with an empty CC.
     cc: CC_FOR[variant],
     from: INFO_FROM,
     replyTo: INFO_FROM,
@@ -797,4 +788,177 @@ export async function slackInvite(
   if (data.ok) return { success: true };
   if (data.error === "already_in_channel") return { success: true };
   return { success: false, error: data.error };
+}
+
+// ============================================================================
+// Confirm the Slack user id before inviting.
+//
+// The zap did a fresh users.lookupByEmail before EVERY invite and trusted no
+// stored id. This build seeded from members.slack_user_id and only looked up
+// when that was null, which sends a stale id straight to conversations.invite:
+// 241 members carry a stored id and 12 mapping rows are already flagged deleted
+// in Slack. One API call restores the zap's own guard.
+//
+// The stored id is used only when the lookup fails for a reason that is not
+// "this person is not in Slack" (a network error, a rate limit, a bad token).
+// users_not_found is an ANSWER, and the answer is no.
+// ============================================================================
+export async function confirmSlackUserId(
+  email: string,
+  storedId: string | null,
+  token: string,
+): Promise<{ userId: string | null; via: string }> {
+  const look = await slackLookupByEmail(email, token);
+  if (look.found && look.userId) {
+    return { userId: look.userId, via: storedId && storedId !== look.userId ? "lookup (stored id was stale)" : "lookup" };
+  }
+  if (look.error === "users_not_found") return { userId: null, via: "lookup: not in Slack" };
+  if (storedId) return { userId: storedId, via: `stored id (lookup errored: ${look.error})` };
+  return { userId: null, via: `lookup failed: ${look.error}` };
+}
+
+// ============================================================================
+// Recording what the cascade did.
+//
+// public.slack_channel_membership_log is what the CRM Slack page renders, and
+// the onboarding cascade wrote nothing to it, so a whole live onboarding run
+// would leave that page silent. The row shape is EXACTLY the shape the trigger
+// and Slack's own events already write; only `source` is new, so the three
+// foreign-key hint embeds the CRM depends on are untouched.
+//
+// HARD CONSTRAINT: slack_channel_membership_log.slack_user_id has a foreign key
+// to slack_user_mapping, so a log row cannot exist for a Slack user with no
+// mapping row. ensureSlackUserMapping runs first. That also closes the separate
+// gap that nothing linked a new member's Slack account to their member row at
+// signup: linkage previously only happened later, if Slack delivered an event.
+//
+// Both functions FAIL SOFT. Neither may break an onboarding that has already
+// emailed a real person.
+// ============================================================================
+export const LOG_SOURCE_ONBOARDING = "onboarding";
+
+export async function ensureSlackUserMapping(
+  supabase: { from: (t: string) => any },
+  memberId: string,
+  slackUserId: string,
+  email: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await supabase
+    .from("slack_user_mapping")
+    .upsert({
+      member_id: memberId,
+      slack_user_id: slackUserId,
+      slack_email: email,
+      matched_by: "onboarding_email_lookup",
+      match_confidence: 1.0,
+      last_synced_at: new Date().toISOString(),
+    }, { onConflict: "slack_user_id" });
+  if (error) {
+    console.error("[onboarding] slack_user_mapping upsert failed:", error.message);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+export async function recordChannelInvite(
+  supabase: { from: (t: string) => any },
+  row: {
+    memberId: string;
+    slackUserId: string;
+    channelId: string;
+    success: boolean;
+    error?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<void> {
+  const { error } = await supabase.from("slack_channel_membership_log").insert({
+    member_id: row.memberId,
+    slack_user_id: row.slackUserId,
+    slack_channel_id: row.channelId,
+    action: "invited",
+    source: LOG_SOURCE_ONBOARDING,
+    success: row.success,
+    // 'executed' because the Slack call has already been made by the time this
+    // is written. The dispatch gate exists to stop UNSENT rows being sent; a
+    // row recorded after the fact is history, not a queue entry, and must never
+    // be picked up by the slack-sync-to-slack drain.
+    dispatch: "executed",
+    error_message: row.error ?? null,
+    metadata: { recorded_at: new Date().toISOString(), ...(row.metadata || {}) },
+  });
+  if (error) console.error("[onboarding] membership log insert failed:", error.message);
+}
+
+// ============================================================================
+// Internal notification. Nothing in 147 edge functions posts to Slack, so
+// nobody inside MOYD is told a new member joined. The zaps DM'd the College
+// chairs on every student submission; this replaces that and the implicit
+// officer CCs with one post to #membership-outreach plus a DM per chair.
+//
+// Driven off public.members, NOT off the Google Sheet the zap read: that sheet
+// was itself written by a second zap whose n8n port fails every minute on a
+// broken Google Sheets trigger credential.
+//
+// Fails soft everywhere. A member is onboarded whether or not we manage to
+// announce it.
+// ============================================================================
+export const NOTIFY_CHANNEL = "C093RMQKXRA"; // #membership-outreach-committee
+
+export async function slackPostMessage(
+  channel: string,
+  text: string,
+  token: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ channel, text, unfurl_links: false }),
+    });
+    const data = await res.json();
+    return data.ok ? { ok: true } : { ok: false, error: data.error };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+// DM a person identified by email. Two calls: resolve the user, then post to
+// their user id (chat.postMessage opens the DM itself for a user id).
+export async function slackDmByEmail(
+  email: string,
+  text: string,
+  token: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const look = await slackLookupByEmail(email, token);
+  if (!look.found || !look.userId) return { ok: false, error: look.error || "users_not_found" };
+  return await slackPostMessage(look.userId, text, token);
+}
+
+// The officers who should hear about a new student member, by variant. Same
+// addresses the email CC uses, so there is one list to maintain, and the Slack
+// ids are resolved live rather than stored (stored ids go stale silently).
+export function chairsForVariant(variant: Variant): string[] {
+  if (variant === "college") return COLLEGE_CC;
+  if (variant === "high_school") return HS_CC;
+  return [];
+}
+
+export function buildInternalNotice(opts: {
+  name: string;
+  email: string;
+  variant: Variant;
+  committees: string[];
+  channels: string[];
+}): string {
+  const variantLabel = opts.variant === "high_school"
+    ? "High School"
+    : opts.variant === "college" ? "College" : "General";
+  const lines = [
+    `:tada: New Missouri Young Democrats member: *${opts.name}*`,
+    `Track: ${variantLabel}`,
+    `Email: ${opts.email}`,
+    `Committees: ${opts.committees.length ? opts.committees.join(", ") : "none selected"}`,
+    `Channels they are being added to: ${opts.channels.length ? opts.channels.map((c) => `<#${c}>`).join(" ") : "none"}`,
+  ];
+  return lines.join("\n");
 }
