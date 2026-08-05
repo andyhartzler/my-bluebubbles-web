@@ -6052,3 +6052,349 @@ while its disclosure paragraph asserted nothing new was named. Operational notes
 about how this agent reaches Andrew go to Andrew. Also withheld per the practice
 READ SIXTH set: the state of the live endorsement vote, and any operational read
 on production sessions.
+
+## READ NINETEENTH: the 06:22 UTC sweep, a slice with no probe traffic at all, and two checks that came back clean
+
+Swept the 24 hours to 2026-08-05 06:22 UTC. No code change: every line in the
+genuinely new observation belongs to a family the sections above enumerate, and
+outside SUPABASE-PLATFORM-1 and the ignored watchdog, no Sentry event fired in
+the new slice at all. Short by design, per READ TWELFTH.
+
+Carve that out the way READ EIGHTEENTH insists rather than writing "nothing else
+fired". ENDORSEMENT-SCORER-4 reads 359 here and read 359 in the three sweeps
+before it, and a FLAT rolling 24 hour count of a periodic emitter means events
+kept landing as old ones aged out, not that it stopped. It is correctly ignored,
+so it is excluded on purpose, not absent.
+
+Per the overlap warning in READ FOURTH: this window shares 22 hours with the
+sweep that closed at 04:20 UTC, so only 2 hours is new observation. Nothing
+below independently confirms anything above it.
+
+FULL DECOMPOSITION OF THE NEW SLICE
+`by_message` read on all 8 SUPABASE-PLATFORM-1 events after 04:20 UTC, per READ
+SEVENTH. Forty four log lines, reconciling against the sum of the eight per
+event `count` fields:
+
+    04:26:59  column d.form_id does not exist                      ERROR
+    04:35:29  column "form_id" does not exist                      ERROR
+    04:49:36  column "updated_at" does not exist                   ERROR
+    04:50:33  column "phone_e164" does not exist                   ERROR
+    05:00:04  invalid input syntax for type uuid: "cron"           ERROR
+    05:50:53  column "created_at" does not exist                   ERROR
+    06:01:06  duplicate key value violates unique constraint  x32  ERROR
+    (no ts)   invalid input syntax for type uuid: "cron"           ERROR
+    06:02:52  column "state_house_district" does not exist         ERROR
+    06:03:03  column "created_at" does not exist                   ERROR
+    06:03:12  aggregate functions are not allowed in GROUP BY      ERROR
+    06:07:04  column "name" does not exist                         ERROR
+    06:13:06  column l.committee_name does not exist               ERROR
+
+Thirteen rows, forty four lines: the dup key row carries 32 of them and every
+other row carries one. The second cron row has NO observed timestamp, per READ
+SIXTH's precedent for this: it is a `by_message` key in the 06:05 rollup that
+did not make that rollup's five entry `sample`, so all that is established is
+that it fell inside the rollup's window. Be exact about why, because a draft of
+this paragraph said the burst had filled the sample and that is checkably false:
+three of those five slots carry the non-burst lines timestamped 06:02:52,
+06:03:03 and 06:03:12 in the table above, so at most two went to the burst. The
+cron line simply missed the sample. Do not infer where in the window it landed,
+and do not read its position in the table as an ordering.
+
+EVERY EVENT IN THIS SLICE IS ERROR LEVEL, WHICH IS NEW AND MEANS LITTLE
+Not one of the eight is tagged `includes FATAL`, so the filtered password family
+is absent, and so are the two malformed startup packet families READ FOURTH
+enumerates as shapes 4 and 5 AND the SASL Terminate line READ ELEVENTH adds.
+Keep those three counted the way this file counts them: two malformed startup
+packet families plus a third shape whose packet was valid and whose client hung
+up at authentication, not three startup packet families. READ EIGHTEENTH
+observed the first ABSENCE of the password lines any sweep has recorded, and
+insists on that wording rather than "the first slice without them", because a
+partially read slice cannot support a slice level universal. Keep it. This is
+the second such absence running, and it is also the first sweep to record no
+probe shape of any kind in a slice it read in full.
+
+Do not read that as the scanning having stopped. Two hours is far too short a
+sample against a family that averages roughly six lines per two hour slice, and
+READ FOURTH's caveat that shape 1 is a `by_severity` residual rather than a
+direct read applies to its absence exactly as it does to its presence. Recorded
+so a future run notices if it becomes a trend, not as a finding.
+
+THE AD HOC FAMILY IS ACTIVE, AND TWO IDENTIFIERS WERE CHECKED RATHER THAN WAVED
+THROUGH
+Count this in ROWS and say so, because counting the dup key burst as one line is
+the "six lines, five shapes" error READ SIXTH had to correct after the fact. Of
+the eleven non-cron rows, TEN are the family READ SEVENTEENTH attributes to
+Andrew's own membership audit from the commit prose; the eleventh is the 32 line
+dup key burst, which is the undeployed `e79339b`. As lines rather than rows the
+family is ten of forty two, because the burst alone is 32.
+
+Inherit that attribution at its stated scope and no wider. READ SEVENTEENTH
+attributes ITS session and the READ SIXTEENTH session, and says plainly that a
+future run must not treat the family as pre cleared.
+
+This slice DOES bear on it, and an auditor had to point that out after a draft
+of this paragraph asserted the opposite. The instrument READ NINTH describes,
+dating the CALLING code rather than grepping the tree, is available here because
+four sibling commits carry commit dates inside these two hours, at 04:39:36,
+04:46:34, 05:04:56 and 05:10:26 UTC. All four are membership and roster work.
+Their subject lines are deliberately not reproduced: the timing is what carries
+the argument, the sibling is private, and paraphrasing them cost two audit
+rounds over how exactly the paraphrases matched.
+
+Some of the ad hoc rows interleave with them. `d.form_id` at 04:26:59 and `form_id` at
+04:35:29 both PRECEDE the first commit, by roughly thirteen and four minutes;
+they do not straddle it, and a draft of this paragraph said they sat either side
+of it, which is false against the times printed three lines above. `updated_at`
+at 04:49:36 and `phone_e164` at 04:50:33 land three and four minutes after the
+second commit, and 05:00:04 falls between the second and the third. Nothing else
+does: the last of the four commits is 05:10:26, so the 05:50:53 row and
+everything from 06:02 onward is AFTER all of them, by forty minutes and more. A
+draft claimed 05:50:53 fell between commits and it does not.
+
+A COLUMN OVERLAP ARGUMENT WAS TRIED HERE AND IS DELIBERATELY ABANDONED
+Three successive drafts claimed the failing column names are the columns that
+membership work touches, each stating it more carefully than the last, and an
+auditor falsified all four at successively finer granularity. Recorded once,
+precisely, so nobody tries a fifth time:
+
+    phone_e164              in changed lines
+    name                    in changed lines, and matches trivially
+    updated_at              unchanged context only
+    formId                  hunk headers only; snake case form_id appears nowhere
+    created_at              absent, despite carrying two of the ten family rows
+    state_house_district    absent
+    committee_name          absent
+
+An overlap that includes `name`, a word this common, and excludes three names
+carrying four of the ten rows, discriminates nothing. So this section does not
+rely on it and a future run should not resurrect it.
+
+The lesson is worth more than the strand was. A plausible looking overlap
+between error identifiers and a diff is easy to assert and tedious to verify,
+and every attempt here was wrong in a different way: wrong about which names,
+then about changed lines versus context, then about casing. If you raise one,
+grep the changed lines specifically, check the casing, and check whether the
+matches are common words. Otherwise do not raise it.
+
+Rate the TIMING, which is the strand that survived and not the abandoned overlap
+above, as corroboration and not as proof, for the reason READ SECOND gives:
+git records no push time, so a commit date establishes when the code EXISTED and
+not when anything ran. Interleaving is consistent with the READ SEVENTEENTH
+reading and is the same kind of timing strand that section used. It does not
+newly attribute anything, and the family still must not be treated as pre
+cleared.
+
+`form_id`, `phone_e164` and `state_house_district` are membership and roster
+shaped names, which is a topical observation and nothing stronger. Do not
+upgrade it into a claim about the four sibling commits dated in the attribution
+paragraph above; that was tried four times and never survived checking.
+
+`aggregate functions are not allowed in GROUP BY` is a message shape no earlier
+section records, but it is NOT a new family: it belongs with the `array_agg` and
+`syntax error at or near "minute"` shapes READ SEVENTH already lists. New
+identifier, same family. It is raised when an aggregate is written into the
+GROUP BY list itself, which is a SQL authoring mistake rather than anything a
+deployed statement does, which is the same reason those two belong here.
+
+State the cover for the OTHER eight rows correctly before the two below, because
+an earlier draft implied a grep negative cleared them and that instrument does
+not apply to most of them. `form_id`, `phone_e164`, `name`, `created_at` and
+`updated_at` are all real committed columns somewhere in one tree or the other.
+READ SIXTH says so of `form_id` and READ SEVENTEENTH of `phone_e164` and `name`.
+`created_at` and `updated_at` are common in both trees, and while several
+earlier sections record them as failing log lines, no earlier section makes the
+real-column claim for them, so that pair is asserted here rather than cited.
+
+Those rows are covered by READ THIRTEENTH's discriminator instead: the BARE
+unqualified form, which PostgREST does not emit, since a filter or order from
+either app's data layer renders the table qualified name. Two of the eight are
+NOT bare and need the other instrument, which an auditor caught after a draft
+swept all eight under the same one. `d.form_id` is qualified, so it takes READ
+SIXTH's standard, and that standard is satisfied: the string appears nowhere in
+either repo outside this file. The GROUP BY row carries no column identifier at
+all for either instrument to act on, and its family membership rests on the
+authoring mistake argument above.
+
+Neither instrument is as strong as a grep negative on a name that exists
+nowhere, and the company these rows keep is doing real work in the reading.
+
+Two lines named identifiers real enough that even that reading needed checking,
+so both were checked:
+
+- `l.committee_name`. `committee_name` IS a real committed column on
+  `mec_committees`, so the bare grep negative does not apply. What clears it is
+  the QUALIFIED form: the string `l.committee_name` appears nowhere in either
+  repo outside this file, so no committed statement makes that reference. That
+  is READ SIXTH's standard and it is the whole argument.
+
+  Do NOT reach for an alias argument here. Two successive drafts did, each
+  naming the set of aliases committed code uses for this table, and an auditor
+  falsified BOTH against the migrations: the first was wrong outright, and the
+  second was incomplete even after the correction. No alias set is restated
+  here, deliberately, because any such list is a trap: a next run inheriting it
+  would clear a line carrying an alias the list omits, or read a real one as
+  ours. The qualified reference being absent is the whole argument and it needs
+  no letters at all.
+- `state_house_district`. Its only occurrence in either repo's application code
+  is a `case` label in a switch that returns null, explicitly commented as not
+  stored in the member model. A switch case is not a query and cannot raise
+  this. The remaining hits are this file, one plan document and one progress
+  tracker, none of them a query.
+
+Nothing was changed for any of the ten, and nothing should be. The standing
+instruction not to change a working query to make one of these go away applies
+unchanged.
+
+BOTH LONG STANDING UNDEPLOYED FIXES CONFIRMED STILL UNDEPLOYED, DIRECTLY
+Not inferred from silence. The 06:00 UTC cycle carried exactly 32
+`legislation_bill_sponsors_unique` lines, unchanged size, so `e79339b` is not
+deployed. The hourly uuid line fired at 05:00:04 and inside the 06:05 rollup, so
+`1cdb96e` is not deployed.
+
+Day counts as of the window close, computed with `git show -s --format=%cI` and
+FLOORED per READ TWELFTH: `1cdb96e` at 9 days, `e79339b` at 8, `0d2963e` at 5,
+`285a05f` at under 18 hours. All four are hand deploy work per READ FIRST.
+
+The blocker is unchanged and was re-checked rather than inherited, per READ
+TWELFTH: nothing matching `SUPABASE` or `PROJECT_REF` is in this container's
+environment. The single item ask in READ TWELFTH stands, and READ SEVENTEENTH's
+sharper version of it stands too: Andrew is deploying edge functions by hand
+already, and these four are neighbours of the ones he deployed.
+
+NOTHING ELSE FIRED, THE WATCHDOG ASIDE
+The newest `flutter` event of any kind is still 2026-08-04 19:34:33, which is 76
+minutes BEFORE `6ff6a45` landed at 20:50:30, so FLUTTER-8, -B and -X have not
+fired since that fix. Do not read that as the fix confirmed in production. The
+quiet is equally well explained by nobody having opened a conversation in the 10
+hours 47 minutes since, and note that Sentry cannot tell those two apart in
+either direction: a WORKING fix emits nothing and an unused app emits nothing.
+Earlier sections state the no-session half as fact, inherited from READ
+FIFTEENTH; it is not establishable and is written as the alternative it is here.
+None was re-resolved,
+and three `flutter` issues carry a resolved status somebody else set.
+FLUTTER-Y and FLUTTER-6 are the `RenderBox was not laid out` pair with zero
+first party frames, left alone per READ FOURTEENTH. FLUTTER-1 and FLUTTER-5 are
+browser transport. SUPABASE-PLATFORM-3's only event is the 12:10:02 429, which
+`285a05f` postdates. SUPABASE-PLATFORM-4's two are the 06:39:35 and 12:55:16
+requests READ EIGHTH and READ ELEVENTH document. MAUTIC-H's three are the probe
+POSTs READ SIXTEENTH records. Same occurrences throughout, not recurrences.
+Nothing was resolved.
+
+THE CENSUS, CROSS FOOTED ON BOTH AXES PER READ TWELFTH
+
+    by project   endorsement-scorer 359, supabase-platform 108, flutter 38,
+                 mautic 3                                                  = 508
+    by issue     ENDORSEMENT-SCORER-4 359                                  = 359
+                 SUPABASE-PLATFORM-1 105, -4 2, -3 1                       = 108
+                 FLUTTER-8 11, -B 10, -X 9, -1 3, -5 2, -Y 1, -6 1, -2 1   =  38
+                 MAUTIC-H 3                                                =   3
+                                                                             508
+
+`website`, `moydforms`, `n8n` and `supabase-edge` at zero. Queried with NO status
+filter per READ EIGHTH, which is how the ignored watchdog and the three resolved
+`flutter` issues stayed visible. Read READ TWELFTH's caveat on what the equality
+does and does not buy.
+
+THE BRANCH REF TRAP, THIRTEENTH RUN
+Both repos again presented a stale named branch with `HEAD` detached at the true
+remote tip: this repo's `master` at `5d8a5b0` against a real `b3d0302`, and the
+sibling's `main` at `77d879f` against a real `9af7a94`. Repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH, and `git ls-remote`
+re-run immediately before committing per READ FOURTEENTH. That is the same stale
+PAIR READ EIGHTEENTH enumerates; per its instruction, this is one more
+correlation and not a mechanism, so keep running the check.
+
+AND THE REMOTE MOVED AGAIN MID RUN, WHICH IS WHY THAT RE-RUN IS NOT OPTIONAL
+`b3d0302` was the real tip when this run started and was NOT the real tip when
+it committed. The `git ls-remote` re-run immediately before committing returned
+`8d922e9`, two commits further on, both authored by Andrew at 06:56:31 and
+07:00:41 UTC while this sweep was working. That is the second time the hazard
+READ FOURTEENTH records has actually bitten, and the check caught it both times.
+
+Handled the way READ FOURTEENTH prescribes: stash, `checkout -B master`
+FETCH_HEAD, pop, and then verify the moving base did not invalidate the audit.
+It did not, and that is checked rather than assumed. The two commits touch only
+`supabase/functions/` and two migrations; neither touches `AGENTS.md`, so this
+diff is unaffected and the audit rounds behind it still stand.
+
+One of the two is worth a line for the next run rather than for this one. Its
+message says it records what production actually runs instead of the stale local
+copy of an edge function, which is the deployment drift READ FIRST is about,
+being closed by hand from the other direction. It is Andrew's work, not this
+run's, and nothing here acts on it.
+
+The ordinal is THIRTEENTH rather than twelfth, and it was recomputed rather than
+carried forward, which is how the discrepancy surfaced. READ THIRTEENTH reads
+SEVENTH and READ FIFTEENTH reads EIGHTH, but READ FOURTEENTH records a bite
+between them that the running count never absorbed. Counting bites recorded in
+this file rather than incrementing the previous section's number, this is the
+thirteenth. Recompute it the same way next time; this is the drift READ TWELFTH
+documents for day counts, in a different column.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public. Enumerated rather than waved at, per READ EIGHTEENTH, and
+this is a claim to check rather than a habit: named above are the bare column
+identifiers `form_id`, `updated_at`, `phone_e164`, `created_at`,
+`state_house_district` and `name`, the camelCase symbol `formId`, and the
+qualified `d.form_id` and
+`l.committee_name`; the real column `committee_name` and its real table
+`mec_committees`; the constraint `legislation_bill_sponsors_unique`; the commits
+`1cdb96e`, `e79339b`, `0d2963e`, `285a05f` and `6ff6a45`; the issue ids and
+project names; the stale refs `5d8a5b0` and `77d879f`, the start of run real
+tips `b3d0302` and `9af7a94`, and this repo's mid run tip `8d922e9`; the
+directory path `supabase/functions/`, published here since READ FIRST; and the
+env var name patterns `SUPABASE` and
+`PROJECT_REF`. Per READ EIGHTEENTH's carve out, quoted log CONTENT such as the
+uuid literal `"cron"` and the Sentry rollup field names is error text already
+published throughout this file from READ FIRST onward.
+
+That carve out explicitly does NOT cover log content which is not already
+public, and this slice carries exactly one such line, so weigh it rather than
+sweep it in: `aggregate functions are not allowed in GROUP BY` appears nowhere
+earlier in this file. It is kept. It is a generic Postgres planner message
+carrying no identifier of any kind, no table, no column, no value and no
+address, so it describes a SQL authoring mistake and nothing about this
+deployment.
+
+Newly published private repo content, weighed rather than passed over, because
+an auditor caught the first version of this enumeration omitting it entirely:
+four sibling commit TIMES appear in the attribution paragraph above, and three
+of those commits are not named by hash at all. The times are kept, because the
+timing argument is the finding and cannot be made without them, and a bare
+timestamp names no table, route, RPC, person or credential.
+
+An earlier draft also published paraphrased SUBJECT lines for those four
+commits. They are gone. Two audit rounds went into how faithfully the
+paraphrases tracked the originals, which was effort spent defending a disclosure
+the finding never needed, and the private repo is the one place where the
+cheapest correct answer is to publish less. The characterization that survives,
+that all four are membership and roster work, says what the argument requires
+and quotes nothing.
+
+Two more need their cover stated correctly rather than in bulk, because an
+auditor caught the bulk version getting it backwards. `b3d0302` and `8d922e9`
+are THIS public repo's own tips, so they disclose nothing. `9af7a94` is the
+PRIVATE sibling's tip and appears nowhere earlier in this file, so "already
+published" is
+NOT its cover: it is published here for the first time. It is kept because a bare
+commit hash of a private repo names no table, route or person and this file has
+published sibling hashes before, and it is recorded as a deliberate first
+publication rather than smuggled in under a false justification. READ SEVENTEENTH
+records this exact inversion as a caught defect: before citing prior publication
+as cover, check WHICH repo published it. Everything else in the list is already
+committed in this repo's own migrations, tree or this file.
+
+Migration filenames are deliberately NOT enumerated here any more, and this
+paragraph does not name the one that mattered. The earlier draft listed three,
+and one of them carries the name of the RPC it defines in its filename, which
+made the closing "no RPC name appears" claim false while it was named. Naming it
+again to explain the correction would reintroduce exactly the thing being
+removed. The finding survives without any of the three, so all three are gone and
+the claim below is true as written.
+
+No credential, no DSN, no probe source address, no policy body, no RPC name and
+no raw upstream error appears, and nothing here widens access to anything.
+Withheld per the practice READ SIXTH set: the state of the live endorsement vote,
+any operational read on production sessions, and anything describing this
+container's own reporting or credential tooling, which READ EIGHTEENTH records as
+a BLOCKER class.
