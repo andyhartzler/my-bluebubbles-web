@@ -991,23 +991,44 @@ function hasRealAnswers(data) {
   });
 }
 /**
- * Update subscriber with real values (replacing placeholders)
+ * FILL IN a subscriber row, never rewrite one.
+ *
+ * This is called from update_field, which fires while somebody types on the
+ * identity card. The row it writes was resolved BY PHONE NUMBER, and a phone
+ * number identifies a handset rather than a person: 69 numbers in this database
+ * are shared by two or more subscriber rows, and the lookup picks one of them
+ * with .limit(1) and no ordering. So the person typing is not necessarily the
+ * person this row describes.
+ *
+ * It used to write a name whenever the typed one DIFFERED, and an email
+ * whenever the typed one differed. A teenager filling the membership form on a
+ * parent's phone therefore renamed the parent's subscriber record and, if they
+ * typed their own address, moved the parent's email onto their own inbox, which
+ * is where the newsletter and every wallet notification go.
+ *
+ * Now a value is only ever written into a hole: a placeholder name or email
+ * (the row this session just created for a new number), or an empty
+ * zip/address/city/state. A real value that disagrees with what is stored is a
+ * disagreement between two PEOPLE, and it is recorded on the submission
+ * (submitter_name / submitter_email, done by the caller) instead of being
+ * pushed onto a record whose owner never asked for it.
  */ async function updateSubscriber(subscriberId, updates) {
   // First get current subscriber to check for placeholders
-  const { data: current } = await supabase.from('subscribers').select('name, email').eq('id', subscriberId).single();
+  const { data: current } = await supabase.from('subscribers').select('name, email, zip_code, address, city, state').eq('id', subscriberId).single();
   if (!current) {
     return {
       success: false
     };
   }
+  const isEmpty = (v)=>v === null || v === undefined || String(v).trim() === '';
   const updateData = {};
-  // Only update name if current is placeholder or new name is provided
-  if (updates.name && (isPlaceholderName(current.name) || updates.name !== current.name)) {
+  // Name: only onto a placeholder ("Pending +1816...").
+  if (updates.name && isPlaceholderName(current.name || '')) {
     updateData.name = updates.name;
   }
-  // Handle email update carefully (unique constraint)
-  if (updates.email && updates.email !== current.email) {
-    // Check if this email already exists
+  // Email: only onto a placeholder ("...@pending.moyd.org"), and even then only
+  // if no other subscriber already holds it (the column is unique).
+  if (updates.email && isPlaceholderEmail(current.email || '') && updates.email.toLowerCase() !== current.email) {
     const { data: existingWithEmail } = await supabase.from('subscribers').select('id').eq('email', updates.email.toLowerCase()).neq('id', subscriberId).maybeSingle();
     if (existingWithEmail) {
       // Email exists with different subscriber - return conflict info
@@ -1016,18 +1037,14 @@ function hasRealAnswers(data) {
         conflictSubscriberId: existingWithEmail.id
       };
     }
-    // Safe to update email
     updateData.email = updates.email.toLowerCase();
-    // If updating from placeholder, also update subscription status
-    if (isPlaceholderEmail(current.email)) {
-      updateData.subscription_status = 'subscribed';
-    }
+    updateData.subscription_status = 'subscribed';
   }
-  // Add other fields
-  if (updates.zip_code) updateData.zip_code = updates.zip_code;
-  if (updates.address) updateData.address = updates.address;
-  if (updates.city) updateData.city = updates.city;
-  if (updates.state) updateData.state = updates.state;
+  // Address-ish fields: only into an empty one.
+  if (updates.zip_code && isEmpty(current.zip_code)) updateData.zip_code = updates.zip_code;
+  if (updates.address && isEmpty(current.address)) updateData.address = updates.address;
+  if (updates.city && isEmpty(current.city)) updateData.city = updates.city;
+  if (updates.state && isEmpty(current.state)) updateData.state = updates.state;
   if (Object.keys(updateData).length === 0) {
     return {
       success: true
