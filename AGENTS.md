@@ -6398,3 +6398,353 @@ Withheld per the practice READ SIXTH set: the state of the live endorsement vote
 any operational read on production sessions, and anything describing this
 container's own reporting or credential tooling, which READ EIGHTEENTH records as
 a BLOCKER class.
+
+## READ TWENTIETH: the 08:20 UTC sweep, a check constraint doing its job, and two hours with no hourly line captured
+
+Swept the 24 hours to 2026-08-05 08:20 UTC. No code change: the one new message
+shape in this window is a constraint refusing an invalid write, which is the
+system working, and everything else belongs to a family the sections above
+enumerate. Short by design, per READ TWELFTH.
+
+Carve out the watchdog the way READ EIGHTEENTH insists rather than writing
+"nothing else fired". ENDORSEMENT-SCORER-4 reads 358 by project and 359 by
+issue, against 359 in the four sweeps before it, and a FLAT rolling 24 hour
+count of a periodic emitter means events kept landing as old ones aged out, not
+that it stopped. It is correctly ignored, so it is excluded on purpose.
+
+Per the overlap warning in READ FOURTH: this window shares 22 hours with the
+sweep that closed at 06:22 UTC, so only 1 hour 58 minutes is new observation.
+Nothing below independently confirms anything above it.
+
+FULL DECOMPOSITION OF THE NEW SLICE
+`by_message` read on all 5 SUPABASE-PLATFORM-1 events after 06:22 UTC, the
+FATAL tagged one included, per READ SEVENTH. Seven log lines, reconciling
+against the sum of the five per event `count` fields:
+
+    06:33:44  column "status" does not exist                      ERROR
+    06:36:38  new row for relation "slack_channel_membership_log"
+              violates check constraint
+              "slack_channel_membership_log_dispatch_check"       ERROR
+    06:47:35  column "channel_name" does not exist                ERROR
+    06:48:13  column "email" does not exist                       ERROR
+    06:50:23  column "created_at" does not exist                  ERROR
+    06:52:50  column "status" does not exist                      ERROR
+    08:12:53  password authentication failed for user "?"         FATAL, filtered
+
+Seven rows, seven lines. The password total is the usual `by_severity` residual
+and not a direct read, per the standing caveat in READ FOURTH. The two
+malformed startup packet families and the SASL Terminate line are absent, so
+the password family is the only probe shape this slice, at one line where the
+recent average is about six per two hour slice. That is the third slice running
+with an unusual probe profile and it still means nothing at this sample size,
+for the reason READ NINETEENTH gives. Recorded so a future run notices a trend,
+not as a finding.
+
+THE NEW SHAPE IS THE SLACK DISPATCH GATE REFUSING A BAD VALUE
+No earlier section records this message. It is not a defect, and unusually for
+this family the reasoning does not rest on timing at all.
+
+The constraint is created by `20260805_01_slack_dispatch_gate.sql` in THIS
+repo, committed in `b2ccf15`, and reads
+`dispatch IS NULL OR dispatch IN ('approved', 'superseded', 'executed')`. The
+gate exists because `slack_channel_membership_log` held a nine month backlog of
+unsent committee changes that scheduling the drain would have mass invited at
+real people; NULL is the default and means inert.
+
+Every committed write of that column was enumerated rather than sampled. There
+are FIVE write sites carrying TWO distinct values across THREE writers:
+`sync_committees_to_slack` stamps `'approved'` at both of its INSERT sites,
+`recordChannelInvite` in `_shared/onboarding.ts` writes `'executed'`, and
+`slack-sync-to-slack` updates to `'executed'` at both of its post-attempt
+sites. Count it in all three units and say which is which, because an earlier
+draft called this "exactly three literals" while its own sentence described
+five sites, which is READ SIXTH's "six lines, five shapes" error committed
+again in a section that cites it. Nothing writes `'superseded'`, and no site
+writes the column from a variable. Every value is inside the allowed set, and
+every other insert site leaves the column unset, which is NULL and also
+allowed.
+
+So no committed statement in either repo can raise this error. Do NOT upgrade
+that into "a stronger negative than the usual grep", which is what an earlier
+draft claimed on the reasoning that the allowed set is small and closed. The
+set being closed makes the enumeration complete over COMMITTED source and does
+nothing about the blind spot READ FIRST and READ FOURTH exist to document: a
+hand deployed draft of an edge function, or a draft of this trigger applied to
+production before the committed version, raises the identical line and is
+invisible from here. This very window supplies the counterexample, which is why
+the overclaim is worth recording rather than just deleting: `8d922e9` proves a
+DEPLOYED copy newer than the repo for one function, and it landed at 07:00:41,
+four minutes after `b2ccf15` and about eight after the last of these lines.
+
+Anchor an interval to the event you name, which the first correction of this
+paragraph did not: an earlier draft said "four minutes after these lines
+landed", and four minutes is the `b2ccf15` to `8d922e9` gap rather than
+anything measured from the log lines. That is the same anchoring error this
+section corrects twice elsewhere, committed a third time inside one of the
+corrections.
+
+The `source` check widened in the same migration was checked the same way:
+`LOG_SOURCE_ONBOARDING` is the literal `"onboarding"`, which the widened
+constraint admits, and the other three writers pass `'slack_event'`,
+`'manual_sync'` and `'supabase_trigger'`. No mismatch there either.
+
+At least THREE emitters remain, not one, and an earlier draft named only the
+first: a hand INSERT asserting the gate holds, a draft of the trigger applied
+to production ahead of the committed text, or a draft edge function deployed
+the same way. Nothing here distinguishes them, and nothing needs to. All three
+sit inside the same hand applied session, and both operative conclusions, that
+committed code is not defective and that the constraint must not be relaxed,
+hold under every one of them.
+
+The best supported reading is still the negative testing practice READ ELEVENTH
+decoded and READ SEVENTEENTH attributed. The company the line keeps supports it:
+`channel_name` at 06:47:35 is a metadata key the trigger builds rather than a
+column, and every line in the run precedes `b2ccf15`, which published the
+migration defining the constraint being tripped. Be exact about that margin
+rather than rounding it, because an earlier draft wrote that "the whole run
+sits twenty minutes before" the commit: twenty minutes is true only of the
+06:36:38 constraint line, and the last line of the run at 06:52:50 precedes
+`b2ccf15` at 06:56:31 by under four minutes. What carries the argument is that
+all of them precede it, not how far. Per READ NINTH, code that did not exist in
+the tree cannot have been running in production, so this is the migration being
+applied and exercised by hand before it was committed, exactly as READ
+SEVENTEENTH records for the membership audit.
+
+DO NOT RELAX THIS CONSTRAINT
+It is not a permission, so the standing prohibition in READ THIRD and READ TENTH
+does not literally cover it, and it should be covered anyway. Widening the
+allowed set, or dropping the check to clear the log line, would reopen the door
+`b2ccf15` was written to close, and if the write was an assertion then relaxing
+the constraint makes the assertion pass while breaking the thing it asserts.
+READ ELEVENTH makes the same point about the admin RPC denials.
+
+NO HOURLY uuid LINE WAS CAPTURED AT 07:00 OR 08:00, AND THAT IS THE ONE THING
+FOR THE NEXT SWEEP
+`invalid input syntax for type uuid: "cron"` has been captured once an hour on
+the hour in every sweep since READ FOURTH. It was not captured at 07:00 or at
+08:00 today.
+
+Word that as carefully as it is worded above, because the tempting phrasing is
+already an inference. What was OBSERVED is that there is no rollup event at all
+in the 07:05 or 08:05 slot. Whether the underlying statement fired and went
+uncaptured, or did not fire, is NOT observable from Sentry, and the difference
+is the whole finding. An earlier draft of this section said flatly that the line
+"did NOT fire" and put "the hourly emitter stopped" in its own heading, which an
+auditor caught: the body then spent a paragraph explaining why that is not
+establishable, so the heading was contradicting the section under it, and a
+heading is what a future run skims.
+
+The `:05` slot carried a rollup in every hour from 02:05 through 06:05. The
+06:05 rollup's `by_message` was read directly this run rather than inherited
+from READ NINETEENTH, per READ FOURTEENTH's instruction not to inherit a
+group's diagnosis: it carries the uuid key once, in window 05:59:06 to
+06:04:01, so the last captured occurrence falls inside THAT WINDOW. Do not
+tighten that to "in the 06:00 hour", which an earlier draft did: the window
+opens 54 seconds BEFORE the 06 hour boundary, so it carries the last 54 seconds
+of the 05 hour, and the hour placement follows only if you
+assume the on-the-hour pattern, which is the very thing this finding is
+questioning. READ NINETEENTH's precedent for this exact rollup key is not to
+infer where in the window a line landed. The relay
+itself is alive across the gap: it emitted at 06:35, 06:40, 06:50, 06:55 and
+again at 08:15, so this is not a dead relay.
+
+Do NOT read this as `1cdb96e` being deployed, however tempting that is after ten
+days of it firing. READ FOURTH's caveat is the reason: no rollup means only that
+the run sent nothing, and this relay has two paths that send nothing while still
+advancing the watermark, a `postgres_logs` query failure caught non-fatally and
+a failed ingest that returns null without throwing. Two consecutive silent runs
+landing on the two `:05` slots would be a coincidence, which is why this is
+worth recording, but a coincidence is not an exclusion. A disabled or
+rescheduled cron job produces the identical observation and is not a deploy
+either.
+
+So this is an OBSERVATION with a cheap test attached, and the next sweep should
+run it rather than inherit either reading: check whether a cron line appears at
+09:00 and 10:00. Three or four consecutive misses is a step change worth
+believing; two is not. If it has genuinely stopped, `1cdb96e` is the first of
+the four undeployed fixes to clear, and the day count below stops mattering.
+
+DAY COUNTS, RECOMPUTED AND NOT CARRIED FORWARD
+Computed with `git show -s --format=%cI` and FLOORED against the 08:20 window
+close, per READ TWELFTH: `1cdb96e` at 10 days, `e79339b` at 9, `0d2963e` at 5,
+`285a05f` at under 20 hours.
+
+The first two BOTH advanced since the 06:22 sweep, which read 9 and 8, and this
+is the READ EIGHTEENTH case rather than the arithmetic drift READ SEVENTEENTH
+warns about: `1cdb96e` landed at 06:29:38 UTC and `e79339b` at 06:39:23 UTC, so
+both crossed a day boundary within eighteen minutes of the previous sweep
+closing, at 7m38s and 17m23s after a 06:22 close. Two figures moving at once
+between consecutive sweeps looks exactly like copied drift and is not.
+Recompute rather than assume in either direction.
+
+`e79339b` is not directly observable in this slice because no 6 hour boundary
+falls inside 06:22 to 08:20; READ NINETEENTH confirmed it at the 06:00 cycle,
+32 lines and unchanged.
+
+The deploy blocker is unchanged and was re-checked rather than inherited, per
+READ TWELFTH: nothing matching `SUPABASE` or `PROJECT_REF` is in this
+container's environment. READ SEVENTEENTH's sharper version of the ask stands,
+and this window strengthens it: `b2ccf15` and `8d922e9` show Andrew deploying
+edge functions and comparing deployed against committed source by hand, and
+`8d922e9` found the deployed copy NEWER than the repo for one function. These
+four fixes are neighbours of the ones he is already in there deploying.
+
+NOTHING ELSE FIRED, THE WATCHDOG ASIDE
+Every other issue's newest event predates the new slice, so all of them are the
+same occurrences the sections above document rather than recurrences, and none
+was resolved.
+
+FLUTTER-1 and FLUTTER-2 have now aged OUT of the 24 hour window, which is why
+`flutter` reads 34 where the last five sweeps read 38: 38 minus FLUTTER-1's
+three events and FLUTTER-2's one is exactly 34. Both were the 2026-08-04
+07:24 to 07:25 session. That is the rolling window working, not a change in
+behaviour, and a future sweep should expect the remaining `flutter` issues to
+age out the same way tomorrow.
+
+FLUTTER-8, -B and -X still have not fired since `6ff6a45` landed at 20:50:30,
+their newest event of any kind being 19:34:33 on 08-04. Do not read that as the
+fix confirmed in production: Sentry cannot tell a working fix from an unused app,
+since both emit nothing, per READ NINETEENTH. FLUTTER-Y and FLUTTER-6 are the
+`RenderBox was not laid out` pair with zero first party frames, left alone per
+READ FOURTEENTH. FLUTTER-5 is browser transport. SUPABASE-PLATFORM-3's only
+event is the 12:10:02 429, which `285a05f` postdates. MAUTIC-H's three are the
+probe POSTs READ SIXTEENTH records.
+
+SUPABASE-PLATFORM-4 IS DOWN TO ONE EVENT, AND THE AGING RULE HAS TO BE APPLIED
+EVERYWHERE OR IT IS NOT A RULE
+Its only in window event is the 12:55:16 `form-uploads` probe READ ELEVENTH
+documents. The 06:39:35 keyless bucket root GET that READ EIGHTH documents has
+now aged OUT, at 2026-08-04 06:39:35 against a window opening at 08:20.
+
+That correction is recorded rather than quietly applied, because of how it was
+caught. An earlier draft of this section said "two" and named both requests, a
+phrase carried forward verbatim from READ NINETEENTH whose window still held
+them, while this same section's own census read `-4 1` three paragraphs later.
+The section contradicted itself, and it did so while correctly computing the
+identical aging for FLUTTER-1 and FLUTTER-2 in the paragraph above. READ
+EIGHTEENTH had already performed this exact correction for the 02:03:37
+request. So this is not a new trap: it is READ TWELFTH's copied-not-computed
+failure, in the one place the section forgot to recompute, surviving until an
+adversarial auditor cross checked the prose against the census.
+
+The lesson is cheap and worth more than the fact: the census is a computed
+number and the prose is a remembered one, so when they disagree the prose is
+wrong. Cross foot them against each other, not just the two census axes against
+each other.
+
+THE CENSUS, CROSS FOOTED ON BOTH AXES PER READ TWELFTH
+
+    by project   endorsement-scorer 358, supabase-platform 100, flutter 34,
+                 mautic 3                                                  = 495
+    by issue     ENDORSEMENT-SCORER-4 359                                  = 359
+                 SUPABASE-PLATFORM-1 98, -4 1, -3 1                        = 100
+                 FLUTTER-8 11, -B 10, -X 9, -5 2, -Y 1, -6 1               =  34
+                 MAUTIC-H 3                                                =   3
+                                                                             496
+
+The two axes differ by ONE and the difference is entirely `endorsement-scorer`,
+358 against 359. Do not paper over that: it is the rolling window moving between
+two calls in one run, which READ FIFTH records happening inside a single sweep,
+and the watchdog is the one emitter here firing often enough to gain or lose an
+event in the seconds between them. Every other project agrees exactly. A
+discrepancy in a project that fires roughly every four minutes is expected; the
+same discrepancy in `supabase-platform` or `flutter` would not be, and would be
+worth chasing.
+
+`website`, `moydforms`, `n8n` and `supabase-edge` at zero. Queried with NO
+status filter per READ EIGHTH, which is how the ignored watchdog and the
+resolved `flutter` issues stayed visible. Read READ TWELFTH's caveat on what the
+equality does and does not buy.
+
+NAME the resolved ones rather than counting them, because an auditor could not
+check the count against this file and neither will the next run. In THIS window
+they are FLUTTER-8 and FLUTTER-5, both carrying a resolved status somebody else
+set while still holding in window events. READ NINETEENTH counted three, and
+that is not a discrepancy: its third was FLUTTER-2, which has since aged out.
+Neither status was touched by this run, per READ EIGHTH's practice of not
+re-resolving what somebody else set. Word it that way rather than "both remain
+unresolved", which a draft said and which contradicts this paragraph's own
+first sentence: they ARE resolved, by someone else. The act this run declined
+was touching a status, not resolving an issue.
+
+THE BRANCH REF TRAP, FOURTEENTH RUN
+Both repos again presented a stale named branch with `HEAD` detached at the true
+remote tip: this repo's `master` at `5d8a5b0` against a real `2354a00`, and the
+sibling's `main` at `77d879f` against a real `308ef92`. Repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH, and `git ls-remote`
+re-run immediately before committing per READ FOURTEENTH. That is the same stale
+PAIR READ EIGHTEENTH enumerates; per its instruction this is one more
+correlation and not a mechanism, so keep running the check. The ordinal is
+recomputed from bites recorded in this file rather than incremented, per READ
+NINETEENTH.
+
+ONE TOOL NOTE
+`search_events` timed out at 60s twice in a row on the same issue-scoped query
+with an `id` field, and `search_issue_events` answered the same question
+immediately. That is the hazard READ NINTH and READ TENTH both record; retry
+with a differently shaped query rather than classifying by title.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Enumerated rather than waved at,
+per READ EIGHTEENTH, and this is a claim to check rather than a habit.
+
+Named above from the Slack work: the table `slack_channel_membership_log`, the
+constraint `slack_channel_membership_log_dispatch_check`, the `dispatch` column
+and its full allowed value set, the widened `source` value set, the trigger
+`sync_committees_to_slack`, the migration filename
+`20260805_01_slack_dispatch_gate.sql`, the helper `recordChannelInvite`, the
+constant `LOG_SOURCE_ONBOARDING` and the functions `slack-sync-to-slack` and
+`_shared/onboarding.ts`. Apply READ SEVENTEENTH's test rather than the lazy
+version of it: every one of these is committed in THIS repo, the public one, by
+`b2ccf15`, so naming them adds no reach. That test is the whole point, because
+"already committed" would be an argument for withholding had they come from the
+sibling.
+
+Also named: the bare column identifiers `status`, `channel_name`, `email` and
+`created_at`, all four already on this record or committed here; the real
+column `slack_channel_name`, committed here in the same migration; the commits
+`1cdb96e`, `e79339b`, `0d2963e`, `285a05f`, `6ff6a45`, `b2ccf15`, `8d922e9` and
+`9af7a94`; the issue ids and project names; the stale refs `5d8a5b0` and
+`77d879f`; this repo's real tip `2354a00`; and the env var name patterns
+`SUPABASE` and `PROJECT_REF`. `9af7a94` is a private sibling hash whose cover
+is READ NINETEENTH's recorded first publication, not this section's.
+
+FIVE more are swept in rather than argued about, each caught by an auditor as
+missing from an earlier draft of this list: the `form-uploads` bucket, already
+published by READ ELEVENTH as committed in this repo's own storage RLS audit
+snapshot; the `postgres_logs` dataset, published here since READ FIRST; and the
+Sentry tool names `search_events` and `search_issue_events` with the `id` field
+from the tool note, both tools already published in READ TENTH.
+
+All five arguably sit outside the identifier scope READ EIGHTEENTH defines,
+which is hashes, columns, tables, env vars, file paths, issue ids and project
+names. Sweep them in anyway. The enumeration's stated standard is that it is a
+claim to CHECK, and a scope argument that has to be relitigated every sweep
+costs more than five extra names. Count them before writing the number: a draft
+of this very paragraph said four, then five, then four again in three adjacent
+sentences, which is the same class as the "three literals" slip above and
+READ SIXTH's "six lines, five shapes", committed inside the paragraph whose
+whole subject is enumerating exactly. Per READ EIGHTEENTH's carve out, quoted log CONTENT such as the
+uuid literal `"cron"` and the Sentry rollup field names is error text already
+published throughout this file from READ FIRST onward. The one log line here
+that is NOT already public is the check constraint violation itself, weighed
+rather than swept in: it names only the table and constraint that the paragraph
+above already clears as this public repo's own committed schema, and carries no
+value, no row, no person and no address.
+
+`308ef92` is the PRIVATE sibling's tip and appears nowhere earlier in this file,
+so "already published" is NOT its cover and it is recorded as a deliberate first
+publication, on the same call READ NINETEENTH made for `9af7a94`: a bare commit
+hash of a private repo names no table, route or person, and this file has
+published sibling hashes before.
+
+Deliberately withheld: the operational specifics in `b2ccf15`'s message beyond
+what the finding needs, including the backlog and channel figures and the cron
+job identifier, since the finding is that the gate refused a bad value and none
+of that carries it. Also withheld per the practice READ SIXTH set, the state of
+the live endorsement vote, any operational read on production sessions, and
+anything describing this container's own reporting or credential tooling, which
+READ EIGHTEENTH records as a BLOCKER class.
+
+No credential, no DSN, no probe source address, no policy body, no RPC name and
+no raw upstream error appears, and nothing here widens access to anything.
