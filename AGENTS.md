@@ -5528,3 +5528,144 @@ appears, and nothing here widens access to anything. Withheld per the practice
 READ SIXTH set: the state of the live endorsement vote, the identity of the
 executive in the `flutter` session, and the operational read on who is running
 the ad hoc statements.
+
+## READ SIXTEENTH: the 00:20 UTC sweep, and the prober starts labelling its own output
+
+Swept the 24 hours to 2026-08-05 00:20 UTC. One code change this run, in the
+SIBLING repo: `918d3ac`, described below. That one IS deployed by CI, since
+Vercel builds the Next.js site from `main`; check the deployment, not the commit.
+
+Per the overlap warning in READ FOURTH: this window shares 22 hours with the
+sweep that closed at 22:20 UTC, so only 2 hours is new observation. Everything
+genuinely new below lands inside that slice.
+
+THE AD HOC SQL FAMILY IS NOT ANONYMOUS ANY MORE, AND IT NEVER WAS HAND ITERATION
+Every section from READ SIXTH onward reads this family as somebody typing SQL by
+hand, inferred from identifiers, aliases and burst timing, and each says plainly
+that it is an inference. This window replaces the inference with the emitter's
+own words. Four lines, all ERROR level, all inside 23:47 to 00:10:
+
+    23:49:30  PROBE_RESULTS >>> A_FAILED 23503 :: insert or update on table
+              "members" violates foreign key constraint "members_user_id_fkey"
+              ||| B_INSERT_SUCCEEDED id=<uuid> ||| C_FAILED 23502 :: null value
+              in column "name" of relation "members" violates not-null
+              constraint ||| D_INSERT_SUCCEEDED
+    23:54:35  CASE_PROBE >>> DUPLICATE_LOWERCASE_MEMBER_CREATED for a member
+              whose stored email is mixed-case
+    23:55:45  TIMING >>> no_social=ok (130ms) | with_instagram=ok (14ms)
+    00:07:14  ROLLBACK_PROBE sqlstate=23503 msg=insert or update on table
+              "members" violates foreign key constraint "members_user_id_fkey"
+
+These are RAISE output, not statements that failed. Something with write access
+is running a structured harness against member intake and reporting its findings
+into the Postgres log. READ ELEVENTH decoded the 12:30 cluster as negative
+testing from a `probe/nonexistent-<date>.csv` storage key; this is the same
+practice, now self-labelled, and it retires the hand-typing reading rather than
+confirming it.
+
+Two of the lines report INSERTs that SUCCEEDED into `members`, so this harness
+WRITES to the production member file. In the same window MAUTIC-H fired three
+POSTs to the Mautic contacts endpoint for an `@example.com` probe address,
+failing the leads email unique constraint, so it reaches production Mautic too.
+
+Attribution is still not available and was not attempted. The rollup carries
+message, severity and timestamp only, with no client address, user or
+application name. The timing fits an audit of the member intake work that landed
+in the sibling repo the same day, and that is a hypothesis for the next run
+rather than a finding.
+
+THE PROBE NAMED A REAL DEFECT IN OUR CODE, AND IT IS FIXED
+`CASE_PROBE >>> DUPLICATE_LOWERCASE_MEMBER_CREATED` is not noise. The sibling
+repo's live membership intake route lowercases the submitted address, then
+looked the member up with a case-sensitive `.eq('email', ...)` and INSERTs on a
+miss. Stored addresses are not all lowercase: the events RSVP route,
+`process-chartering-submission`, `zapier-webhook` and `slack-initial-sync` each
+write the submitted address verbatim. So a member stored mixed-case was
+invisible to the lookup and got a second row. Production carries a plain
+byte-comparison unique index on `members(email)`, applied outside version
+control, which is why the duplicate INSERT succeeded rather than raising 23505.
+
+Fixed in `918d3ac`: exact match first, since it is the only lookup that can use
+that index, then a case-insensitive candidate query whose results are confirmed
+in JS by lowercased equality, so over-matching can never merge two people.
+
+THREE THINGS FROM THE AUDIT WORTH INHERITING
+The first draft discarded the error on both lookups. On a duplicate-prevention
+change that is self-defeating: any transient failure falls through to INSERT and
+mints the exact duplicate. Check the error on a lookup whose whole purpose is to
+decide between UPDATE and INSERT.
+
+The pattern was unescaped. The underscore in an ordinary address like
+`first_last@example.com` is a LIKE wildcard, so an unescaped ilike over-matches
+and can push the genuine row outside the row limit, and a submitted `%` hands a
+public unauthenticated endpoint a whole-table wildcard match. Escape `\ % _`.
+
+PostgREST rewrites `*` to `%` on its own side, where no escaping in application
+code can reach it. That is not a Postgres behaviour and it is easy to miss;
+`postgrest-js` passes the value through untouched, so the aliasing is server
+side. An address carrying one now skips the fallback entirely.
+
+WHAT ELSE FIRED, ALL ALREADY ON THE RECORD
+The 00:00 sponsors dup key cycle at 32 lines and the hourly uuid line at 00:00,
+01:00 and 02:00 equivalents. `e79339b` and `1cdb96e` are committed and
+undeployed at 8 and 9 days. `0d2963e` at 4 days and `285a05f` at under 12 hours,
+same state. All four are hand deploy work per READ FIRST and all four are still
+blocked on a `SUPABASE_ACCESS_TOKEN`, re-checked and still absent from this
+container's environment, per READ TWELFTH's instruction to test rather than
+inherit.
+
+The rest of the ad hoc family this window: `column "is_active"`,
+`column "mautic_contact_id"`, `column "district"`, `column "start_time"`,
+`column "new_data"`, `column "submitted_at"`, `column "created_at"`,
+`column fs.processed_at`, `relation "public.mo_zip_county"` and
+`syntax error at or near ":="`. No committed statement in either repo makes
+these references. Nothing changed for any of them.
+
+Scan noise unchanged: the filtered password FATALs, `unsupported frontend
+protocol 255.255` and `no PostgreSQL user name specified in startup packet`.
+
+FLUTTER-8, -B and -X have not fired since `6ff6a45` landed at 20:50:30, the
+newest event of any kind in that project being 19:34:33. Do not read that as the
+fix confirmed: no CRM session has opened a conversation since either, so the
+quiet is equally well explained by nobody using it. None was re-resolved.
+SUPABASE-PLATFORM-3 and -4 carried no new occurrences. ENDORSEMENT-SCORER-4 is
+the expected n8n watchdog at 359 events, correctly ignored.
+
+THE CENSUS, CROSS FOOTED ON BOTH AXES PER READ TWELFTH
+
+    by project   endorsement-scorer 359, supabase-platform 111, flutter 38,
+                 mautic 3                                                  = 511
+    by issue     ENDORSEMENT-SCORER-4 359                                  = 359
+                 SUPABASE-PLATFORM-1 107, -4 3, -3 1                       = 111
+                 FLUTTER-8 11, -B 10, -X 9, -1 3, -5 2, -Y 1, -6 1, -2 1   =  38
+                 MAUTIC-H 3                                                =   3
+                                                                             511
+
+`website`, `moydforms`, `n8n` and `supabase-edge` at zero. `mautic` had been at
+zero in every prior sweep, which is why the per project census is worth running
+even when the issue list looks familiar. Queried with NO status filter per READ
+EIGHTH. Read READ TWELFTH's caveat on what the equality does and does not buy.
+
+THE BRANCH REF TRAP, NINTH RUN
+Both repos again presented a stale named branch with `HEAD` detached at the true
+remote tip: this repo's `master` at `5d8a5b0` against a real `ad11c6a`, and the
+sibling's `main` at `77d879f` against a real `df8c8d9`. Repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH, and `git ls-remote`
+re-run immediately before committing per READ FOURTEENTH.
+
+ONE CONTAINER NOTE
+A subagent's transcript file size is NOT a progress signal. It sat at 110 bytes
+through a run that completed and returned a full report, which nearly caused a
+perfectly healthy auditor to be abandoned as unavailable and replaced. Wait for
+the completion notification instead of inferring from the file.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public. Named above: the `members` table, its `name` and `email`
+columns and the `members_user_id_fkey` constraint, all already committed here by
+READ EIGHTH and READ ELEVENTH; the probe log lines, which name no person; and
+the sibling repo's intake paths by role. Deliberately withheld: the member id
+the probe reported inserting, the probe contact address, the state of the live
+endorsement vote, and the operational read on who is running the harness. Those
+went to Andrew directly. No credential, no DSN, no source address, no policy
+body and no raw upstream error appears, and nothing here widens access to
+anything.
