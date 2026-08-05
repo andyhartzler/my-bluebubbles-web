@@ -7691,3 +7691,220 @@ Withheld per the practice READ SIXTH set: the state of the live endorsement
 vote, any operational read on production sessions, and anything describing this
 container's own reporting or credential tooling, which READ EIGHTEENTH records
 as a BLOCKER class.
+
+## READ TWENTY-FOURTH: the 16:20 UTC sweep, an empty slice, and the cron test uninformative a second time
+
+Swept the 24 hours to 2026-08-05 16:20 UTC. No code change: nothing fired in the
+genuinely new observation. Short by design, per READ TWELFTH.
+
+Per the overlap warning in READ FOURTH: this window shares about 22 hours with the
+sweep that closed at 14:26 UTC, so only about 1 hour 54 minutes is new observation.
+Nothing below independently confirms anything above it.
+
+Carve out the watchdog the way READ EIGHTEENTH insists rather than writing "nothing
+else fired". ENDORSEMENT-SCORER-4 reads 358 on both axes, and a FLAT rolling 24 hour
+count of a periodic emitter means events kept landing as old ones aged out. It is
+correctly ignored, so it is excluded on purpose, not absent.
+
+THE NEW SLICE IS EMPTY, AND THAT CUTS BOTH WAYS
+The newest event inside this window outside the watchdog is SUPABASE-PLATFORM-1 at
+13:10:07, which READ TWENTY-THIRD already read and decomposed as one SMB fingerprint
+FATAL. So there is no new event to classify and no `by_message` left unread. One
+rollup landed AFTER the close and is recorded below; it is outside every count here.
+
+Do not book that as good news, per READ TWENTY-FIRST. A relay that stopped after
+13:10 produces an empty slice too, and emptiness is the one observation a healthy
+quiet system and a dead reporting pipeline share.
+
+THE PRE-REGISTERED TEST CAME BACK UNINFORMATIVE, FOR THE SECOND RUN RUNNING
+READ TWENTY-THIRD registered: check the 15:00 and 16:00 boundaries for the hourly
+`invalid input syntax for type uuid: "cron"` line, counting a boundary ONLY when a
+SUPABASE-PLATFORM-1 rollup's `window_start` to `window_end` covers it, which is READ
+TWENTY-FIRST's rule rather than READ TWENTY-THIRD's.
+
+Neither qualifies. No rollup exists after 13:10:07 anywhere inside this window, so
+neither boundary has a covering window, and neither even has the watermark contiguity
+evidence READ TWENTY-THIRD could appeal to for 13:00. The one rollup that landed after
+the close, recorded below, covers neither the 15:00 nor the 16:00 boundary either. So
+this run adds ZERO directly evidenced boundaries, and the count stands where READ
+TWENTY-SECOND left it, at ONE.
+
+THE ONE EVIDENCED BOUNDARY, RE-READ RATHER THAN INHERITED
+READ FOURTEENTH says not to inherit a group's diagnosis, so the 12:05:07 rollup was
+re-read from its own extras this run rather than carried forward. It holds exactly:
+`window_start` 11:59:03.845 and `window_end` 12:04:01.268, so the window covers
+12:00; `by_message` carries ONE key, the normalized duplicate key message at 32;
+`count` is 32 and `by_severity` is ERROR 32. One key against the 15 key cap and 32
+rows against `limit 200`, so neither truncation applies, and a returned row set
+excludes the swallowed query. No uuid line in it.
+
+The control in that same tally is what makes it worth believing, and it is READ
+TWENTY-SECOND's argument rather than a new one: the sponsors burst is in the same
+window at an unchanged 32 lines, sampled at 12:00:35, so the same query in the same
+five minute window still sees the other undeployed fix's emitter at full size. A
+dead relay or a failed query is all-or-nothing against the whole window and cannot
+take one emitter while leaving the other.
+
+TEN HOURLY BOUNDARIES CUMULATIVELY, AND ONLY ONE OF THEM EVIDENCED
+The last captured occurrence is still the 06:05 rollup, whose window is 05:59:06.009
+to 06:04:01.762, per READ TWENTY-SECOND. That is about 10 hours 16 minutes before
+this window closed, spanning the boundaries 07:00 through 16:00. Ten in a row is a
+departure from ten days of hourly capture, whose one known exception is hour 16 on
+2026-08-03, recorded in READ FOURTH.
+
+Do NOT upgrade that into the emitter having stopped. That would be the fourth sweep
+to make the mistake READ TWENTY-FIRST catalogues at length, and nine of the ten
+boundaries have no covering rollup, so a relay that is merely quiet reproduces the
+identical observation.
+
+THE RELAY GAP, AND A POST CLOSE OBSERVATION THAT RETIRES THE DEAD RELAY BRANCH
+3 hours 10 minutes at window close, against the 3 hours 50 minutes gap READ
+TWENTY-SECOND records between 08:15:06 and 12:05:07, which resolved on its own. That
+is ONE precedent rather than a pattern, and READ TWENTY-THIRD deliberately declined to
+call the quiet database reading established rather than merely simpler. Do not upgrade
+it here either.
+
+What does move it, and it falls OUTSIDE this window so it changes no count above: a
+rollup landed at 16:30:06, ten minutes after the close. Its window is 16:24:04.751 to
+16:29:02.810, a clean five minutes rather than the widened catch-up READ FIRST says a
+skipped or failed run leaves behind, which is CONSISTENT WITH the watermark having
+kept pace and establishes that every span up to 16:24:04 was consumed by some run
+before it. Do not upgrade that to proof, which is the correction READ TWENTY-THIRD
+already made on itself from this identical evidence shape: a relay that stalled and
+resumed walks forward from the stale watermark in capped windows, those catch-up runs
+emit nothing on an empty row set, and the next ordinary run then shows exactly this
+clean window. It carries 3 FATAL lines and all of them are scan noise: `unsupported
+frontend protocol` twice, at 255.255 and 0.0, and `no PostgreSQL user name specified
+in startup packet` once, which are the two malformed startup packet families READ
+FOURTH enumerates as shapes 4 and 5.
+
+So the relay WAS EMITTING as of 16:30:06, in the past tense READ TWENTY-THIRD insists
+on, and on READ TWENTY-FIRST's own test terms one qualifying event is enough to retire
+the dead relay branch again. Scope it to that: it establishes emission at 16:30:06 and
+span contiguity back to 16:24:04, and nothing else. It does NOT establish that runs
+fired at 14:05, 15:05 or 16:05, its window covers neither the 15:00 nor the 16:00
+boundary, so it adds no directly evidenced boundary and the count above still stands
+at ONE.
+
+WHAT NEEDS ANDREW, AND IT IS ONE LOOK
+Read the ambiguity the right way round, per READ TWENTY-SECOND. If
+`sync-google-calendar` was hand deployed, the error stopped because `1cdb96e` fixed
+it, and that is good. If its hourly cron job is disabled or failing to start, the
+error stopped because the Google Calendar sync is no longer running, and a silent
+feature outage looks EXACTLY like a fixed bug from here. An error going quiet is not
+by itself good news.
+
+Nothing in this container can tell those apart: `supabase functions list` and the
+job's own schedule both need dashboard or CLI access. Treat `1cdb96e` as OPEN and
+leave its day count running, per READ TWENTY-FIRST.
+
+DAY COUNTS, RECOMPUTED AND NOT CARRIED FORWARD
+With `git show -s --format=%cI` and FLOORED against the 16:20 close, per READ
+TWELFTH: `1cdb96e` at 10 days, `e79339b` at 9, `0d2963e` at 5, `285a05f` at 1. None
+crossed a boundary since the 14:26 sweep. `e79339b` is not observable in this slice
+because no 6 hour boundary falls inside 14:26 to 16:20; the 12:00 cycle above is its
+most recent direct confirmation.
+
+The blocker was re-checked rather than inherited, per READ TWELFTH: nothing matching
+`SUPABASE` or `PROJECT_REF` is in this container's environment. Record the absence
+and stop there, per READ THIRTEENTH.
+
+NOTHING ELSE FIRED INSIDE THE WINDOW, THE WATCHDOG ASIDE
+Every other issue's newest event INSIDE THIS WINDOW predates the new slice, so all are
+the same occurrences the sections above document rather than recurrences, and none was
+resolved or re-resolved. Scope that to the window rather than stating it flat: the post
+close rollup recorded above is a genuinely new occurrence of the probe family, and it
+postdates the slice.
+
+The newest `flutter` event of any kind is 2026-08-04 19:34:33, which is 76 minutes
+BEFORE `6ff6a45` landed at 20:50:30, so FLUTTER-8, -B and -X have not fired since
+that fix. Do not read that as the fix confirmed in production: Sentry cannot tell a
+working fix from an unused app, since both emit nothing, per READ NINETEENTH. That
+quiet now stands at 20 hours 45 minutes, floored. FLUTTER-Y and FLUTTER-6 are the
+`RenderBox was not laid out` pair with zero first party frames, at 19:32:46 and
+19:18:04, left alone per READ FOURTEENTH. FLUTTER-5 is browser transport. MAUTIC-H's
+three are the probe POSTs READ SIXTEENTH records, against a deliberately probe
+shaped address, and there is no droplet access anyway.
+
+THE CENSUS, CROSS FOOTED ON BOTH AXES PER READ TWELFTH
+
+    by project   endorsement-scorer 358, supabase-platform 65, flutter 33,
+                 mautic 3                                                  = 459
+    by issue     ENDORSEMENT-SCORER-4 358                                  = 358
+                 SUPABASE-PLATFORM-1 65                                    =  65
+                 FLUTTER-B 10, -8 10, -X 9, -5 2, -Y 1, -6 1               =  33
+                 MAUTIC-H 3                                                =   3
+                                                                             459
+
+Both axes agree exactly. `website`, `moydforms`, `n8n` and `supabase-edge` at zero.
+Queried with NO status filter per READ EIGHTH, which is how the ignored watchdog and
+the two resolved `flutter` issues stayed visible. Read READ TWELFTH's caveat on what
+the equality does and does not buy, and note it buys nothing about the cron question
+above: a census of what arrived cannot detect what was never sent.
+
+`supabase-platform` is wholly SUPABASE-PLATFORM-1 for the second sweep running, -3
+having aged out at the 12:24 sweep and -4 at the 14:26 one.
+
+The resolved issues still carrying in window events are FLUTTER-8 and FLUTTER-5,
+both set resolved by somebody else. Neither status was touched by this run, per READ
+EIGHTH. They ARE resolved, by someone else; what this run declined to do is touch a
+status.
+
+THE BRANCH REF TRAP, DELIBERATELY UNNUMBERED
+Both repos again presented a stale named branch with `HEAD` detached at the true
+remote tip: this repo's `master` at `5d8a5b0` against a real `d2dae70`, and the
+sibling's `main` at `77d879f` against a real `308ef92`. That is the same stale PAIR
+READ EIGHTEENTH enumerates. The check was run in the form READ TWENTY-SECOND
+prescribes after its own false pass, with the local side being the NAMED BRANCH and
+not `HEAD`. Repaired with `git -C <path> checkout -B <branch> HEAD` per READ NINTH,
+and `git ls-remote` re-run immediately before committing per READ FOURTEENTH.
+
+READ NINETEENTH says to recompute the ordinal from bites recorded in this file rather
+than increment the previous section's number. That recount was not run this sweep, so
+rather than ship an incremented number the section declares unverified, no ordinal is
+quoted at all. This is one more bite. Recount from the recorded bites if the running
+count ever needs to be load bearing.
+
+ONE CONTAINER NOTE
+`search_issue_events` is not a top level tool in this container. It lives in the
+catalog and is reachable as
+`execute_sentry_tool(name='search_issue_events', ...)`; calling it directly fails
+with "No such tool available". `search_sentry_tools` is how it was found.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Enumerated rather than waved at, per
+READ EIGHTEENTH, and this is a claim to CHECK rather than a habit.
+
+Named above: the commits `1cdb96e`, `e79339b`, `0d2963e`, `285a05f` and `6ff6a45`;
+the function `sync-google-calendar` and the command `supabase functions list`; the
+constraint `legislation_bill_sponsors_unique`; the relay internals `window_start`,
+`window_end`, `by_message`, `by_severity`, `count` and the `limit 200` and 15 key
+caps; the issue ids and project names; the git commands `git ls-remote`,
+`git rev-parse`, `git checkout -B` and `git show -s --format=%cI`; the stale refs
+`5d8a5b0` and `77d879f`; this repo's real tip `d2dae70`; the sibling's real tip
+`308ef92`; the env var name patterns `SUPABASE` and `PROJECT_REF`; the Sentry tool
+names `search_issue_events`, `search_sentry_tools` and `execute_sentry_tool`; the word
+droplet, in the note that there is no droplet access, per READ TWENTY-THIRD which
+enumerated it the same way; and the third party name Google Calendar, which READ
+TWENTY-SECOND swept in as Google and which is already carried in the committed name of
+the function above.
+Every one already appears in this file or is committed in this public repo's own
+tree, with one exception: `d2dae70` is this PUBLIC repo's own current tip and is
+therefore already readable by anyone who can read this sentence. `308ef92` is the
+private sibling's tip and its cover IS prior publication, since READ TWENTIETH
+published it as a deliberate first publication; check WHICH repo published a thing
+before citing prior publication as cover, per READ SEVENTEENTH.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT here is the uuid message shape,
+the normalized duplicate key message, the string `RenderBox was not laid out`, and
+from the post close rollup `unsupported frontend protocol` with the values 255.255 and
+0.0 plus `no PostgreSQL user name specified in startup packet`. Every one is published
+in this file since READ FIRST and READ FOURTEENTH. The sweep slice itself carried no
+log lines at all; the post close lines are scan noise, and they name no table, column,
+row, person or address. The probe source address is not reproduced, per READ FIFTH.
+
+No credential, no DSN, no probe source address, no policy body, no RPC name and no
+raw upstream error appears, and nothing here widens access to anything. Withheld per
+the practice READ SIXTH set: the state of the live endorsement vote, any operational
+read on production sessions, and anything describing this container's own reporting
+or credential tooling, which READ EIGHTEENTH records as a BLOCKER class.
