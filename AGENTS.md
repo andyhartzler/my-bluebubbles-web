@@ -5871,3 +5871,184 @@ address, no policy body, no migration filename and no raw upstream error
 appears, and nothing here widens access to anything. Withheld per the practice
 READ SIXTH set: the state of the live endorsement vote, and anything amounting
 to an operational read on production sessions. Those go to Andrew directly.
+
+## READ EIGHTEENTH: the 04:20 UTC sweep, nothing new, and one day count that really did advance
+
+Swept the 24 hours to 2026-08-05 04:20 UTC. No code change: every line in the
+genuinely new observation belongs to a family the sections above enumerate, and
+outside SUPABASE-PLATFORM-1 and the ignored watchdog, no Sentry event fired in
+the new slice at all. Short by design, per READ TWELFTH.
+
+Be exact about that carve out rather than writing "nothing else fired", which an
+auditor caught in the first draft of this section. ENDORSEMENT-SCORER-4 reads 359
+here and read 359 in the two sweeps before it, and a FLAT rolling 24 hour count
+of a periodic emitter means events kept landing as old ones aged out, not that it
+stopped. On its own numbers roughly 30 watchdog events fired inside these two
+hours. It is correctly ignored, so it is excluded on purpose, not absent.
+
+Per the overlap warning in READ FOURTH: this window shares 22 hours with the
+sweep that closed at 02:20 UTC, so only 2 hours is new observation. Nothing
+below independently confirms anything above it.
+
+FULL DECOMPOSITION OF THE NEW SLICE
+`by_message` read on all 5 SUPABASE-PLATFORM-1 events after 02:20 UTC, the
+FATAL tagged one included, per READ SEVENTH. Eight log lines, reconciling
+against the sum of the five per event `count` fields:
+
+    03:00:07  invalid input syntax for type uuid: "cron"        ERROR
+    03:16:25  unsupported frontend protocol 0.0                 FATAL
+    03:16:27  unsupported frontend protocol 255.255             FATAL
+    03:16:28  no PostgreSQL user name specified in startup packet  FATAL
+    03:16:38  column "is_active" does not exist                 ERROR
+    03:44:50  column s.fields does not exist                    ERROR
+    04:00:04  invalid input syntax for type uuid: "cron"        ERROR
+    04:07:14  column "current_page" does not exist              ERROR
+
+Two things about that list are worth one line each and no more.
+
+The password authentication FATAL family is ABSENT from this slice, which is the
+first ABSENCE any sweep has observed. Word it that way rather than as the first
+slice without them: READ SIXTH read `by_message` on 4 of 75 events and says
+outright it could not see inside FATAL tagged rollups, so its slice is silent on
+this rather than evidence of presence. The three malformed startup packet
+lines are present and sit inside 13 seconds of each other, which is the probe
+family READ FOURTH enumerates as shapes 4 and 5 behaving exactly as usual. Do
+not read the missing password lines as anything: two hours is far too short a
+sample against a family that averages roughly six lines per two hour slice, and
+READ FOURTH's caveat that shape 1 is a `by_severity` residual rather than a
+direct read applies to its absence as much as to its presence.
+
+All three ad hoc family identifiers are already on the record: `is_active` in
+READ SIXTEENTH, `s.fields` in READ EIGHTH and READ SEVENTEENTH, `current_page`
+in READ SEVENTH. READ SEVENTEENTH attributes this family to Andrew's own
+membership audit from the commit prose, and nothing in this slice bears on that
+either way. Nothing was changed for any of them.
+
+The 32 line sponsors dup key burst is absent only because no 6 hour boundary
+falls inside 02:20 to 04:20.
+
+BOTH LONG STANDING UNDEPLOYED FIXES CONFIRMED STILL UNDEPLOYED, DIRECTLY
+The hourly uuid line fired at 03:00:07 and 04:00:04, so `1cdb96e` is not
+deployed. `e79339b` is not directly observable in this slice for the boundary
+reason above, and READ SEVENTEENTH confirmed it directly at the 00:00 cycle.
+
+Day counts as of the window close, computed with `git show -s --format=%cI` and
+FLOORED, per READ TWELFTH: `1cdb96e` at 9 days, `e79339b` at 8, `0d2963e` at 5,
+`285a05f` at under 16 hours.
+
+`0d2963e` reads 5 here and 4 in READ SEVENTEENTH two hours ago. That one is
+real elapsed time rather than the arithmetic drift READ SEVENTEENTH warns about:
+it landed 2026-07-31T02:31:19 UTC, so it crossed its fifth day boundary at
+02:31 today, between the two sweeps. Recompute rather than assume either way.
+
+The deploy blocker is unchanged and was re-checked rather than inherited, per
+READ TWELFTH: nothing matching `SUPABASE`, `PROJECT_REF` or a Supabase key
+prefix is in this container's environment. The single item ask stands.
+
+NOTHING ELSE FIRED, THE WATCHDOG ASIDE
+The newest `flutter` event of any kind is still 2026-08-04 19:34:33, which is
+76 minutes BEFORE `6ff6a45` landed at 20:50:30, so FLUTTER-8, -B and -X have
+not fired since that fix. Do not read that as the fix confirmed in production:
+no CRM session has opened a conversation in the 8 hours 45 minutes since either,
+so the quiet is equally well explained by nobody using it. None was re-resolved,
+and three of the `flutter` issues carry a resolved status somebody else set.
+SUPABASE-PLATFORM-3's only event is the 12:10:02 429, which `285a05f` postdates.
+SUPABASE-PLATFORM-4's two are the 06:39:35 and 12:55:16 requests READ EIGHTH and
+READ ELEVENTH document; the 02:03:37 request has now aged out. MAUTIC-H's three
+are the probe POSTs READ SIXTEENTH records, timestamped 00:05:35 and 00:05:47 in
+READ SEVENTEENTH rather than in READ SIXTEENTH, which carries no times. Same
+occurrences throughout, not recurrences. Nothing was resolved.
+
+THE CENSUS, CROSS FOOTED ON BOTH AXES PER READ TWELFTH
+
+    by project   endorsement-scorer 359, supabase-platform 110, flutter 38,
+                 mautic 3                                                  = 510
+    by issue     ENDORSEMENT-SCORER-4 359                                  = 359
+                 SUPABASE-PLATFORM-1 107, -4 2, -3 1                       = 110
+                 FLUTTER-8 11, -B 10, -X 9, -1 3, -5 2, -Y 1, -6 1, -2 1   =  38
+                 MAUTIC-H 3                                                =   3
+                                                                             510
+
+`website`, `moydforms`, `n8n` and `supabase-edge` at zero. Queried with NO
+status filter per READ EIGHTH, which is how the ignored watchdog and the three
+resolved `flutter` issues stayed visible. Read READ TWELFTH's caveat on what the
+equality does and does not buy.
+
+THE BRANCH REF TRAP, ELEVENTH RUN
+Both repos again presented a stale named branch with `HEAD` detached at the true
+remote tip: this repo's `master` at `5d8a5b0` against a real `57e96a0`, and the
+sibling's `main` at `77d879f` against a real `1b7d10d`. Repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH, and `git ls-remote`
+re-run immediately before committing per READ FOURTEENTH.
+
+That same PAIR of stale values appears in READ SEVENTH, NINTH, TENTH,
+THIRTEENTH, FIFTEENTH, SIXTEENTH and SEVENTEENTH. That enumeration is the claim;
+do not upgrade it to a universal, and if you extend it, grep both hashes and map
+the hits to section boundaries rather than trusting this list.
+
+Two drafts of this paragraph were falsified by auditors, in the same way twice,
+which is why it is worded so flatly. The first wrote "a fixed property of the
+image rather than drift" and "every sweep since READ THIRTEENTH has reported",
+and both are false: READ FOURTEENTH reports the trap while naming NEITHER STALE
+VALUE, READ SECOND records a DIFFERENT pair on 2026-08-01, `f17be39` here and
+`d2c3cd7` in the sibling, so the stale value has already changed once, and READ
+ELEVENTH records a container where the trap did not bite. The second draft fixed
+the wording and then omitted READ SEVENTH from its own list while calling that
+list exhaustive, which is the denominator error READ FOURTH warns about, made
+inside the correction to a denominator error. The third draft said READ
+FOURTEENTH names "no values at all", which is wrong in the other direction: that
+section names `286403e` and `74f6fc2`, the remote tip before and after it moved
+mid run. Only the stale half is missing there, and only the stale half is what
+this list is about. READ SECOND says the mechanism is NOT established. A run of
+correlations does not overturn that. Keep running the check.
+
+One more trap if you run the grep this paragraph asks for. READ SECOND carries
+BOTH hashes, in mixed roles rather than as a stale pair: `5d8a5b0` as a stale
+`origin/master` in its 2026-08-03 addendum, which predates READ SEVENTH, and
+`77d879f` as a REAL `refs/heads/main` tip on 2026-08-01. That is why it is not in
+the list of seven, and it is the hit most likely to make a future run think the
+list is wrong.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public. Enumerated rather than waved at, which is the whole point of
+this paragraph: named above are the three bare column identifiers `is_active`,
+`s.fields` and `current_page`, all already on this record per the citations in
+the decomposition; the commits `1cdb96e`, `e79339b`, `0d2963e`, `285a05f` and
+`6ff6a45`; the issue ids and project names; the two stale git refs `5d8a5b0` and
+`77d879f`; the two real remote tips `57e96a0` and `1b7d10d`; the four further
+hashes `f17be39`, `d2c3cd7`, `286403e` and `74f6fc2` cited from READ SECOND and
+READ FOURTEENTH; and the environment variable name patterns `SUPABASE` and
+`PROJECT_REF`. All but one already appear elsewhere in this file. The exception
+is `57e96a0`, which is this PUBLIC repo's own current tip and is therefore
+already readable by anyone who can read this sentence.
+
+Two successive auditors found this enumeration incomplete, each time in the
+paragraph written to fix the previous incompleteness, and the second time in the
+paragraph whose whole stated point was enumerating. That is the lesson worth
+inheriting rather than the list: an enumeration that claims to be exhaustive is a
+claim to CHECK, so re-read the section you just wrote and list every identifier
+in it, rather than listing the ones you remember putting there.
+
+Scope that enumeration deliberately, because a fourth auditor asked for the call
+to be made explicitly rather than by omission. It covers IDENTIFIERS: hashes,
+column and table names, env var names, file paths, issue ids, project names. It
+does NOT cover quoted log CONTENT, which here means the uuid literal `"cron"`,
+the protocol values `0.0` and `255.255`, and the Sentry rollup field names
+`by_message`, `by_severity` and `count`. Those are the error text itself, every
+one of them is published verbatim throughout this file from READ FIRST onward,
+and no prior sweep has enumerated them either. If a future slice ever carries log
+content that is NOT already public, that content is the thing to weigh, and this
+carve out does not cover it.
+
+No credential, no DSN, no probe source address, no policy body and no raw
+upstream error appears, and nothing here widens access to anything.
+
+Deliberately NOT written down, and this one was caught by an auditor as a BLOCKER
+rather than by the author: anything describing the triage container's own
+reporting or credential tooling. READ THIRTEENTH already ruled on exactly this
+class, that an inventory of what the container carries "serves nobody but someone
+probing it", and the first draft of this section published a fresh one anyway
+while its disclosure paragraph asserted nothing new was named. Operational notes
+about how this agent reaches Andrew go to Andrew. Also withheld per the practice
+READ SIXTH set: the state of the live endorsement vote, and any operational read
+on production sessions.
