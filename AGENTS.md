@@ -10768,3 +10768,504 @@ upstream error body appears, and nothing here widens access to anything. Withhel
 practice READ SIXTH set: the state of the live endorsement vote, any operational read on
 production sessions, and anything describing this container's own reporting or credential
 tooling, which READ EIGHTEENTH records as a BLOCKER class.
+
+## READ THIRTY-FOURTH: the 12:21 UTC sweep, a fifth consecutive evidenced miss on a rollup that carried more than the burst, and two new shapes with no committed emitter
+
+Swept the 24 hours to 2026-08-06 12:21 UTC. No code change beyond this note: neither new shape
+is a defect in committed code, and neither has a committed emitter. One of the two has a
+strongly supported reading that lands it on Andrew's own hand applied work from the same hour,
+established below from that commit's prose; the other is unattributed.
+
+Per the overlap warning in READ FOURTH: this window shares about 22 hours with the sweep
+that closed at 10:20 UTC, so only about 2 hours is new observation. Nothing below
+independently confirms anything above it.
+
+Carve out the watchdog the way READ EIGHTEENTH insists rather than writing "nothing else
+fired". ENDORSEMENT-SCORER-4 reads 359 on both axes, and a FLAT rolling 24 hour count of a
+periodic emitter means events kept landing as old ones aged out. It is correctly ignored,
+so it is excluded on purpose, not absent.
+
+FULL DECOMPOSITION OF THE NEW SLICE
+`by_message` read on all 4 SUPABASE-PLATFORM-1 events after 10:20 UTC, the FATAL tagged one
+included, per READ SEVENTH. Thirty eight log lines, reconciling against the sum of the four
+per event `count` fields:
+
+    11:45:17 rollup, window 11:39:01.337 to 11:44:03.671
+        1  password authentication failed for user "?"          FATAL, filtered
+    12:05:07 rollup, window 11:59:04.579 to 12:04:02.453
+       32  duplicate key value violates unique constraint "?"   ERROR, the 12:00 cycle
+        1  PROOF: simulated downstream failure in knowledge_documents   ERROR, 12:01:32.255
+        1  must be owner of table http_request_queue                    ERROR
+    12:15:08 rollup, window 12:09:04.273 to 12:14:02.101
+        1  "array_agg" is an aggregate function      ERROR, 12:13:30.591
+        1  column "status" does not exist            ERROR, 12:13:24.747
+    12:20:05 rollup, window 12:14:02.101 to 12:19:02.929
+        1  column m.membership_status does not exist ERROR, 12:15:14.229
+
+The password total is the usual `by_severity` residual and not a direct read, per the
+standing caveat in READ FOURTH. It is the only probe shape present: the two malformed
+startup packet families and the SASL Terminate line are all absent. Only the protocol family
+meets READ FIRST's byte decoding standard anyway, and the password family's attribution to
+that same traffic is INFERRED and not established, which READ FIRST states and no sweep
+since has overturned.
+
+The `must be owner` line carries no timestamp of its own. It is a `by_message` key in the
+12:05 rollup that did not make that rollup's five entry `sample`, all five of which went to
+the burst and the `PROOF:` line. Per READ SIXTH's and READ NINETEENTH's precedent for this,
+all that is established is that it fell inside the rollup's window. Do not infer where.
+
+THE 12:00 BOUNDARY IS THE FIFTH CONSECUTIVE EVIDENCED MISS, ON THE FIRST SUCH ROLLUP THAT
+CARRIED MORE THAN THE BURST
+The counting rule is READ TWENTY-FIRST's: count a boundary only when a SUPABASE-PLATFORM-1
+rollup's `window_start` to `window_end` covers it. The 12:05:07 rollup qualifies, its window
+running 11:59:04.579 to 12:04:02.453. There is no `invalid input syntax for type uuid: "?"`
+line in it.
+
+The three relay side and query side artefacts are excluded by the event's own fields, exactly
+as READ TWENTY-SECOND, READ TWENTY-FIFTH, READ TWENTY-EIGHTH and READ THIRTY-FIRST exclude
+them. THREE keys against the 15 key cap, so no tally truncation. 34 rows against `limit 200`,
+so no row truncation. A returned row set at all, so the postgres query did not fail silently
+into the `[]` that would have produced no event.
+
+What is different here is the SHAPE of the control rather than its strength, and the
+distinction is worth stating because the tempting version of it is an overclaim an auditor
+caught in the first draft. The four earlier misses each carried a `count` of exactly 32, the
+sponsors burst ALONE, so the control read "the other undeployed fix's emitter is at full size
+in this window". This rollup carries 34 across THREE distinct shapes, so the query returned
+rows from three unrelated emitters and the calendar line was none of them.
+
+Do NOT read that as better evidence. The fields-based exclusions above are the same three the
+four earlier misses used, and they are neither strengthened nor weakened by how many emitters
+happened to be firing. In particular the per-line ingestion loss case does not get less likely
+because the surviving lines came from three sources rather than one: that mechanism drops a
+specific line, and nothing about the company it keeps bears on it. The extra shapes make the
+window more interesting, not the miss more certain.
+
+Both artefacts READ TWENTY-FIFTH names as NOT excluded therefore remain not excluded, and the
+phrase "every artefact" must not be inherited. Per-line ingestion loss above `postgres_logs`
+is still possible, and the line could still have fallen outside the window, which is a
+regularity rather than a proof: every occurrence in this file carrying a recorded second lands
+between HH:00:04 and HH:00:10, and this window opens 55 seconds before the hour and closes
+four minutes after it.
+
+So, with the interval attached because the interval is the claim: at the 12:00 boundary the
+hourly uuid line was not written to `postgres_logs` inside 11:59:04.579 to 12:04:02.453. Per
+READ TWENTY-SECOND, "not written to `postgres_logs`" does not license "the emitter did not
+write it".
+
+THE SEQUENCE
+Among the boundaries this instrument has been able to read:
+
+    06:00 Aug 5   HIT    READ NINETEENTH, re-read by READ TWENTIETH and READ TWENTY-FIFTH
+    12:00 Aug 5   MISS   READ TWENTY-SECOND
+    18:00 Aug 5   MISS   READ TWENTY-FIFTH
+    00:00 Aug 6   MISS   READ TWENTY-EIGHTH, re-read by READ TWENTY-NINTH and READ THIRTIETH
+    06:00 Aug 6   MISS   READ THIRTY-FIRST
+    12:00 Aug 6   MISS   read directly this run
+
+Give each row its FULL read-set rather than its most recent reader. READ TWENTY-EIGHTH
+chastised two of its own drafts for misciting the read-set of the 06:00 Aug 5 rollup
+specifically, and a first draft of this table then reproduced the error by naming two of that
+row's three readers and one of the 00:00 row's two.
+
+Five consecutive evidenced misses, spanning 24 hours, and about 30 hours since the last
+evidenced HIT. Those are two different numbers and must not be run together, which is the
+error READ TWENTY-EIGHTH caught in its own draft. The 06:00 Aug 5 hit has now aged OUT of the
+24 hour window, so it is inherited rather than re-readable here; apply the aging rule
+everywhere or it is not a rule, per READ TWENTIETH.
+
+All five misses are six hour cycle boundaries, which is what READ TWENTY-FIFTH's asymmetry
+predicts rather than a coincidence: a MISS needs some OTHER row in the covering window to
+produce a rollup at all, and at 00, 06, 12 and 18 the sponsors burst supplies it.
+
+Five is past the high end of the threshold READ TWENTIETH registered. It buys exactly what
+READ THIRTY-FIRST says it buys and no more. It establishes that this line has stopped
+APPEARING in `postgres_logs` at the boundaries this instrument can read. It does NOT
+establish that the emitter stopped writing it, and it does NOT establish WHY: a hand deploy
+of `sync-google-calendar`, that function's hourly cron job being disabled, the job being
+rescheduled off the hour, and per-line ingestion loss all produce this identical silence.
+
+Read the ambiguity the right way round, which is why this stays escalated rather than closed.
+If the function was deployed, the error stopped because `1cdb96e` fixed it, and that is good.
+If the cron job is disabled or failing to start, the error stopped because the Google Calendar
+sync is no longer running, and a silent feature outage looks EXACTLY like a fixed bug from
+here. An error going quiet is not by itself good news, and per `a1b4a94` this exact job has
+silently lacked its scheduling wrapper before. Per READ TWENTY-NINTH the deployed-fix branch
+buys back an audit row rather than restored calendar sync, since `1cdb96e` records that the
+failing insert was the audit row on the cron path and the calendar work completed either way,
+so it is the OTHER branch that is expensive.
+
+Checked this run rather than inherited, via the GitHub path-history API rather than this
+shallow clone, per READ TWENTY-FIRST's graft warning: `1cdb96e` is still the last commit to
+touch `supabase/functions/sync-google-calendar/index.ts`. `1cdb96e` stays OPEN with its day
+count running, per READ TWENTY-FIRST. The check is two dashboard reads, neither reachable from
+this container: `supabase functions list` for the deployed version, and whether the calendar
+job still exists and is enabled in `cron.job`, which is READ TWENTY-NINTH's sharpening.
+
+TWO NEW SHAPES, NEITHER WITH A COMMITTED EMITTER
+Neither appears anywhere earlier in this file.
+
+`PROOF: simulated downstream failure in knowledge_documents` is not an error Postgres
+composed. It is a RAISE whose text somebody wrote, in the self labelling style READ SIXTEENTH
+records for `PROBE_RESULTS`, `CASE_PROBE` and `ROLLBACK_PROBE`, and it says on its face that
+the failure it reports was SIMULATED. The string appears nowhere in either repo, checked
+across SQL, TypeScript and Dart, so the harness that emitted it is not committed.
+
+The SUBJECT has a strongly supported reading, and it comes from READ SEVENTEENTH's instrument,
+the commit's own prose, rather than from the provenance rule in READ NINTH. Be exact about why
+READ NINTH is the wrong citation, because a first draft of this paragraph used it and got the
+mechanics backwards twice. That rule dates the CALLING code to EXONERATE a deployed build, and
+its canonical case ALSO has the commit landing after the error, by 20 minutes, so there is no
+temporal inversion here to remark on. What would be inverted is the INFERENCE, exoneration
+into attribution, and READ NINTH forbids exactly that promotion: it says the timing "actively
+supports" the hand-session reading rather than establishing it. The rule also has nothing to
+date here, since the emitting harness never entered the tree at all, so applying it to the
+harness is trivially true and applying it to the guard establishes only that no deployed build
+carried the guard, which is not what emitted the line.
+
+What does the work is `e37ddba`, authored 12:49:12 UTC, 47 minutes after the 12:01:32 line,
+whose message states in as many words that its migrations "are applied to production" and that
+its edge function "is deployed". That is hand application declared in git, which is precisely
+the instrument READ SEVENTEENTH used. Its migration
+`20260806_04_member_insert_enrichment_fails_soft.sql` guards three previously unguarded
+enrichment triggers on `members`, and the LEAD one of the three is `sync_table_to_knowledge`,
+which writes `knowledge_documents` and which when it raised aborted the entire signup so the
+member row never landed. Its companion `20260806_06` adds a table so those now-swallowed
+failures stay visible.
+
+So a deliberate simulated failure in `knowledge_documents`, 47 minutes before a hand applied
+commit whose lead subject is a failure in `knowledge_documents` aborting a member insert, is
+BEST READ as that guard being exercised by hand before the change was committed.
+
+Calibrate that hedge against READ TWENTIETH rather than firming it up, because that section
+faced tighter evidence than this and still refused to state it flat. There, an error named the
+EXACT constraint a migration defined, and that line fired about twenty minutes before the
+commit carrying the migration. Quote that interval carefully, because READ TWENTIETH exists
+partly to correct a draft that got it wrong: the "under four minutes" figure in that section
+belongs to the LAST line of the run and not to the constraint line, and its standing rule is
+to anchor an interval to the event you name. Even at twenty minutes it wrote "the best
+supported reading" and listed three surviving emitters. This match is looser still, being a
+subject match rather than an exact name match, at 47 minutes. So the reading is the best
+supported one and not a finding, the
+harness is uncommitted and unidentified, which side of the guard was being exercised is not
+established, and the rollup carries no client address, user or application name, so none of it
+is readable from Sentry.
+
+Nothing to fix here either way. On the reading above the line is a test of a defect this repo
+has since fixed, and the fix is Andrew's own; on any other reading there is still no committed
+emitter to change.
+
+`must be owner of table http_request_queue` is the pg_net queue table, and this repo already
+documents the identical error class with its cause and its remediation, which is why this
+needs no new diagnosis. `supabase/perf-2026-07-21.md` records an `ALTER TABLE` setting
+autovacuum storage parameters on the sibling pg_net table failing with `must be owner of
+table _http_response`, and states the reason: the `postgres` role does not own pg_net's
+tables on managed Supabase, they are owned by `supabase_admin`, so the statement has to be run
+from the dashboard SQL editor, which executes as `supabase_admin`, or raised with Supabase
+support. Today's line is the same wall, hit against the queue table instead of the response
+table.
+
+No committed EXECUTABLE statement in either repo requires ownership of a pg_net table. Say it
+that narrowly, because the obvious universal is false and this section's own evidence is the
+counterexample. `ALTER TABLE net._http_response` appears TWICE in `supabase/perf-2026-07-21.md`,
+once as the tuning statement and once as its RESET rollback, alongside a
+`VACUUM FULL net._http_response`. That document is committed in this repo and is the source
+quoted above, so a claim that no `ALTER TABLE` against a `net.` object exists anywhere is
+refuted in the paragraph immediately after the one quoting such a statement, which is where a
+first draft put it. What that document is, though, is a record of
+statements RUN BY HAND and of the ownership wall they hit; it is prose and not a migration, so
+nothing executes it.
+
+Split the committed references by whether Postgres ever executes them, which is the only
+division that matters here, and do not blur the two the way a first draft did.
+
+LIVE SQL against a `net.` object is exactly two shapes. There are `net.http_post` calls, spread
+across the audit retention and audit fixes migrations, the mail and onboarding followup cron
+migrations, the orphan RPC backfill, the Slack migrations Andrew landed today, the enrichment
+guard migration in the same batch, and the sibling repo's profile picture migration. And there
+is one read, a `left join net._http_response` in the Slack watchdog delivery migration, which
+selects from the response table. Calling a function and selecting from a table need no
+ownership of anything, so neither shape can raise this error.
+
+Treat that list of LOCATIONS as a snapshot and the two SHAPES as the finding, which is the
+distinction a first draft failed. It went stale for TWO reasons and not one, so do not blame
+the moving tree for all of it: `e37ddba` added a `net.http_post` call the list did not carry,
+in a migration this section names elsewhere, and separately the list had simply MISSED the
+sibling repo's profile picture migration all along, in a paragraph whose stated scope is both
+repos. One is drift and one is an ordinary incomplete grep. The shapes argument does not depend on the enumeration being
+current. Any new call site is another function call and still needs no ownership.
+
+Everything else naming these tables is PROSE. The audit retention migration mentions the queue
+and the response table in a comment block and again in a commented out `SELECT`; the audit
+fixes migration mentions the response table only inside its header comment, so do not describe
+it as live SQL either, which the first draft implied by singling out the retention one; and
+the Slack watchdog migration names the response table inside a `COMMENT ON COLUMN` string,
+which is a comment body rather than a statement against anything.
+
+The queue table the error actually names is the sharpest version of this. `http_request_queue`
+appeared EXACTLY ONCE across both trees when this was checked, at one comment line in the audit
+retention migration. Attach READ SIXTH's caveat, which it wrote for exactly this shape of claim:
+committing this section publishes the string again, so grep it now and you will hit this file
+too. Nothing in either repo issues any statement against that table at all. No committed `TRUNCATE` or
+`OWNER TO` against any `net.` object exists in either tree either. So there is nothing to fix
+and no committed emitter.
+
+DO NOT MAKE THIS ONE GO AWAY BY GRANTING OWNERSHIP
+The standing prohibition in READ THIRD and READ TENTH is about RLS, GRANTs and bucket flags
+rather than table ownership, so cover it explicitly instead of assuming it reaches. Handing
+the `postgres` role ownership of an extension's internal tables to clear a log line is the
+same move for worse stakes: it takes a table the platform maintains and makes it ours to
+break. The perf doc's route, the dashboard SQL editor or Supabase support, is the remediation
+and it needs no privilege change at all.
+
+Resist collapsing the ERROR lines into one session, which is the reading that suggests itself
+and which the evidence does not carry. Count them before arguing from them, since running the
+count together is the "six lines, five shapes" class READ SIXTH and READ TWENTIETH both
+catalogue and a first draft of this paragraph committed it. There are FIVE such lines across
+the slice: the PROOF line, the hand SQL PAIR at 12:13 which is two lines and not one, the
+qualified `m.membership_status`, and the `must be owner` line.
+
+What is OBSERVED is that the PROOF line at 12:01:32 precedes the pair at 12:13:24 and 12:13:30
+by about twelve minutes, and `m.membership_status` at 12:15:14 by about fourteen. The
+`must be owner` line cannot enter that arithmetic at all: it has no observed timestamp, only a
+window, and the decomposition above says not to infer where inside a window a line landed. So
+the ordering argument reaches FOUR of the five lines and not the fifth.
+
+One session across that quarter of an hour is the reading that FITS, and for the PROOF line
+specifically it is now better than an inference from shape, since the paragraph above dates it
+against a commit landing 47 minutes later. For the other four it remains an inference from
+timing and message shape rather than an attribution, exactly as READ SIXTH and READ SEVENTEENTH
+describe for this family. Per READ NINETEENTH, inherit READ SEVENTEENTH's attribution at its
+stated scope and no wider: it attributes the sessions it names, not every line since. What is
+new here is one more session that names itself in git, which is the same instrument rather
+than a new one.
+
+THE THREE AD HOC LINES, AND THE ONE THAT NEEDED CHECKING
+`"array_agg" is an aggregate function` and `column "status" does not exist` are both already
+on the record, from READ SEVENTH and READ TWENTIETH respectively. Nothing was changed for
+either.
+
+`column m.membership_status does not exist` needed checking, because `membership_status` is
+NOT absent from this repo and the bare grep negative therefore does not apply. It appears at
+two call sites in the CRM's votes service and once in a Mailchimp planning document. Both code
+sites read it as a KEY out of a vote's stored eligibility configuration map, in Dart, and the
+column they then filter on is `current_chapter_member`. A Dart map lookup is not SQL and
+cannot raise this.
+
+What clears it is READ SIXTH's standard applied to the QUALIFIED form: the string
+`m.membership_status` appears nowhere in either repo, so no committed statement makes that
+reference. READ THIRTEENTH's discriminator points the same way, since both applications reach
+Postgres through PostgREST and a filter or order renders the TABLE QUALIFIED name, which for
+those two call sites would be `members.current_chapter_member` and not this. Do not read that
+as "not ours" without READ THIRTEENTH's caveat: a deployed only RPC carrying that reference is
+exactly the emitter a repo search cannot see. The `flutter` project also emitted nothing at
+all this window, which is READ EIGHTH's discriminator and points the same way.
+
+The signature is READ SIXTH's plausible-guess-for-the-right-name shape, `membership_status`
+for a real membership column that is named something else. Nothing was changed, and nothing
+should be: the standing instruction not to change a working query to make one of these go away
+applies unchanged.
+
+THE UNDEPLOYED FIXES
+`e79339b` is confirmed still undeployed from direct evidence rather than inferred from
+silence: the 12:00 cycle carried exactly 32 lines, unchanged size, and no `42P10`, which per
+READ TWENTY-SECOND is inconsistent with a deployed copy on either branch.
+
+SUPABASE-PLATFORM-3's Occurrences field was read DIRECTLY this run rather than incremented,
+per READ FIRST's standing instruction for this group, and reads 18 with `lastSeen`
+2026-08-06T05:40:02. Unchanged from READ THIRTY-SECOND and READ THIRTY-THIRD, so the three in
+window events are the 20:20:01, 03:45:02 and 05:40:02 occurrences that READ TWENTY-SIXTH, READ
+THIRTIETH and READ THIRTY-FIRST decompose in full. Same occurrences, not recurrences. So
+`0d2963e` and `285a05f` gain no new observation; their most recent direct confirmation is the
+05:40:02 message shape, which READ THIRTY-FIRST reads in full.
+
+The watermark instrument READ THIRTIETH registered needs no new reading, there being no new
+throw. For completeness all four rollups here are ordinary starts under its governing rule:
+emission minus about 6 minutes matches each observed `window_start` to within seconds, so
+every difference is about zero, which is bullet 3 and proves nothing either way.
+
+Day counts as of the window close, computed with `git show -s --format=%cI` and FLOORED per
+READ TWELFTH rather than carried forward: `1cdb96e` at 11 days, `e79339b` at 10, `0d2963e` at
+6, `285a05f` at 1. None crossed a boundary since the 10:20 sweep.
+
+READ THIRTY-THIRD forewarned that `285a05f` reaches 2 days at 12:43:21 today, which is 22
+minutes AFTER this window closed, so a 12:20 sweep still reads 1 and only a 14:20 sweep reads
+2. It reads 1. The forewarning held, and it is a check on the recomputation rather than a
+substitute for it: the count was recomputed, not carried.
+
+The blocker was re-checked rather than inherited, per READ TWELFTH: nothing matching
+`SUPABASE` or `PROJECT_REF` is in this container's environment. Record the absence and stop
+there, per READ THIRTEENTH. READ SEVENTEENTH's sharper version of the ask stands for all four,
+and today gives it more force than usual: Andrew landed three new migrations and an edge
+function change in this repo inside this window, so he is in the deployment path already while
+four fixes sit undeployed at 11, 10, 6 and 1 days.
+
+NOTHING ELSE FIRED, THE WATCHDOG ASIDE
+`website`, `flutter`, `mautic`, `moydforms`, `n8n` and `supabase-edge` are all at ZERO events.
+`flutter` is at zero for the ninth sweep running and `mautic` for the seventh, counted from the
+sections rather than from memory per READ TWENTY-EIGHTH: `flutter` went to zero at READ
+TWENTY-SIXTH and `mautic` joined it at READ TWENTY-EIGHTH. Neither zero is evidence of a fix,
+since Sentry cannot tell a working fix from an unused app, per READ NINETEENTH.
+
+SUPABASE-PLATFORM-4 carries no in window event, having aged out at the 14:26 sweep; it was not
+fixed and must not be resolved. No issue was resolved or re-resolved, and this is the ninth
+sweep running carrying no resolved-but-firing issue.
+
+THE CENSUS, CROSS FOOTED ON BOTH AXES PER READ TWELFTH
+
+    by project   endorsement-scorer 359, supabase-platform 18               = 377
+    by issue     ENDORSEMENT-SCORER-4 359                                   = 359
+                 SUPABASE-PLATFORM-1 15, -3 3                               =  18
+                                                                              377
+
+Both axes agree exactly. Queried with NO status filter per READ EIGHTH, which is how the
+ignored watchdog stayed visible. Read READ TWELFTH's caveat on what the equality does and does
+not buy, and note it buys nothing about the cron question: a census of what arrived cannot
+detect what was never sent.
+
+The event query was issued at a limit of 50 and returned 50 over the tool's 14 day default
+range, of which 15 fall in window, so the in-window figure is not itself capped; but 50 against
+a limit of 50 is exactly the silent denominator READ TWENTY-EIGHTH warns about, and any
+question needing the FULL 14 day range would have to re-query wider.
+
+SUPABASE-PLATFORM-1 rose from 12 to 15, and reconcile that rather than asserting it, per READ
+THIRTIETH: the slice GAINED 4 events and 1 aged out. The one is the 12:05:07 rollup of
+2026-08-05, the 12:00 Aug 5 MISS, which sat in the 10:20 to 12:21 stretch the trailing edge
+crossed. That reading survives as an inherited entry in the sequence table above, which is
+exactly the aging distinction READ TWENTIETH insists on.
+
+THE BRANCH REF TRAP, DELIBERATELY UNNUMBERED
+Both repos again presented a stale named branch with `HEAD` detached at the true remote tip:
+this repo's `master` at `5d8a5b0` against a real `d5e8529` AT THE START OF THE RUN, and the
+sibling's `main` at `77d879f` against a real `308ef92`. That is the same stale PAIR READ
+EIGHTEENTH enumerates. The check was run in the form READ TWENTY-SECOND prescribes after its
+own false pass, with the local side being the NAMED BRANCH and not `HEAD`; the wrong form
+would have compared the detached tip with itself and returned clean. Repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH.
+
+AND THE REMOTE MOVED MID RUN, WHICH IS WHY THE PRE COMMIT RE-CHECK IS NOT OPTIONAL
+`d5e8529` was this repo's real tip when the run started and was NOT its real tip when the run
+committed. The `git ls-remote` re-run immediately before committing, which READ FOURTEENTH
+prescribes after the hazard bit it, returned `e37ddba`, one commit further on, authored while
+this sweep was working. That is at least the third time this hazard has actually bitten, and
+the check has caught it every time. Record the move rather than only the start value, per READ
+FOURTEENTH, or the section contradicts its own body: this one discusses `e37ddba` as landed
+several paragraphs above, so a branch paragraph naming only `d5e8529` would be stale against
+its own text.
+
+Handled as READ FOURTEENTH prescribes: stash, fetch, `checkout -B master FETCH_HEAD`, pop, and
+then verify the moving base did not invalidate the audit rather than assuming it. It did not,
+and that is checked: `e37ddba` touches two edge function files and three migrations and does
+not touch `AGENTS.md`, so this diff is unaffected and the audit rounds behind it stand. That
+check is the point, because `e37ddba` DID change what this section says about the PROOF line,
+by supplying the commit prose the attribution now rests on.
+
+No ordinal is quoted, per READ TWENTY-FOURTH: the recount from bites recorded in this file was
+not run this sweep, and shipping an incremented number the section itself declares unverified
+is the drift READ NINETEENTH warns about. This is one more bite.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Enumerated rather than waved at, per READ
+EIGHTEENTH, and this is a claim to CHECK rather than a habit. Re-derive it against the body
+rather than listing what you remember putting there.
+
+Named above: the commits `1cdb96e`, `e79339b`, `0d2963e`, `285a05f` and `a1b4a94`; the function
+`sync-google-calendar` and its path `supabase/functions/sync-google-calendar/index.ts`; the
+command `supabase functions list`; the pg_cron identifier `cron.job`; the pg_net identifiers
+`net.http_post`, `net._http_response` and `http_request_queue`, and the extension name pg_net
+itself; the roles `postgres` and `supabase_admin`; the table `knowledge_documents` and the
+document `supabase/perf-2026-07-21.md`; the
+column names `membership_status`, `current_chapter_member` and `status`, the qualified
+`m.membership_status`, and the CRM's votes service named by role rather than by path; the
+SQLSTATE `42P10`; the relay internals `window_start`, `window_end`, `by_message`,
+`by_severity`, `count`, `sample`, `postgres_logs` and the `limit 200` and 15 key caps; the
+Sentry issue field `lastSeen` and the group field `Occurrences`; the name Sentry itself; the
+issue ids and project names; the git commands `git ls-remote`, `git checkout -B`, `git -C`, `git stash`, `git fetch` and
+`git show -s --format=%cI`, plus `git rev-parse`, which reaches the body only through the
+strike citation below and is declared on the same READ TWENTY-SEVENTH ground that governs the
+two keywords there; and the ref names `HEAD` and `FETCH_HEAD`; the GitHub path-history API; the third
+party names PostgREST, Supabase, Slack, Mailchimp and Google Calendar; the SQL keywords
+`ALTER TABLE`, `TRUNCATE`, `OWNER TO`, `RESET`, `RAISE`, `VACUUM FULL`, `SELECT`,
+`left join` and `COMMENT ON COLUMN`, enumerated because precedent sweeps enumerate `PERFORM`,
+`DO`, `IF`, `ON CONFLICT` and the `try` keyword; the migrations
+`20260505_01_audit_retention.sql` and `20260506_01_audit_fixes.sql`, with the mail, onboarding
+followup, orphan RPC backfill and Slack migrations, and the sibling repo's profile picture
+migration, all named by role rather than by filename; the
+commit `e37ddba` and the two phrases quoted from its message, the migrations
+`20260806_04_member_insert_enrichment_fails_soft.sql` and `20260806_06`, the trigger function
+`sync_table_to_knowledge` and the table `members`; the
+Supabase dashboard SQL editor as a named surface, taken from the perf document; the probe
+labels `PROBE_RESULTS`, `CASE_PROBE` and `ROLLBACK_PROBE`, quoted from READ SIXTEENTH which
+published all three; the stale refs `5d8a5b0` and `77d879f`; this repo's start of run tip
+`d5e8529` and its mid run tip `e37ddba`;
+the sibling's real tip `308ef92`; and the env var name patterns `SUPABASE` and `PROJECT_REF`.
+
+Four groups in that list, the SQL keywords, the two named migrations, the dashboard SQL editor
+and the probe labels, were missing from the first draft of this enumeration and an auditor
+found them. Three entries then had to come back OUT, an audit trigger migration and the
+keywords `AFTER INSERT` and `PERFORM`, and the three did not get there the same way: the
+migration name and `AFTER INSERT` were in a body a later rewrite removed, while `PERFORM` was
+never in any draft's body at all and entered the list purely by note-patching. Both routes end
+in the same place, an enumeration patched from a note rather than re-derived. An enumeration naming
+what the body does not use is the same defect as one omitting what it does, which READ
+TWENTY-SEVENTH records being caught on `git rev-parse` in exactly this shape.
+
+`AFTER INSERT` and `PERFORM` are therefore enumerated HERE, in the paragraph that strikes them,
+and that is not a contradiction. It is READ TWENTY-SEVENTH's own resolution of the identical
+knot: a mention made in order to strike something is still a mention, and the standard is the
+body rather than the intent, so the words survive in this sentence and are declared. The struck
+migration name is genuinely gone from the body and is not declared. Word that by WHICH groups rather than by position, because "the last four" is what
+the correction first said and it was false: the groups it added sit in the middle of the list,
+and the four groups that actually end it were present all along. Every one is harmless, which
+is exactly READ THIRTY-FIRST's point about copied lists: the entries that slip are the ones
+whose content raises no flag, so only re-derivation against the body catches them.
+
+Four need their cover stated rather than assumed. `knowledge_documents`,
+and `supabase/perf-2026-07-21.md` are committed in THIS
+repo, the public one, and the perf document is the source of the ownership finding quoted from
+it, so naming them adds no reach; the credentials and project identifiers that document
+discusses elsewhere are not reproduced, and neither is any figure from it beyond the ownership
+error and its remedy. `membership_status` and `current_chapter_member` are committed in this
+repo's own Dart sources, and the votes service file path is deliberately NOT written out: the
+finding is that the qualified reference is absent, which needs the column names and not the
+path, and that file sits in the endorsement voting surface. `d5e8529` and `e37ddba` are this
+PUBLIC repo's own tips before and after the mid run move, and are therefore already readable by
+anyone who can read this sentence. `308ef92`
+is the private sibling's tip, and its cover is the deliberate FIRST publication in READ
+TWENTIETH, which recorded it as such precisely because "already published" was not then
+available; READ TWENTY-FIRST through READ THIRTY-THIRD each name it under that cover rather
+than supplying it. Getting that chain backwards is the inverted cover check READ SEVENTEENTH
+and READ TWENTY-FIRST both record as caught defects. Everything else above already appears in
+this file or is committed in this public repo's own tree.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT here is the normalized duplicate key
+message, the uuid message shape, `password authentication failed for user "?"`, `"array_agg" is an aggregate function`,
+`column "status" does not exist`, the qualified `column m.membership_status does not exist`,
+the two new lines `PROOF: simulated downstream failure in knowledge_documents` and
+`must be owner of table http_request_queue`, and the sibling error
+`must be owner of table _http_response` quoted from the perf document. All but the last four
+are published in this file from READ FIRST, READ FOURTH, READ SEVENTH and READ TWENTIETH
+onward; the sibling error is published verbatim in this repo's own committed perf document,
+which is where it is quoted from.
+
+The four that are new to this FILE are weighed rather than swept in. `m.membership_status`
+names a column that does not exist and an alias letter, so it describes nothing real. The
+`PROOF:` line is a message somebody wrote about a simulation and it names one table, which the
+paragraph above already clears as this public repo's own committed schema; it carries no row,
+value, person or address. The two ownership lines name pg_net internal tables and identify no
+caller, and the `_http_response` one is not a new publication at all in the sense that matters,
+since this repo's own committed perf document carries it verbatim; it is new only to this file. FOUR SAMPLE timestamps are quoted, at 12:01:32.255, 12:13:24.747, 12:13:30.591 and
+12:15:14.229. Keep the word SAMPLE, which READ THIRTY-THIRD's equivalent sentence carries and
+which a first draft of this one dropped: the body quotes many more clock values than four,
+being seven window boundaries, the four rollup emission times, a `lastSeen`, three relay event
+times and TWO commit times, so the sentence is false the moment the qualifier goes. That count
+was repaired once already and then went stale again when the rewrite quoted a second commit
+time, which is READ TWENTY-SEVENTH's point that the account of a fix is as checkable as the fix. Count them against the body before writing the number,
+which is the counting class READ TWENTIETH catalogues. All of them are bare clock values and
+name nothing.
+
+No credential, no DSN, no probe source address, no policy body, no RPC name and no raw
+upstream error body appears, and nothing here widens access to anything. Withheld per the
+practice READ SIXTH set: the state of the live endorsement vote, any operational read on
+production sessions, and anything describing this container's own reporting or credential
+tooling, which READ EIGHTEENTH records as a BLOCKER class.
