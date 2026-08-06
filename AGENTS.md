@@ -9290,3 +9290,275 @@ practice READ SIXTH set: the state of the live endorsement vote, any operational
 production sessions, and anything describing this container's own reporting or credential
 tooling beyond the auditor model weighed above, which READ EIGHTEENTH records as a BLOCKER
 class.
+
+## READ TWENTY-NINTH: the 02:20 UTC sweep, nothing outside the watchdog, and the calendar emitter described as pg_cron by the fix's own commit message
+
+Swept the 24 hours to 2026-08-06 02:20 UTC. No code change beyond this note: outside the
+ignored watchdog, no Sentry event fired anywhere in the genuinely new observation. Short by
+design, per READ TWELFTH.
+
+Per the overlap warning in READ FOURTH: this window shares 22 hours with the sweep that
+closed at 00:20 UTC, so only 2 hours is new observation. Nothing below independently
+confirms anything above it.
+
+Carve out the watchdog the way READ EIGHTEENTH insists rather than writing "nothing else
+fired". ENDORSEMENT-SCORER-4 reads 358 on both axes, and a FLAT rolling 24 hour count of a
+periodic emitter means events kept landing as old ones aged out. On its own numbers roughly
+30 watchdog events fired inside this slice, so the slice is not empty in the literal sense;
+it is empty of everything the watchdog carve-out does not cover. It is correctly ignored, so
+it is excluded on purpose, not absent.
+
+NOTHING OUTSIDE THE WATCHDOG LANDED IN THE NEW SLICE, WHICH IS NOT READ TWENTY-SEVENTH'S SHAPE
+The newest event anywhere outside the watchdog is SUPABASE-PLATFORM-1 at 00:05:04, which
+PREDATES this slice's 00:20 start rather than falling inside it. So this is not READ
+TWENTY-SEVENTH's shape, where the slice's single event was one an earlier sweep had already
+read and which then had to be counted in two sections. Nothing arrived here at all.
+
+Do not book that as good news, per READ TWENTY-FIRST. A relay that stopped after 00:05:04
+produces the same picture, and emptiness is the one observation a healthy quiet system and a
+dead reporting pipeline share. There is no relay observation covering 00:05:04 to 02:20, so
+this stretch is uninformative rather than clean.
+
+THE CRON TEST DID NOT ADVANCE
+The counting rule is READ TWENTY-FIRST's: count a boundary only when a SUPABASE-PLATFORM-1
+rollup's `window_start` to `window_end` covers it. No rollup exists after 00:05:04, so
+neither the 01:00 nor the 02:00 boundary has a covering window and both are uninformative.
+The count of directly evidenced misses stands where READ TWENTY-EIGHTH left it, at THREE,
+12:00, 18:00 and 00:00.
+
+That count already meets the low end of the threshold READ TWENTIETH registered, and READ
+TWENTY-EIGHTH escalated it. Nothing here strengthens or weakens it. Per READ TWENTY-FIFTH's
+asymmetry the next boundary at which a MISS would be readable is 06:00, and only if the
+sponsors burst still supplies the covering row; a HIT remains self evidencing at any hourly
+boundary and would reset the count to zero, so keep checking every sweep.
+
+THE 00:00 MISS RE-READ RATHER THAN INHERITED
+Per READ FOURTEENTH, the 00:05:04 rollup was re-read from its own extras this run. Every
+field matches READ TWENTY-EIGHTH: `window_start` 2026-08-05T23:59:06.037Z, `window_end`
+2026-08-06T00:04:01.747Z so the window covers 00:00; `by_message` carries ONE key, the
+normalized duplicate key message at 32; `count` 32 and `by_severity` ERROR 32; no uuid line.
+The three relay side and query side artefacts are excluded by those fields exactly as that
+section excludes them, and the TWO it names as NOT excluded, the line falling outside the
+window and per-line ingestion loss above `postgres_logs`, remain not excluded.
+
+THE ONE NEW THING: THE FIX'S OWN COMMIT MESSAGE CALLS THE CALENDAR EMITTER A pg_cron JOB,
+AND NO SUCH JOB IS DEFINED IN EITHER REPO
+READ TWENTY-EIGHTH established that no cron job invoking `sync-google-calendar` is defined in
+either repo, from a `cron\.schedule` grep. This run adds the other half, and it comes from
+this repo's own commit log rather than from any inference.
+
+`1cdb96e`'s commit message, read directly this run, describes the path it fixed as "a cron
+branch that authenticates the hourly pg_cron calendar sync with a shared x-cron-secret
+header". So the invoker is pg_cron by the fix author's own account. Scope that as what it is
+and do not let the heading above outrun it: it is a claim in a commit message about the
+system, not a read of `cron.job`, which needs database access this container does not have.
+In a file whose whole subject is described state diverging from live state, that distinction
+is the point rather than a formality.
+
+Against that, this repo's `cron.schedule` call sites were enumerated rather than counted, and
+the three numbers are kept apart per READ TWENTY-EIGHTH, which corrected exactly this
+conflation: 16 grep hits, of which one is the `cron.schedule_in_database` doc-comment
+substring that section ruled is not a call at all, leaving 15 live call sites, which register
+14 distinct job names because one name is registered at two sites. None of the 14 is the
+calendar sync. A targeted search for any schedule mentioning a calendar returns nothing in
+this repo, searched this run; the sibling half of that rests on READ TWENTY-EIGHTH's
+zero-hits finding rather than on a search run here. The job names are not reproduced; the
+finding is the absence, and the list is one grep away.
+
+So the schedule was created out of band and is invisible from here. That is not a novel
+hazard for this particular job, which is why it sharpens the ask rather than merely restating
+it: `a1b4a94` says in its own message that this same hourly calendar cron "had been failing
+forever: its SQL wrapper didn't exist". One prior occasion is not a pattern, and it is
+directly on point, because it is the same job failing silently in exactly the way the benign
+reading of the current silence would hide.
+
+`1cdb96e` is still the last commit to touch
+`supabase/functions/sync-google-calendar/index.ts`, read from the GitHub path-history API
+rather than from this shallow clone, per READ TWENTY-FIRST's graft warning.
+
+WHAT NEEDS ANDREW, NARROWED BY ONE NOTCH
+Unchanged in substance from READ TWENTY-FOURTH and READ TWENTY-EIGHTH, and read the ambiguity
+the right way round: a hand deploy of the function, the job being disabled, the job being
+rescheduled off the hour, and per-line ingestion loss all produce this identical silence. An
+error going quiet is not by itself good news.
+
+What is narrower is the second check. It is not only `supabase functions list` for the
+deployed version; it is specifically whether the calendar job still exists and is enabled in
+`cron.job`, because per `a1b4a94` this exact job has silently lacked its scheduling wrapper
+before. Both need dashboard or CLI access and neither is reachable from this container.
+
+One thing the log line never meant, worth stating so nobody reads the silence as a bigger
+win than it is: per `1cdb96e`, the failing insert was the audit row on the cron path, and the
+calendar work itself completed either way. So the deployed-fix branch buys a restored audit
+row, not restored calendar sync.
+
+THE UNDEPLOYED FIXES
+`e79339b` is confirmed still undeployed from direct evidence rather than inferred from
+silence: the 00:00 cycle carried exactly 32 lines, unchanged size, and no `42P10`, which per
+READ TWENTY-SECOND is inconsistent with a deployed copy on either branch. `0d2963e` gains no
+new observation; SUPABASE-PLATFORM-3's only in window event is the 20:20:01 502 that READ
+TWENTY-SIXTH decomposes in full, and its Occurrences field was read directly this run rather
+than incremented, per READ FIRST's standing instruction for this group, and reads 16, which
+is unchanged from that section. `1cdb96e` stays OPEN with its day count running, per READ
+TWENTY-FIRST.
+
+Day counts as of the window close, computed with `git show -s --format=%cI` and FLOORED per
+READ TWELFTH rather than carried forward: `1cdb96e` at 10 days, `e79339b` at 9, `0d2963e` at
+5, `285a05f` at 1.
+
+`0d2963e` crosses to 6 days at 02:31:19 UTC today, ten minutes after the 02:20:50 instant
+this window closed, anchored to that instant rather than to the nominal 02:20 boundary per
+READ TWENTIETH's anchoring rule. A sweep two hours from now will read 6 against this
+section's 5 with no commit in between. That is real elapsed time, not the arithmetic drift
+READ SEVENTEENTH warns about. It is a forewarning of a genuine crossing rather than READ
+TWENTY-EIGHTH's near miss, which was a draft asserting a crossing that had NOT happened; the
+lesson is the same one, recompute rather than assume in either direction.
+
+The blocker was re-checked rather than inherited, per READ TWELFTH: nothing matching
+`SUPABASE` or `PROJECT_REF` is in this container's environment. Record the absence and stop
+there, per READ THIRTEENTH. READ SEVENTEENTH's sharper version of the ask stands for all
+four.
+
+THE CENSUS, CROSS FOOTED ON BOTH AXES PER READ TWELFTH
+
+    by project   endorsement-scorer 358, supabase-platform 25              = 383
+    by issue     ENDORSEMENT-SCORER-4 358                                  = 358
+                 SUPABASE-PLATFORM-1 24, -3 1                              =  25
+                                                                             383
+
+Both axes agree exactly. `website`, `flutter`, `mautic`, `moydforms`, `n8n` and
+`supabase-edge` at zero. Queried with NO status filter per READ EIGHTH, which is how the
+ignored watchdog stayed visible. Read READ TWELFTH's caveat on what the equality does and
+does not buy, and note it buys nothing about the cron question: a census of what arrived
+cannot detect what was never sent.
+
+SUPABASE-PLATFORM-1 fell from 34 to 24 purely by age-out, the trailing edge having crossed
+the 00:20 to 02:20 stretch of 2026-08-05, which READ SEVENTEENTH decomposed as exactly 10
+events. 34 minus 10 is 24, so the drop is fully accounted for and nothing was lost to
+anything else.
+
+`flutter` is at zero for the fourth sweep running and `mautic` for the second, counted from
+the sections rather than from memory per READ TWENTY-EIGHTH: `flutter` went to zero at READ
+TWENTY-SIXTH and `mautic` joined it at READ TWENTY-EIGHTH. Neither zero is evidence of a fix,
+since Sentry cannot tell a working fix from an unused app, per READ NINETEENTH. No issue was
+resolved or re-resolved, and this is the fourth sweep running carrying no
+resolved-but-firing issue.
+
+The event query was issued at a limit of 100 and returned 25, so that is a real total rather
+than another silent denominator, per READ TWENTY-EIGHTH's method note.
+
+THE BRANCH REF TRAP, DELIBERATELY UNNUMBERED
+Both repos again presented a stale named branch with `HEAD` detached at the true remote tip:
+this repo's `master` at `5d8a5b0` against a real `5b060ec`, and the sibling's `main` at
+`77d879f` against a real `308ef92`. That is the same stale PAIR READ EIGHTEENTH enumerates.
+The check was run in the form READ TWENTY-SECOND prescribes after its own false pass, with
+the local side being the NAMED BRANCH and not `HEAD`; the wrong form would have compared the
+detached tip with itself and returned clean. Repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH, and `git ls-remote` re-run
+immediately before committing per READ FOURTEENTH.
+
+The cosmetic trap READ TWENTY-SIXTH names appeared again in both repos, reporting the branch
+ahead of its remote-tracking ref by 42 and 33 commits. That is the stale `origin/<branch>`
+talking, not the remote, and `git ls-remote` showed both branches exactly AT their remote
+tips. Do not act on those numbers.
+
+No ordinal is quoted, per READ TWENTY-FOURTH: the recount from bites recorded in this file
+was not run this sweep, and shipping an incremented number the section itself declares
+unverified is the drift READ NINETEENTH warns about. This is one more bite.
+
+WHAT THE AUDITOR CAUGHT, AND THE ONE THAT MATTERED MOST
+The first draft was returned NOT CLEAN with a BLOCKER, and it fell in the class READ
+EIGHTEENTH records and READ TWENTY-SEVENTH deleted rather than trimmed. The draft even named
+that class, then built a fresh carve-out for itself on the ground that its own instance was
+of a different kind. READ TWENTY-SEVENTH forecloses that move, if not that exact wording of
+it: "no carve out for 'it is only a property of the tool set' exists in either ruling." The
+paragraph is deleted rather than trimmed and what it observed went to Andrew directly. It is
+described no further here, deliberately, because an account precise enough to be useful would
+republish the thing being withdrawn, and a second auditor caught an earlier version of this
+very paragraph doing exactly that.
+
+Inherit the shape rather than the instance. This is now two of the last three sweeps in which
+a draft published, or tried to publish, something in that class, each time with a reason that
+felt local and sound while writing it. Two and NOT consecutive, which is worth the extra
+word: READ TWENTY-EIGHTH sits between them, and it weighed a nearby item whose auditor flag
+was REJECTED on checking, because prior publication genuinely covered it, so that one is a
+check that passed rather than a third offence. Calling the pair consecutive, or counting it
+as three, would both be the reflex READ TWENTY-FIRST names, the same one as inflating
+evidence; READ TWENTY-FIFTH catalogues the identical "and not consecutive" correction against
+a different tally in this same file. The rule is
+not a judgement call to be re-made each run. If a future draft finds itself constructing an
+argument for why ITS version is different, that construction is the tell.
+
+The same pass caught ELEVEN more, twelve in total with the blocker, and all eleven are fixed
+above. Give the count rather than the tidy subset, per READ TWENTY-SEVENTH, which records
+deflating such a tally as the same reflex pointed the other way. Four were HIGH: two
+zero-streak counts carried forward instead of counted, an age-out attributed to the wrong two
+hour stretch, `git rev-parse` enumerated in the disclosure list while appearing nowhere in the
+body, and a direct read of SUPABASE-PLATFORM-3's Occurrences claimed but not performed. Three
+were MEDIUM: a sub-heading stating flatly what its own body demoted to a claim, the 16/15/14
+cron numbers re-flattened, and a false cover for a first publication. Four were LOW: an
+anchoring error on a ten minute interval, "the same near miss" overstating a parallel, a grep
+presented as covering both repos when it was run in one, and a heading calling the slice
+empty. Every one is a checkable fact asserted slightly past what had been checked.
+
+Two of those deserve a line each. The SUPABASE-PLATFORM-3 read was fixed by RUNNING it rather
+than by softening the sentence, and it is the only one of the twelve where the honest repair
+was more work than the wording. And the cron numbers were only PARTLY re-flattened against
+something already in the file: READ TWENTY-EIGHTH's correction covers 16 hits against 15 call
+sites and explicitly declines the third number, saying nothing checks whether two sites
+register the same job name, so the 14 distinct names were established here for the first time.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Enumerated rather than waved at, per READ
+EIGHTEENTH, and this is a claim to CHECK rather than a habit. Re-derive it against the body
+rather than listing what you remember putting there; the first draft failed exactly that and
+an auditor found it.
+
+Named above: the commits `1cdb96e`, `e79339b`, `0d2963e`, `285a05f` and `a1b4a94`; the
+function `sync-google-calendar` and its path
+`supabase/functions/sync-google-calendar/index.ts`; the command `supabase functions list`;
+the pg_cron identifiers `pg_cron`, `cron.schedule`, `cron.schedule_in_database` and
+`cron.job`; the header name `x-cron-secret`; the SQLSTATE `42P10`; the relay internals
+`window_start`, `window_end`, `by_message`, `by_severity`, `count` and `postgres_logs`; the
+Sentry issue field `Occurrences`; the name Sentry itself; the issue ids and project names;
+the git commands `git ls-remote`, `git checkout -B`, `git -C` and
+`git show -s --format=%cI`, the ref name `HEAD` and the remote-tracking ref
+`origin/<branch>`; `git rev-parse`, which appears above only in the findings paragraph naming
+it as the entry that did NOT belong, and is enumerated anyway per READ TWENTY-SEVENTH, which
+states the rule in those words, because a mention made in order to strike something is still
+a mention and the standard is the body rather than the intent; the stale refs `5d8a5b0` and
+`77d879f`; this repo's real tip `5b060ec`;
+the sibling's real tip `308ef92`; the env var name patterns `SUPABASE` and `PROJECT_REF`; and
+the GitHub path-history API. The third party name Google Calendar is already carried in this
+repo's own committed function name above.
+
+Three need their cover stated rather than assumed. `x-cron-secret` is a HEADER NAME and not a
+secret value; it is already committed throughout this repo's own edge functions and published
+verbatim in `1cdb96e`'s and `a1b4a94`'s commit messages, and the secret it carries is not
+reproduced. `5b060ec` is this PUBLIC repo's own current tip and is therefore already readable
+by anyone who can read this sentence. `308ef92` is the private sibling's tip, and its cover is
+the deliberate FIRST publication in READ TWENTIETH, which recorded it as such precisely
+because "already published" was not then available; READ TWENTY-FIRST through READ
+TWENTY-EIGHTH each name it under that cover rather than supplying it. Getting that chain
+backwards is the inverted cover check READ SEVENTEENTH and READ TWENTY-FIRST both record as
+caught defects. Everything else above already appears in this file or is committed in this
+public repo's own tree.
+
+The 14 pg_cron job names enumerated during this run are deliberately NOT reproduced. They are
+committed in this repo's own migrations, so publishing them would add no reach and withholding
+them costs nothing; the finding is that the calendar job is absent from that set, and a bare
+list of scheduled job names is more useful to somebody probing than to the next run. The two
+quoted commit message phrases are this public repo's own log and carry no secret, path or
+schedule.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT here is the normalized duplicate key
+message, the uuid message shape and the bare status code `502`, all published in this file
+from READ FIRST onward. The new slice carried no log lines at all, so it contributed no
+content of its own.
+
+No credential, no DSN, no probe source address, no policy body, no RPC name and no raw
+upstream error body appears, and nothing here widens access to anything. Withheld per the
+practice READ SIXTH set: the state of the live endorsement vote, any operational read on
+production sessions, and anything describing this container's own reporting or credential
+tooling, which READ EIGHTEENTH records as a BLOCKER class and which this run's own blocked
+draft is the reason to restate here.
