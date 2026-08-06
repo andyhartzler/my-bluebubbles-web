@@ -764,6 +764,18 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
       return 'This email is not associated with a Missouri Young Democrats member. If you believe this is an error, please contact info@moyoungdemocrats.org';
     }
 
+    // gotrue's wording for "the PKCE code verifier is not in this browser's
+    // local storage", which means the link was opened somewhere other than
+    // where it was requested. Nothing is expired and nothing is broken, so
+    // the invalid-or-expired copy below would send the exec to request a
+    // second link that fails exactly the same way. Without this the raw SDK
+    // sentence falls through to the caller and is shown verbatim.
+    if (normalized.contains('code verifier')) {
+      return 'This sign-in link has to be opened in the same browser you '
+          'requested it from. Request a new link below and open it in this '
+          'browser to continue.';
+    }
+
     if (normalized.contains('auth_failed') || normalized.contains('expired')) {
       return 'That sign-in link was invalid or expired. Request a new link to continue.';
     }
