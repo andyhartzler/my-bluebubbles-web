@@ -5,11 +5,31 @@
 // ============================================
 //
 // THE HAZARD THIS FUNCTION IS BUILT AROUND
-// POSTing to tooling.tokens.rotate returns a NEW access token AND a NEW refresh
-// token, and INVALIDATES THE OLD REFRESH TOKEN THE INSTANT IT ANSWERS. Slack will
-// not tell you the pair again. So the failure that matters is not "rotation
-// errored" (harmless, the old pair survives) but "rotation succeeded and we did
-// not write the answer down" (fatal, a human must mint a new token by hand).
+// POSTing to tooling.tokens.rotate returns a NEW access token, and may return a
+// new refresh token. Slack will not tell you the pair again. So the failure that
+// matters is not "rotation errored" (harmless, the old pair survives) but
+// "rotation succeeded and we did not write the answer down" (fatal, a human must
+// mint a new token by hand).
+//
+// WHAT WAS ACTUALLY MEASURED, 2026-08-06, and it is gentler than assumed.
+// The original version of this comment asserted that rotate ALWAYS issues a new
+// refresh token and invalidates the old one THE INSTANT IT ANSWERS. Seven
+// rotations that day say otherwise. slack_token_rotation_log ids 3, 4, 5 and 7
+// each obtained a NEW access token while the refresh token was UNCHANGED, and
+// ids 4 and 5 did so 149 ms apart against the same refresh token. Two of those
+// rows were probes deliberately re-using a refresh token that the previous call
+// had supposedly superseded, and Slack honoured it both times. The access token
+// stored by id 7 was still authenticating at Slack 45 minutes later
+// (auth.test ok=true, team "Missouri Young Democrats"), which is what proves
+// these were real Slack-issued tokens rather than a bookkeeping artefact.
+//
+// So the old refresh token is NOT reliably dead the moment rotate answers, and
+// a rotation is not always one-shot. This is recorded because it is easy to
+// read the ordering below as paranoia and "simplify" it. Do not. The semantics
+// above are undocumented by Slack and observed over a single day; they are a
+// reason to be relieved when a retry works, not a guarantee to build on. The
+// ordering costs one extra round trip and buys correctness in the case where
+// Slack does behave as originally assumed.
 //
 // The ordering below exists to make that second case as close to impossible as
 // two systems without a shared transaction can get:
@@ -41,9 +61,21 @@ const corsHeaders = {
 const SLACK_ROTATE_URL = "https://slack.com/api/tooling.tokens.rotate";
 const SLACK_AUTH_TEST_URL = "https://slack.com/api/auth.test";
 
-// Retry the persist for roughly half a minute before giving up. A brief
-// Postgres blip must not cost us the pair.
-const PERSIST_BACKOFF_MS = [0, 500, 1000, 2000, 4000, 8000, 15000];
+// Retry the persist before giving up. A brief Postgres blip must not cost us
+// the pair.
+//
+// THE BUDGET IS SIZED TO FIT INSIDE THE CALLER'S TIMEOUT. The cron job calls
+// this with timeout_milliseconds := 30000. The previous ladder summed to 30,500
+// ms of sleeps alone, so the last and longest retry, the one that only matters
+// when Postgres has been unavailable for half a minute, began after the caller
+// had already hung up. The Supabase edge runtime does not guarantee an isolate
+// survives client disconnect, which made the retry designed for exactly that
+// case the one most likely to be killed, inside the irreversible window.
+//
+// 20,500 ms of sleeps leaves roughly 9 s of headroom for the Slack round trip
+// and the seven RPC calls themselves. Seven attempts are kept; the tail is
+// shortened rather than dropped.
+const PERSIST_BACKOFF_MS = [0, 500, 1000, 2000, 4000, 6000, 7000];
 
 async function fingerprint(value: string): Promise<string> {
   const bytes = new TextEncoder().encode(value);
@@ -207,24 +239,50 @@ serve(async (req) => {
   const oldRefreshFp = await fingerprint(current.refresh_token);
 
   // ---- STEP 2: the irreversible call ----
+  //
+  // `sent` flips the instant fetch resolves. A rejection BEFORE that point
+  // means the request never left this runtime (DNS failure, connection
+  // refused, TLS handshake), so Slack was never reached, nothing rotated, and
+  // the stored pair is untouched and still good. A rejection AFTER it means the
+  // response body was lost mid-read and Slack may well have rotated.
+  //
+  // Those two used to be recorded identically as 'persist_failed', which pinned
+  // the health view to LOST. Since egress from this project is not reliable
+  // (pg_net has been observed timing out on DNS at a high rate), an ordinary
+  // network blip that changed nothing would raise "programmatic Slack access
+  // may be gone" and keep raising it. Only the genuinely ambiguous case gets to
+  // say that now.
   let rotated: Record<string, unknown>;
+  let sent = false;
   try {
     const res = await fetch(SLACK_ROTATE_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ refresh_token: current.refresh_token }),
     });
+    sent = true;
     rotated = await res.json();
   } catch (e) {
-    // Network failure. We cannot tell whether Slack rotated. Treat as suspect.
     const msg = String((e as Error)?.message ?? e);
+    if (!sent) {
+      // Safe. Slack was never contacted; the old pair is intact. Record it as a
+      // plain error so the next scheduled run simply tries again.
+      await admin.rpc("slack_token_rotation_fail", {
+        p_attempt_id: attemptId,
+        p_status: "slack_error",
+        p_error: `could not reach Slack, request never sent, old pair intact: ${msg}`,
+      });
+      console.error(`[slack-token-rotate] could not reach Slack (pre-request): ${msg}`);
+      return json({ ok: false, error: "could not reach Slack; nothing rotated" }, 502);
+    }
+    // Suspect. The request was sent and the answer was lost.
     await admin.rpc("slack_token_rotation_fail", {
       p_attempt_id: attemptId,
       p_status: "persist_failed",
-      p_error: `transport failure, rotation outcome unknown: ${msg}`,
+      p_error: `response lost after the request was sent, rotation outcome unknown: ${msg}`,
     });
-    await sendTelegram(`MOYD Slack token rotation: transport failure calling Slack. It is UNKNOWN whether the token rotated, so the stored refresh token may now be dead. Check v_slack_token_rotation_health.\n${msg}`);
-    return json({ ok: false, error: "transport failure, outcome unknown" }, 502);
+    await sendTelegram(`MOYD Slack token rotation: the rotate request was sent but the response was lost. It is UNKNOWN whether the token rotated, so the stored refresh token may now be dead. Check v_slack_token_rotation_health.\n${msg}`);
+    return json({ ok: false, error: "response lost after send, outcome unknown" }, 502);
   }
 
   if (rotated.ok !== true) {
@@ -241,9 +299,14 @@ serve(async (req) => {
 
   const newAccess = String(rotated.token ?? "");
   const newRefresh = String(rotated.refresh_token ?? "");
+  // Fall back to the measured 12 hour lifetime rather than storing null. A null
+  // expiry used to disable the health view's EXPIRED branch entirely, because
+  // `null < now()` is null and the CASE fell through to OK: the token would die
+  // with the view still reporting healthy. The view now reports NO_EXPIRY
+  // instead of hiding it, and this keeps it from arising in the first place.
   const expiresAt = rotated.exp
     ? new Date(Number(rotated.exp) * 1000).toISOString()
-    : null;
+    : new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
 
   // ---- STEP 3: persist, hard ----
   let persisted: Record<string, unknown> | null = null;
@@ -256,6 +319,14 @@ serve(async (req) => {
       p_expires_at: expiresAt,
       p_attempt_id: attemptId,
       p_note: `rotated via ${source}`,
+      // Compare and swap. Says "I am replacing the pair I rotated FROM".
+      // Without it, a retry whose earlier attempt actually committed but whose
+      // acknowledgement was lost would rewrite an older pair over a newer one,
+      // and the newer refresh token is the only one Slack still honours. The
+      // SQL side treats "already stores exactly this refresh token" as an
+      // idempotent success, so the ordinary retry path is unaffected; only a
+      // genuine interleaving raises.
+      p_expect_refresh_fp: oldRefreshFp,
     });
     if (!error) {
       persisted = data;

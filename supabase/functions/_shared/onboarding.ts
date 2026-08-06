@@ -576,9 +576,21 @@ export function buildTooYoungEmail(first: string): BuiltEmail {
   return {
     subject: "We can't wait to welcome you to Missouri Young Democrats!",
     ...build(r),
-    // The zap CC'd info@ on both age-branch emails. Without it nobody inside
-    // MOYD ever learns that an applicant was turned away, which is the one
-    // outcome somebody may want to review by hand.
+    // The zap CC'd info@ on both age-branch emails, so somebody inside MOYD
+    // learns that an applicant was turned away. Kept, and kept deliberately:
+    // now that From is info@ too this reads like a copy to itself, and it is
+    // not one. Gmail files the one message under SENT and INBOX both, so it
+    // lands unread in the mailbox. That was checked against real mail rather
+    // than assumed, including the 2026-07-26 MEC filing confirmations, which
+    // carry From info@, Cc info@ and the labels UNREAD, SENT and INBOX.
+    //
+    // It is also not the only record, so do not bolt a second notification on
+    // top of it. The applicant is written to public.members before this
+    // function runs, and 20260714_03's BEFORE INSERT trigger stamps
+    // membership_eligible false for BOTH branches, which is the "Ineligible
+    // Members" section of the CRM members list. A live send additionally
+    // leaves an age_branch_notified row in onboarding_tasks carrying the
+    // branch. Three channels already answer "did a 12 year old apply".
     cc: [INFO_FROM],
     from: INFO_FROM,
     replyTo: INFO_FROM,
