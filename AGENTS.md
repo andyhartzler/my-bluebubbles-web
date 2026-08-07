@@ -13685,3 +13685,139 @@ No credential, no DSN, no project reference, no probe source address, no policy 
 upstream error body appears, and nothing here widens access to anything. Withheld per the practice
 READ SIXTH set: the state of the live endorsement vote, and anything describing this container's
 own reporting or credential tooling.
+
+## READ FORTY-SECOND: the 06:26 UTC sweep, a ninth evidenced miss, and no audit line captured since 01:25
+
+Swept the 24 hours to 2026-08-07 06:26 UTC. No code change: the new slice carries 35 log lines,
+every one of them either scan noise or the known undeployed sponsors burst, and nothing that is a
+defect in committed code. Deliberately short, per READ TWELFTH and READ FORTIETH.
+
+The previous sweep closed at 04:20 UTC, so about 2 hours 6 minutes is new observation. Carve out
+the watchdog per READ EIGHTEENTH: ENDORSEMENT-SCORER-4 reads 358 on both axes, correctly ignored,
+excluded on purpose rather than absent.
+
+FULL DECOMPOSITION OF THE NEW SLICE
+`by_message` read on all three SUPABASE-PLATFORM-1 events after 04:20, per READ SEVENTH. Thirty
+five log lines, reconciling against the sum of the three per event `count` fields:
+
+    04:40:04 rollup, window 04:34:04.175 to 04:39:02.939
+        1  no PostgreSQL user name specified in startup packet   FATAL, at 04:38:54.621
+    06:05:04 rollup, window 05:59:03.930 to 06:04:01.404
+       32  duplicate key value violates unique constraint "?"    ERROR, the 06:00 cycle
+    06:25:06 rollup, window 06:19:04.330 to 06:24:01.308
+        2  unsupported frontend protocol N.N   FATAL, values 255.255 and 0.0, 321 ms apart
+
+Two of the five probe families are present, the malformed startup packet pair READ FOURTH
+enumerates as shapes 4 and 5. Split them rather than lumping them, per READ ELEVENTH: only the
+protocol family meets READ FIRST's byte decoding standard.
+
+NO AUDIT SESSION LINE HAS BEEN CAPTURED SINCE 01:25, WHICH IS NOT THE SAME AS STOPPED
+READ FORTY-FIRST read the 00:35 to 01:25 burst of 39 permission denials and 82 ad hoc SQL lines as
+Andrew's own hand session behind `a9e4f65`, and it is careful to call that the BEST SUPPORTED
+READING rather than an established one, with the burst stopping as one of four strands. Inherit it
+at that strength and no firmer.
+
+What is observed here is narrower than the reading. No permission-denied line and no ad hoc family
+line has been CAPTURED since the 01:25:06 rollup, about 5 hours. Keep the captured qualifier, per
+READ TWENTY-SECOND: absence from `postgres_logs` is not absence in fact, and this window carries
+long stretches with no rollup at all.
+
+That is consistent with the revoke having broken nothing, and it is not evidence of it. The
+`flutter` project is at ZERO events, and Sentry cannot tell a working system from an unused one,
+per READ NINETEENTH. READ FORTY-FIRST's signal stands unchanged: if exec-only CRM screens start
+failing, THAT is the signal, and the repair would be a targeted grant to `authenticated` on the
+views the CRM reads, decided by Andrew, never a blanket restore and never anything touching
+`anon`. Do not grant any of the 39 back.
+
+THE 06:00 BOUNDARY IS THE NINTH CONSECUTIVE EVIDENCED MISS
+Per READ TWENTY-FIRST's counting rule, the 06:05:04 rollup covers 06:00. ONE `by_message` key
+against the 15 key cap, 32 rows against `limit 200`, and a returned row set at all, so the three
+relay side and query side artefacts are excluded exactly as the eight sweeps before this one
+exclude them. No `invalid input syntax for type uuid` line in it. The TWO artefacts READ
+TWENTY-FIFTH names as NOT excluded remain not excluded.
+
+That is nine consecutive with no hit between, spanning 42 hours from 12:00 Aug 5, and it is 48
+hours since the last evidenced hit. Those are two different figures and must not be run together.
+It buys exactly what READ THIRTY-FIRST says it buys and no more: this line has stopped APPEARING
+in `postgres_logs` at the boundaries this instrument can read. It does NOT establish that the
+emitter stopped writing it, and it does NOT establish WHY. Read the ambiguity the right way round:
+a deployed `1cdb96e` and a disabled or rescheduled cron job look identical from here, and per
+`a1b4a94` this exact job has silently lacked its scheduling wrapper before. Checked via the GitHub
+path-history API rather than this shallow clone, per READ TWENTY-FIRST's graft warning, `1cdb96e`
+is still the last commit to touch the function. It stays OPEN.
+
+THE UNDEPLOYED FIXES
+`e79339b` is confirmed still undeployed directly: the 06:00 cycle carried exactly 32 lines and no
+`42P10`. Day counts as of the 06:26:15 close, computed with `git show -s --format=%cI` and FLOORED
+per READ TWELFTH: `1cdb96e` at 11 days, `e79339b` at 10, `0d2963e` at 7, `285a05f` at 2. Two cross
+within minutes of this close, so recompute rather than suspecting drift: `1cdb96e` reaches 12 at
+06:29:38 today and `e79339b` reaches 11 at 06:39:23. The blocker was re-checked rather than
+inherited, and it is still exactly ONE thing, per READ TWELFTH: no Supabase access token, since
+nothing matching `SUPABASE` or `PROJECT_REF` is in this container's environment. The missing
+`supabase` binary is NOT part of it, which READ SEVENTEENTH records a draft getting wrong: the
+registry answered PONG in 126 ms when tested this run rather than inherited, so the CLI is
+installable in seconds.
+
+THE CENSUS, CROSS FOOTED PER READ TWELFTH
+
+    by project   endorsement-scorer 358, supabase-platform 41              = 399
+    by issue     ENDORSEMENT-SCORER-4 358                                  = 358
+                 SUPABASE-PLATFORM-1 34, -4 7                              =  41
+                                                                             399
+
+Both axes agree exactly. `website`, `flutter`, `mautic`, `moydforms`, `n8n` and `supabase-edge` at
+zero. Queried with NO status filter per READ EIGHTH. SUPABASE-PLATFORM-1 rose from 33 to 34, and
+reconcile rather than assert, per READ THIRTIETH: the slice GAINED 3 and 2 aged out. The two that
+left fell in the 04:20 to 06:26 stretch of 2026-08-06 and were not re-identified, so that half is
+arithmetic rather than a read. SUPABASE-PLATFORM-3 has aged out ENTIRELY, its last event being the
+05:40:02 relay 502 of 2026-08-06 that READ THIRTY-FIRST decomposes; it was not fixed and must not
+be resolved. SUPABASE-PLATFORM-4 holds at 7, every one of them between 00:40:03 and 01:25:06 and
+so inside the ground READ FORTY-FIRST covers. Do not harden that into "all documented": that
+section read ONE of the seven directly, the 01:10:08 event, and declared the rest a weaker scope
+per READ SIXTH. Same occurrences throughout, not recurrences. Nothing was resolved or re-resolved.
+
+THE BRANCH REF TRAP, DELIBERATELY UNNUMBERED
+Both repos again presented the same stale PAIR READ EIGHTEENTH enumerates, `5d8a5b0` here and
+`77d879f` in the sibling, with `HEAD` detached at the true remote tips `8c89045` and `ad24682`.
+Checked in the form READ TWENTY-SECOND prescribes, local side the NAMED BRANCH and not `HEAD`.
+Repaired with `git -C <path> checkout -B <branch> HEAD` per READ NINTH, and `git ls-remote` re-run
+immediately before committing per READ FOURTEENTH, which returned the same two tips.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `1cdb96e`, `e79339b`,
+`0d2963e`, `285a05f`, `a1b4a94` and `a9e4f65`; the SQLSTATE `42P10`; the roles `anon` and
+`authenticated`; the relay internals `by_message`, `count`, `postgres_logs` and the `limit 200` and
+15 key caps; the issue ids and project names; the name Sentry itself, and the product and binary
+name `supabase`, both published here since READ FIRST; the package manager `npm` and its `PONG`
+reply, published here since READ TWELFTH; the git commands `git show -s --format=%cI`,
+`git ls-remote` and `git -C <path> checkout -B <branch> HEAD`, and the ref name `HEAD`; the GitHub
+path-history API; the stale refs `5d8a5b0` and `77d879f`, this repo's tip `8c89045` and the
+sibling's tip `ad24682`; and the env var name patterns `SUPABASE` and `PROJECT_REF`. Every one
+already appears in this file or is committed in this public repo's own tree. The npm registry PONG
+latency is a property of this container's network rather than of either system, and it names
+nothing. `8c89045` is this PUBLIC repo's own current tip.
+`ad24682` is the private sibling's tip and its cover is READ THIRTY-FIFTH's deliberate first
+publication.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT here is the normalized duplicate key message,
+`no PostgreSQL user name specified in startup packet`, `unsupported frontend protocol N.N` with the
+values 255.255 and 0.0, the uuid message shape, and the bare status code `502` in the reference to
+the SUPABASE-PLATFORM-3 event. Count that last one IN rather than waving it past as a status code,
+per READ THIRTY-NINTH, which rules that backticking is not what decides it; READ THIRTY-FIRST files
+it in the identifier enumeration instead, and both placements have precedent, so only the double
+filing would be wrong. All are published in this file from READ FIRST
+and READ FOURTH onward, values included, and none names a table, column, row, person or address.
+The sponsors constraint name is elided rather than written in order to be struck. The probe source
+address is not reproduced, per READ FIFTH. Clock values are the ONE log line sample timestamp, the
+six window boundaries, the two crossing times, and every remaining clock value elsewhere in the
+section, OF WHATEVER KIND, which is READ THIRTY-SEVENTH's wording rather than READ FORTY-FIRST's or
+READ FORTIETH's, both of which restate it, and is used here deliberately because this section also
+quotes durations. That catch-all is where the rollup and event emission times, the
+SUPABASE-PLATFORM-4 range endpoints and the relay event time sit; they are not given a count,
+because no consistent partition of this section's body yields one and a false count is worse than
+none. All are bare and name nothing.
+
+No credential, no DSN, no project reference, no probe source address, no policy body, no RPC name
+and no raw upstream error body appears, and nothing here widens access to anything. Withheld per
+the practice READ SIXTH set: the state of the live endorsement vote, any operational read on
+production sessions, and anything describing this container's own reporting or credential tooling.
