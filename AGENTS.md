@@ -14112,3 +14112,181 @@ No credential, no DSN, no project reference, no probe source address, no policy 
 and no raw upstream error body appears, and nothing here widens access to anything. Withheld per
 the practice READ SIXTH set: the state of the live endorsement vote, any operational read on
 production sessions, and anything describing this container's own reporting or credential tooling.
+
+## READ FORTY-FIFTH: the 13:05 UTC sweep, a tenth evidenced miss, and a census that has to match the window it names
+
+Swept the 24 hours to 2026-08-07 13:05:00 UTC. No code change beyond this note. The previous sweep
+closed at 10:20:09, so 2 hours 44 minutes is new observation.
+
+State the close to the SECOND, as READ FORTY-THIRD and READ FORTY-FOURTH both do in their ledes.
+A first draft here wrote a bare "12:34" and every duration in it was then rounded up rather than
+floored, because no exact close existed to floor against. Worse, its census was queried minutes
+after that nominal close, so the rolling window had SHIFTED off the one the section named: it
+reported SUPABASE-PLATFORM-1 at 29 where the declared window held 31. Shifted rather than
+narrowed, because the fix is to anchor the query and not to widen it. A close without seconds is
+not a window, it is an estimate.
+
+Carve out the watchdog per READ EIGHTEENTH: ENDORSEMENT-SCORER-4 reads 358 on both axes, correctly
+ignored, excluded on purpose rather than absent.
+
+This section runs about 175 lines against READ FORTY-FOURTH's 124, so it is LONGER than
+its predecessor and misses the cut that section asked for. Say that plainly rather than claiming a
+cut that did not happen. The excess is the correction record: a first draft was returned NOT CLEAN
+with TEN findings, two HIGH, four MEDIUM and four LOW, and this section repairs all ten, the four
+LOWs included. Give the whole tally rather than the tidier top of it, per READ TWENTY-SEVENTH,
+which rules that deflating this number in the paragraph whose subject is what the auditor caught is
+the same reflex as inflating evidence, pointed the other way. The repairs carry their reasons so
+the next run does not repeat them. That is the trade, and it is only worth making once. A sweep
+that finds nothing and needs no corrections should be far shorter than this.
+
+Credit READ FORTY-FOURTH for the length lesson rather than presenting it as new: it reached the
+same place from four drafts and ruled that a self-referential count goes stale by construction, so
+write it LAST and hedge it, because an exact one is a promise the section cannot keep. Two drafts
+here proved it again, claiming 60 while being 115, then 115 while being 157.
+
+FULL DECOMPOSITION OF THE NEW SLICE
+`by_message` read on all three SUPABASE-PLATFORM-1 events after 10:20:09, per READ SEVENTH, two of
+them titled `includes FATAL`. Thirty nine log lines, reconciling against the sum of the three per
+event `count` fields:
+
+    11:00:11 rollup, `window_start` 10:54:00.632 to `window_end` 10:59:06.630
+        1  password authentication failed for user "?"   FATAL, filtered, at 10:54:19.505
+    11:20:06 rollup, `window_start` 11:14:05.286 to `window_end` 11:19:02.343
+        6  password authentication failed for user "?"   FATAL, filtered
+           five sampled 11:15:11.206 to 11:15:13.257, a 2.05 second burst
+    12:05:09 rollup, `window_start` 11:59:02.877 to `window_end` 12:04:06.093
+       32  duplicate key value violates unique constraint "?"   ERROR, the 12:00 cycle
+
+Three is the whole slice, confirmed by an explicit range query rather than by reading the top of a
+24 hour list, so nothing landed between the first census call and the close.
+
+Both password totals are `by_severity` residuals, exact here because the password key is the only
+key in its event, which READ THIRTY-SECOND notes still leaves them residuals. That family's
+attribution to scan traffic is INFERRED and not established, per READ FIRST, and it is the only
+probe family present. The 2.05 second burst is the shape READ FIRST RECORDS for the 2026-08-01
+window and adds nothing to it, records being the verb READ THIRTY-SECOND uses for this same burst.
+
+THE 12:00 BOUNDARY IS THE TENTH CONSECUTIVE EVIDENCED MISS
+Per READ TWENTY-FIRST's counting rule, count a boundary only when a SUPABASE-PLATFORM-1 rollup,
+the postgres category, has a `window_start` to `window_end` span covering it. Keep that qualifier:
+it is what stops a rollup from another category being counted, and this window is exactly where
+that bites, since SUPABASE-PLATFORM-4 emitted seven storage rollups inside it, two of them at
+01:00:08 and 01:25:06. The 12:05:09 rollup qualifies. ONE `by_message` key against the 15 key cap, 32
+rows against `limit 200`, and a returned row set at all, so the three relay side and query side
+artefacts are excluded as the nine sweeps before this one exclude them. No `invalid input syntax
+for type uuid` line in it. The TWO artefacts READ TWENTY-FIFTH names as NOT excluded remain not
+excluded.
+
+Record which boundaries were uninformative, which the sweeps carrying no miss do as a matter of
+course and the ones carrying a miss tend to skip. Setting 12:00 aside, since it is the miss above,
+11:00 and 13:00 have no covering rollup: nothing was emitted between 12:05:09 and the close,
+and the 11:00:11 rollup MISSES the 11:00 boundary by 53 seconds, its `window_end` being
+10:59:06.630 rather than the truncated value, which is where a 54 came from in an earlier draft.
+That
+near miss is why 11:00 is uninformative rather than a miss, and it is the kind of thing a sweep
+that only reports its hits leaves the next run to rediscover.
+
+Ten buys exactly what READ THIRTY-FIRST says it buys and no more. It does NOT establish that the
+emitter stopped writing that line, per READ TWENTY-SECOND, and it does NOT establish WHY: a
+deployed `1cdb96e` and a disabled or rescheduled cron job look identical from here, and per
+`a1b4a94` this exact job has silently lacked its scheduling wrapper before. Checked this run via
+the GitHub path-history API rather than this shallow clone, per READ TWENTY-FIRST's graft warning,
+`1cdb96e` is still the last commit to touch the function. It stays OPEN.
+
+NOTHING FROM THE 08-07 AUDIT SESSION HAS BEEN CAPTURED SINCE 01:25
+No permission-denied line and no ad hoc SQL family line since the 01:25:06 rollup, now 11 hours 39
+minutes. Keep the CAPTURED qualifier, per READ TWENTY-SECOND. That is consistent with `a9e4f65`'s
+revoke having broken nothing and is not evidence of it, since `flutter` is at ZERO events and
+Sentry cannot tell a working system from an unused one, per READ NINETEENTH. READ FORTY-FIRST's
+signal and prohibition stand unchanged: if exec-only CRM screens start failing, THAT is the signal,
+and the repair WOULD BE a targeted grant to `authenticated` on the views the CRM reads, decided by
+Andrew, never a blanket restore and never anything touching `anon`. Keep that conditional, which
+READ FORTY-FIRST through READ FORTY-FOURTH all use: on the one sentence in this file most at risk of
+being read as a standing recommendation to restore a grant, an indicative is the wrong mood. Do not
+grant any of the 39
+back. Keep that sentence whole rather than compressing it to a cross reference: a first draft cut
+it to "the prohibition stands unchanged" and left the two role names in the disclosure enumeration
+with nothing in the body using them, which is the copied-list defect READ TWENTY-EIGHTH rules on.
+
+THE UNDEPLOYED FIXES
+`e79339b` is confirmed still undeployed directly: the 12:00 cycle carried exactly 32 lines and no
+`42P10`. Day counts computed with `git show -s --format=%cI` and FLOORED per READ TWELFTH:
+`1cdb96e` at 12 days, `e79339b` at 11, `0d2963e` at 7, `285a05f` at 3.
+
+`285a05f` reads 3 where READ FORTY-FOURTH read 2 and forewarned the crossing at 12:43:21 today.
+That crossing happened DURING this run, between the first census call and the close, which is why
+an early draft of this section still read 2. Recompute against the declared close, not against the
+moment you started.
+
+The blocker was re-checked rather than inherited and is still exactly ONE thing: no Supabase access
+token in this container's environment.
+
+THE CENSUS, CROSS FOOTED PER READ TWELFTH
+
+    by project   endorsement-scorer 358, supabase-platform 34              = 392
+    by issue     ENDORSEMENT-SCORER-4 358                                  = 358
+                 SUPABASE-PLATFORM-1 27, -4 7                              =  34
+                                                                             392
+
+Both axes agree exactly. Both were queried with an EXPLICIT timestamp range matching the declared
+window rather than with a rolling 24h period, which is the fix for the shifted-window census defect
+described at the head of this record: a rolling period silently re-anchors to the moment of the
+call, so the two axes
+can agree with each other and still both describe a window the section never claimed.
+
+SUPABASE-PLATFORM-1 fell from 33 to 27, and reconcile that rather than asserting it, per READ
+THIRTIETH: the slice GAINED 3 and 9 aged out. The 9 were enumerated rather than inferred, all in
+the 10:20:09 to 13:05:00 stretch of 2026-08-06: the 11:45:17 rollup, the 12:05:07 rollup at 34
+lines, and 12:15:08, 12:20:05, 12:30:13, 12:35:06, 12:40:04, 12:55:08 and 13:00:13. 33 plus 3 minus
+9 is 27. Dropping this reconciliation is what let the first draft ship a census that did not match
+its own window, so it is not an optional paragraph on a quiet sweep.
+
+`website`, `flutter`, `mautic`, `moydforms`, `n8n` and `supabase-edge` at zero, `flutter` for the
+TWENTIETH sweep running and `mautic` for the EIGHTEENTH, counted from the sections rather than by
+increment per READ TWENTY-EIGHTH. Neither zero is evidence of a fix. Queried with NO status filter
+per READ EIGHTH. SUPABASE-PLATFORM-4 holds at 7, all between 00:40:03 and 01:25:06 and so the same
+occurrences READ FORTY-FIRST covers, of which it read ONE directly, the rest a weaker scope per
+READ SIXTH. Nothing was resolved or re-resolved.
+
+THE BRANCH REF TRAP, DELIBERATELY UNNUMBERED
+Both repos again presented the same stale PAIR READ EIGHTEENTH enumerates, `5d8a5b0` here and
+`77d879f` in the sibling, with `HEAD` detached at the true remote tips `a751b8a` and `ad24682`.
+Checked in the form READ TWENTY-SECOND prescribes, local side the NAMED BRANCH and not `HEAD`.
+Repaired with `git -C <path> checkout -B <branch> HEAD` per READ NINTH, and `git ls-remote` re-run
+immediately before committing per READ FOURTEENTH, which is the step a first draft omitted
+entirely. The only commit between this repo's previous tip `453b642` and `a751b8a` is READ
+FORTY-FOURTH's own sweep record.
+
+READ NINTH's cwd trap bit again harmlessly: a `cd` into this repo left the shell here, so a later
+bare `wc -l AGENTS.md` read this file rather than failing. Use absolute paths and `git -C`.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `1cdb96e`, `e79339b`,
+`0d2963e`, `285a05f`, `a1b4a94` and `a9e4f65`; the roles `anon` and `authenticated`; the relay
+internals `window_start`, `window_end`, `by_message`, `by_severity`, `count` and the `limit 200`
+and 15 key caps; the Sentry title fragment `includes FATAL`; the SQLSTATE `42P10`; the file
+`AGENTS.md`; the issue ids and project names; the names Sentry and Supabase; the git commands
+`git show -s --format=%cI`, `git ls-remote`, `git -C <path> checkout -B <branch> HEAD` and the bare
+`git -C`, plus the shell `cd` and `wc -l`, and the ref name `HEAD`; the GitHub path-history API;
+the stale refs `5d8a5b0` and `77d879f`, this repo's previous tip `453b642` and current tip
+`a751b8a`, and the sibling's tip `ad24682`, whose cover is READ THIRTY-FIFTH's deliberate first
+publication. Every entry was re-derived against the body this pass rather than carried forward. Name
+the ones a copied list had wrongly kept rather than counting them, per READ EIGHTEENTH's standard
+for this paragraph: they were `anon`, `authenticated`, `window_start` and `window_end`, and all four
+are now genuinely used by the body. Everything else already appears in this file or is committed in
+this public repo's own tree.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is `password authentication failed for user
+"?"`, the normalized duplicate key message, and `invalid input syntax for type uuid`, all published
+here from READ FIRST and READ FOURTH onward, none naming a table, column, row, person or address.
+The unique constraint behind the duplicate key message is named nowhere in this section, which uses
+only the normalized form; there is no elision formula to apply, because the body never reaches for
+the name. Quantities are enumerated together per READ THIRTY-SIXTH: the clock values, the day
+counts, the census and reconciliation figures, the section length figures, the 39 revoked grants,
+the 32 line cycle, the 34 line aged-out rollup, the TENTH miss, the streak ordinals, and every
+remaining quantity elsewhere in the section, OF WHATEVER KIND. All are bare and name nothing.
+
+No credential, no DSN, no project reference, no probe source address, no policy body, no RPC name
+and no raw upstream error body appears, and nothing here widens access to anything. Withheld per
+the practice READ SIXTH set: the state of the live endorsement vote, any operational read on
+production sessions, and anything describing this container's own reporting or credential tooling.
