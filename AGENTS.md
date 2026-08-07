@@ -9634,3 +9634,188 @@ BEYOND the auditor model, its credit state and the fallback rule weighed in this
 carve out, per READ THIRTY-EIGHTH and READ FORTY-THIRD: dropping it while keeping the sentence it
 qualifies leaves the paragraph asserting it withheld a class its own body just described. READ
 FORTY-EIGHTH could carry the flat form only because its body had no fallback note; this one has.
+
+## READ FIFTIETH: the 22:19 UTC sweep, one probe burst, and no ERROR level line at all
+
+Swept the 24 hours to 2026-08-07 22:19:59 UTC. No code change and no defect. The previous sweep
+closed at 20:20:06, so 1 hour 59 minutes is new observation.
+
+On length, measured rather than asserted, per READ FORTY-THIRD's rule that a section claiming
+brevity must be measured against the last one before the claim is written, and READ FORTY-FOURTH's
+that such a figure goes stale by construction, so write it LAST and hedge it. Counting content
+lines, each heading down to its last non-blank line, which is the convention READ FORTY-SIXTH
+fixed, the recent run is 165, 124, 177, 129, 202, 164, 187 and this one about 160. So it is shorter
+than its predecessor and near the short end of the run, and it is NOT a plateau: READ FORTY-NINTH
+is the second longest of the eight, so there is no established shortness to stay at. That is why
+the heading claims no brevity at all.
+
+Carve out the watchdog per READ EIGHTEENTH: ENDORSEMENT-SCORER-4 is correctly ignored and excluded
+on purpose rather than absent. It fired 30 times inside this slice, queried for the slice rather than derived
+from cadence, so the slice is not empty in the literal sense, which is why no heading here says it
+is.
+
+FULL DECOMPOSITION OF THE NEW SLICE
+An org-wide query carrying no `level` and no project filter, which is READ FORTY-SEVENTH's form for
+avoiding the rewrite trap READ FIFTH documents, returned 31 events after 20:20:06: the 30 watchdog
+events above and ONE other. `by_message` read on that one, per READ FOURTH:
+
+    20:55:03 rollup, `window_start` 20:49:01.149 to `window_end` 20:54:01.355
+        3  password authentication failed for user "?"   FATAL, filtered
+           sampled 20:50:49.802, 20:50:50.806 and 20:50:51.918, a 2.116 second burst
+
+The 3 is a `by_severity` residual rather than a direct read, per READ FOURTH, exact here only
+because that key is the only one in its event, which READ THIRTY-SECOND notes still leaves it a
+residual. That family's attribution to scan traffic is INFERRED and not established, per READ
+FIRST, and it is the only probe family present. The burst shape adds nothing to what READ FIRST
+records for the 2026-08-01 window.
+
+Nothing from the 08-07 audit session has been CAPTURED since the 01:25:06 rollup, now 20 hours 54
+minutes. Keep the CAPTURED qualifier, per READ TWENTY-SECOND. `flutter` is at ZERO events and
+Sentry cannot tell a working system from an unused one, per READ NINETEENTH, so that is consistent
+with `a9e4f65`'s revoke having broken nothing and is not evidence of it. READ FORTY-FIRST's signal
+and prohibition stand unchanged: if exec-only CRM screens start failing, THAT is the signal, and
+the repair WOULD BE a targeted grant to `authenticated` on the views the CRM reads, decided by
+Andrew, never a blanket restore and never anything touching `anon`. Do not grant any of the 39
+back, in those words per READ FORTY-NINTH, since substituting the corrected DENIALS label into the
+verb phrase makes it read as granting denials rather than permissions.
+
+THE CRON TEST DID NOT ADVANCE
+Per READ TWENTY-FIRST's counting rule, count a boundary only when a SUPABASE-PLATFORM-1 rollup, the
+postgres category, has a `window_start` to `window_end` span covering it. The one new rollup's
+window closes at 20:54:01 and nothing was emitted after it, so 21:00 and 22:00 are both
+uninformative. The count of directly evidenced misses of the hourly `invalid input syntax for type
+uuid` line stands where READ FORTY-EIGHTH left it, at ELEVEN.
+
+It does NOT establish that the emitter stopped writing that line, per READ TWENTY-SECOND, and it
+does NOT establish WHY: a deployed `1cdb96e` and a disabled or rescheduled `sync-google-calendar`
+cron job look identical from here, and per `a1b4a94` that exact job has silently lacked its
+scheduling wrapper before. Checked this run via the GitHub path-history API rather than this
+shallow clone, per READ TWENTY-FIRST's graft warning, `1cdb96e` is still the last commit to touch
+that function. It stays OPEN.
+
+THE UNDEPLOYED FIXES
+Day counts as of the close, FLOORED per READ TWELFTH: `1cdb96e` at 12 days, `e79339b` at 11,
+`0d2963e` at 7, `285a05f` at 3. None crossed a boundary since the 20:20 sweep, and all four cross
+on 2026-08-08: `0d2963e` at 02:31:19, so a 02:20 sweep still reads 7 and only an 04:20 one reads 8;
+`1cdb96e` and `e79339b` minutes after a 06:20 close, at 06:29:38 and 06:39:23; `285a05f` after a
+12:20 close, at 12:43:21. The forewarning PRACTICE is READ TWENTY-NINTH's, its sweep-boundary
+consequence READ THIRTY-THIRD's and its absolute crossing date READ THIRTY-EIGHTH's, and it is a
+check on the recomputation rather than a substitute for it.
+
+Exactly as READ FORTY-SEVENTH records, `285a05f` and `a1b4a94` are again absent from this
+container's shallow clone, both answering `fatal: ambiguous argument`. Only `285a05f`'s date is
+load bearing and it came from the GitHub commits API instead; `a1b4a94` is cited for its content
+alone and no date for it appears anywhere in this section.
+
+`e79339b` gains no NEW direct observation, since no 6 hour boundary falls inside the new slice; its
+most recent confirmation is the 18:00 cycle at an unchanged 32 lines, which READ FORTY-EIGHTH read.
+The blocker was re-checked rather than inherited and is still exactly ONE thing: no Supabase access
+token in this container's environment.
+
+THE CENSUS, CROSS FOOTED PER READ TWELFTH
+
+    by project   endorsement-scorer 358, supabase-platform 32              = 390
+    by issue     ENDORSEMENT-SCORER-4 358                                  = 358
+                 SUPABASE-PLATFORM-1 25, -4 7                              =  32
+                                                                             390
+
+Both axes agree exactly, so there is no drift to explain and no direction to read. Both were
+queried with NO status filter per READ EIGHTH, which is how the ignored watchdog stayed visible.
+
+The by-project axis was re-run ANCHORED to the declared window and returned 358 and 32 unchanged.
+Record that check rather than skipping it, per READ FORTY-EIGHTH: READ FORTY-FIFTH shipped a census
+that had silently shifted off the window it named, and READ FORTY-SEVENTH records the anchoring
+failing silently twice in three attempts. Anchoring took READ FORTY-SEVENTH's TWO parameter form,
+an explicit `timestamp` range AND a `period` set wider than that window, and the echo carried the
+`timestamp` filter rather than the `Query: (empty)` that marks a dropped one. Both failure modes
+are invisible without this record, and neither is caught by the two axes agreeing: a `period` clip
+carries its filter and echoes normally, and a clip would cut both axes identically.
+`website`, `flutter`, `mautic`, `moydforms`, `n8n` and `supabase-edge` at zero, `flutter` for the
+TWENTY-FIFTH sweep running and `mautic` for the TWENTY-THIRD, counted from the sections rather than
+by increment per READ TWENTY-EIGHTH. Neither zero is evidence of a fix, per READ NINETEENTH.
+
+SUPABASE-PLATFORM-1 rose from 24 to 25, and reconcile rather than assert, per READ THIRTIETH: the
+slice GAINED 1 and NOTHING aged out. That second half is a read rather than arithmetic, and it
+takes TWO of READ THIRTY-NINTH's records rather than one. Its slice does not quite cover the
+crossed stretch: that stretch opens at 20:20:06 on 2026-08-06 and its slice opens at the 20:20:22
+close it inherited, leaving a 16 second sliver at the head. What closes the sliver is the same
+section recording the newest non-watchdog event BEFORE its slice as 20:10:09, and what covers the
+rest is its finding that nothing outside the watchdog landed in the slice itself. Do not write that
+it swept the stretch exactly, which is the true-claim-undersized-cover class READ THIRTY-THIRD
+records being caught on.
+
+SUPABASE-PLATFORM-4 holds at 7, enumerated this run at 00:40:03, 00:45:06, 00:50:05, 00:55:03,
+01:00:08, 01:10:08 and 01:25:06, so the same occurrences READ FORTY-FIRST covers, of which it read
+ONE directly and declared the rest a weaker scope per READ SIXTH. Nothing was resolved or
+re-resolved.
+
+THE BRANCH REF TRAP, DELIBERATELY UNNUMBERED
+Both repos again presented the same stale PAIR READ EIGHTEENTH enumerates, `5d8a5b0` here and
+`77d879f` in the sibling, with `HEAD` detached at the true remote tips `134b8a6` and `ad24682`.
+Checked in the form READ TWENTY-SECOND prescribes, local side the NAMED BRANCH and not `HEAD`.
+Repaired with `git -C <path> checkout -B <branch> HEAD` per READ NINTH, and `git ls-remote` re-run
+immediately before committing per READ FOURTEENTH. The only commit between this repo's previous tip
+`f0d65bd` and `134b8a6` is READ FORTY-NINTH's own sweep record.
+
+VERIFICATION
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. That is stated rather than skipped silently, per READ FORTY-EIGHTH, and it is
+not a licence to skip the audit gate, which ran on the documentation diff.
+
+Fable was out of usage credits before doing any work, so the audit ran on Opus 5, which is the
+prescribed fallback and is the same state READ THIRTY-EIGHTH, READ THIRTY-NINTH, READ FORTY-THIRD
+and READ FORTY-NINTH each record. By READ FORTY-THIRD's convention of counting RECORDED instances
+this is the fifth; no consecutive run is claimed, because most sweeps are silent on the auditor
+model and a gap is indistinguishable from an unrecorded fallback.
+
+The auditor returned NOT CLEAN with two MEDIUM and three LOW and no blocker or high. It overturned
+no triage figure: it re-derived the rollup fields, both census axes, the reconciliation, the seven
+storage timestamps, all four day counts and crossings, the calendar path history and the branch
+refs, and every one held. All five findings were in the apparatus and all five are repaired above.
+One is worth inheriting rather than only fixing. It flagged that the VERIFICATION paragraph carried
+no auditor-model note while the withholding sentence used the flat form, said it could not check
+which was right from where it sat, and named the consequence either way. It was right, the fallback
+had happened, and the omission would have shipped a false flat form. An auditor that cannot see a
+fact can still name the fact it cannot see, and that is worth asking one for.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `1cdb96e`, `e79339b`,
+`0d2963e`, `285a05f`, `a1b4a94` and `a9e4f65`; the function `sync-google-calendar`; the roles
+`anon` and `authenticated`; the Sentry search field `level`; the relay internals `window_start`,
+`window_end`, `by_message` and `by_severity`; the issue ids and project names; the names Sentry,
+GitHub and Supabase; the git commands `git ls-remote`, `git -C <path> checkout -B <branch> HEAD`
+and the ref name `HEAD`, plus the git error string `fatal: ambiguous argument`, whose cover is
+prior publication in READ THIRTY-SIXTH; the verification commands `npx tsc --noEmit` and
+`flutter analyze`; the GitHub path-history and commits APIs; the stale refs `5d8a5b0` and
+`77d879f`, this repo's previous tip `f0d65bd` and current tip `134b8a6`, and the sibling's tip
+`ad24682`, whose cover is READ THIRTY-FIFTH's deliberate first publication; the Sentry search field
+`timestamp` used as an explicit range, the `period` parameter and the tool echo string
+`Query: (empty)`, all three carved out as first publications by READ FORTY-SEVENTH, which rules they
+need no cover, being two tool parameter names and an echo string naming nothing of ours; and the
+auditor model names Fable and Opus 5 together with the fact that the Fable call returned out of
+credits, which READ TWENTY-EIGHTH treats as a disclosure item needing weighed cover rather than an
+automatic pass, the cover being prior publication BOTH in this file, at READ THIRTY-EIGHTH, READ
+THIRTY-NINTH, READ FORTY-THIRD and READ FORTY-NINTH, and in this PUBLIC repo's own commit log, per
+READ FORTY-NINTH's correction that stating only the commit log understates it. Everything else
+already appears in this file or is committed in this public repo's own tree.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is `password authentication failed for user
+"?"` and `invalid input syntax for type uuid`, both published here from READ FIRST and READ FOURTH
+onward, neither naming a table, column, row, person or address: the password line's user name is
+exactly what the filter removes. The sponsors constraint name is never reached for, so there is no
+elision formula to apply. The probe source address is not reproduced, per READ FIFTH. Quantities
+are enumerated together per READ THIRTY-SIXTH: the clock values, the day counts, the census and
+reconciliation figures, the 39 denials, the 32 line cycle, the ELEVEN cron misses, the two streak
+ordinals, the eight section-length figures in the length paragraph, the auditor's finding tally and
+its fallback ordinal, and every remaining quantity elsewhere in the section, OF WHATEVER KIND. All are bare and
+name nothing. Call that 39 figure DENIALS and not revoked grants, per READ FORTY-EIGHTH's
+correction: READ FORTY-FIRST splits it, and only 14 of the 39 were grants `a9e4f65` removed.
+
+No credential, no DSN, no project reference, no probe source address, no policy body, no RPC name
+and no raw upstream error body appears, and nothing here widens access to anything. Withheld per
+the practice READ SIXTH set: the state of the live endorsement vote, any operational read on
+production sessions, and anything describing this container's own reporting or credential tooling
+BEYOND the auditor model, its credit state and the fallback rule weighed in this check. Keep that
+carve out, per READ THIRTY-EIGHTH, READ FORTY-THIRD and READ FORTY-NINTH: dropping it while keeping
+the sentence it qualifies leaves the paragraph asserting it withheld a class its own body just
+described.
