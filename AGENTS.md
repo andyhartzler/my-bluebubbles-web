@@ -13987,3 +13987,128 @@ sessions, and anything describing this container's own reporting or credential t
 auditor model, its credit state and the fallback rule weighed in this check. Keep that carve out, per
 READ THIRTY-EIGHTH: dropping it while keeping the sentence it qualifies leaves the paragraph asserting
 it withheld a class its own body just described.
+
+## READ FORTY-FOURTH: the 10:20 UTC sweep, nothing outside the watchdog, and a section that stays short
+
+Swept the 24 hours to 2026-08-07 10:20:09 UTC. No code change beyond this note. The previous
+sweep closed at 08:21:00, so 1 hour 59 minutes is new observation, and outside the ignored
+watchdog NOTHING landed in it.
+
+This section is roughly 124 lines against READ FORTY-THIRD's 165, both measured from the heading
+to the end of file, which is the cut that section asked its successor to make and READ FORTIETH
+asked for before it. Four drafts of this sentence each named a figure the next edit invalidated,
+the last of them by the audit fixes below. A self-referential count goes stale by construction, so
+write it LAST and hedge it; an exact one here is a promise the section cannot keep. On a sweep that finds nothing the
+apparatus is the whole cost, and the way it grows is by answering a wording finding with a new
+paragraph instead of a shorter one. The two biggest blocks left are the census paragraph and the
+disclosure check, at 28 and 26 lines measured from each heading to its last content line; a
+successor that wants to cut much further has to cut one of those, deliberately.
+
+Carve out the watchdog per READ EIGHTEENTH: ENDORSEMENT-SCORER-4 reads 358 by project and 357 by
+issue, correctly ignored, excluded on purpose rather than absent.
+
+THE NEW SLICE IS EMPTY OF EVERYTHING THE CARVE-OUT DOES NOT COVER
+The newest SUPABASE-PLATFORM-1 event of any kind is 06:50:08, which READ FORTY-THIRD read and
+decomposed as one `no PostgreSQL user name specified in startup packet` FATAL. Nothing has been
+emitted since. So there is no `by_message` left unread and nothing to classify.
+
+Do not book that as good news, per READ TWENTY-FIRST. A relay that stopped after 06:50:08
+produces the same picture, and emptiness is the one observation a healthy quiet system and a
+dead reporting pipeline share. There is no relay observation covering 06:50:08 to 10:20, so this
+stretch is uninformative rather than clean.
+
+No permission-denied line and no ad hoc SQL family line has been CAPTURED since the 01:25:06
+rollup of 2026-08-07, now about 8 hours 55 minutes. Keep the CAPTURED qualifier, per READ
+TWENTY-SECOND. That is consistent with `a9e4f65`'s revoke having broken nothing and is not
+evidence of it, since `flutter` is at ZERO events and Sentry cannot tell a working system from an
+unused one, per READ NINETEENTH. READ FORTY-FIRST's signal and prohibition stand unchanged: if
+exec-only CRM screens start failing, THAT is the signal, and the repair would be a targeted grant
+to `authenticated` on the views the CRM reads, decided by Andrew, never a blanket restore and
+never anything touching `anon`. Do not grant any of the 39 back.
+
+THE CRON TEST DID NOT ADVANCE
+Per READ TWENTY-FIRST's counting rule, no rollup exists after 06:50:08, so 09:00 and 10:00 are
+both uninformative. The count of directly evidenced misses of the hourly `invalid input syntax
+for type uuid` line stands where READ FORTY-SECOND left it, at NINE. It does NOT establish that
+the emitter stopped writing that line, per READ TWENTY-SECOND, and it does NOT establish WHY: a
+deployed `1cdb96e` and a disabled or rescheduled cron job look identical from here, and per
+`a1b4a94` this exact job has silently lacked its scheduling wrapper before. Checked this run via
+the GitHub path-history API rather than this shallow clone, per READ TWENTY-FIRST's graft
+warning, `1cdb96e` is still the last commit to touch the function. It stays OPEN.
+
+THE UNDEPLOYED FIXES
+Day counts as of the close, computed with `git show -s --format=%cI` and FLOORED per READ
+TWELFTH: `1cdb96e` at 12 days, `e79339b` at 11, `0d2963e` at 7, `285a05f` at 2. None crossed a
+boundary since the 08:21 sweep. `285a05f` reaches 3 at 12:43:21 today, so a 12:20 sweep still
+reads 2 and only a 14:20 one reads 3.
+
+`e79339b` gains no NEW direct observation, since no 6 hour boundary falls inside the new slice;
+its most recent confirmation is the 06:00 cycle at an unchanged 32 lines, which READ FORTY-SECOND
+read. The blocker was re-checked rather than inherited, per READ TWELFTH, and is still exactly
+ONE thing: no Supabase access token in this container's environment.
+
+THE CENSUS, CROSS FOOTED PER READ TWELFTH
+
+    by project   endorsement-scorer 358, supabase-platform 40              = 398
+    by issue     ENDORSEMENT-SCORER-4 357                                  = 357
+                 SUPABASE-PLATFORM-1 33, -4 7                              =  40
+                                                                             397
+
+The axes differ by ONE, entirely on `endorsement-scorer`, which is the rolling window moving
+between two calls in one run, per READ FIFTH. The direction is readable because dispatch was
+SEQUENTIAL, which READ THIRTY-FIFTH records is the condition: the by-project call ran FIRST at 358
+and the by-issue call second at 357, so the LATER value is the smaller one and this is an AGE-OUT.
+The rule is to compare the LATER call's value against the EARLIER one, and it needs BOTH the order
+and the values. Do not inherit READ TWENTY-SEVENTH's phrasing, which reads the direction off call
+order alone: that works only in its own case, where the by-issue figure was the larger, and the
+identical pair of numbers here would be a GAIN had the calls run the other way round.
+
+`supabase-platform` agrees exactly on both axes. `website`, `flutter`, `mautic`, `moydforms`,
+`n8n` and `supabase-edge` at zero. Queried with NO status filter per READ EIGHTH.
+
+SUPABASE-PLATFORM-1 FELL from 35 to 33, and reconcile rather than assert, per READ THIRTIETH: the
+slice GAINED nothing and 2 aged out, both in the 08:21 to 10:20 stretch of 2026-08-06, not
+re-identified, so that half is arithmetic rather than a read. SUPABASE-PLATFORM-4 holds at 7, all
+seven between 00:40:03 and 01:25:06 and so inside the ground READ FORTY-FIRST covers, of which it
+read ONE directly and declared the rest a weaker scope per READ SIXTH. SUPABASE-PLATFORM-3 remains
+aged out entirely. `flutter` is at zero for the NINETEENTH sweep running and `mautic` for the
+SEVENTEENTH, counted from the sections rather than by increment per READ TWENTY-EIGHTH and per
+READ FORTY-THIRD's warning that a sweep stating no ordinal is still a sweep. Neither zero is
+evidence of a fix. Nothing was resolved or re-resolved.
+
+THE BRANCH REF TRAP, DELIBERATELY UNNUMBERED
+Both repos again presented the same stale PAIR READ EIGHTEENTH enumerates, `5d8a5b0` here and
+`77d879f` in the sibling, with `HEAD` detached at the true remote tips `453b642` and `ad24682`.
+Checked in the form READ TWENTY-SECOND prescribes, local side the NAMED BRANCH and not `HEAD`.
+Repaired with `git -C <path> checkout -B <branch> HEAD` per READ NINTH, and `git ls-remote` re-run
+immediately before committing per READ FOURTEENTH. The cosmetic trap READ TWENTY-SIXTH names
+appeared again, this repo reporting ahead 50 and behind 50 and the SIBLING's `main` ahead of
+`origin/main` by 34; both are the stale `origin/<branch>` talking, not the remote. Do not act on
+either number.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `1cdb96e`, `e79339b`,
+`0d2963e`, `285a05f`, `a1b4a94` and `a9e4f65`; the roles `anon` and `authenticated`; the relay
+internal `by_message`; the issue ids and project names; the names Sentry and Supabase; the git
+commands `git show -s --format=%cI`, `git ls-remote` and
+`git -C <path> checkout -B <branch> HEAD`, the ref names `HEAD` and `main` and the remote-tracking
+ref `origin/<branch>` and its literal `origin/main`; the GitHub path-history API; the stale refs
+`5d8a5b0` and `77d879f`; this repo's tip `453b642`; and the sibling's tip `ad24682`, whose cover
+is READ THIRTY-FIFTH's deliberate first publication. Everything else already appears in this file
+or is committed in this public repo's own tree.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is `no PostgreSQL user name specified in
+startup packet` and `invalid input syntax for type uuid`, both published here from READ FIRST and
+READ FOURTH onward, neither naming a table, column, row, person or address. The sponsors
+constraint name is elided rather than written in order to be struck, per the practice READ
+THIRTIETH and READ THIRTY-FIFTH set. Quantities are enumerated together per READ THIRTY-SIXTH's
+ruling that a count is as much a body term as a clock value: the clock values, the four day
+counts, the section-length figures in the lede, the two commit distances in the branch
+paragraph, the census figures, the 39 revoked grants, the 32 line cycle, the two streak ordinals,
+the NINE cron misses, and every remaining quantity elsewhere in the section, OF WHATEVER KIND. All
+are bare and name nothing.
+
+No credential, no DSN, no project reference, no probe source address, no policy body, no RPC name
+and no raw upstream error body appears, and nothing here widens access to anything. Withheld per
+the practice READ SIXTH set: the state of the live endorsement vote, any operational read on
+production sessions, and anything describing this container's own reporting or credential tooling.
