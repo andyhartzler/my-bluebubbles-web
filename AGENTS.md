@@ -13821,3 +13821,169 @@ No credential, no DSN, no project reference, no probe source address, no policy 
 and no raw upstream error body appears, and nothing here widens access to anything. Withheld per
 the practice READ SIXTH set: the state of the live endorsement vote, any operational read on
 production sessions, and anything describing this container's own reporting or credential tooling.
+
+## READ FORTY-THIRD: the 08:21 UTC sweep, two probe lines of the only family present, which is NOT established as scan traffic, and both forewarned crossings landed
+
+Swept the 24 hours to 2026-08-07 08:21:00 UTC. No code change beyond this note: the new slice carries
+two log lines, both of one probe family, and no ERROR level line at all.
+
+This section is NOT short, and the lede is the place to say so rather than to claim otherwise. READ
+TWELFTH sets the standard that a sweep finding nothing should cost the next run a minute, and READ
+FORTIETH says each quiet sweep should be shorter than the last. At 165 lines against READ
+FORTY-SECOND's 135, for a slice of 2 log lines against its 35, this one misses that target. The next
+quiet sweep should cut. The habit that inflates a section like this one is answering a wording finding
+by ADDING apparatus rather than by deleting the wording, and the cheapest guard is that a section
+claiming brevity should be measured against the last one before the claim is written.
+
+Do NOT compress those two into "scan noise", in a heading or anywhere else. READ THIRTY-THIRD forbids
+the move in as many words, and the reason is specific to this slice: the only family present is the
+one READ FIRST's byte decoding standard does NOT reach, so unlike READ FORTY-SECOND's slice there is
+not a single established member to hang the label on. Hold one position across heading, lede and body.
+
+The previous sweep closed at 06:26:15 UTC, which READ FORTY-FIRST is explicit that a figure like this
+needs, so 1 hour 54 minutes is new observation. Carve out the
+watchdog per READ EIGHTEENTH: ENDORSEMENT-SCORER-4 reads 358 on both axes, correctly ignored,
+excluded on purpose rather than absent.
+
+FULL DECOMPOSITION OF THE NEW SLICE
+`by_message` read on both SUPABASE-PLATFORM-1 events after 06:26, per READ SEVENTH. Two log lines,
+reconciling against the sum of the two per event `count` fields:
+
+    06:30:08 rollup, window 06:24:01.308 to 06:29:06.005
+        1  no PostgreSQL user name specified in startup packet   FATAL, at 06:24:01.623
+    06:50:08 rollup, window 06:44:01.480 to 06:49:04.101
+        1  no PostgreSQL user name specified in startup packet   FATAL, at 06:45:51.135
+
+One of the five probe families is present, the no-username line READ FOURTH enumerates as shape 5.
+Split the families rather than lumping them, per READ ELEVENTH: that shape is a structurally valid
+startup packet and is NOT established as scan traffic to READ FIRST's byte decoding standard, which
+only the protocol family meets. Both `by_severity` tallies read FATAL only, so the slice carries zero
+ERROR lines, read off the tallies rather than off the titles.
+
+NO AUDIT SESSION LINE HAS BEEN CAPTURED SINCE 01:25, NOW 6 HOURS 55 MINUTES
+READ FORTY-FIRST read the 00:35 to 01:25 burst as Andrew's own hand session behind `a9e4f65`, and
+calls that the BEST SUPPORTED READING rather than an established one. Inherit it at that strength.
+Every SUPABASE-PLATFORM-1 event since 01:25:06 was enumerated this run: 02:20:02, 04:40:04, 06:05:04,
+06:25:06, 06:30:08 and 06:50:08. None carries a permission-denied line or an ad hoc SQL family line.
+
+Keep the CAPTURED qualifier, per READ TWENTY-SECOND: absence from `postgres_logs` is not absence in
+fact. That is consistent with the revoke having broken nothing and is not evidence of it, since
+`flutter` is at ZERO events and Sentry cannot tell a working system from an unused one, per READ
+NINETEENTH. READ FORTY-FIRST's signal stands unchanged: if exec-only CRM screens start failing, THAT
+is the signal, and the repair would be a targeted grant to `authenticated` on the views the CRM
+reads, decided by Andrew, never a blanket restore and never anything touching `anon`. Do not grant
+any of the 39 back.
+
+THE CRON TEST DID NOT ADVANCE
+Per READ TWENTY-FIRST's counting rule, count a boundary only when a SUPABASE-PLATFORM-1 rollup's
+`window_start` to `window_end` covers it. Neither new window does, and no rollup exists after
+06:50:08, so 07:00 and 08:00 are both uninformative. The count of directly evidenced misses stands
+where READ FORTY-SECOND left it, at NINE.
+
+Nine buys exactly what READ THIRTY-FIRST says it buys and no more. It does NOT establish that the
+emitter stopped writing the hourly `invalid input syntax for type uuid` line, per READ TWENTY-SECOND,
+and it does NOT establish WHY. Name that line rather than writing "the line", which in a section whose
+own slice carries no uuid occurrence leaves the anaphor with no antecedent. Read the
+ambiguity the right way round: a deployed `1cdb96e` and a disabled or rescheduled cron job look
+identical from here, and per `a1b4a94` this exact job has silently lacked its scheduling wrapper
+before. `1cdb96e` stays OPEN.
+
+THE UNDEPLOYED FIXES, AND TWO FOREWARNED CROSSINGS THAT LANDED
+Day counts as of the close, computed with `git show -s --format=%cI` and FLOORED per READ TWELFTH
+rather than carried forward: `1cdb96e` at 12 days, `e79339b` at 11, `0d2963e` at 7, `285a05f` at 2.
+
+The first two read 11 and 10 in READ FORTY-SECOND, which forewarned both crossings to the minute, at
+06:29:38 and 06:39:23 today, both minutes after that sweep closed. Both landed. That is real elapsed
+time and not the arithmetic drift READ SEVENTEENTH warns about, and the forewarning is a check on the
+recomputation rather than a substitute for it.
+
+`e79339b` gains no NEW direct observation this slice, since no 6 hour boundary falls inside it; its
+most recent confirmation is the 06:00 cycle at an unchanged 32 lines, which READ FORTY-SECOND read
+and which is the same occurrence rather than a recurrence. The blocker was re-checked rather than
+inherited, per READ TWELFTH, and is still exactly ONE thing: no Supabase access token, since nothing
+matching `SUPABASE` or `PROJECT_REF` is in this container's environment.
+
+THE CENSUS, CROSS FOOTED PER READ TWELFTH
+
+    by project   endorsement-scorer 358, supabase-platform 42              = 400
+    by issue     ENDORSEMENT-SCORER-4 358                                  = 358
+                 SUPABASE-PLATFORM-1 35, -4 7                              =  42
+                                                                             400
+
+Both axes agree exactly. `website`, `flutter`, `mautic`, `moydforms`, `n8n` and `supabase-edge` at
+zero. Queried with NO status filter per READ EIGHTH. SUPABASE-PLATFORM-1 rose from 34 to 35, and
+reconcile rather than assert, per READ THIRTIETH: the slice GAINED 2 and 1 aged out. The one that left
+fell in the 06:26 to 08:21 stretch of 2026-08-06 and was not re-identified, so that half is arithmetic
+rather than a read.
+
+SUPABASE-PLATFORM-4 holds at 7, its newest event being 01:25:06 and all seven falling between 00:40:03
+and 01:25:06, so these are the same occurrences READ FORTY-FIRST covers rather than recurrences. Do
+not harden that into "all documented": that section read ONE of the seven directly and declared the
+rest a weaker scope per READ SIXTH. It was not fixed and must not be resolved. SUPABASE-PLATFORM-3
+remains aged out entirely. `flutter` is at zero for the EIGHTEENTH sweep running and `mautic` for the
+SIXTEENTH; neither zero is evidence of a fix. Nothing was resolved or re-resolved.
+
+Count those from the sections and not by increment, per READ TWENTY-EIGHTH, and note the trap that
+makes incrementing wrong here: READ FORTY-SECOND states no ordinal for either project while its census
+does carry both at zero, so a run that increments the last STATED number lands one short. A sweep with
+no ordinal is still a sweep. The anchors check in both directions: sixth at READ THIRTY-FIRST puts
+`flutter`'s first at READ TWENTY-SIXTH, and fourth there puts `mautic`'s first at READ TWENTY-EIGHTH,
+which is what those sections say.
+
+THE BRANCH REF TRAP, DELIBERATELY UNNUMBERED
+Both repos again presented the same stale PAIR READ EIGHTEENTH enumerates, `5d8a5b0` here and
+`77d879f` in the sibling, with `HEAD` detached at the true remote tips `9284631` and `ad24682`.
+Checked in the form READ TWENTY-SECOND prescribes, local side the NAMED BRANCH and not `HEAD`.
+Repaired with `git -C <path> checkout -B <branch> HEAD` per READ NINTH, and `git ls-remote` re-run
+immediately before committing per READ FOURTEENTH. This repo's tip moved from `8c89045` to `9284631`,
+and the only commit between them is READ FORTY-SECOND's own sweep record.
+
+THE AUDITOR FALLBACK IS NOW ROUTINE
+Fable was unavailable again: the auditor call returned out of usage credits before doing any work, so
+the audit ran on Opus 5 instead. That is the fallback this run's own operating instructions prescribe,
+and they require it to be noted. Counting sweeps where Fable did NO work at all, this is the THIRD,
+after READ THIRTY-EIGHTH and READ THIRTY-NINTH. Expect the fallback rather than treating it as an
+incident.
+
+No audit account follows, per READ FORTIETH. Every finding is repaired where it lives.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `1cdb96e`, `e79339b`,
+`0d2963e`, `285a05f`, `a1b4a94` and `a9e4f65`; the auditor model names Fable and Opus 5 together with
+the fact that the Fable call returned out of credits, which READ TWENTY-EIGHTH treats as a disclosure
+item needing weighed cover rather than an automatic pass, the cover being prior publication in this
+PUBLIC repo's own commit log rather than in this file, per that section's lesson that a file search is
+not a publication search when the artefact is a commit; the roles `anon` and `authenticated`; the relay
+internals `window_start`, `window_end`, `by_message`, `by_severity`, `count` and `postgres_logs`; the
+issue ids and project names; the name Sentry itself, and the product name Supabase, published here
+since READ FIRST; the git commands `git show -s --format=%cI`, `git ls-remote` and
+`git -C <path> checkout -B <branch> HEAD`, and the ref name `HEAD`; the stale refs `5d8a5b0` and
+`77d879f`, this repo's prior tip `8c89045` and current tip `9284631`, and the sibling's tip
+`ad24682`; and the env var name patterns `SUPABASE` and `PROJECT_REF`. Every one already appears in
+this file or is committed in this public repo's own tree. `9284631` is this PUBLIC repo's own current
+tip. `ad24682` is the private sibling's tip and its cover is READ THIRTY-FIFTH's deliberate first
+publication.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT here is `no PostgreSQL user name specified in
+startup packet` and `invalid input syntax for type uuid`. Both are published in this file from READ
+FIRST and READ FOURTH onward, and neither names a table, column, row, person or address. The uuid line
+is QUOTED rather than described, so this declaration matches the body; the slice itself carried no uuid
+occurrence, and the quote is in the cron paragraph. The sponsors constraint name is elided rather than written in order to be struck,
+per the practice READ THIRTIETH and READ THIRTY-FIFTH set and READ THIRTY-SEVENTH restates. Cite the
+originator and not only the restater. The probe source address is not reproduced, per READ
+FIFTH. Clock values are the two log line sample timestamps, the four window boundaries, the two
+crossing times, and every remaining clock value elsewhere in the section, OF WHATEVER KIND, which is
+also where the four section-length magnitudes in the lede sit, the 165 and 135 line counts and the 2
+and 35 log line counts, declared here rather than left to a scope argument on READ FORTIETH's direct
+precedent and READ THIRTY-SIXTH's ruling that a count is as much a body term as a clock value; that is
+READ THIRTY-SEVENTH's wording and is used deliberately because this section also quotes durations and
+day counts. All are bare and name nothing. Per that section's scope convention this counts the
+SUBSTANTIVE BODY and not the disclosure apparatus's own mentions.
+
+No credential, no DSN, no project reference, no probe source address, no policy body, no RPC name and
+no raw upstream error body appears, and nothing here widens access to anything. Withheld per the
+practice READ SIXTH set: the state of the live endorsement vote, any operational read on production
+sessions, and anything describing this container's own reporting or credential tooling BEYOND the
+auditor model, its credit state and the fallback rule weighed in this check. Keep that carve out, per
+READ THIRTY-EIGHTH: dropping it while keeping the sentence it qualifies leaves the paragraph asserting
+it withheld a class its own body just described.
