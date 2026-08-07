@@ -15,15 +15,22 @@
 //                       invites (only if they are already in Slack), and the two
 //                       follow-up tasks are enqueued.
 // A real member is only ever emailed/invited when mode === "live". Follow-up
-// tasks are created in LIVE MODE ONLY: they are drained up to 24h later by
-// onboarding-followups, which reads the mode at drain time, so a task minted in
-// dry_run or test would start sending the moment the mode is flipped to live.
+// tasks are created whenever a welcome was actually SENT, which is test and
+// live; each row is stamped with the mode that minted it. dry_run sends nothing
+// and so owes no follow-up, and mints nothing. onboarding-followups reads the
+// mode at drain time, up to 24h later, and drains only tasks whose stamped mode
+// equals the mode it is running in, so a test task can never turn into a live
+// send when the mode is flipped, and a live task can never be closed out by a
+// drain that happens to run in test.
 //
-// SEND IDEMPOTENCY: the two follow-up tasks are the record that a member has
-// been welcomed. If this member has ANY onboarding_tasks row, the function
-// returns a no-op plan and sends nothing. The website form upserts members on
-// email and calls this unconditionally, so without that probe a returning member
-// receives a second welcome.
+// SEND IDEMPOTENCY: the follow-up tasks are the record that a member has been
+// welcomed IN A GIVEN MODE. If this member has an onboarding_tasks row minted in
+// the current mode, the function returns a no-op plan and sends nothing. The
+// website form upserts members on email and calls this unconditionally, so
+// without that probe a returning member receives a second welcome. The probe is
+// mode-scoped because a test row means the mail went to ONBOARDING_TEST_EMAIL:
+// the member has not been told anything, and must not be treated as though they
+// had once the system goes live.
 //
 // Age gate (calendar-year): eligible = the age you turn this year is 13 through
 // 35 (13 through under 36); age out the year you turn 36. Authoritative logic is
@@ -146,15 +153,17 @@ Deno.serve(async (req) => {
   // anywhere to say it had already been said. It sits above the branch now so
   // that every email this function can send is covered by one guard.
   //
-  // A row is written only when an email really reached the MEMBER, which means
-  // live mode: in test mode the mail goes to ONBOARDING_TEST_EMAIL, so the
-  // member has not been told anything and must not be marked as though they
-  // had. Rows are marked done and never deleted, so the probe covers the whole
-  // history rather than the open tasks.
+  // Scoped to the CURRENT mode. A row is proof that an email really reached
+  // whoever that mode addresses: in test the mail goes to ONBOARDING_TEST_EMAIL,
+  // so a test row says "this member has been exercised in test", not "this
+  // member has been told", and it must not suppress their real welcome when the
+  // system goes live. Rows are marked done and never deleted, so the probe
+  // covers the whole history of this mode rather than the open tasks.
   const { data: priorTasks, error: priorErr } = await supabase
     .from("onboarding_tasks")
     .select("id")
     .eq("member_id", memberId)
+    .eq("mode", mode)
     .limit(1);
   if (priorErr) {
     // Fail closed for the same reason as the age gate: unable to tell is not a
@@ -167,7 +176,7 @@ Deno.serve(async (req) => {
     return json({
       ok: true,
       plan: { mode, member_id: memberId, age_branch: branch, email_actually_to: null },
-      actions: ["already onboarded (onboarding_tasks rows exist for this member): no email, no Slack writes, no new tasks"],
+      actions: [`already onboarded in ${mode} (onboarding_tasks rows exist for this member in this mode): no email, no Slack writes, no new tasks`],
       email_msg_id: null,
     });
   }
@@ -213,23 +222,36 @@ Deno.serve(async (req) => {
     }
     actions.push("Slack SKIPPED and no follow-up tasks enqueued (age-gated)");
 
-    // Record that this member has now been told, so a resubmission does not
-    // tell them again. done=true and no run_after, so the followups drainer
+    // Record that this branch email has now been sent, so a resubmission does
+    // not send it again. done=true and no run_after, so the followups drainer
     // (done=false AND run_after <= now) can never pick it up: it is a receipt,
-    // not a scheduled send. Live only, for the reason given at the probe above.
-    if (mode === "live" && emailResult) {
+    // not a scheduled send. Written whenever a mail actually went out, stamped
+    // with the mode that sent it, so the mode-scoped probe above can find it.
+    if (mode !== "dry_run" && emailResult) {
       const { error: receiptErr } = await supabase.from("onboarding_tasks").insert({
         member_id: memberId,
         task_type: "age_branch_notified",
+        mode,
         done: true,
         meta: { branch, email: realEmail, subject: ageEmail.subject, message_id: emailResult.id },
       });
       if (receiptErr) {
-        // Loud, not fatal: the member has had their email, and swallowing this
-        // is how a second copy gets sent tomorrow with nobody the wiser.
+        // Fail the response. The mail is already gone, so there is nothing to
+        // undo, but with no receipt the next resubmission tells this person
+        // they are too young/too old all over again. Returning 200 here is how
+        // that happens with nobody the wiser: the caller checks only the status
+        // code, so a WARN buried in `actions` is the same as silence.
         console.error("failed to record age-branch receipt for", memberId, receiptErr.message);
-        actions.push(`WARNING: age-branch receipt not recorded (${receiptErr.message}); a resubmission could send this again`);
+        return json({
+          error: "age-branch email sent but receipt not recorded",
+          detail: receiptErr.message,
+          member_id: memberId,
+          email_msg_id: emailResult.id,
+          consequence: "a resubmission will send this email again",
+          plan, actions,
+        }, 500);
       }
+      actions.push(`recorded age_branch_notified receipt (mode ${mode})`);
     }
 
     return json({ ok: true, plan, actions, email_msg_id: emailResult?.id ?? null });
@@ -367,19 +389,25 @@ Deno.serve(async (req) => {
     if (groupAdds.length) actions.push(`${mode.toUpperCase()}: Google Group writes SKIPPED. Would add ${realEmail} to groups: ${groupAdds.map((x) => x.group).join(", ")}`);
   }
 
-  // --- 3. Enqueue follow-up tasks (spec §5 / §8), LIVE ONLY ----------------
-  // A task is created only when a real welcome has really been sent. It used to
-  // be enqueued in every mode, on the reasoning that the followup processor is
-  // itself gated, but that gate is read up to 24 hours LATER, at drain time: a
-  // task minted while the system was deliberately silent becomes sendable the
-  // moment the mode is flipped to live, and the member gets "Don't forget to
-  // join us on Slack!" as their first ever contact from MOYD, unthreaded because
-  // no welcome thread exists. dry_run and test report the plan in the response
-  // instead, which is exactly what those modes are for.
+  // --- 3. Enqueue follow-up tasks (spec §5 / §8) ---------------------------
+  // A task is created only when a welcome has really been sent, which is test
+  // and live. dry_run sends nothing, so there is no welcome to follow up on and
+  // no thread to hang a reminder from; it reports the plan in the response
+  // instead, which is exactly what that mode is for.
+  //
+  // The row carries the mode that minted it. That is the whole guard. The
+  // followup processor is gated too, but its gate is read up to 24 hours LATER,
+  // at drain time: an unstamped task minted while the system was deliberately
+  // quiet becomes sendable the moment the mode is flipped, and the member gets
+  // "Don't forget to join us on Slack!" as their first ever contact from MOYD,
+  // unthreaded because no welcome thread exists. Refusing to write the task at
+  // all used to be the defence, and it cost the cascade the ability to complete
+  // a single pass outside live. onboarding-followups now matches on mode, so a
+  // test task simply stops being due the moment the mode changes.
   // Nothing here needs a duplicate check: the probe above returned early if this
-  // member had any task history at all, so reaching this point means zero rows.
-  if (mode !== "live") {
-    actions.push(`${mode.toUpperCase()}: no follow-up tasks enqueued (tasks are created in live mode only, so a reminder can never fire for a member whose welcome was never sent)`);
+  // member had any task history in this mode, so reaching this point means zero.
+  if (mode === "dry_run") {
+    actions.push("DRY_RUN: no follow-up tasks enqueued (nothing was sent, so nothing is owed a follow-up)");
   } else {
     const nowMs = Date.now();
     const metaBase = {
@@ -400,19 +428,36 @@ Deno.serve(async (req) => {
       {
         member_id: memberId,
         task_type: "slack_channel_sync",
+        mode,
         run_after: new Date(nowMs + firstCheckMin * 60_000).toISOString(),
         meta: metaBase,
       },
       {
         member_id: memberId,
         task_type: "slack_join_reminder",
+        mode,
         run_after: new Date(nowMs + 24 * 60 * 60_000).toISOString(),
         meta: metaBase,
       },
     ];
     const { error: insErr } = await supabase.from("onboarding_tasks").insert(toInsert);
-    if (insErr) actions.push(`WARN: onboarding_tasks insert failed: ${insErr.message}`);
-    else actions.push(`enqueued ${toInsert.length} follow-up task(s): ${toInsert.map((t) => t.task_type).join(", ")}`);
+    if (insErr) {
+      // Fail the response, for the same reason as the age-branch receipt. The
+      // welcome is already gone; what is lost is every follow-up this member was
+      // owed AND the record that they were welcomed at all, which means the next
+      // resubmission welcomes them a second time. This used to push a WARN into
+      // `actions` and still return 200. The caller checks only the status code,
+      // so that was silence with extra steps.
+      return json({
+        error: "welcome sent but follow-up tasks not enqueued",
+        detail: insErr.message,
+        member_id: memberId,
+        email_msg_id: emailResult?.id ?? null,
+        consequence: "no Slack sync, no join reminder, and a resubmission will welcome this member again",
+        plan, actions,
+      }, 500);
+    }
+    actions.push(`enqueued ${toInsert.length} follow-up task(s) in mode ${mode}: ${toInsert.map((t) => t.task_type).join(", ")}`);
   }
 
   return json({ ok: true, plan, actions, email_msg_id: emailResult?.id ?? null });

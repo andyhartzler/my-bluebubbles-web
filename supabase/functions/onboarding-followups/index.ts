@@ -17,10 +17,18 @@
 // never reprocessed. Safe to run repeatedly.
 //
 // HARD GATING (ONBOARDING_MODE): same as member-onboard.
-//   dry_run (DEFAULT), no email, no Slack writes; logs what WOULD happen and
-//                       still advances/rechedules tasks so the queue drains.
+//   dry_run (DEFAULT), no email, no Slack writes.
 //   test             , reminder emails routed to ONBOARDING_TEST_EMAIL; no Slack.
 //   live             , real reminders + real Slack channel invites.
+//
+// MODE MATCHING. Every task carries the mode it was minted under, and this
+// function only ever sees tasks stamped with the mode it is itself running in.
+// That is what makes it safe for member-onboard to enqueue outside live: the
+// mode is read here, up to 24h after the task was created, so without the match
+// a test task would become a real send the instant the mode was flipped. It cuts
+// the other way too, which is the less obvious half: a drain running in dry_run
+// used to close out pending LIVE reminders as "would have sent", destroying
+// them. Tasks minted in another mode are now simply not due.
 //
 // Auth: x-cron-secret == CRON_SECRET (pattern copied from slack-sync-to-slack).
 // Deployed --no-verify-jwt.
@@ -82,11 +90,27 @@ Deno.serve(async (req) => {
   const mode = getMode();
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
+  // dry_run sends nothing, so member-onboard mints no task in it and there is
+  // nothing stamped dry_run to ever drain. Say that, rather than run a query
+  // guaranteed to return nothing and then reason about a queue that cannot
+  // exist. This is also the safe answer if ONBOARDING_MODE is ever unset or
+  // mistyped: getMode() degrades to dry_run, and this function stops dead
+  // instead of quietly deciding a live queue is not due.
+  if (mode === "dry_run") {
+    return json({
+      ok: true, mode, processed: 0, results: [],
+      note: "dry_run: no task is ever minted in this mode, so nothing is ever due",
+    });
+  }
+
   // --- Claim due tasks -----------------------------------------------------
+  // Due means: not done, scheduled for now or earlier, AND minted under the mode
+  // this run is operating in. See MODE MATCHING in the header.
   const nowIso = new Date().toISOString();
   const { data: due, error: dueErr } = await supabase
     .from("onboarding_tasks")
     .select("id, member_id, task_type, attempts, meta")
+    .eq("mode", mode)
     .eq("done", false)
     .lte("run_after", nowIso)
     .order("run_after", { ascending: true })
@@ -181,27 +205,22 @@ Deno.serve(async (req) => {
       const built = buildReminderEmail(variant, first);
       const recipient = mode === "test" ? testEmail() : email;
       const ccList = mode === "test" ? [] : built.cc;
-      if (mode === "dry_run") {
+      if (mode === "test" && (!recipient || !EMAIL_RE.test(recipient))) {
+        log.result = "ONBOARDING_TEST_EMAIL missing, left pending";
+        results.push(log);
+        continue;
+      }
+      try {
+        const sent = await sendGmail({
+          to: recipient, cc: ccList, subject: built.subject,
+          html: built.html, text: built.text, threadId: meta.thread_id ?? null,
+          from: built.from, replyTo: built.replyTo,
+        });
         await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
-        log.result = `DRY_RUN: would send ${variant} reminder to ${email}`;
-      } else {
-        if (mode === "test" && (!recipient || !EMAIL_RE.test(recipient))) {
-          log.result = "ONBOARDING_TEST_EMAIL missing, left pending";
-          results.push(log);
-          continue;
-        }
-        try {
-          const sent = await sendGmail({
-            to: recipient, cc: ccList, subject: built.subject,
-            html: built.html, text: built.text, threadId: meta.thread_id ?? null,
-            from: built.from, replyTo: built.replyTo,
-          });
-          await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
-          log.result = `${mode.toUpperCase()}: sent ${variant} reminder to ${recipient} [msg ${sent.id}]`;
-        } catch (e) {
-          await supabase.from("onboarding_tasks").update({ attempts }).eq("id", t.id);
-          log.result = `send failed (will retry): ${String(e)}`;
-        }
+        log.result = `${mode.toUpperCase()}: sent ${variant} reminder to ${recipient} [msg ${sent.id}]`;
+      } catch (e) {
+        await supabase.from("onboarding_tasks").update({ attempts }).eq("id", t.id);
+        log.result = `send failed (will retry): ${String(e)}`;
       }
       results.push(log);
       continue;
