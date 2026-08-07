@@ -13397,3 +13397,291 @@ deliberately NOT reproduced, per READ THIRTY-FIFTH. Withheld per the practice RE
 the state of the live endorsement vote, any operational read on production sessions, and
 anything describing this container's own reporting or credential tooling, which READ EIGHTEENTH
 records as a BLOCKER class.
+
+## READ FORTY-FIRST: the 04:20 UTC sweep, a permission-denied burst that must NEVER be granted away, and two write failures that are a migration and not a defect
+
+Swept the 24 hours to 2026-08-07 04:20 UTC. No code change: every ERROR line in the new
+observation belongs, on the best supported reading, to one hand session of Andrew's, and the
+obvious "fix" for the largest family in it would reopen a leak he had just closed.
+
+Per the overlap warning in READ FOURTH: the previous sweep closed at 00:23:49 UTC, which READ FORTIETH
+records and this figure needs, so 3 hours 56 minutes is new observation and about 20 hours is shared. Compute that subtraction rather than
+carrying "22 hours" forward, which is what an earlier draft of this section did and which its own
+3h57m figure contradicts.
+
+Carve out the watchdog per READ EIGHTEENTH. ENDORSEMENT-SCORER-4 reads 358 on both axes, correctly
+ignored, excluded on purpose rather than absent.
+
+FULL DECOMPOSITION OF THE BURST
+`by_message` read on ALL ELEVEN ERROR rollups from 00:35:05 to 01:25:06, per READ SEVENTH, after
+an earlier draft of this section shipped with no decomposition at all and was caught. SUPABASE-
+PLATFORM-1 carries 33 in-window events; the 00:05:09 and 02:20:02 events were also read directly,
+and the remaining 20 are dated 2026-08-06 and fall in the roughly 20 hours the previous sweeps
+already decomposed. That last part is the weaker guarantee READ SIXTH describes and is recorded as
+weaker. Per event
+`count` fields sum to 121, and the shape totals below sum to 121, so this is a decomposition
+rather than a sample:
+
+    39  permission denied              25 table, 13 view, 1 function
+    82  the ad hoc hand SQL family     mostly `column ? does not exist`, plus
+                                       `? is an aggregate function`, `column reference ? is
+                                       ambiguous`, `operator does not exist: uuid = text`,
+                                       `operator is not unique: text || ?`, `relation ? does not
+                                       exist`, `schema ? does not exist`,
+                                       `syntax error at or near ? of jsonpath input`,
+                                       `expression contains variables of more than one relation`,
+                                       `canceling statement due to statement timeout`, and the two
+                                       `onboarding_tasks` write failures below
+
+Get the size right, because an earlier draft of this section put "roughly 100" on the view family
+alone, which is wrong against every figure here: the VIEW family is 13, its permission-denied
+superset is 39, and even the total of all ERROR lines across those eleven rollups is only 121. The
+eight distinct tables are `members` (13 lines), `form_submissions` (3), `donors` (2),
+`email_logs` (2), `subscribers` (2), `chapters`, `chapter_documents` and
+`form_session_verifications`, which sums to the 25 above. Twelve of the thirteen view denials land in the 01:20 rollup and the
+thirteenth at 01:10.
+
+THE FIX THAT MUST NEVER BE MADE
+Do not grant any of those 39 back. That prohibition is the standing one in READ THIRD and READ
+TENTH, and here it has more teeth than it has ever had.
+
+Split the 39 by provenance rather than bundling them, which an earlier draft of this section did
+and which is false for most of them. The 13 VIEW denials and the 1 FUNCTION denial are grants
+`a9e4f65` removed. Anchor the interval to the event it measures, per READ THIRTY-FIFTH: the 98
+seconds runs from the FUNCTION denial at 01:21:52 to the commit. Of the 13 view denials only FIVE
+carry an observed timestamp, and those five sit about five minutes before the commit; the other
+seven are bounded only by their rollup window and the thirteenth only by a window ending
+01:09:06, so do not locate any of the eight, per READ NINETEENTH. Restoring those grants re-exposes 73,267
+subscriber rows, 419 member rows and the donor file to the anon key that ships in the public
+browser bundle, and those row counts are that commit's own committed numbers. The 25 TABLE denials
+were never granted at all: `20260807_11_revoke_anon_on_leaking_views.sql` filters on
+`c.relkind in ('v','m')`, so its revoke loop reached no table. Its `alter default privileges`
+statement does name tables, but that binds only objects created later and so cannot explain a
+denial on an existing one. Its own header records
+`GET /rest/v1/members -> 401 42501 permission denied` as the pre-fix CONTROL, the thing the views
+were walking around. So a base-table denial here is the state that was always correct.
+
+Either way the instruction is the same and the reason differs: do not grant the views back because
+that reopens the breach, and do not grant the tables because they were never open.
+
+WHY THIS IS THE BEST SUPPORTED READING
+Word it that way and not as established, per READ TWENTIETH, which had a TIGHTER fit than this,
+an exact constraint-name match twenty minutes before its commit, and still wrote only "the best
+supported reading". Strand 1 is the emitter's own prose, which is READ SEVENTEENTH's instrument
+rather than READ NINTH's; strands 2 to 4 are consistent-with rather than establishing.
+
+1. `a9e4f65` was authored 2026-08-07T01:23:30 UTC, 98 seconds AFTER the last denial. Its message
+   says the migrations were applied to production and reports "Verified by impersonation against
+   the running system, not by reading definitions", with "Anonymous: 401 on every view, 42501 on
+   the RPC". 42501 IS `permission denied`.
+2. The function line matches a specific migration in that same commit: `_14` revokes
+   `search_knowledge_base` from PUBLIC, and `permission denied for function
+   search_knowledge_base` fired at 01:21:52.
+3. The spacing is a walk. The five of the twelve view denials that the 01:20 rollup SAMPLES land
+   103, 112, 95 and 95 ms apart, in that order, which is the regular-interval enumeration READ TENTH decoded for
+   the admin RPC family. The other seven have no observed timestamp; do not infer one, per READ
+   NINETEENTH.
+4. It STOPPED. No ERROR line of any kind was CAPTURED after 01:21:52 in this window, and the
+   newest in-window SUPABASE-PLATFORM-1 event, at 02:20:02, is a lone
+   `unsupported frontend protocol` FATAL, which is scan noise. Keep the captured qualifier, per
+   READ TWENTY-SECOND: absence from `postgres_logs` is not absence in fact. A real executive being
+   denied would still be firing.
+
+Scope it correctly. This attributes THIS session. It does NOT establish that no user-facing path
+broke, and that cannot be established from Sentry; what argues against breakage is strand 4 plus
+the commit's own impersonation results, which report the executive chair still reading every table
+at full row count. If exec-only CRM screens start failing, THAT is the signal, and the repair
+would be a targeted grant to `authenticated` on the four views the CRM reads, decided by Andrew,
+never a blanket restore and never anything touching `anon`.
+
+THE TWO onboarding_tasks WRITE FAILURES ARE A MIGRATION, NOT A DEFECT
+At 00:42:30 and 00:42:32, 1.8 seconds apart:
+
+    new row for relation "onboarding_tasks" violates check constraint "onboarding_tasks_mode_check"
+    null value in column "mode" of relation "onboarding_tasks" violates not-null constraint
+
+These are the only WRITE failures in the window and they deserve the check that reads rather than
+the shrug, because a failed write loses data where a failed read does not.
+
+They are INSERT attempts against a constraint added minutes earlier, not the migration being
+applied. Be exact about that, because an earlier draft of this section asserted the migration
+reading and it is refuted three ways. The message text is wrong for it: a failing
+`ADD COLUMN ... NOT NULL` raises `column ? of relation ? contains null values` and a failing added
+CHECK raises `check constraint ? of relation ? is violated by some row`, neither of which is what
+fired. The table was empty, so the ALTER could not fail:
+`20260807_01_onboarding_tasks_mode.sql` states in its own header that
+`public.onboarding_tasks has held zero rows since it was created on 2026-07-14`. And the rows that
+do exist arrived at 00:41:10Z, about 80 seconds BEFORE these two errors, from what
+`20260807_11_onboarding_live_roster_receipts.sql` calls an undocumented hand-invoked cascade test,
+both at `mode='test'`, which is valid.
+
+So the shape is somebody exercising the brand new constraint by hand: an out-of-domain value
+rejected by the CHECK, then a missing one rejected by NOT NULL, 1.8 seconds apart. That is the
+constraint doing exactly what its header says it is for, "a task whose mode is unknown must fail
+loudly rather than pick one".
+
+Committed code cannot raise either one, checked rather than assumed. `member-onboard/index.ts` has
+the only two runtime inserts, at the age-branch receipt and the follow-up enqueue. The first is
+guarded `if (mode !== "dry_run" && emailResult)` and the second sits in the `else` of
+`if (mode === "dry_run")`, so the third mode value the code can hold never reaches either insert,
+and `mode` is a non-null local at both sites. So no committed path writes a NULL or an
+out-of-domain mode. Nothing to fix.
+
+THE STORAGE 400s
+SUPABASE-PLATFORM-4 carried 7 events, ONE of which was read directly, the 01:10:08 event, and that
+scope is declared as weaker per READ SIXTH rather than glossed. This category carries no
+`by_message`; its tallies are `by_path` and `by_status`, which read
+`POST /storage/v1/object/list` 8 and `400` 8. So 8 list requests all answering 400 is a direct
+read. The bucket names and the single source address are NOT: they come from that event's
+five-entry `sample`, so they describe five of the eight requests and the other three are
+unobserved. What is unhedged is the timing, 78 to 116 ms apart at 01:05:38, which is within the
+sample and lands in the same minutes as the Postgres burst.
+
+Do NOT write that nothing in either repo issues a bucket-root list. That is false and this file
+already refutes it: READ THIRD records `global_search_service.dart` calling `/object/list/` on
+every global document search. The attribution here rests on the timing, the single source and the
+company the requests keep, not on a uniqueness claim about the path shape. Nothing to fix, and do
+not resolve the issue.
+
+THE CRON TEST GAINS AN HOURLY BOUNDARY FOR THE FIRST TIME
+Per READ TWENTY-FIRST's counting rule. The 01:05:04 rollup covers 01:00, its window running
+00:59:03.227 to 01:04:03.386. Eleven `by_message` keys summing exactly to its `count` of 15, so no
+15-key truncation and no `limit 200` truncation, and a returned row set excludes the swallowed
+query. No `invalid input syntax for type uuid` line in it.
+
+That is an EIGHTH evidenced miss with no hit between, and the first at an HOURLY rather than a
+six-hour boundary. It is readable only because the audit traffic supplied the covering rows that
+READ TWENTY-FIFTH's asymmetry says a miss requires. The 00:00 Aug 7 rollup in this window is the
+one READ FORTIETH already read; same occurrence, do not count it twice.
+
+Eight buys exactly what READ THIRTY-FIRST says seven bought and no more. It does NOT establish
+that the emitter stopped writing the line, per READ TWENTY-SECOND, and it does NOT establish WHY.
+Read the ambiguity the right way round: a deployed `1cdb96e` and a disabled or rescheduled cron
+job look identical from here, and per `a1b4a94` this exact job has silently lacked its scheduling
+wrapper before. `1cdb96e` is still the last commit to touch the function, checked via the GitHub
+path-history API rather than this shallow clone, per READ TWENTY-FIRST's graft warning. It stays
+OPEN.
+
+THE UNDEPLOYED FIXES
+Computed with `git show -s --format=%cI` and FLOORED per READ TWELFTH: `1cdb96e` at 11 days,
+`e79339b` at 10, `0d2963e` at 7, `285a05f` at 2.
+
+`0d2963e` reads 7 where READ FORTIETH read 6, crossing at 02:31:19 today as READ THIRTY-EIGHTH
+forewarned, READ THIRTY-NINTH restated and READ FORTIETH carried. READ FORTIETH credits READ
+THIRTY-NINTH for it and that is a miscitation; do not inherit it. Cite the originator and not only the restater, per READ
+THIRTY-SEVENTH. Recomputed rather than carried.
+
+`e79339b` is confirmed still undeployed directly: the 00:00 cycle carried exactly 32 lines and no
+`42P10`, which per READ TWENTY-SECOND is inconsistent with a deployed copy on either branch.
+SUPABASE-PLATFORM-3 produced no new event; its one in-window occurrence is the 05:40:02 event of
+2026-08-06 that READ THIRTY-FIRST decomposes.
+
+The blocker was re-checked rather than inherited, per READ TWELFTH: nothing matching `SUPABASE` or
+`PROJECT_REF` is in this container's environment. Record the absence and stop there, per READ
+THIRTEENTH.
+
+THE CENSUS, CROSS FOOTED PER READ TWELFTH
+
+    by project   endorsement-scorer 358, supabase-platform 41              = 399
+    by issue     ENDORSEMENT-SCORER-4 358                                  = 358
+                 SUPABASE-PLATFORM-1 33, -4 7, -3 1                        =  41
+                                                                             399
+
+Both axes agree exactly. `website`, `flutter`, `mautic`, `moydforms`, `n8n` and `supabase-edge` at
+zero. Queried with NO status filter per READ EIGHTH. `flutter` is at zero for the sixteenth sweep
+running and `mautic` for the fourteenth, counted from the sections rather than by increment per
+READ TWENTY-EIGHTH. Neither zero is evidence of a fix, per READ NINETEENTH. Nothing was resolved
+or re-resolved.
+
+THE BRANCH REF TRAP, DELIBERATELY UNNUMBERED
+Both repos again presented the same stale PAIR READ EIGHTEENTH enumerates, `5d8a5b0` here and
+`77d879f` in the sibling, with `HEAD` detached at the true remote tips `a9e4f65` and `ad24682`.
+Checked in the form READ TWENTY-SECOND prescribes, with the local side being the NAMED BRANCH and
+not `HEAD`. Repaired with `git -C <path> checkout -B <branch> HEAD` per READ NINTH.
+
+WHAT THE AUDITOR CAUGHT
+An earlier draft of this section was returned NOT CLEAN with a BLOCKER and fourteen further
+findings. Two are worth inheriting as rules rather than as history. The draft asserted a quantity,
+"roughly 100", for a family it had never tallied, having read `by_message` on only 4 of the 11
+rollups while READ SEVENTH requires all of them; the real figure is 13 for that family and 39 for
+its superset. And it cleared the storage 400s with a uniqueness claim, "nothing in either repo
+issues a keyless bucket-root list", that READ THIRD refutes in this same file. A conclusion can be
+right while the premise offered for it is false, and the premise is the part a future run
+inherits.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Enumerated rather than waved at, per READ
+EIGHTEENTH, and re-derived against the body in both directions.
+
+Named above: the commits `1cdb96e`, `e79339b`, `0d2963e`, `285a05f`, `a1b4a94` and `a9e4f65`;
+the tables `members`, `subscribers`, `donors`, `email_logs`, `form_submissions`,
+`chapters`, `chapter_documents`, `form_session_verifications` and `onboarding_tasks`, its `mode`
+column and its constraint `onboarding_tasks_mode_check`; the mode values `test` and `dry_run`; the function `search_knowledge_base` and the migration identifier `_14`; the migration
+`20260807_01_onboarding_tasks_mode.sql`, `20260807_11_onboarding_live_roster_receipts.sql` and
+`20260807_11_revoke_anon_on_leaking_views.sql`; the catalog filter `c.relkind in ('v','m')` and
+the statement form `alter default privileges`; the SQL form `ADD COLUMN ... NOT NULL` and the
+keyword `else`; the HTTP status `400`; the function
+file `member-onboard/index.ts` and the guards quoted from it; `global_search_service.dart`; the roles `anon`, `authenticated` and
+`PUBLIC`; the SQLSTATEs `42501` and `42P10`; the API path shapes `POST /storage/v1/object/list` and `/object/list/`; the
+relay internals `by_message`, `by_path`, `by_status`, `count`, `sample`, `postgres_logs` and the
+`limit 200` and 15-key caps; the issue ids and project names; the name Sentry itself; the git
+commands `git show -s --format=%cI`,
+`git -C <path> checkout -B <branch> HEAD` and the ref name `HEAD`; the GitHub path-history API;
+the stale refs `5d8a5b0` and `77d879f`, this repo's tip `a9e4f65` and the sibling's tip
+`ad24682`; and the env var name patterns `SUPABASE` and `PROJECT_REF`.
+
+Covers, stated rather than assumed. Every table, column, constraint, migration, function and file
+above is committed in THIS repo, the public one. Apply READ SEVENTEENTH's test rather than the
+lazy version: "already committed" would be an argument for WITHHOLDING had any of them come from
+the private sibling, and none did. `email_logs` is a FIRST publication in this file and its cover
+is NOT `a9e4f65`, which does not contain the string; it is committed elsewhere in this public tree
+and that is the cover. An earlier draft claimed two covers for it that both fail on inspection,
+which is the inverted cover check READ SEVENTEENTH, READ TWENTY-FIRST and READ THIRTY-SIXTH each
+record being caught on. `ad24682` is the private sibling's tip and its cover is READ
+THIRTY-FIFTH's deliberate first publication.
+
+Quoted PROSE, declared separately per the practice READ TWENTIETH and READ THIRTY-FIFTH set for
+commit messages. From `a9e4f65`: "Verified by impersonation against the running system, not by
+reading definitions" and "Anonymous: 401 on every view, 42501 on the RPC". From
+`20260807_11_revoke_anon_on_leaking_views.sql`: the pre-fix control line
+`GET /rest/v1/members -> 401 42501 permission denied`. From `20260807_01`:
+"public.onboarding_tasks has held zero rows since it was created on 2026-07-14" and "a task whose
+mode is unknown must fail loudly rather than pick one". From
+`20260807_11_onboarding_live_roster_receipts.sql`: the phrase "undocumented hand-invoked cascade
+test" and the value `mode='test'`. All are committed in THIS public repo. The row counts 73,267
+and 419 are enumerated too, per READ THIRTY-SIXTH's ruling that a count is as much a body term as
+a clock value, and both are `a9e4f65`'s own committed figures.
+
+Two things are deliberately WITHHELD. The thirteen denied VIEW names are not enumerated: the
+finding is the shape, the count and the prohibition, none of which needs the list, and one of the
+names carries a real person's surname. And the storage source address is not reproduced, per READ
+FIFTH.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is `permission denied for function
+search_knowledge_base`, the two `onboarding_tasks` write-failure lines, the ad hoc family shapes
+listed in the decomposition, `unsupported frontend protocol`, the uuid message shape, and the two
+migration-time shapes named only to show they did NOT fire,
+`column ? of relation ? contains null values` and
+`check constraint ? of relation ? is violated by some row`. The normalized
+`permission denied for view ?` and `permission denied for table ?` forms are deliberately NOT
+quoted in the body, which counts them instead, so they are not listed; an earlier draft listed
+them and that is the copied-list defect READ TWENTY-EIGHTH rules on. The permission-denied and
+write-failure families are new to this file and are weighed rather than swept in: each names an
+object this public repo already commits, and none carries a row, a value, a person or an address.
+
+Clock values are enumerated BY CATEGORY rather than as a single tally, per READ THIRTY-FIFTH: the
+log line sample timestamps quoted in the burst and write-failure paragraphs, and the four
+millisecond gaps 103, 112, 95 and 95 derived from them; every rollup emission time named in the
+text, which is 00:05:09, 00:35:05, 01:05:04, 01:10:08, 01:25:06 and 02:20:02, together with the
+bare rollup labels 01:10 and 01:20; the window pair 00:59:03.227 to 01:04:03.386 and the lone
+window end 01:09:06; the storage cluster time 01:05:38 and its 78 to 116 ms range; the commit instant 01:23:30 and the 98 second
+interval from 01:21:52; the cascade test time 00:41:10Z; the day-count crossing 02:31:19; and
+every remaining clock value elsewhere in the section, OF WHATEVER KIND, which is READ FORTIETH's
+wording and is used here deliberately because this section also quotes durations, the day counts
+and the overlap and interval figures among them. All are bare quantities and name nothing. Per READ THIRTY-SEVENTH's scope convention this counts the
+SUBSTANTIVE BODY and not the disclosure apparatus's own mentions.
+
+No credential, no DSN, no project reference, no probe source address, no policy body and no raw
+upstream error body appears, and nothing here widens access to anything. Withheld per the practice
+READ SIXTH set: the state of the live endorsement vote, and anything describing this container's
+own reporting or credential tooling.
