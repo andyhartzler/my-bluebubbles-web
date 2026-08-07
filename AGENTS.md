@@ -14420,3 +14420,206 @@ name and no raw upstream error body appears, and nothing here widens access to a
 Withheld per the practice READ SIXTH set: the state of the live endorsement vote, any
 operational read on production sessions, and anything describing this container's own
 reporting or credential tooling.
+
+## READ FORTY-SEVENTH: the 16:22 UTC sweep, nothing outside the watchdog, and a day count the clone could not compute
+
+Swept the 24 hours to 2026-08-07 16:22:26 UTC. No code change and no defect. The previous
+sweep closed at 14:23:39, so 1 hour 58 minutes is new observation, and outside the ignored
+watchdog NOTHING landed in it.
+
+This section is NOT short, and the lede is the place to say so rather than to claim otherwise,
+per READ FORTY-THIRD. It is the longest of the recent five, against READ FORTY-SIXTH's explicit
+instruction to its successor to cut, on a sweep where nothing fired. Nearly all the excess is
+the anchoring lesson below, which is worth keeping because it corrects a method READ
+FORTY-FIFTH and READ FORTY-SIXTH both prescribe in a form that does not work. The next quiet
+sweep should carry that lesson as two sentences and cut the rest.
+
+Carve out the watchdog per READ EIGHTEENTH: ENDORSEMENT-SCORER-4 is correctly ignored and
+excluded on purpose rather than absent. It fired 30 times inside this slice, so the slice is
+not empty in the literal sense, which is why no heading here says it is.
+
+THE NEW SLICE IS EMPTY OF EVERYTHING THE CARVE-OUT DOES NOT COVER
+An explicit range query for every error event after 14:23:39 returned 30, all
+ENDORSEMENT-SCORER-4. Read "error event" as the errors DATASET rather than as a severity, per
+READ FIFTH's usage, because the query carried no `level` filter at all. Say what that buys and
+no more: it establishes a count and a grouping across the whole slice, which is weaker than
+the per event `by_message` read READ SEVENTH requires and is enough only because no
+non-watchdog event is in it to decompose. Carrying no `level` and no project filter is what
+AVOIDS the trap READ FIFTH documents, where a `level:error` rewrite hid a whole project. Do
+not read that sentence backwards and add a filter for the reason the absence is recorded.
+
+The newest SUPABASE-PLATFORM-1 event of any kind is 12:05:09, which READ FORTY-FIFTH read
+and decomposed as the 12:00 cycle and the tenth evidenced miss. Nothing has been emitted
+since, a gap of 4 hours 17 minutes at the close, so there is no `by_message` left unread.
+
+Do not book that as good news, per READ TWENTY-FIRST. A relay that stopped after 12:05:09
+produces the same picture, and emptiness is the one observation a healthy quiet system and
+a dead reporting pipeline share. This stretch is uninformative rather than clean.
+
+Nothing from the 08-07 audit session has been CAPTURED since the 01:25:06 rollup, now 14
+hours 57 minutes. Keep the CAPTURED qualifier, per READ TWENTY-SECOND. `flutter` is at ZERO
+events and Sentry cannot tell a working system from an unused one, per READ NINETEENTH, so
+that is consistent with `a9e4f65`'s revoke having broken nothing and is not evidence of it.
+READ FORTY-FIRST's signal and prohibition stand unchanged: if exec-only CRM screens start
+failing, THAT is the signal, and the repair WOULD BE a targeted grant to `authenticated` on
+the views the CRM reads, decided by Andrew, never a blanket restore and never anything
+touching `anon`. Do not grant any of the 39 back.
+
+THE CRON TEST DID NOT ADVANCE
+Per READ TWENTY-FIRST's counting rule, no SUPABASE-PLATFORM-1 rollup, the postgres category,
+exists after 12:05:09, so 15:00 and 16:00 are both uninformative. Keep that category
+qualifier, per READ FORTY-FIFTH: it is what stops a rollup from another category being
+counted, and SUPABASE-PLATFORM-4 did emit inside this window, though its newest is 01:25:06
+and so it could not have covered either boundary anyway. The count of directly evidenced
+misses of the hourly `invalid input
+syntax for type uuid` line stands where READ FORTY-FIFTH left it, at TEN. It does NOT
+establish that the emitter stopped writing that line, per READ TWENTY-SECOND, and it does
+NOT establish WHY: a deployed `1cdb96e` and a disabled or rescheduled cron job look
+identical from here, and per `a1b4a94` this exact job has silently lacked its scheduling
+wrapper before. Checked this run via the GitHub path-history API rather than this shallow
+clone, per READ TWENTY-FIRST's graft warning, `1cdb96e` is still the last commit to touch
+the function. It stays OPEN.
+
+THE UNDEPLOYED FIXES, AND A CLONE THAT COULD NOT ANSWER FOR ONE OF THEM
+Day counts as of the close, FLOORED per READ TWELFTH: `1cdb96e` at 12 days, `e79339b` at
+11, `0d2963e` at 7, `285a05f` at 3. None crossed a boundary since the 14:23 sweep.
+
+The first three were computed with `git show -s --format=%cI` in the CRM repo as usual. The
+fourth could NOT be: that command answers `fatal: ambiguous argument`, so the commit is
+absent from this container's shallow clone even though it is this repo's own history and 35
+prior sections quote a day count for it, one in each of READ TWELFTH through READ FORTY-SIXTH,
+none of them twice. Compute that against the section boundary rather than file wide: a bare
+`grep -c` returns 36, because this section's own day count is the thirty sixth. That is a
+SELF INCLUSION error and not the staleness READ FORTY-FOURTH describes, where a figure is
+invalidated by the next edit; the two traps are distinct and only the practical instruction is
+shared, which is to compute such a count last. One more trap if you re-run it: a trailing
+space in the grep pattern drops two matches, because two sections end a line on "at". READ
+THIRTY-SIXTH records that same error string for a DIFFERENT cause, asking the SIBLING for a
+commit that lives here, and warns it is an absent object rather than a stale ref. That
+warning and its diagnosis both hold; what does not transfer is the CAUSE. The repo was right
+this time and the object was still missing.
+
+`a1b4a94` is absent the same way, which is worth checking before reading anything into the
+first absence, and this section's cron paragraph cites it. Two absent hashes are CONSISTENT
+WITH the shallow boundary having moved, and do not establish it: a clone re-created at a
+fixed depth per container produces the identical observation and nothing here separates the
+two. The date came from the GitHub commits API instead, 2026-08-04T12:43:21Z, which is the
+same instrument READ TWENTY-FIRST prescribes for path history and works equally for a single
+commit. Reach for it whenever a local `git show` fails on a hash this file already carries,
+and do not read the failure as the commit having been rewritten.
+
+`e79339b` gains no NEW direct observation, since no 6 hour boundary falls inside the new
+slice; its most recent confirmation is the 12:00 cycle at an unchanged 32 lines, which READ
+FORTY-FIFTH read. The blocker was re-checked rather than inherited and is still exactly ONE
+thing: no Supabase access token in this container's environment.
+
+THE CENSUS, CROSS FOOTED PER READ TWELFTH
+
+    by project   endorsement-scorer 358, supabase-platform 33              = 391
+    by issue     ENDORSEMENT-SCORER-4 358                                  = 358
+                 SUPABASE-PLATFORM-1 26, -4 7                              =  33
+                                                                             391
+
+Both axes agree exactly, and BOTH were ANCHORED to the declared window, per READ FORTY-FIFTH,
+whose own census shifted off the window it named. There is no drift to explain and no
+direction to read. Anchoring took an explicit `timestamp` range AND a `period` set wider than
+the window, which is not READ FORTY-FIFTH's phrasing and is the sub-section below; do not
+take "an explicit range rather than a rolling period" as the recipe, because omitting the
+second half reproduces the 354 failure recorded there.
+
+ANCHORING TAKES TWO PARAMETERS, NOT ONE, AND THE FIRST TWO ATTEMPTS FAILED
+Worth recording because both failures are silent and both look like an answer.
+
+An explicit range with `period` 24h returned `endorsement-scorer` 354 rather than 358. The
+range is INTERSECTED with the rolling period rather than replacing it, so the period clipped
+the early end of the declared window, and the returned Sentry link carries both, which is how
+to see it. The size fits: about 5 watchdog events fall in the clipped 23 minutes at a roughly
+4 minute cadence, and 358 minus 354 is 5. So set `period` WIDER than the window you are
+anchoring, 48h for a 24h sweep.
+
+Widening to 48h then returned 718, a raw 48h count, because the tool DISCARDED the timestamp
+filter, visible in its echoed `Query: (empty)`. That is READ FIFTH's rewrite hazard, which
+ADDED a `level:error` filter where this DROPPED a timestamp one. Do NOT conclude from it that
+anchoring is impossible. READ FIFTH settles that in as many words: an empty query string was
+NOT rewritten when an auditor retried it, so the hazard is per call rather than unconditional.
+A retry of the identical 48h shape preserved the filter and produced the 358 and 33 above.
+
+An earlier draft concluded the opposite, that the figure "cannot be pinned to the declared
+window with this tool", and an auditor falsified it by retrying. Check the echo every time,
+and when it is wrong RETRY rather than recording an impossibility a future sweep would inherit
+as a standing reason never to anchor.
+
+`website`, `flutter`, `mautic`, `moydforms`, `n8n` and `supabase-edge` at zero, `flutter`
+for the TWENTY-SECOND sweep running and `mautic` for the TWENTIETH, counted from the
+sections rather than by increment per READ TWENTY-EIGHTH. Neither zero is evidence of a fix.
+
+SUPABASE-PLATFORM-1 fell from 27 to 26, and reconcile rather than assert, per READ THIRTIETH:
+the slice GAINED nothing and 1 aged out. That is a read rather than arithmetic. READ
+FORTY-SIXTH records its 27 event list running back only to 2026-08-06T15:20:15, this run's 26
+event list runs back only to 2026-08-06T18:05:07, and the trailing edge moved from 14:23:39
+to 16:22:26, crossing the first of those and nothing else. SUPABASE-PLATFORM-4 holds at 7,
+all between 00:40:03 and 01:25:06 and so the same occurrences READ FORTY-FIRST covers, of
+which it read ONE directly, the rest a weaker scope per READ SIXTH. Nothing was resolved or
+re-resolved.
+
+THE BRANCH REF TRAP, DELIBERATELY UNNUMBERED
+Both repos again presented the same stale PAIR READ EIGHTEENTH enumerates, `5d8a5b0` here
+and `77d879f` in the sibling, with `HEAD` detached at the true remote tips `187c6a5` and
+`ad24682`. Checked in the form READ TWENTY-SECOND prescribes, local side the NAMED BRANCH
+and not `HEAD`. Repaired with `git -C <path> checkout -B <branch> HEAD` per READ NINTH, and
+`git ls-remote` re-run immediately before committing per READ FOURTEENTH.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `1cdb96e`,
+`e79339b`, `0d2963e`, `285a05f`, `a1b4a94` and `a9e4f65`; the roles `anon` and
+`authenticated`; the relay internal `by_message`; the issue ids and project names; the names
+Sentry, GitHub and Supabase; the git commands `git show -s --format=%cI`, the bare `git show`,
+`git show --stat`, `grep -c`, `git ls-remote`, `git -C <path> checkout -B <branch> HEAD` and
+the shallow-clone marker `.git/shallow`,
+the ref name `HEAD` and the git error string `fatal: ambiguous argument`; the Sentry search
+field `level`, the filter form `level:error`, the search field `timestamp` used as an explicit
+range, the `period` parameter and the tool echo string `Query: (empty)`; the GitHub
+path-history and commits APIs;
+the stale refs `5d8a5b0` and `77d879f`; this repo's tip `187c6a5`; and the sibling's tip
+`ad24682`, whose cover is READ THIRTY-FIFTH's deliberate first publication. The bare
+`git show` is enumerated separately from the longer form on READ THIRTY-EIGHTH's precedent,
+which lists `git show --stat` and `git show -s --format=%cI` as separate entries. Cite that
+section alone and NOT READ TWENTY-FIRST, whose enumeration carries `git show --stat` only and
+so is no precedent for listing two forms; an earlier draft cited both and was caught, which is
+the undersized cover class READ SEVENTEENTH records. `git show --stat` and `.git/shallow` are themselves
+enumerated even though each reaches the body only through a justification citation, on READ
+TWENTY-SEVENTH's rule that a mention made in order to STRIKE something is still a mention,
+WIDENED here to a mention made in order to justify one. That widening is marked rather than
+passed off as a quotation, on READ THIRTY-EIGHTH's precedent for adapting a rule and saying
+so. Both arrive by the identical route in one sentence, so enumerating one and not the other,
+which an earlier draft did, is incoherent rather than merely incomplete.
+
+FIVE FIRST PUBLICATIONS AS IDENTIFIERS, CARVED OUT RATHER THAN SWEPT IN
+`period`, `timestamp`, `Query: (empty)`, `grep -c` and the GitHub commits API appear nowhere
+earlier in this file AS IDENTIFIERS, so prior publication is NOT their cover and the blanket
+sentence below does not reach them. Scope that claim to identifiers deliberately: the bare
+WORDS period and timestamp appear about thirty times earlier, READ FORTY-FIFTH using both in
+one sentence about this same tool, so the unscoped form would be false and this file teaches
+grepping exactly such a claim. `period` and `timestamp` are carved out TOGETHER for that
+reason, being parallel in every respect; an earlier draft carved out one and left the other
+under the blanket. They need no cover: two tool parameter names, a tool echo string naming
+nothing of ours, a generic shell flag and a public API named descriptively. That is READ
+TWENTY-FIRST's call for `.git/shallow` and `git show --stat`, and READ TWENTY-FIFTH records
+being caught for sweeping such an item under the blanket instead.
+
+The error string's cover is prior publication in READ THIRTY-SIXTH. Everything else already
+appears in this file or is committed in this public repo's own tree.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is `invalid input syntax for type uuid`,
+published here from READ FIRST onward, naming no table, column, row, person or address. The
+sponsors constraint name is never reached for, so there is no elision formula to apply.
+Quantities are enumerated together per READ THIRTY-SIXTH: the clock values, the day counts,
+the census and reconciliation figures, the 39 revoked grants, the 32 line cycle, the 30
+watchdog events, the TEN cron misses, the two streak ordinals, and every remaining quantity
+elsewhere in the section, OF WHATEVER KIND. All are bare and name nothing.
+
+No credential, no DSN, no project reference, no probe source address, no policy body, no RPC
+name and no raw upstream error body appears, and nothing here widens access to anything.
+Withheld per the practice READ SIXTH set: the state of the live endorsement vote, any
+operational read on production sessions, and anything describing this container's own
+reporting or credential tooling.
