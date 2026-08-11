@@ -764,6 +764,10 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
       return 'This email is not associated with a Missouri Young Democrats member. If you believe this is an error, please contact info@moyoungdemocrats.org';
     }
 
+    if (normalized.contains('link_wrong_browser')) {
+      return 'That sign-in link has already been used, or it was opened in a different browser or on a different device. Request a new link here and open it in this browser, or enter the 6-digit code from that new email instead.';
+    }
+
     if (normalized.contains('auth_failed') || normalized.contains('expired')) {
       return 'That sign-in link was invalid or expired. Request a new link to continue.';
     }

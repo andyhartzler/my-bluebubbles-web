@@ -40,7 +40,16 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
     try {
       await client.auth.getSessionFromUrl(Uri.base, storeSession: true);
     } on AuthException catch (error) {
-      _errorCode = error.message;
+      // The PKCE code verifier is written to this browser's local storage when
+      // the link is requested, read back here, and deleted once the exchange
+      // succeeds. So there is nothing to read back if the link is opened in a
+      // different browser, a different device or a private window, and equally
+      // if the link has already been used. Either way the exchange fails with a
+      // message that is true and useless to the person reading it. Send a
+      // stable code instead and let the sign-in screen explain what to do.
+      _errorCode = error.message.toLowerCase().contains('code verifier')
+          ? 'link_wrong_browser'
+          : error.message;
     } catch (_) {
       _errorCode = 'auth_failed';
     }
