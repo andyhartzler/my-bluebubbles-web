@@ -201,9 +201,10 @@ function isConnectionProbe(r: PgRow): boolean {
 // Every one of the 18 events that group carried between 2026-07-25 and
 // 2026-08-11 was a 400 of exactly that kind, from four different source
 // addresses including two datacenter ranges, with 0 users impacted and not one
-// upload or download among them. Roughly forty triage passes reached "left
-// alone deliberately, nothing to fix" on it. An error-level event every five
-// minutes for traffic we neither emit nor control is not a signal.
+// upload or download among them. Twenty-nine triage sections in AGENTS.md
+// carry this group and not one of them found anything to fix. An error-level
+// event every five minutes for traffic we neither emit nor control is not a
+// signal.
 //
 // What still reports: 401 and 403, which is an authenticated caller being
 // refused and therefore the RLS-regression case worth waking up for, plus 409,
