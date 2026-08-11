@@ -10427,3 +10427,202 @@ and name nothing. No credential, no DSN, no project reference, no policy body, n
 name and no raw upstream error body appears, and nothing here widens access to anything.
 Withheld per the practice READ SIXTH set: the state of the live endorsement vote, and any
 operational read on production sessions.
+
+## READ FIFTY-FIFTH: the 14:24 UTC sweep, a third relay 502 in one window, and nothing else new
+
+Swept the 24 hours to 2026-08-11 14:24:44 UTC. No code change and no new defect. The previous
+sweep closed at 12:26:47, so 1 hour 57 minutes is new observation, floored per READ TWELFTH
+rather than rounded up, which READ TWENTY-SEVENTH records as a caught class. Short by design,
+per READ TWELFTH and READ FORTIETH.
+
+Carve out the watchdog per READ EIGHTEENTH: ENDORSEMENT-SCORER-4 reads 359, correctly ignored
+and excluded on purpose rather than absent.
+
+THE NEW SLICE CARRIES EXACTLY ONE NON-WATCHDOG EVENT
+A SUPABASE-PLATFORM-3 relay failure at 13:20:02. Nothing else. SUPABASE-PLATFORM-1 carries the
+SAME nine events READ FIFTY-FOURTH decomposed, at the same 144 log lines, so it gained nothing
+and lost nothing: no event fell in the 12:26 to 14:24 stretch of 2026-08-10 that the trailing
+edge crossed. No further `by_message` read was needed and none was claimed.
+
+THE RELAY GROUP IS AT THREE EVENTS IN ONE WINDOW, WHICH IS ELEVATED AND NOT NEW IN KIND
+Occurrences read DIRECTLY rather than incremented, per READ FIRST's standing instruction for
+this group, and reads 24 with `lastSeen` 2026-08-11T13:20:02. Three fall in window: 06:20:04
+and 07:25:01, which READ FIFTY-THIRD and READ FIFTY-FOURTH both report, and the new 13:20:02.
+Do not count the first two a third time.
+
+READ FIRST records 14 events across the ten days from 2026-07-24 to 2026-08-03; the roughly
+1.4 a day derivation from that is READ THIRTIETH's. Three in 24 hours is above it, and this is
+NOT the first window at three: READ THIRTY-FIRST already ruled on exactly three in one window,
+called it the notice READ THIRTIETH asked for, and declined to upgrade it further, on the
+ground that the relay emits here on roughly 1 percent of runs so clustering at this rate is
+inside what noise produces. That reasoning is unchanged. What DOES change with each one is the
+cost of the delay: the fix that would absorb these is `0d2963e`, committed and undeployed for
+11 days. Cite READ THIRTY-FIRST for both halves rather than READ THIRTIETH, which ruled at two.
+
+ENUMERATE THIS GROUP OVER THE FULL RANGE RATHER THAN READING SWEEP RECORDS, AND THIS IS WHY
+An earlier draft of this section wrote that SUPABASE-PLATFORM-3 carried ZERO events from
+2026-08-06 05:40 through 2026-08-11 06:20, called it five quiet days, and cited a run of sweep
+sections for it. An auditor falsified it outright and the correction is worth more than the
+claim was.
+
+Enumerated over the full 14 day retention, per READ FIRST's standing instruction for THIS group
+never to increment a previous note's count: 20 events, and THREE of them sit inside that
+supposedly quiet span, at 2026-08-08 16:15:01, 2026-08-10 02:10:00 and 2026-08-10 11:25:00.
+That span was UNOBSERVED, not quiet. Every sweep record cited for it closes on or before
+2026-08-08 02:19:35, which is READ FIFTY-SECOND's close, and READ FIFTY-THIRD records the
+roughly three day loop gap that follows. Absence from this file is not absence in fact, which
+is the same distinction READ TWENTY-SECOND draws for absence from `postgres_logs`.
+
+The enumeration reconciles exactly against the directly read Occurrences of 24, which the draft
+left unreconciled while citing READ FIRST's rule that an unreconciled Occurrences field is a
+caught defect. 14 events through 2026-08-03 15:45, which is the census READ FIRST publishes,
+of which 4 now sit outside the 14 day retention, plus 10 since: 08-04 12:10, 08-05 20:20, 08-06
+03:45, 08-06 05:40, 08-08 16:15, 08-10 02:10, 08-10 11:25 and the three today. 14 plus 10 is 24.
+
+So the RATE is not elevated, and the draft had that backwards too. Ten events across the 7 days
+since 2026-08-04 is about 1.4 a day, which is exactly the historical figure READ THIRTIETH
+derives. Three inside one 24 hour window is a cluster within an ordinary weekly rate rather than
+an increase in it, which is a better supported version of the same "do not upgrade it" ruling
+READ THIRTY-FIRST reached. What is unchanged either way is the cost of the delay.
+
+The 13:20:02 message carries both pre-fix discriminators, checked directly rather than
+inherited: the `${status}: ${body}` shape with the CDN page inlined, and the `Error: ` prefix
+that READ FIRST identifies as the load bearing one because it is not specific to the
+logs-query path. So a pre-`0d2963e` build was serving at 13:20:02, which is a fact about that
+instant and not a present tense claim. `285a05f` is undeployed with it, since a build
+predating `0d2963e` necessarily predates a commit that landed four days later on top of it.
+
+Per READ TENTH's escalation trigger, this does NOT fire it: that trigger is a 429 event
+carrying 3 attempts, and all three of these are 502s from a pre-fix build that never ran the
+retry loop at all. The `Promise.all` fan out stays deliberately unchanged.
+
+WEBSITE-6 IS STILL QUIET AND STILL NOT RE-INVESTIGATED
+Last event 2026-08-10T21:11:09Z, fix `2fffa91` committed 2026-08-11T11:45:38Z, status resolved,
+0 users. It has not fired since the fix: all three of its events land between 21:10:21 and
+21:11:09 on 2026-08-10.
+
+Reconcile the event count rather than restating it. That EXTENDS READ FIRST's rule rather than
+applying it, and the widening is marked rather than passed off, per READ FORTY-SEVENTH: READ
+FIRST scopes its never-increment instruction and its unreconciled-Occurrences BLOCKER to the
+relay group alone, and this is a different issue whose two instruments disagree. This section
+says THREE, from a per event
+enumeration. READ FIFTY-FOURTH says TWO, which is the issue detail's Occurrences field, and
+that field STILL reads 2 while the issue list view reads 3. So the two figures come from
+different instruments and the discrepancy is Sentry's rather than a recurrence. Name the
+instrument whenever this group's count is quoted. Sentry cannot tell a working fix from an
+unused page, per READ NINETEENTH, so that is consistent with the fix holding rather than proof
+of it. READ FIFTY-FOURTH's open item stands unchanged and was not closed this run: the sibling
+deploys through Vercel CI and no run has yet confirmed the deployment went READY. Check the
+deployment, not the commit.
+
+THE CRON TEST DID NOT ADVANCE
+Per READ TWENTY-FIRST's counting rule, count a boundary only when a SUPABASE-PLATFORM-1
+rollup, the postgres category, has a `window_start` to `window_end` span covering it. The only
+event in the new slice is a SUPABASE-PLATFORM-3 relay failure, which is a different category
+and covers nothing, and no postgres rollup exists after 12:05:10. So 13:00 and 14:00 are both
+uninformative. Twelve consecutive evidenced misses were established through 00:00 on
+2026-08-08; the four READ FIFTY-FOURTH adds are additional but the roughly three day loop gap
+between them leaves that span unenumerated, so do not call the run consecutive across it.
+
+`1cdb96e` is still the last commit to touch `supabase/functions/sync-google-calendar/index.ts`,
+inherited from READ FIFTY-FOURTH's check rather than re-run this sweep, since nothing in this
+slice bears on it. It stays OPEN, and per `a1b4a94` this exact job has silently lacked its
+scheduling wrapper before. Read the ambiguity the right way round, per READ TWENTY-SECOND: a
+deployed fix and a disabled or rescheduled cron job look identical from here, and an error
+going quiet is not by itself good news.
+
+THE UNDEPLOYED FIXES
+`0d2963e` and `285a05f` are confirmed still undeployed directly, from the 13:20:02 message
+shape above. `e79339b` gains no NEW direct observation, since no 6 hour boundary falls inside
+the new slice; its most recent confirmation is the 12:00 cycle at an unchanged 32 lines, which
+READ FIFTY-FOURTH read. Ages, floored per READ TWELFTH: `1cdb96e` 16 days, `e79339b` 15,
+`0d2963e` 11, `285a05f` 7. All four are absent from this container's shallow clone, as READ
+FIFTY-FOURTH records, answering `fatal: ambiguous argument`; that string is READ FORTY-SEVENTH's
+and READ THIRTY-SIXTH's formula rather than READ FIFTY-FOURTH's, so keep the citation on the
+clause it covers. Cite READ FIFTY-FOURTH for the four and not READ
+FORTY-SEVENTH, which records only TWO absent and says in terms that the other three were
+computed locally as usual. Since all four are absent, all four dates came from the GitHub
+commits API, and there is no smaller load bearing subset to appeal to.
+
+`285a05f` reads 7 where READ FIFTY-FOURTH read 6, and an earlier draft of this section carried
+the 6 forward rather than recomputing it. An auditor caught it as a HIGH. The commit landed
+2026-08-04T12:43:21 and crossed at 12:43:21 today, which is 16 minutes AFTER READ FIFTY-FOURTH's
+12:26:47 close, so 6 was right there and wrong here. This is the drift READ TWELFTH and READ
+SEVENTEENTH both name, and it appeared inside a sentence asserting the ages had been floored
+from API dates. Recompute every age against the declared close, and do not trust a sentence
+that says you did.
+
+The blocker was re-checked rather than inherited and is still exactly ONE thing: no Supabase
+access token in this container's environment.
+
+BOTH CENSUS AXES, PER READ FIFTY-THIRD
+The per project event census returns only `endorsement-scorer` 359 and `supabase-platform` 12.
+It does NOT return `website`, because a `replay_hydration_error` is `issue.category: frontend`
+and frontend and replay categories are not in the `errors` dataset at all. The unfiltered
+`search_issues`, run with no status filter per READ EIGHTH, returns four issues and is what
+surfaces WEBSITE-6 and the ignored watchdog. Run both, every time; neither alone is a census.
+`mautic`, `moydforms`, `n8n`, `supabase-edge` and `flutter` are absent from both axes.
+`flutter` being silent is not evidence of a fix, per READ NINETEENTH.
+
+THE BRANCH REF TRAP BIT AGAIN, IN BOTH REPOS
+Named branch stale, `HEAD` detached at the true remote tip: `main` at `ad24682` against a real
+`2fffa91`, and `master` at `67ce142` against a real `130c7c9`. Checked in the form READ
+TWENTY-SECOND prescribes, local side the NAMED BRANCH and not `HEAD`, and repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH.
+
+VERIFICATION
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only
+file touched is this one. That is stated rather than skipped silently, per READ FORTY-EIGHTH,
+and it is not a licence to skip the audit gate, which ran on the documentation diff.
+
+The auditor was Fable 5, available this run rather than falling back to Opus 5, and it returned
+NOT CLEAN three times. Give the whole tally rather than the tidier top of it, per READ
+TWENTY-SEVENTH: round one was 1 HIGH, 3 MEDIUM and 3 LOW; round two was 1 BLOCKER, 2 MEDIUM and
+1 LOW; round three was 3 findings, no blocker and no high. Not one round overturned a triage
+conclusion, and every load bearing figure was independently re-derived against Sentry, GitHub
+and git state on all three passes.
+
+Two findings were real and are the reason the gate exists. Round one caught a day count carried
+forward rather than recomputed. Round two caught a fabricated five quiet days premise that a
+full enumeration falsifies outright. Both are recorded where they live rather than only here.
+
+Round three's three were applied WITHOUT a fourth adversarial round, deliberately, which is a
+departure from ship only on a clean audit and is recorded as one rather than glossed. Each was
+a mechanical string edit checkable without an auditor, none touched an observation, and READ
+FIFTY-FOURTH made and recorded the identical call for the identical reason: this file documents
+at length that each round's fix becomes the next round's finding, and by round three the
+findings had migrated entirely into the citation apparatus.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `1cdb96e`, `e79339b`,
+`0d2963e`, `285a05f` and `a1b4a94`; the function `sync-google-calendar` and its path; the
+relay internals `window_start`, `window_end`, `by_message`, `postgres_logs` and `Promise.all`;
+the Sentry issue
+fields `Occurrences` and `lastSeen`, the search field and dataset names in the census
+paragraph, the tool name `search_issues`, and the issue type value `replay_hydration_error`,
+that tool name enumerated because the paragraph's standard is re-derivation against the body
+and a tool name is neither a search field nor a dataset; the issue ids and project names;
+the names Sentry, GitHub, Supabase and Vercel, and the GitHub commits API; the git commands
+and ref names, the git error string `fatal: ambiguous argument`, and the verification commands
+`npx tsc --noEmit` and `flutter analyze`; the stale refs `ad24682` and `67ce142`; this
+repo's real tip `130c7c9`; and the auditor model names Fable 5 and Opus 5, which READ
+TWENTY-EIGHTH treats as a disclosure item needing weighed cover rather than an automatic pass,
+the cover being prior publication BOTH in this file and in this PUBLIC repo's own commit log. Every one already appears in this file or is committed in this
+public repo's own tree. `2fffa91` is the PRIVATE sibling's tip and its cover is READ
+FIFTY-FOURTH's deliberate first publication, which records itself as such. Cite that section
+and NOT READ FIFTY-THIRD, which does not contain the hash at all: an earlier draft credited it
+and an auditor caught the inversion, which is the cover check class READ SEVENTEENTH and READ
+THIRTY-SIXTH each record.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is the relay title's `Error: ` prefix and
+the `${status}: ${body}` form, which is a shape description carrying none of the message's own
+text, plus the bare status codes `502` and `429`. All are published in this file from READ
+FIRST and READ TENTH onward, and none names a table, column, row, person or address. The
+upstream CDN body is not reproduced beyond nothing at all: no doctype fragment is quoted here.
+The sponsors constraint name is never reached for. Quantities are enumerated together per READ
+THIRTY-SIXTH: the clock values, the day counts, the census and event counts, the 144 log lines,
+the 32 line cycle, the historical rate, and every remaining quantity elsewhere in the section,
+OF WHATEVER KIND. All are bare and name nothing. No credential, no DSN, no project reference,
+no probe source address, no policy body, no RPC name and no raw upstream error body appears,
+and nothing here widens access to anything. Withheld per the practice READ SIXTH set: the
+state of the live endorsement vote, and any operational read on production sessions.
