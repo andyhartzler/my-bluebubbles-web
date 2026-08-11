@@ -1414,13 +1414,37 @@ class ApiInterceptor extends Interceptor {
     params.remove("guid");
     params.remove("password");
 
-    // Make a nice log of what failed
-    Logger.error("""Failed Request: [${err.requestOptions.method}] ${err.requestOptions.path}
+    final log = """Failed Request: [${err.requestOptions.method}] ${err.requestOptions.path}
   -> Error: ${err.error ?? 'No Error'}
   -> Request Params: ${params.toString()}
   -> Request Data: ${err.requestOptions.data ?? 'No Data'}
   -> Response Status: ${err.response?.statusCode ?? 'No Response'}
-  -> Response Data: ${err.response?.data ?? 'No Data'}""", tag: "HTTP Service");
+  -> Response Data: ${err.response?.data ?? 'No Data'}""";
+
+    // Who owns the Sentry event for this failure. `addSentry()` inserts
+    // sentry_dio's FailedRequestInterceptor at index 0, so it runs BEFORE this
+    // one and captures exactly the failures whose response status falls inside
+    // its failedRequestStatusCodes range, 500-599 by default. It captures
+    // nothing when the request never got a response, because
+    // `_containsStatusCode` returns false for a null status.
+    //
+    // So error level here does one of two useless things. On a 5xx it files a
+    // second event for a failure sentry_dio already reported with richer
+    // request and response context. On a response-less failure it files a
+    // Sentry event whose entire content is that the BlueBubbles host did not
+    // answer, which is a transport condition and not a defect of this app.
+    // FLUTTER-8 is 164 of 238 events in 30 days from the latter alone.
+    //
+    // Warn keeps the identical text in the on-device log and leaves a Sentry
+    // breadcrumb, so the failure still rides along with whatever error a
+    // caller reports next. Only a server-answered status sentry_dio ignores,
+    // which is a 4xx, still files an event of its own from here.
+    final status = err.response?.statusCode;
+    if (status != null && (status < 500 || status > 599)) {
+      Logger.error(log, tag: "HTTP Service");
+    } else {
+      Logger.warn(log, tag: "HTTP Service");
+    }
 
     if (err.response != null && err.response!.data is Map) return handler.resolve(err.response!);
     if (err.response != null) {

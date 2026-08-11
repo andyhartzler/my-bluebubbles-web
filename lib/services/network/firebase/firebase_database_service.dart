@@ -58,7 +58,16 @@ class FirebaseDatabaseService extends GetxService {
     // Make sure setup is complete and we have valid data
     if (!ss.settings.finishedSetup.value) return null;
     if (ss.fcmData.isNull) {
-      Logger.error("Firebase Data was null when fetching new URL!");
+      // Not an error, and specifically not one on web. A client that never
+      // registered for FCM has no Firebase config to look a new server URL up
+      // in, which is the permanent expected state for the CRM, and returning
+      // null here is this function handling that rather than failing at it.
+      //
+      // It matters because of who calls it: the socket reconnect path asks on
+      // every attempt, so one outage of an unreachable host produced a burst
+      // of these, 58 of FLUTTER-8's 238 events in 30 days. Warn leaves the
+      // breadcrumb without filing an event of its own.
+      Logger.warn("Firebase Data was null when fetching new URL!");
       return null;
     }
 
