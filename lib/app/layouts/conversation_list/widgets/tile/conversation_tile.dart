@@ -450,15 +450,14 @@ class _ChatSubtitleState extends CustomState<ChatSubtitle, void, ConversationTil
       _contactsSub = eventDispatcher.stream.listen((event) {
         if (!mounted) return;
         if (event.item1 != 'update-contacts') return;
-        if (event.item2.isNotEmpty) {
-          // Null-guard: a chat with no hydrated latest message must not hit
-          // getNotificationText (FLUTTER-4 crash storm). The getter is typed
-          // non-nullable today, but placeholder chats have violated that in
-          // practice — keep the defensive check.
-          // ignore: unnecessary_nullable_for_final_variable_declarations
-          final Message? latest = controller.chat.latestMessage;
-          if (latest == null) return;
-          String newSubtitle = MessageHelper.getNotificationText(latest);
+        // item2 is the optional [contactIds, handleIds] reload hint. The web
+        // contacts fetch emits it as NULL to mean "contacts changed, no
+        // specific rows" (contact_service.fetchNetworkContacts), and a bare
+        // .isNotEmpty on that null is what stormed FLUTTER-4: one throw per
+        // mounted tile, per contacts refresh. This listener never reads the
+        // hint's contents, so null means refresh.
+        if (event.item2?.isNotEmpty ?? true) {
+          String newSubtitle = MessageHelper.getNotificationText(controller.chat.latestMessage);
           if (newSubtitle != subtitle) {
             setState(() {
               subtitle = newSubtitle;
