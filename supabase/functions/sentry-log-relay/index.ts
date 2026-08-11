@@ -153,6 +153,42 @@ async function queryLogs<T>(sql: string, startIso: string, endIso: string): Prom
   }
 }
 
+// Connection probes against the public direct-connect endpoint on 5432.
+//
+// Every shape below is raised by the postmaster BEFORE authentication
+// completes, so no statement of ours can produce one: there is no session, no
+// transaction and no query behind them. They are unattributable from here by
+// construction, because the rollup carries no client address (the dashboard
+// log explorer keeps the unscrubbed line, and that is where the attribution
+// question has to be settled). Reporting them one Sentry event per five minute
+// window bought nothing and cost about 40 percent of this issue's volume.
+//
+// Suppressed rather than deleted: the count still rides along on any event that
+// does fire, and a burst above the threshold gets its own fingerprint, so a
+// genuine escalation stays visible while the routine drip stops paying rent.
+// The real remediation is network restrictions or dropping the direct-connect
+// endpoint for the pooler, which is infrastructure and not a code change.
+const PROBE_PATTERNS: readonly RegExp[] = [
+  /^password authentication failed for user/,
+  /^unsupported frontend protocol /,
+  /^no PostgreSQL user name specified in startup packet/,
+  /^expected SASL response/,
+  /^canceling authentication due to timeout/,
+];
+
+// Sized against observed history: routine probe windows carry 1 to 6 lines,
+// while the anomalous ones on record carry 7, 14 and 24. This lets those three
+// through and stops the drip.
+const PROBE_BURST_THRESHOLD = 20;
+
+// The severity guard matters. These strings are only ever FATAL when the
+// postmaster raises them, so requiring FATAL means an ERROR level line that
+// merely quotes one (a RAISE, a probe harness, an application log) is never
+// silently dropped.
+function isConnectionProbe(r: PgRow): boolean {
+  return r.sev === "FATAL" && PROBE_PATTERNS.some((re) => re.test(r.msg));
+}
+
 function tally<T>(rows: T[], keyFn: (r: T) => string, cap = 10): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const r of rows) {
@@ -308,25 +344,57 @@ Deno.serve(async (req: Request) => {
       if (id) sent.push(`traffic:${id}`);
     }
 
-    if (pgRows.length > 0) {
-      // Normalize messages for grouping (strip volatile literals)
-      const norm = (m: string) =>
-        m.replace(/"[^"]*"/g, '"?"').replace(/\d+/g, "N").slice(0, 160);
-      const fatal = pgRows.some((r) => r.sev === "FATAL" || r.sev === "PANIC");
+    // Normalize messages for grouping (strip volatile literals)
+    const norm = (m: string) =>
+      m.replace(/"[^"]*"/g, '"?"').replace(/\d+/g, "N").slice(0, 160);
+
+    const probeRows = pgRows.filter(isConnectionProbe);
+    const appRows = pgRows.filter((r) => !isConnectionProbe(r));
+
+    if (appRows.length > 0) {
+      const byMessage = tally(appRows, (r) => norm(r.msg), 15);
+      const fatal = appRows.some((r) => r.sev === "FATAL" || r.sev === "PANIC");
+      // The title used to be a count and a severity flag, so two events with
+      // identical titles routinely carried completely different errors and the
+      // group could not be decomposed without opening every event. Lead with
+      // the dominant shape instead. Grouping is unaffected: the fingerprint is
+      // explicit and does not read the title.
+      const topShape = (Object.keys(byMessage)[0] ?? "unknown").slice(0, 80);
       const id = await sendSentryEvent({
-        message: `Postgres errors: ${pgRows.length} (${fatal ? "includes FATAL" : "ERROR level"})`,
+        message:
+          `Postgres errors: ${appRows.length} (${fatal ? "includes FATAL" : "ERROR level"}) - ${topShape}`,
         level: fatal ? "error" : "warning",
         fingerprint: ["supabase-platform", "postgres-errors"],
         tags: { category: "postgres" },
         extra: {
-          count: pgRows.length,
-          by_message: tally(pgRows, (r) => norm(r.msg), 15),
-          by_severity: tally(pgRows, (r) => r.sev),
-          sample: pgRows.slice(0, 5),
+          count: appRows.length,
+          by_message: byMessage,
+          by_severity: tally(appRows, (r) => r.sev),
+          sample: appRows.slice(0, 5),
+          // Carried even when zero, so a reader can tell "no probes in this
+          // window" from "this build does not know about probes".
+          probes_suppressed: probeRows.length,
           ...windowTag,
         },
       });
       if (id) sent.push(`postgres:${id}`);
+    }
+
+    // Its own fingerprint, so an escalation never lands back in the catch-all.
+    if (probeRows.length >= PROBE_BURST_THRESHOLD) {
+      const id = await sendSentryEvent({
+        message: `Connection probes: ${probeRows.length} rejected pre-auth connections in window`,
+        level: "warning",
+        fingerprint: ["supabase-platform", "connection-probes"],
+        tags: { category: "postgres-probes" },
+        extra: {
+          count: probeRows.length,
+          by_message: tally(probeRows, (r) => norm(r.msg), 15),
+          sample: probeRows.slice(0, 5),
+          ...windowTag,
+        },
+      });
+      if (id) sent.push(`probes:${id}`);
     }
 
     const { error: updErr } = await supabase
@@ -343,7 +411,8 @@ Deno.serve(async (req: Request) => {
         storage_errors: storageErrs.length,
         api_5xx: any5xx.length,
         http_429: tooMany.length,
-        postgres_errors: pgRows.length,
+        postgres_errors: appRows.length,
+        connection_probes: probeRows.length,
       },
       sentry_events: sent,
     };
