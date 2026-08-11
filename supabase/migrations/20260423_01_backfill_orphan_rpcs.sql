@@ -601,7 +601,7 @@ BEGIN
       'https://faajpcarasilbfndzkmd.supabase.co/functions/v1/fetch-all-member-profile-pictures',
       ARRAY[
         extensions.http_header('Content-Type', 'application/json'),
-        extensions.http_header('Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYWpwY2FyYXNpbGJmbmR6a21kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MDIxNzE5OSwiZXhwIjoyMDc1NzkzMTk5fQ.aNG79mrHw8P1TjJ6uYqP0ceSK65DOjaVUMt-MazXnWU')
+        extensions.http_header('Authorization', 'Bearer REDACTED_SERVICE_ROLE_KEY_SEE_VAULT')
       ],
       'application/json',
       jsonb_build_object('memberId', NEW.id::text)::text
@@ -5020,7 +5020,7 @@ BEGIN
   SELECT net.http_post(
     url := 'https://faajpcarasilbfndzkmd.supabase.co/functions/v1/extract-bill-text-openstates',
     headers := jsonb_build_object(
-      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYWpwY2FyYXNpbGJmbmR6a21kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MDIxNzE5OSwiZXhwIjoyMDc1NzkzMTk5fQ.aNG79mrHw8P1TjJ6uYqP0ceSK65DOjaVUMt-MazXnWU',
+      'Authorization', 'Bearer REDACTED_SERVICE_ROLE_KEY_SEE_VAULT',
       'Content-Type', 'application/json'
     ),
     body := jsonb_build_object(
@@ -6205,7 +6205,7 @@ BEGIN
       url := 'https://faajpcarasilbfndzkmd.supabase.co/functions/v1/lookup-districts',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
-        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYWpwY2FyYXNpbGJmbmR6a21kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MDIyMTcxOSwiZXhwIjoyMDc1Nzk3NzE5fQ.aNG79mrHw8P1TjJ6uYqP0ceSK65DOjaVUMt-MazXnWU'
+        'Authorization', 'Bearer REDACTED_SERVICE_ROLE_KEY_SEE_VAULT'
       ),
       body := jsonb_build_object(
         'memberId', NEW.id::text
@@ -6297,7 +6297,7 @@ BEGIN
     SELECT net.http_post(
       url := 'https://faajpcarasilbfndzkmd.supabase.co/functions/v1/extract-bill-text-openstates',
       headers := jsonb_build_object(
-        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYWpwY2FyYXNpbGJmbmR6a21kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MDIxNzE5OSwiZXhwIjoyMDc1NzkzMTk5fQ.aNG79mrHw8P1TjJ6uYqP0ceSK65DOjaVUMt-MazXnWU',
+        'Authorization', 'Bearer REDACTED_SERVICE_ROLE_KEY_SEE_VAULT',
         'Content-Type', 'application/json'
       ),
       body := jsonb_build_object(
@@ -6349,7 +6349,7 @@ BEGIN
     url := 'https://faajpcarasilbfndzkmd.supabase.co/functions/v1/notify-executive-job-submission',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYWpwY2FyYXNpbGJmbmR6a21kIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MDIxNzE5OSwiZXhwIjoyMDc1NzkzMTk5fQ.aNG79mrHw8P1TjJ6uYqP0ceSK65DOjaVUMt-MazXnWU'
+      'Authorization', 'Bearer REDACTED_SERVICE_ROLE_KEY_SEE_VAULT'
     ),
     body := jsonb_build_object('job_id', NEW.id::text)
   ) INTO request_id;
