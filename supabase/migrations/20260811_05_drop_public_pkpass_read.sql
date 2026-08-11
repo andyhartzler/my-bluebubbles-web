@@ -1,0 +1,17 @@
+-- Phase 0a: kill anonymous enumeration and self-signing of membership-cards.
+--
+-- The policy "Public read access for pkpass files" granted SELECT on
+-- storage.objects to PUBLIC (all roles, including anon) for the whole
+-- membership-cards bucket. That is what let an anonymous caller holding only
+-- the publishable key LIST every object (81 <member_uuid>.pkpass names) and
+-- MINT ITS OWN SIGNED URLS via /object/sign. Both verified live before the drop.
+--
+-- Dropping it does NOT break the 71 stored /object/public/ URLs: reads through
+-- the public path bypass RLS entirely while buckets.public = true. Proven by
+-- form-uploads, which has no SELECT policy at all and still serves anonymous
+-- public reads. So this is a zero-breakage mitigation that converts
+-- "enumerable" into "guessable-only" (122-bit UUID) ahead of the bucket flip.
+--
+-- Verified after apply: anon LIST -> [], anon /object/sign -> 400 NoSuchKey,
+-- unauthenticated /object/public read -> 200 (unchanged).
+DROP POLICY IF EXISTS "Public read access for pkpass files" ON storage.objects;

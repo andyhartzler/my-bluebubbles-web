@@ -1,0 +1,44 @@
+-- Phase 2b: take membership-cards private.
+--
+-- The bucket held 81 Apple Wallet passes, one per member, each disclosing that
+-- member's name, email, join date, exec role/chapter and the Apple Wallet
+-- authenticationToken. With public = true an unauthenticated GET of
+-- /storage/v1/object/public/membership-cards/apple-wallet-passes/<uuid>.pkpass
+-- returned the file with NO credentials at all (verified before: HTTP 200,
+-- 38159 bytes, content-type application/vnd.apple.pkpass).
+--
+-- Safe to flip because every consumer was checked first:
+--   * members portal       -> mints a signed URL per signed-in caller via the
+--                             getApplePassUrl server action (moyoungdemocrats
+--                             203f5db, deployed READY before this ran).
+--   * apple-wallet-updates -> service-role .download(), bypasses RLS.
+--   * generate-wallet-passes and _shared/apple-wallet.ts -> .upload() only.
+--     Their getPublicUrl() call only builds a string and cannot fail; it now
+--     mints a dead URL, which nothing reads for Apple any more.
+--   * download-apple-pass  -> DELETED. It was verify_jwt=false with a
+--     service-role client and no auth check at all, and served any member's
+--     pass anonymously by UUID. Probed live with zero credentials before
+--     deletion: HTTP 200, a real 38186-byte pass.
+--
+-- Verified after this ran:
+--   unauthenticated GET /object/public/...            -> 400
+--   anon POST /object/list/membership-cards           -> []
+--   anon POST /object/sign/...                        -> 400 NoSuchKey
+--   anon GET  /object/membership-cards/...            -> 400
+--   service-role sign + unauthenticated fetch of it   -> 200, 38312 bytes,
+--                                                        application/vnd.apple.pkpass
+--
+-- ONE CAVEAT WORTH KNOWING. Objects already in the Cloudflare edge cache keep
+-- being served on their exact public URL until the TTL expires. Immediately
+-- after this ran, a pass fetched minutes earlier still returned 200 with
+-- cf-cache-status: HIT and cache-control: public, max-age=3600, while the same
+-- key with a cache-busting query string and a never-fetched key both returned
+-- 400. So the origin is closed; already-cached URLs self-heal within an hour.
+-- Flipping a bucket private is not a retroactive revocation of what the CDN
+-- already holds.
+--
+-- Deliberately NOT backfilling membership_cards.apple_wallet_pass_url here.
+-- Leaving the 71 stored public URLs in place keeps this reversible with a
+-- single UPDATE while the signed path is confirmed by a real member; the portal
+-- no longer reads that column for Apple, only as a "card exists" test.
+UPDATE storage.buckets SET public = false WHERE id = 'membership-cards';
