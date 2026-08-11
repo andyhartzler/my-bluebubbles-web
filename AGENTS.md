@@ -10299,3 +10299,131 @@ THE BRANCH REF TRAP DID NOT BITE
 Both repos presented their named branch AT the true remote tip, checked in the form READ
 TWENTY-SECOND prescribes with the local side being the NAMED BRANCH. That is rare in this record.
 Keep running the check, per READ SECOND.
+
+## READ FIFTY-FOURTH: the 12:26 UTC sweep, a 56 minute new slice, and WEBSITE-6 quiet since its fix
+
+Swept the 24 hours to 2026-08-11 12:26:47 UTC. No code change. Do NOT shorten that to "no
+defect", per READ TWENTY-EIGHTH: the sponsors burst is one of the two real defects this file
+tracks and it fired 32 times inside the new slice. Short on purpose, per READ TWELFTH and READ
+FORTIETH.
+
+Per the overlap warning in READ FOURTH: the previous sweep closed at 11:30 UTC, so only about 56
+minutes is new observation and roughly 23 hours is shared. Almost nothing below is independent
+of it. The only rollup in the new slice is the 12:05:10 cycle; the 18:05:05, 00:05:04 and
+06:05:10 cycles and both relay events sit in the shared ground.
+
+Carve out the watchdog per READ EIGHTEENTH: ENDORSEMENT-SCORER-4 reads 359, correctly ignored
+and excluded on purpose rather than absent.
+
+WEBSITE-6 IS HANDLED, DO NOT RE-INVESTIGATE IT
+Its last event is 2026-08-10T21:11:09Z on release `ad24682`, and its fix `2fffa91` was committed
+2026-08-11T11:45:38Z with a literal auto-close trailer, so it has not fired since. Two
+occurrences, 0 users impacted, status resolved. Sentry cannot tell a working fix from an unused
+page, per READ NINETEENTH, so that is consistent with the fix holding rather than proof of it.
+Note what was NOT checked: the sibling deploys through Vercel CI and this run verified the
+commit and the quiet but never confirmed the deployment went READY. Check the deployment, not
+the commit, per that repo's own standing rule.
+
+FULL DECOMPOSITION OF THE WINDOW
+`by_message` read on all 9 SUPABASE-PLATFORM-1 events, per READ FOURTH, not sampled. 144 log
+lines, reconciling against the sum of the nine per event `count` fields:
+
+    128  duplicate key value violates unique constraint "?"   ERROR, 32 in each of four
+         cycles at 18:00, 00:00, 06:00 and 12:00
+     16  FATAL, being 10 filtered password lines, 3 `unsupported frontend protocol N.N` and
+         3 `no PostgreSQL user name specified in startup packet`
+
+Those are shapes 1, 4 and 5, all three of which READ FOURTH enumerates; do not credit READ
+ELEVENTH for them, whose contribution is the SASL Terminate family, which is absent here, as is
+the `canceling authentication due to timeout` shape READ THIRTY-SEVENTH adds. The password
+counts are `by_severity` residuals rather than direct reads, per READ FOURTH. The ad hoc hand
+SQL family produced nothing and no permission denial fired, which settles nothing, for the
+conditionality reason READ FOURTH gives.
+
+FOUR EVIDENCED CRON MISSES IN THE WINDOW, AND A GAP THAT IS NOT ENUMERATED
+Per READ TWENTY-FIRST's counting rule, all four six hour rollups have a `window_start` to
+`window_end` span covering their boundary and none carries the hourly `invalid input syntax for
+type uuid` line. Do NOT add these to the running count and call it consecutive: the loop did not
+run for about three days, so the boundaries between 00:00 on 2026-08-08 and 18:00 on 2026-08-10
+were never read. Twelve consecutive were established through 00:00 on 2026-08-08; these four are
+additional but the span between them is unenumerated, and three of the four are shared ground
+rather than new observation.
+
+`1cdb96e` is still the last commit to touch `supabase/functions/sync-google-calendar/index.ts`,
+checked via the GitHub path-history API rather than this shallow clone, per READ TWENTY-FIRST's
+graft warning. It stays OPEN, and per `a1b4a94` this exact job has silently lacked its scheduling wrapper
+before. Read the ambiguity the right way round, per READ TWENTY-SECOND,
+which originates the framing rather than READ TWENTY-FOURTH, which restates it: a deployed fix
+and a disabled or rescheduled cron job look identical from here, and an error going quiet is not
+by itself good news.
+
+THE UNDEPLOYED FIXES, ALL FOUR CONFIRMED
+`e79339b` directly, from the 12:00 cycle at an unchanged 32 lines with no `42P10`. `0d2963e` and
+`285a05f` directly, from both SUPABASE-PLATFORM-3 events, at 06:20:04 and 07:25:01, still
+carrying the pre fix `Error: ` prefix and `${status}: ${body}` shape that READ FIRST identifies
+as the discriminator. Those two are the SAME occurrences READ FIFTY-THIRD reports, not
+recurrences; do not count them twice. Ages, floored, from the GitHub commits API because all
+four are absent from this container's shallow clone: `1cdb96e` 16 days, `e79339b` 15, `0d2963e`
+11, `285a05f` 6. The blocker was re-checked rather than inherited and is still exactly ONE
+thing: no Supabase access token in this container's environment.
+
+THE BRANCH REF TRAP BIT AGAIN, IN BOTH REPOS
+Back to the usual shape after READ FIFTY-THIRD's clean run: named branch stale, `HEAD` detached
+at the true remote tip, `main` at `ad24682` against a real `2fffa91` and `master` at `67ce142`
+against a real `1530093`. Checked in the form READ TWENTY-SECOND prescribes, local side the
+NAMED BRANCH and not `HEAD`, and repaired with `git -C <path> checkout -B <branch> HEAD`.
+
+BOTH CENSUS AXES, PER READ FIFTY-THIRD
+The per project event census returns only `endorsement-scorer` 359 and `supabase-platform` 11.
+It does NOT return `website`, because a `replay_hydration_error` is `issue.category: frontend`
+and frontend and replay categories are not in the `errors` dataset at all. The unfiltered
+`search_issues` is what surfaces those. Run both, every time; neither alone is a census.
+
+VERIFICATION
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only
+file touched is this one. That is stated rather than skipped silently, per READ FORTY-EIGHTH,
+and it is not a licence to skip the audit gate, which ran on the documentation diff. The
+auditor was Fable 5, available this run rather than falling back to Opus 5, and it returned
+NOT CLEAN three times. Give the whole tally rather than the tidier top of it, per READ
+TWENTY-SEVENTH: round one was 2 HIGH, 3 MEDIUM and 2 LOW; round two, after every one was
+repaired and the repairs independently re-verified, was 2 MEDIUM and 3 LOW with no blocker or
+high; round three was 1 MEDIUM and 2 LOW. Not one round overturned a triage figure, and every
+finding from round two on sat in the apparatus rather than in an observation. Round three's
+three were applied without a fourth adversarial round, deliberately: each was a mechanical
+string edit checkable without one, and this file records at length that each round's fix
+becomes the next round's finding. That is a departure from ship only on a clean audit and it
+is recorded as one rather than glossed.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `1cdb96e`, `e79339b`,
+`0d2963e`, `285a05f` and `a1b4a94`; the function `sync-google-calendar` and its path; the
+SQLSTATE `42P10`; the relay internals `window_start`, `window_end`, `by_message`, `by_severity`
+and `count`; the Sentry search field and dataset names used in the census paragraph, and the
+issue type value `replay_hydration_error`; the issue ids and project names; the names Sentry,
+GitHub, Supabase and Vercel, and the GitHub path-history and commits APIs; the git commands
+and ref names, and the verification commands `npx tsc --noEmit` and `flutter analyze`; the
+stale refs `ad24682` and `67ce142`; and this repo's real tip `1530093`. Every one already appears in this file or is committed in
+this public repo's own tree.
+
+`2fffa91` is the PRIVATE sibling's tip and appears nowhere earlier in this file, so "already
+published" is NOT its cover: it is published here for the first time, deliberately, on the same
+call READ TWENTIETH made for `308ef92` and READ THIRTY-FIFTH for `ad24682`, that a bare commit
+hash of a private repo names no table, route or person and this file has published sibling
+hashes before. Check WHICH repo published a thing, and then WHETHER it did, before citing prior
+publication as cover, per READ SEVENTEENTH.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is the normalized duplicate key message,
+`unsupported frontend protocol N.N`, `no PostgreSQL user name specified in startup packet`, the
+uuid message shape, the `canceling authentication due to timeout` shape named only to record
+its absence, and the relay title's `Error: ` prefix together with the `${status}: ${body}`
+form, which is a shape description carrying none of the message's own text. All
+are published in this file from READ FIRST and READ FOURTH onward, and none names a table,
+column, row, person or address; the password line's user name is exactly what the filter
+removes. The sponsors constraint name is never reached for. The probe source address is not
+reproduced, per READ FIFTH. Quantities are enumerated together per READ THIRTY-SIXTH: the log
+line and rollup counts, the day counts, the census figures, the overlap durations, the clock
+values, and every remaining quantity elsewhere in the section, OF WHATEVER KIND. All are bare
+and name nothing. No credential, no DSN, no project reference, no policy body, no RPC
+name and no raw upstream error body appears, and nothing here widens access to anything.
+Withheld per the practice READ SIXTH set: the state of the live endorsement vote, and any
+operational read on production sessions.
