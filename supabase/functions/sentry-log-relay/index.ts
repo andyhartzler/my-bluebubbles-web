@@ -189,6 +189,31 @@ function isConnectionProbe(r: PgRow): boolean {
   return r.sev === "FATAL" && PROBE_PATTERNS.some((re) => re.test(r.msg));
 }
 
+// Storage statuses that describe the CALLER rather than storage health.
+//
+// 404 was always excluded here. 400 belongs with it and had not been, which is
+// the whole of SUPABASE-PLATFORM-4: Supabase Storage answers 400, not 404, for
+// an object or bucket that does not exist, a keyless path, a malformed list
+// body, and a public-path read of a bucket that is deliberately private. All
+// four mean the request could not be served as asked, and none of them says
+// anything about storage working.
+//
+// Every one of the 18 events that group carried between 2026-07-25 and
+// 2026-08-11 was a 400 of exactly that kind, from four different source
+// addresses including two datacenter ranges, with 0 users impacted and not one
+// upload or download among them. Roughly forty triage passes reached "left
+// alone deliberately, nothing to fix" on it. An error-level event every five
+// minutes for traffic we neither emit nor control is not a signal.
+//
+// What still reports: 401 and 403, which is an authenticated caller being
+// refused and therefore the RLS-regression case worth waking up for, plus 409,
+// 413, 429 and every 5xx. Storage breaking does not answer 400.
+//
+// A user-facing failure keeps a better reporting path than this one anyway:
+// the CRM's own Sentry project captures the failed request with a stack trace
+// and a session, where this rollup has attributed 0 users in its entire life.
+const STORAGE_CALLER_ERRORS = new Set([400, 404]);
+
 function tally<T>(rows: T[], keyFn: (r: T) => string, cap = 10): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const r of rows) {
@@ -271,7 +296,8 @@ Deno.serve(async (req: Request) => {
       r.path.startsWith("/auth/v1/token") && [400, 401, 403].includes(r.status)
     );
     const storageErrs = edgeRows.filter((r) =>
-      r.path.startsWith("/storage/v1") && r.status >= 400 && r.status !== 404
+      r.path.startsWith("/storage/v1") && r.status >= 400 &&
+      !STORAGE_CALLER_ERRORS.has(r.status)
     );
     const any5xx = edgeRows.filter((r) => r.status >= 500);
     const tooMany = edgeRows.filter((r) => r.status === 429);
@@ -292,15 +318,25 @@ Deno.serve(async (req: Request) => {
     }
 
     if (storageErrs.length > 0) {
+      const storageByStatus = tally(storageErrs, (r) => String(r.status));
+      const storageByPath = tally(storageErrs, (r) => `${r.method} ${pathGroup(r.path)}`);
+      // The old title asserted "(uploads/downloads)" unconditionally, and not
+      // one of the 18 events it produced was either. Lead with the dominant
+      // status and path shape instead, the way the postgres title already
+      // does. Grouping is unaffected: the fingerprint is explicit and does not
+      // read the title, so this stays SUPABASE-PLATFORM-4 rather than opening
+      // a new issue.
+      const topShape =
+        `${Object.keys(storageByStatus)[0] ?? "?"} ${Object.keys(storageByPath)[0] ?? "?"}`;
       const id = await sendSentryEvent({
-        message: `Storage errors: ${storageErrs.length} failed storage requests (uploads/downloads)`,
+        message: `Storage errors: ${storageErrs.length} failed storage requests - ${topShape}`,
         level: "error",
         fingerprint: ["supabase-platform", "storage-errors"],
         tags: { category: "storage" },
         extra: {
           count: storageErrs.length,
-          by_status: tally(storageErrs, (r) => String(r.status)),
-          by_path: tally(storageErrs, (r) => `${r.method} ${pathGroup(r.path)}`),
+          by_status: storageByStatus,
+          by_path: storageByPath,
           sample: storageErrs.slice(0, 5),
           ...windowTag,
         },
