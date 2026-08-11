@@ -10223,3 +10223,79 @@ sessions, and anything describing this container's own reporting or credential t
 auditor model, its credit state and the fallback rule weighed in this check. Keep that carve out,
 per READ THIRTY-EIGHTH: dropping it while keeping the sentence it qualifies leaves the paragraph
 asserting it withheld a class its own body just described.
+
+## READ FIFTY-THIRD: the 2026-08-11 sweep, a real hydration defect on the members portal, and the census that hid it
+
+Swept the 24 hours to 2026-08-11 11:30 UTC, after a roughly 3 day gap in which the loop did
+not run. One code change, in the SIBLING repo: `moyoungdemocrats`, fixing WEBSITE-6. Short by
+design, per READ TWELFTH and READ FORTIETH.
+
+THE CENSUS TRAP THAT MATTERS MORE THAN THE FIX
+READ FIFTH says to census by EVENT COUNT PER PROJECT rather than by issue status, because an
+ignored issue hides a whole project. That instruction is necessary and, on its own, WRONG here.
+An `errors` dataset aggregate over `project` with an empty query returned exactly two projects,
+`endorsement-scorer` 360 and `supabase-platform` 11. It did NOT return `website`, which carried
+a live defect with events inside the same window.
+
+The reason is the issue CATEGORY. WEBSITE-6 is `issue.category: frontend`, issue type
+`replay_hydration_error`, and those do not live in the `errors` dataset at all. So the
+per project event census misses every frontend and replay category issue by construction, and
+a run that trusts it will report `website` silent while the public site is throwing.
+
+Run BOTH: the per project event census AND an unfiltered `search_issues` with no status filter,
+per READ EIGHTH, and reconcile. The issue list is what surfaced this one. Neither axis alone is
+a census.
+
+THE DEFECT, AND IT IS THE FIRST ONE ON THE PUBLIC SITE IN SOME TIME
+`ToastViewport` in `src/components/ui/Toast.tsx` opened with
+`if (typeof document === 'undefined') return null;` and then `createPortal`. That is a render
+time server/client branch, the first item on React's own hydration mismatch list: the server
+renders nothing, the client's FIRST render already produces the portal container, so hydration
+fails and React discards and rebuilds the tree.
+
+`ToastProvider` sits at the root of `src/app/site-members/dashboard/layout.tsx`, so this fired on
+every signed in members portal page load, not only the one URL Sentry happened to name. Fixed by
+gating on a `mounted` flag set in an effect, so the first client render matches the server and the
+portal arrives on the next commit. No toast is lost: `items` is state on the PROVIDER, not on the
+viewport, and a toast can only be raised by a user action, which cannot precede mount.
+
+REPRODUCE HYDRATION ERRORS DIRECTLY, DO NOT REASON ABOUT THEM
+This is the transferable part. Chromium is on the image and `next dev` runs in this container, so
+a hydration mismatch can be OBSERVED rather than inferred, and the React error text names the
+offending component and prints the differing subtree with a `+` on the side that rendered it.
+
+Two conditions, both learned the hard way here. Playwright installs at a browser build the image
+does not carry, so launch with
+`executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'` rather than running
+`playwright install`. And read the message from `page.on('pageerror')`, not only `console`.
+
+That method killed this run's FIRST hypothesis, which is why it is worth the setup. The apparent
+suspect was `usePathname()` under the proxy rewrite: the layout computes `activeHref` from it, and
+a server value of `/site-members/...` against a client value of `/members/...` would change which
+nav item renders `aria-current`. Curling the dev server settled it in one command: the server
+already marks Opportunities active, so Next 16 passes the ORIGINAL path through the rewrite and
+that whole mechanism does not exist. Do not inherit it as a hazard.
+
+VERIFICATION, AND THE BASELINE BUILD FAILURE IS STILL THE BASELINE
+`npx tsc --noEmit` exits 0. `npm run build` fails exactly as this repo's sibling AGENTS.md
+records, at "Collecting page data" with `supabaseUrl is required` on `/site-events/api/track/form`,
+an unrelated route. Supplying the two public Supabase env vars on the command line takes the same
+build to exit 0, which is what shows the failure is environmental rather than the diff. Note that
+`node_modules` was absent and `npm ci` was needed first.
+
+WHAT DID NOT CHANGE
+`e79339b` is confirmed still undeployed from direct evidence: the 06:00 cycle carried exactly 32
+`legislation_bill_sponsors_unique` lines and no `42P10`. SUPABASE-PLATFORM-3 fired twice, at
+06:20:04 and 07:25:01, both still carrying the pre fix `${status}: ${body}` shape, so `0d2963e`
+and `285a05f` are also still undeployed. Ages, floored: `1cdb96e` 16 days, `e79339b` 15,
+`0d2963e` 11, `285a05f` 6. The blocker is unchanged and is still exactly ONE thing, re checked
+rather than inherited: no Supabase access token in this container's environment.
+
+Everything else in the window is the probe families READ FOURTH and READ ELEVENTH enumerate.
+No ad hoc hand SQL family line and no permission denial fired at all, which settles nothing, for
+the conditionality reason READ FOURTH gives.
+
+THE BRANCH REF TRAP DID NOT BITE
+Both repos presented their named branch AT the true remote tip, checked in the form READ
+TWENTY-SECOND prescribes with the local side being the NAMED BRANCH. That is rare in this record.
+Keep running the check, per READ SECOND.
