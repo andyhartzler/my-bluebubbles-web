@@ -165,6 +165,18 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
         default:
           break;
       }
+    }, onError: (Object error) {
+      // onError is required, not optional. gotrue's onAuthStateChange is an
+      // rxdart BehaviorSubject, so a stored error is REPLAYED to every new
+      // subscriber, not just delivered live. A failed PKCE code exchange
+      // during Supabase.initialize() latches such an error before this
+      // listener exists (see FLUTTER-Q), and a subscription with no onError
+      // turns that replay into an unhandled zone error.
+      //
+      // Nothing user facing is owed here: _bootstrap() already reads the
+      // ?error= parameter the callback screen redirects with and renders the
+      // sign-in failure. Absorbing only stops the duplicate unhandled report.
+      debugPrint('SupabaseAuthGate: ignoring auth stream error: $error');
     });
   }
 

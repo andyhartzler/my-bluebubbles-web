@@ -61,7 +61,21 @@ class AuthRefreshGuard {
   void start(SupabaseClient client) {
     if (_sub != null) return;
     _client = client;
-    _sub = client.auth.onAuthStateChange.listen(_onAuthState);
+    // onError is required, not optional. gotrue's onAuthStateChange is an
+    // rxdart BehaviorSubject, so a stored error is REPLAYED to every new
+    // subscriber, not just delivered live. A failed PKCE code exchange during
+    // Supabase.initialize() latches such an error before this listener exists
+    // (see FLUTTER-Q), and a subscription with no onError turns that replay
+    // into an unhandled zone error. The SDK's own listener carries an
+    // absorbing onError for exactly this reason.
+    _sub = client.auth.onAuthStateChange.listen(
+      _onAuthState,
+      onError: (Object error) {
+        // Already reported by GoTrueClient.notifyException before reaching the
+        // stream; absorbing here only stops the duplicate unhandled report.
+        debugPrint('AuthRefreshGuard: ignoring auth stream error: $error');
+      },
+    );
   }
 
   void _onAuthState(AuthState state) {
