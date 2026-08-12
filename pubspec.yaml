@@ -16,7 +16,7 @@ description: Send iMessages on Android using BlueBubbles!
 # derives `dist` from the build number, so a build shipped without bumping it
 # is indistinguishable in Sentry from every build before it. Bump the build
 # number whenever a change is meant to be measurable in Sentry.
-version: 1.15.0+71
+version: 1.15.0+72
 publish_to: none
 
 environment:

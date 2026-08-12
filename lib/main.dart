@@ -407,6 +407,55 @@ Future<void> initSentry() async {
           return null;
         }
 
+        // FLUTTER-6 and FLUTTER-Y: one framework defect under two groups, split
+        // only by whether the microtask or the frame-callback path reached it.
+        // Flutter's MultiSelectableSelectionContainerDelegate._flushAdditions
+        // sorts newly registered selectables with compareOrder, and the
+        // comparator reads Selectable.boundingBoxes -> RenderBox.size on a
+        // selectable that was attached but never laid out, which throws
+        // StateError('RenderBox was not laid out: ...') out of box.dart. Every
+        // frame in both stacks is selectable_region.dart on 3.41.8; none is
+        // ours. It is flutter/flutter#151536, open and P2, and the PR that
+        // would fix it (#184900) is unmerged and contested by the framework
+        // reviewer as reactive. The selectables come from route content that an
+        // opaque route above it has pushed offstage: _RenderTheatre skips
+        // layout for obscured overlay entries, so a rebuild underneath a pushed
+        // route registers a selectable that has no size when the flush runs.
+        // We cannot avoid it without either dropping SelectionArea, which costs
+        // text selection across the CRM, or swapping it in and out of the tree,
+        // which rebuilds every screen's subtree and loses its state on every
+        // dialog. So this is a REPORTING change, not a fix: the defect still
+        // happens, it is non-fatal (the frame's selection update is skipped and
+        // the app keeps running), and it is not actionable here.
+        //
+        // The discriminator is the Array.sort frame, not the message. Sorting
+        // is the only way our own code could reach this exception without a
+        // frame of ours on the stack, and nothing we sort reads a RenderBox:
+        // the dashboard comparators sort DashboardWidgetConfig by gridY/gridX,
+        // and our four RenderBox.size readers (ballot_row,
+        // submission_review_body, section_nav_bar, committee_canvas_tab) are
+        // scroll-position and capture helpers with no comparator anywhere near
+        // them. Message alone would have been too wide: dashboard_screen.dart
+        // records a history of real 'RenderBox was not laid out' faults of our
+        // own, and those must keep reporting.
+        //
+        // beforeSend runs before upload, so the frames here are the raw dart2js
+        // stack: filenames are main.dart.js and the selectable_region.dart
+        // names only appear after Sentry applies the source maps. The JS
+        // 'at Array.sort (<anonymous>)' frame survives as an unparsed frame
+        // whose `function` carries that text, which is why the match is on
+        // function and not on fileName.
+        for (final ex in event.exceptions ?? const []) {
+          if (!(ex.value ?? '').contains('RenderBox was not laid out')) {
+            continue;
+          }
+          final frames = ex.stackTrace?.frames;
+          if (frames == null) continue;
+          if (frames.any((f) => (f.function ?? '').contains('Array.sort'))) {
+            return null;
+          }
+        }
+
         return event;
       };
     });
