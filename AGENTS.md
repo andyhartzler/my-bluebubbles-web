@@ -12369,3 +12369,193 @@ upstream error body appears, and nothing here widens access to anything. Withhel
 practice READ SIXTH set: the state of the live endorsement vote, the identity of the exec on
 FLUTTER-Q, any operational read on production sessions, and anything describing this container's
 own reporting or credential tooling.
+
+## READ SIXTY-THIRD: the 14:25 UTC sweep, and two branches that fix the same defect and collide
+
+Swept the 24 hours to 2026-08-12 14:25:30 UTC. No code change and nothing fired. The previous
+sweep closed at 12:23:57, and the new slice is EMPTY across every project, watchdog included:
+an anchored errors query carrying no `level` and no project filter, per READ FORTY-SEVENTH,
+returned zero events in it, and no issue in the org has a `lastSeen` inside it. Everything in
+the window is ground earlier sweeps already COVER. Say cover and not decomposed: READ
+SIXTY-SECOND records four of these rollups classified by title only, and READ FIFTY-SEVENTH read
+just three of its events directly, so several have never had a `by_message` read from any sweep.
+
+The finding is not in the window. It is in the branch backlog, and it is a decision for Andrew
+rather than an error anyone can see in Sentry.
+
+TWO OF THE THREE FLUTTER-2 BRANCHES FIX THE SAME DEFECT AND CANNOT BOTH BE MERGED
+READ SIXTY-SECOND corrected an earlier draft that called these superseded, and established
+that all three mechanisms are absent from master. That holds and was re-verified here. What it
+did not notice is that two of the three are the SAME fix written twice.
+
+`bb494b96`, 2026-07-31T22:38:44Z, and `095f821d`, 2026-08-01T05:31:00Z, both add a client side
+throttle to the email OTP send path, under seven hours apart, by two runs of this loop neither of
+which knew about the other. They do not merely overlap: both introduce `_emailResendCooldown`,
+`_emailResendTimer` and `_startEmailResendCooldown` as new members of the same class in the
+same file, so taking both is a duplicate definition conflict rather than a merge.
+
+Compared from the DIFFS rather than from the commit messages, per READ FIFTY-NINTH, whose
+practice that is. READ TWENTY-EIGHTH's rule is the different one, that an auditor's citations are
+premises to check, and it is how every finding below was confirmed rather than taken on trust:
+
+`095f821d` is the stronger one on the mechanism. List only the GENUINE differentiators rather
+than shared properties dressed as superiority: BOTH arm on a successful send, `bb494b96`'s own
+added comment reading "Armed only on a SUCCESSFUL send", so that is not a contrast. Do NOT extend
+that to the code screen tear down, which an earlier draft did and which the failure handling
+paragraph below refutes: there the two genuinely differ. What actually separates them is that
+`095f821d` keys the hold per address in `_emailCooldownFor` and restarts on a real 429 with the
+interval the server asks for, which are precisely the two MEDIUMs `bb494b96`'s own message
+records ACCEPTING rather than fixing; that `_refuseEmailResend` restores the code box after Back;
+and that it closes a one line re-entrancy hole on `_sendPhoneCode`, the DEFAULT sign in path,
+which `bb494b96` does not touch at all. Its message records `flutter analyze` run on the pinned
+production SDK.
+
+`bb494b96` is toolchain unverified and says so in its own message: flutter and dart were not
+installed in that container, so `flutter analyze` never ran there.
+
+`bb494b96` has TWO things `095f821d` lacks, and neither should be discarded unexamined. The
+first is an email "Resend code" button: master renders that control only under
+`if (_phoneCodeFlow)`, read this run at line 905 of
+`lib/app/layouts/startup/password_screen.dart`, so on the email path the only route to a second
+code is Back then Send. The second is broader failure handling. `bb494b96` guards BOTH tear down
+sites with `if (_emailForCode == null)`, so a member part way through typing a code keeps the box
+on ANY failed resend, a 403 and a network drop included. `095f821d` preserves it only on the rate
+limited paths, through `_refuseEmailResend`; its hunks skip the generic branches altogether,
+jumping from old line 324 to old 546, so their unguarded `_showCodeInput = false` survives
+untouched and a non 429 failure there still wipes the screen. Read that from the RESULTING FILE
+and not from the diff. An absent site is easy to misread as an unchanged one, and an earlier
+draft of this paragraph called it context when it is simply not in the diff at all, which is the
+changed lines versus context precision READ NINETEENTH names.
+
+So do NOT simply close `bb494b96` as superseded. That is what a first draft of this section
+recommended and an auditor falsified it from the diffs, which is this file's documented pattern of
+one round's fix becoming the next round's finding: the correction that made the shared properties
+honest overshot into calling the tear down handling shared too, and it is not.
+
+The honest shape is that `095f821d` is stronger on the throttle and `bb494b96` is stronger on
+failure handling, that they collide, and that the merge worth having is `095f821d` plus those two
+grafts. That is Andrew's call and not this loop's, and it is smaller than it sounds: one file.
+
+`091c78cc` is a genuinely distinct mechanism and does not compete with either. Re-verified on
+master this run: `await client.auth.signOut()` is still bare at line 211, inside `_bootstrap()`,
+which is invoked fire and forget at line 127 with no `await` and no `catchError`, so a throw
+there skips the `setState` that clears the checking flag. The `onError` handlers this file
+credits elsewhere sit on the `onAuthStateChange` STREAM and cannot catch it.
+
+THE GATE THESE ARE STUCK BEHIND CANNOT BE CLEARED FROM INSIDE THIS LOOP
+All three are the exec sign in path, so the endorsement vote rule applies and nothing was
+merged. That rule says to treat the vote as open unless a commit or a note in the repo says it
+has closed. Grepped again this run: nothing in either repo says so.
+
+State the cost plainly, with the ages computed from `%cI` against this window's close and
+FLOORED per READ TWELFTH rather than by calendar date subtraction, which an auditor caught in two
+of these three. Attribute that correctly: READ SEVENTEENTH is the rule against rounding, and READ
+TWELFTH's drift is the different failure of carrying a figure forward instead of computing it. `091c78cc` has been waiting 13 days,
+`bb494b96` 11 and `095f821d` 11.
+The loop cannot clear its own gate and should not: the rule is right, and a bad autonomous
+deploy on the sign in path during a live vote is the exact harm it exists to prevent. But three
+fixes on that path are sitting behind a flag only Andrew can lower, two of them for lockouts
+observed in Sentry and the third, `091c78cc`, for what READ SIXTY-SECOND is explicit is a live
+gap rather than a firing defect, with no production occurrence established for it, and each
+run that rediscovers the issue writes another branch. If the vote has closed, one line in the
+repo saying so unblocks all of it.
+
+Do not open a seventh branch for either issue. Run
+`git ls-remote --heads origin 'sentry-fix/*'` AND check the open PR list BEFORE diagnosing
+anything in this surface. Both halves, per READ FIFTY-EIGHTH, whose whole finding is that four
+independent fixes were written for one issue because nobody ran either.
+
+THE CENSUS, CROSS FOOTED PER READ TWELFTH, BOTH AXES PER READ FIFTY-THIRD
+
+    by project   endorsement-scorer 41, supabase-platform 24, mautic 7, flutter 1  = 73
+    by issue     ENDORSEMENT-SCORER-4 41                                           = 41
+                 SUPABASE-PLATFORM-1 20, -4 3, -3 1                                = 24
+                 MAUTIC-J 4, -M 2, -K 1                                            =  7
+                 FLUTTER-Q 1                                                       =  1
+                                                                                     73
+
+Both axes agree exactly. `website`, `moydforms`, `n8n` and `supabase-edge` at zero. The event
+axis was ANCHORED to the declared window in READ FORTY-SEVENTH's two parameter form; the issue
+axis was queried with NO status filter per READ EIGHTH, which is how the three resolved `mautic`
+probes, the resolved FLUTTER-Q and the ignored watchdog stayed visible.
+
+SUPABASE-PLATFORM-1's 20 rollups were enumerated BY TITLE rather than sampled. All fall in
+ground READ FIFTY-SEVENTH, SIXTIETH, SIXTY-FIRST and SIXTY-SECOND cover: the 16:40 to 17:35
+operator cluster, the 22:55 to 23:45 hardening session, and four rollups after 02:25. Split
+those four rather than calling them all ad hoc hand SQL, which is wrong twice over. 03:00:04 is
+`permission denied for table members`, the `by_app: postgrest` line READ FIFTY-SEVENTH
+deliberately leaves inside the class where a harness and a genuine refused caller are
+indistinguishable, so it is the permission denial family and not this one. And 02:25:02 is
+`syntax error in tsquery`, which IS attributable to committed code: `c38597b` records
+postgrest-dart emitting a bare `fts` operator when `textSearch()` is called with no `type:`, and
+fixes it. So do NOT inherit a flat "nothing here is attributable to committed code" negative for
+this group. It is false, this public repo's own commit log refutes it, and READ FIFTY-SEVENTH
+already records that line as predating its fix. Nothing was changed this run, which is the half
+that holds. SUPABASE-PLATFORM-4's
+three events are the bucket flip verification READ FIFTY-SIXTH documents; SUPABASE-PLATFORM-3's
+one is the 15:05:02 relay 502 predating the v13 relay deploy; the `mautic` three are the probe
+harness, already resolved, and there is no droplet access. Nothing was resolved or re-resolved.
+
+READ SIXTY-FIRST's open ask stands and could not be closed here: `max()` of the write timestamp
+on the bill sponsors table, to tell a healthy openstates sync from a dead one now that the
+deployed `e79339b` has removed the burst that was its only passive signal. Tested rather than
+inherited, per READ TWELFTH: nothing matching `SUPABASE`, `PROJECT_REF` or a Postgres DSN is in
+this container's environment.
+
+THE BRANCH REF TRAP BIT AGAIN, IN BOTH REPOS
+`master` at `67ce142` against a real `3cd8856`, and `main` at `ad24682` against a real
+`aa2d513`, both with `HEAD` detached at the true tip. Checked in the form READ TWENTY-SECOND
+prescribes, local side the NAMED BRANCH and not `HEAD`, and repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH.
+
+One trap worth repeating because it cost a step here: `git diff master <branch>` on these
+branches is useless. They are days behind master, so a two dot diff reports master's own
+intervening work as deletions, 82 files and 17634 of them in one case. Name the master you
+measured against, which those figures do: the STALE `67ce142` this container arrives on. Against
+the repaired tip they are larger, so a future run re-running this post repair will get different
+numbers and must not read these as wrong. Read the branch's OWN
+commit with `git show <tip>` instead, and check `.git/shallow` first, per READ SIXTY-SECOND.
+
+VERIFICATION
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only
+file touched is this one. That is stated rather than skipped silently, per READ FORTY-EIGHTH,
+and it is not a licence to skip the audit gate, which ran on the documentation diff.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `091c78cc`,
+`095f821d`, `bb494b96`, `e79339b` and the branch names under `sentry-fix/`; the file
+`lib/app/layouts/startup/password_screen.dart` with its line numbers, and the symbols
+`_emailResendCooldown`, `_emailResendTimer`, `_startEmailResendCooldown`, `_emailCooldownFor`,
+`_refuseEmailResend`, `_sendPhoneCode`, `_phoneCodeFlow`, `_bootstrap`, `signOut`, `setState`,
+`onAuthStateChange`, `onError`, `catchError` and `await`, plus the quoted member facing label
+"Resend code", every one committed in THIS repo, the public one, or in a branch of it; the
+text search identifiers `fts`, `textSearch()` and `type:` with the commit `c38597b` that carries
+them and the package name `postgrest-dart`, likewise committed here; the tear down symbols
+`_showCodeInput` and `_emailForCode`; the relay extra `by_app` and its value `postgrest`; the verification commands
+`npx tsc --noEmit` and `flutter analyze`; the status codes `429` and `403`; the word droplet, in the note
+that there is no droplet access; the Sentry search field `level` and the issue field `lastSeen`, the issue ids
+and project names, and the name Sentry; the git commands and ref names, the stale refs
+`67ce142` and `ad24682`, this repo's tip `3cd8856`, and the shallow marker `.git/shallow`; the
+env var name patterns `SUPABASE` and `PROJECT_REF`; and `max()` and the openstates sync, cited
+from READ SIXTY-FIRST. One line of quoted PROSE is declared separately, per the practice READ
+TWENTIETH set: `bb494b96`'s own added code comment "Armed only on a SUCCESSFUL send", committed in
+a branch of THIS public repo. Everything else already appears in this file or is committed in this
+public repo's own tree. `aa2d513` is the private sibling's tip and its cover IS prior
+publication, in READ SIXTIETH and READ SIXTY-SECOND. Apply READ SEVENTEENTH's test rather than
+the lazy version: "already committed" would be an argument for WITHHOLDING had any of the rest
+come from the private sibling, and none did.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is `permission denied for table members` and
+`syntax error in tsquery`, both quoted VERBATIM in the census paragraph rather than by reference,
+and both already published in this file by READ FIFTY-SEVENTH, plus the bare status code `502`,
+published from READ FIRST onward. The harness temp table visible in one 23:40 event title is again NOT named,
+per READ FIFTY-SEVENTH and READ SIXTY-SECOND. Quantities are enumerated together per READ
+THIRTY-SIXTH: the census figures, the clock values, the three branch ages, the diff line counts
+in the two dot trap paragraph, and every remaining quantity, OF WHATEVER KIND. All are bare and
+name nothing.
+
+No credential, no DSN, no project reference, no probe source address, no policy body, no RPC
+name and no raw upstream error body appears, and nothing here widens access to anything.
+Withheld per the practice READ SIXTH set: the state of the live endorsement vote, the identity
+of the exec on FLUTTER-Q, any operational read on production sessions, and anything describing
+this container's own reporting or credential tooling.
