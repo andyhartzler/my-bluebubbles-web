@@ -20,7 +20,6 @@ import 'package:bluebubbles/app/layouts/startup/failure_to_start.dart';
 import 'package:bluebubbles/app/layouts/setup/setup_view.dart';
 import 'package:bluebubbles/app/layouts/startup/splash_screen.dart';
 import 'package:bluebubbles/app/layouts/startup/myd_loading_screen.dart';
-import 'package:bluebubbles/app/layouts/startup/auth_callback_screen.dart';
 import 'package:bluebubbles/app/layouts/startup/password_screen.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
@@ -483,7 +482,6 @@ class Main extends StatelessWidget {
             multitouchDragStrategy: MultitouchDragStrategy.latestPointer,
           ),
           getPages: [
-            GetPage(name: '/auth/callback', page: AuthCallbackScreen.new),
             GetPage(
               name: '/crm/donors',
               page: () => const _AuthenticatedRouteGuard(

@@ -165,6 +165,30 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
         default:
           break;
       }
+    }, onError: _onAuthStreamError);
+  }
+
+  /// GoTrue reports auth failures as ERRORS on `onAuthStateChange` rather than
+  /// by throwing at a call site, and that stream is an rxdart BehaviorSubject,
+  /// so the most recent error is replayed to every later subscriber.
+  ///
+  /// A magic link opened in a browser that never held the PKCE code verifier
+  /// (a different browser, a private window, or after site data was cleared)
+  /// fails inside supabase_flutter's own deep-link handler during
+  /// `Supabase.initialize()`, which catches it and routes it to this stream.
+  /// That is long before this widget exists, so this handler is the only place
+  /// the member can ever be told. Without it the replay reached a subscription
+  /// with no onError, escaped to the zone, and was logged as an "Unhandled
+  /// Exception" while the member sat here looking at an unexplained sign-in
+  /// form. Refs FLUTTER-Q.
+  void _onAuthStreamError(Object error) {
+    if (!mounted) return;
+    setState(() {
+      _isCheckingSession = false;
+      _isAuthenticated = false;
+      _errorMessage = _mapErrorMessage(
+        error is AuthException ? error.message : error.toString(),
+      );
     });
   }
 
@@ -735,7 +759,16 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
   }
 
   String _mapErrorMessage(String raw) {
-    final decoded = Uri.decodeComponent(raw).trim();
+    // Callers pass both URL-encoded query parameters and raw server/SDK
+    // messages. Percent-decoding raw prose throws FormatException on a stray
+    // '%', and from the auth-stream handler that throw would land right back
+    // in the zone as the unhandled error this mapping exists to prevent.
+    String decoded;
+    try {
+      decoded = Uri.decodeComponent(raw).trim();
+    } on FormatException {
+      decoded = raw.trim();
+    }
     final normalized = decoded.toLowerCase();
 
     // Pass through specific messages from our edge function
@@ -762,6 +795,16 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
 
     if (normalized.contains('unknown_member') || normalized.contains('member_not_found')) {
       return 'This email is not associated with a Missouri Young Democrats member. If you believe this is an error, please contact info@moyoungdemocrats.org';
+    }
+
+    // The PKCE code verifier is written to the localStorage of the browser
+    // that asked for the link and read back when the link is opened. Opening
+    // the link somewhere else leaves nothing to exchange the code against.
+    // That is a recoverable situation for the member, not a fault, so say
+    // what to do about it instead of showing the SDK's storage wording.
+    if (normalized.contains('code verifier')) {
+      return 'This sign-in link has to be opened in the same browser you '
+          'requested it from. Request a new link below and open it here.';
     }
 
     if (normalized.contains('auth_failed') || normalized.contains('expired')) {

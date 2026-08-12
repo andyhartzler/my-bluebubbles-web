@@ -61,8 +61,20 @@ class AuthRefreshGuard {
   void start(SupabaseClient client) {
     if (_sub != null) return;
     _client = client;
-    _sub = client.auth.onAuthStateChange.listen(_onAuthState);
+    _sub = client.auth.onAuthStateChange.listen(
+      _onAuthState,
+      onError: _ignoreAuthStreamError,
+    );
   }
+
+  /// The auth stream carries errors as well as states, and it is an rxdart
+  /// BehaviorSubject, so the most recent error is replayed to every later
+  /// subscriber. This guard is a token-refresh cadence watchdog and has
+  /// nothing to say about an auth failure; the sign-in gate is what reports
+  /// those to the member. What an onError buys here is that the replay stops
+  /// escaping THIS subscription into the zone, where it was being logged as a
+  /// second, duplicate unhandled exception. Refs FLUTTER-Q.
+  void _ignoreAuthStreamError(Object error, StackTrace stackTrace) {}
 
   void _onAuthState(AuthState state) {
     final client = _client;
