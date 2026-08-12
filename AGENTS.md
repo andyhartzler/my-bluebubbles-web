@@ -10626,3 +10626,89 @@ OF WHATEVER KIND. All are bare and name nothing. No credential, no DSN, no proje
 no probe source address, no policy body, no RPC name and no raw upstream error body appears,
 and nothing here widens access to anything. Withheld per the practice READ SIXTH set: the
 state of the live endorsement vote, and any operational read on production sessions.
+
+## READ FIFTY-SIXTH: SUPABASE-PLATFORM-4 is dead by construction, and the wallet pass it named was never broken
+
+No code change. This is the closing record for the storage-400 group, and it corrects the
+triage reading it inherited on the one point that mattered.
+
+WHAT THE GROUP IS, AND WHY IT STOPPED
+Nineteen lifetime events, every one a 400, 0 users attributed across all of them. The relay
+now classes 400 alongside 404 in `STORAGE_CALLER_ERRORS`, so a status that describes the
+CALLER rather than storage health no longer opens an error-level event. That is a REPORTING
+change and not a defect fix, and it was already committed and shipped before this pass. It is
+confirmed DEPLOYED rather than merely committed, per READ FIRST: the deployed body of
+`sentry-log-relay` was read directly and carries `new Set([400, 404])`, at version 13,
+`updated_at` 2026-08-12T03:06:25Z.
+
+The group's last event is 2026-08-11T17:10:02Z, about ten hours before this was written. Read
+that as suppression working rather than as a dead pipeline, which is the distinction READ
+TWENTY-FIRST insists on: SUPABASE-PLATFORM-1 emitted eleven minutes before this pass, so the
+relay is demonstrably alive and simply has nothing in this category to send.
+
+THE PASS EXISTS. THE TRIAGE READING SAID IT MIGHT NOT, AND THAT WAS WRONG
+The inherited diagnosis offered two branches for the newest event, a signed-URL request for a
+pass "that either was never generated or is being reached by a path that no longer works".
+Neither holds, and the check is one query. The object named in the sample is present in
+`storage.objects` under `membership-cards`, created 2026-08-10 21:10:46, one of 81 in that
+bucket. The path is the correct signing path. It answered 400 because the CALLER held no
+permission on a bucket that had just been taken private, and Supabase Storage hides existence
+behind that status rather than distinguishing it from a missing key.
+
+Do not reason about what a 400 means on this endpoint. Query the bucket. READ THIRD already
+warns against building a diagnosis on an assumed meaning for this status code, and this is the
+case where doing it anyway would have manufactured a member-facing outage out of a success.
+
+IT WAS AN OPERATOR VERIFYING THE CLOSE, AND THE MIGRATION SAYS SO IN ADVANCE
+All three 2026-08-11 events carry the same single source address, and together they walk the
+exact probe list that `20260811_06_membership_cards_bucket_private.sql` records under
+"Verified after this ran": an anon `POST /object/list/membership-cards` twice at 16:56:25, an
+anon `POST /object/sign/` against another bucket at 17:01:19, and the wallet-pass
+`POST /object/sign/` at 17:06:03. `e88558def`, the commit carrying that migration and that
+verification block, is authored 2026-08-11T17:18:26Z, twelve minutes after the last of them.
+
+So this is READ SEVENTEENTH's instrument again, the commit's own prose naming the session, and
+it is unusually clean here because the migration ENUMERATES the probes and their expected
+statuses before the fact. A 400 on each was the PASS condition. The group's final events are a
+security verification succeeding.
+
+WHAT IS ACTUALLY LEFT, AND IT IS DELIBERATE
+`membership_cards` holds 420 rows, 71 of which still carry an `apple_wallet_pass_url` pointing
+at the old public path, and every one of those URLs is now dead. That is recorded in the
+migration as a deliberate non-backfill, kept so the flip stays reversible with a single UPDATE
+while the signed path is confirmed by a real member. It is not a defect and nothing here
+changes it. The member-facing path does not read that column for Apple any more; the portal
+mints a signed URL per signed-in caller server-side, and the migration records that being
+verified end to end at flip time.
+
+Also checked and clean: no storage SELECT policy grants `authenticated` a read on this bucket,
+which is correct, since the portal path is service-role and bypasses RLS. And no Sentry project
+carries any wallet or pass failure since the flip; the only `website` issue in seven days is
+the resolved hydration one.
+
+EXPECTED RATE FROM HERE
+Zero. A 400 or 404 on `/storage/v1` no longer opens an event at all, and this group has
+produced only those. What still reports in this category is 401 and 403, which is an
+authenticated caller being refused and therefore the RLS-regression case worth waking up for,
+plus 409, 413, 429 and every 5xx. Any event in this group at all is a NEW shape and should be
+read as one rather than as this one recurring.
+
+Do not resolve SUPABASE-PLATFORM-4. Nothing was fixed, the group is silenced rather than
+repaired, and a resolve would auto-close on the next 5xx that genuinely belongs here.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public. Named above: the commit `e88558def`; the migration
+`20260811_06_membership_cards_bucket_private.sql`; the bucket `membership-cards`, the table
+`membership_cards` and its column `apple_wallet_pass_url`; the relay constant
+`STORAGE_CALLER_ERRORS`, the function `sentry-log-relay` and its `updated_at` field; the
+storage catalog `storage.objects`; the API path shapes `/storage/v1`, `/object/list/` and
+`/object/sign/`; the roles `authenticated` and anon; the issue ids and project names; and the
+names Sentry and Supabase. Every one already appears in this file or is committed in this
+public repo's own tree.
+
+Deliberately withheld: the object UUID in the event sample, which names one member's pass and
+which the migration itself writes only as `<uuid>`; and the probe source address, per READ
+FIFTH. Quantities are enumerated together per READ THIRTY-SIXTH: the event and object counts,
+the row counts, the clock values and the deployed version number. All are bare and name
+nothing. No credential, no DSN, no project reference, no probe source address, no policy body
+and no raw upstream error body appears, and nothing here widens access to anything.
