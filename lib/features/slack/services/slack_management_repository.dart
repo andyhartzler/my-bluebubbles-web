@@ -98,7 +98,11 @@ class SlackManagementRepository {
 
       // Apply full-text search if query provided
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        query = query.textSearch('search_vector', searchQuery);
+        query = query.textSearch(
+          'search_vector',
+          searchQuery,
+          type: TextSearchType.websearch,
+        );
       }
 
       final data = await query
