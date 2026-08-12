@@ -341,13 +341,32 @@ Future<void> initSentry() async {
       options.sendDefaultPii = false;
       // Failed HTTP requests (Supabase, BlueBubbles, edge fns) become events.
       options.captureFailedRequests = true;
-      // Transient iOS PWA fetch aborts against the mail-list edge fn surface
-      // as 'Load failed'/'Failed to fetch' SentryHttpClient events
-      // (FLUTTER-1/5) and mask real regressions — the edge fn itself is
-      // healthy. Drop just those; everything else passes through.
       options.beforeSend = (event, hint) {
         final url = event.request?.url ?? '';
-        if (url.contains('/functions/v1/mail-list')) {
+        final status = event.contexts.response?.statusCode;
+
+        // A browser fetch that never produced a response at all is a transport
+        // abort, not a server fault: WebKit rejects with 'Load failed' and
+        // Chromium/Firefox with 'Failed to fetch' when the tab is backgrounded,
+        // the page navigates away, or the connection drops mid-request. No
+        // server can emit those strings, and the event carries no status code
+        // and no stack trace, so there is nothing in it to action.
+        //
+        // This was previously scoped to the mail-list edge fn only, which was
+        // the wrong axis: FLUTTER-1 and FLUTTER-5 together carried 134 events
+        // in 30d spread across 20+ distinct URLs (mautic-auth, verify-phone,
+        // mail-identities-get, form_submissions, subscribers, candidates,
+        // members, ...), which is what a backgrounded tab looks like and not
+        // what a broken endpoint looks like. Keying on the exception shape
+        // covers all of them and drops the URL special case.
+        //
+        // The trade, stated rather than hidden: a CORS/deploy break also
+        // surfaces as 'Failed to fetch'. That case is systemic — every call to
+        // the endpoint fails, for every user, continuously — where an abort is
+        // sporadic and spread across endpoints. SentryHttpClient still records
+        // every request as a breadcrumb, so the request is not lost; it stops
+        // being an error-level event of its own.
+        if (status == null) {
           final message = [
             event.throwable?.toString() ?? '',
             ...?event.exceptions?.map((e) => '${e.type} ${e.value}'),
@@ -357,6 +376,7 @@ Future<void> initSentry() async {
             return null;
           }
         }
+
         // gotrue clears the local session and fires signedOut BEFORE it calls
         // /auth/v1/logout, then swallows 401/403/404 from that call on
         // purpose: an expired or already revoked JWT still means the user is
@@ -367,11 +387,26 @@ Future<void> initSentry() async {
         // this fires on normal sign-out. Drop only the codes gotrue ignores;
         // a 500 from logout is still a real fault and still reports.
         if (url.contains('/auth/v1/logout')) {
-          final status = event.contexts.response?.statusCode;
           if (status == 401 || status == 403 || status == 404) {
             return null;
           }
         }
+
+        // The same class on the two other gotrue endpoints the login screen
+        // drives, both of which are the user being told something rather than
+        // anything being broken, and both of which password_screen.dart already
+        // catches as AuthException and renders in the form:
+        //   /auth/v1/verify 403 — the emailed code was mistyped or has expired
+        //   /auth/v1/otp    429 — Supabase's own OTP rate limiter, doing its job
+        // Every other status on both still reports: a 500 on verify is a real
+        // fault, and a 400 on otp means we sent a malformed request.
+        if (url.contains('/auth/v1/verify') && status == 403) {
+          return null;
+        }
+        if (url.contains('/auth/v1/otp') && status == 429) {
+          return null;
+        }
+
         return event;
       };
     });
