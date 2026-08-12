@@ -11322,3 +11322,246 @@ No credential, no DSN, no project reference, no probe source address, no policy 
 RPC name appears, and nothing here widens access to anything. Withheld per the practice READ
 SIXTH set: the state of the live endorsement vote, the identity of the three execs on
 FLUTTER-Q, and any operational read on production sessions.
+
+## READ FIFTY-NINTH: the 06:27 UTC sweep, TWO evidenced absent sponsors cycles, and a suppression that cannot explain the silence it looks like
+
+Swept the 24 hours to 2026-08-12 06:27:18 UTC. No code change. The previous sweep closed at
+04:19:52, so 2 hours 7 minutes is new observation, and the new slice is EMPTY across every
+project: an explicit `timestamp:>2026-08-12T04:19:52` query over 7d returned zero events, so not
+even the watchdog fired in it.
+
+Read the watchdog phrasing narrowly. It is true of the slice and it is NOT a steady cadence
+running into it: the four minute cadence ended at 16:58:13 on 08-11, with off cadence stragglers
+at 17:04:24 and 23:04:28, so it was already about 7 hours quiet at the close. A future run reading
+"159 events" beside a bare "the slice is empty" will assume otherwise.
+
+Keep 16:58:13 as the cadence end and not 17:04:24. READ FIFTY-EIGHTH rules that the later value is
+a straggler six minutes late and off grid, and that calling it the end of the cadence attaches the
+figure to an event it does not belong to. A second audit round caught this section doing exactly
+that, in the banned form, against the section that bans it.
+
+THE SPONSORS BURST: TWO EVIDENCED ABSENCES, NOT THREE
+READ FIFTY-SEVENTH found the 32 line `legislation_bill_sponsors_unique` burst absent at 18:00 and
+00:00 and registered 06:00 as the next data point. The last burst of any size is
+2026-08-11T12:05:10, so no burst has been captured at 18:00, 00:00 or 06:00.
+
+Do NOT count that as three and do not call the threshold met, which is where the first draft of
+this section went and where an adversarial auditor stopped it. Nothing has been emitted since
+03:00:04, so relay liveness across the 06:00 boundary is unobservable, and a relay that stopped
+after 03:00 produces BOTH the `supabase-platform` half of the empty new slice AND the 06:00
+absence from one cause. Scope it to that half: the watchdog does not report through the relay, so
+its own quiet is a separate fact and is recorded above. That is the
+non independence READ TWENTY-FIRST documents and resolves in as many words: strip the boundaries a
+dead relay would explain anyway and count what is left. What is left is TWO, which is the count
+READ TWENTIETH's threshold says is NOT worth believing.
+
+What the two DO have is bracketing. The relay reported postgres rows at 17:35:04 and 22:55:02
+around the 18:00 boundary, and at 23:45:02 and 02:25:02 around 00:00. Word that as bracketing and
+not as adjacency: those runs sit 24 minutes and 4h55m from the 18:00 boundary, and the runs
+actually adjacent to it are unobservable, since an empty window and a swallowed query are
+indistinguishable per READ TWENTY-FIRST.
+
+No relay FILTER can drop this burst, verified from source. `isConnectionProbe` requires
+`r.sev === "FATAL"` AND a probe pattern match, and the dup key line is ERROR level with no pattern
+match; the `appRows` branch reports every non probe row and its own comment says so; and the
+`application_name` suppression `0c7a3f3` introduced was REMOVED by `4a4d6bf` under a note
+forbidding its return.
+
+That is narrower than "nothing can swallow it", which the first draft wrote and which is false
+against the same file: `sendSentryEvent` returns null on a failed ingest without throwing, and the
+watermark update runs after the sends, so a failed ingest drops the event and loses the span.
+READ FIFTY-SEVENTH lists both silent paths for this exact question; quoting one of the two is how
+a filter check gets mistaken for a delivery guarantee.
+
+Three readings survive and nothing here separates them: `e79339b` was finally hand deployed to
+`openstates-orchestrator`, which leaves no trace in this repo per READ FIRST and which no commit
+records; or the 6 hourly openstates cron stopped, which is a silent legislation sync outage; or
+the relay lost the windows. Read it the way READ TWENTY-SECOND insists: a deployed fix and a
+stopped job look identical from here, and an error going quiet is not by itself good news.
+
+One dashboard read settles it and this container cannot make it: the deployed version of
+`openstates-orchestrator`, or whether bills are still syncing. That is this run's ask, and it is
+worth making at two evidenced absences even though the threshold is not met, because the
+expensive branch is silent and the cheap check is one page.
+
+THE PROBE SUPPRESSION IS REAL BUT CANNOT EXPLAIN THE SILENCE ONSET
+No rollup has carried FATAL since 2026-08-11T08:35:03, which is 21 hours 52 minutes at the close,
+FLOORED per READ TWELFTH rather than rounded to 22. `f20ec16`, "Stop paying Sentry quota for
+pre-auth connection probes", does suppress exactly that family, carrying `probes_suppressed` on
+every postgres event so a reader can tell "none in this window" from "this build does not know
+about them", with a separate burst event above `PROBE_BURST_THRESHOLD`.
+
+So probe silence is EXPECTED going forward. It is NOT the explanation for this window, and the
+first draft of this section asserted that it was, which an auditor caught as a BLOCKER.
+
+Rest that on the BUILD FINGERPRINT and not on the commit time, which is the correction a third
+audit round forced. `f20ec16` added the rollup title's dominant shape suffix in the same commit as
+the suppression, so the title form discriminates the build with no dashboard access: 12:05:10,
+16:40:07, 16:45:09 and 16:55:02 all carry the BARE `Postgres errors: N (ERROR level)` form, and
+every event from 17:05:03 onward carries the suffixed form. So the suppressing build began serving
+somewhere in 16:55:02 to 17:05:03, and the FATAL silence began at 08:35:03, more than eight hours
+before the EARLIEST moment that bracket allows.
+
+Do NOT reach for the commit time to tighten that, which the first two drafts did. `f20ec16` was
+committed 17:03:28 UTC, inside the observed bracket rather than before it, so it orders nothing;
+and the premise it was used for, that a hand deploy is at or after its commit, is false against
+this file's own record, since READ TWENTIETH, READ THIRTY-FIFTH and READ FIFTY-SEVENTH each
+document work applied by hand and exercised BEFORE the commit carrying it. A hand deploy ships the
+working tree. Cite READ NINTH only for what it reaches: it dates DEPLOYED builds and says in as
+many words that it is silent about a local checkout or anything applied by hand.
+
+The consequence is the opposite of what the first draft claimed, and the two halves need different
+care. The PROBE stop is established as pre suppression: more than eight hours of FATAL silence
+under a demonstrably non suppressing build. Say MORE THAN EIGHT and not eight and a half, which a
+fourth round caught: the demonstrable interval runs 08:35:03 to 16:55:02, which is 8h19m59s, and
+reaching 8h30m needs the 17:05:03 endpoint, the first SUFFIXED event and so the one moment in the
+bracket that is not demonstrably non suppressing. The SPONSORS stop is NOT, and a second audit round
+caught this section asserting it. Its last success is 12:05:10 and its first evidenced absence is
+the empty 18:05 slot, so the stop falls somewhere in that bracket and the deploy window sits
+INSIDE it. Anchoring the stop to its last success is the anchoring error READ TWENTIETH
+names, and its first miss is no better an anchor: the honest one is the bracket.
+
+What still rules `f20ec16` out for the sponsors burst is the filter analysis above rather than any
+ordering: an ERROR level dup key line is not a probe, and the suppression cannot reach it. So `f20ec16` is not the mechanism behind either
+stop, no cause COMMON to the two onsets is ruled out by it, the sponsors onset is undetermined
+within 12:05 to 18:05, and both stay OPEN. A future run should not inherit a closed question in either half.
+
+THE FLUTTER-Q BRANCH INVENTORY, WITH THE THIRD BRANCH CORRECTED
+READ FIFTY-EIGHTH left three unmerged branches for one issue and asked the next run to verify them
+against the trunk. Done by reading master and the branch diffs, not the commit messages:
+
+    787863b3  sentry-fix/FLUTTER-Q          SUPERSEDED. It stopped the SDK redeeming the link on
+                                            top of `AuthCallbackScreen`; `8ccb4f0` DELETED that
+                                            screen outright and handles the failure downstream.
+    20d11b77  sentry-fix/FLUTTER-Q-onerror  SUPERSEDED. Its mechanism is on master: `onError` at
+                                            `auth_refresh_guard.dart:66` and at
+                                            `password_screen.dart:168`, both listener sites.
+    fa6ec76   sentry-fix/FLUTTER-Q-copy     NOT superseded, and NOT mergeable as it stands.
+
+Be exact about that third one, because the first draft described it from READ FIFTY-EIGHTH's prose
+rather than from the diff and got the mechanism wrong. `fa6ec76` does not contain the string "same
+browser" at all. It touches two files: it maps the error to a `link_wrong_browser` code in
+`auth_callback_screen.dart`, a file `8ccb4f0` has since DELETED, and it adds four lines to
+`password_screen.dart` carrying a both causes wording that is genuinely absent from master. The
+misleading "has to be opened in the same browser you requested it from" copy now on master is
+`8ccb4f0`'s own later text, which `fa6ec76` never touched.
+
+So half that branch targets a file that no longer exists and it cannot merge unchanged. What is
+worth keeping is the wording, not the branch: master tells a member the link must be opened in the
+browser that requested it, which is false for the member who re-clicked an already used link in
+the right browser, since gotrue deletes the verifier once an exchange succeeds. The remedy sentence
+beside it, request a new link and open it here, is correct for both causes, so this is cosmetic
+rather than functional.
+
+It is the exec sign in path, so it is the PROTECTED SURFACE and nothing was merged. No FOURTH
+branch was written either, which is the whole point of READ FIFTY-EIGHTH's finding. Three
+`sentry-fix/FLUTTER-2` branches also exist; that issue is resolved and last fired seven days ago,
+so all six branches are stale and none is this loop's to delete.
+
+THE CENSUS, CROSS FOOTED PER READ TWELFTH, BOTH AXES PER READ FIFTY-THIRD
+
+    by project   endorsement-scorer 159, supabase-platform 29, mautic 7, flutter 1  = 196
+    by issue     ENDORSEMENT-SCORER-4 159                                           = 159
+                 SUPABASE-PLATFORM-1 23, -4 3, -3 3                                 =  29
+                 MAUTIC-J 4, -M 2, -K 1                                             =   7
+                 FLUTTER-Q 1                                                        =   1
+                                                                                      196
+
+Both axes agree exactly. `website`, `moydforms`, `n8n` and `supabase-edge` at zero. The issue axis
+was queried with NO status filter per READ EIGHTH, which is how the ignored watchdog, the three
+resolved `mautic` probes and the resolved FLUTTER-Q stayed visible.
+
+ALREADY HANDLED, LISTED SO THE NEXT RUN DOES NOT RE-OPEN THEM
+FLUTTER-Q's only IN WINDOW event is 15:15:20 on 08-11, of four lifetime, and `8ccb4f0` landed
+03:01:16 on 08-12, so it has not fired since its fix. SUPABASE-PLATFORM-3's three events are 07:25:01, 13:20:02 and 15:05:02 on
+08-11, all carrying the pre fix shape and all predating the v13 relay deploy READ FIFTY-SIXTH
+records at 03:06:25; it has not fired since. SUPABASE-PLATFORM-4's three are the 17:00 to 17:10
+bucket flip verification READ FIFTY-SIXTH documents in full. The three `mautic` issues are the hand
+probe harness READ FIFTY-SEVENTH decodes, already resolved, and there is no droplet access.
+ENDORSEMENT-SCORER-4 is the expected n8n watchdog, correctly ignored. Nothing was resolved or
+re-resolved.
+
+THE BRANCH REF TRAP BIT AGAIN, IN BOTH REPOS
+`master` at `67ce142` against a real `b9a4a4e`, and `main` at `ad24682` against a real `203f5db`,
+both with `HEAD` detached at the true tip. Checked in the form READ TWENTY-SECOND prescribes, local
+side the NAMED BRANCH and not `HEAD`, and repaired with `git -C <path> checkout -B <branch> HEAD`
+per READ NINTH. The cosmetic trap READ TWENTY-SIXTH names appeared after the repair, this repo
+reporting ahead by 29 and the sibling by 3; both are the stale `origin/<branch>` talking, not the
+remote. Do not act on either number.
+
+VERIFICATION
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. That is stated rather than skipped silently, per READ FORTY-EIGHTH, and it is
+not a licence to skip the audit gate, which ran on the documentation diff.
+
+The auditor was Fable 5 and it ran four rounds, returning NOT CLEAN each time: 1 BLOCKER, 3 HIGH,
+4 MEDIUM, 3 LOW; then 1 HIGH, 3 MEDIUM, 4 LOW; then 1 HIGH, 2 MEDIUM, 2 LOW; then a single MEDIUM.
+Record every round rather than the first, per READ TWENTY-SEVENTH, which rules that deflating this
+tally is the same reflex as inflating evidence.
+
+This shipped on that fourth round rather than on a clean one, which is a departure from ship only
+on a clean audit and is recorded as one rather than glossed, per the precedent READ FIFTY-FOURTH,
+READ FIFTY-FIFTH and READ FIFTY-EIGHTH each set. The standing gate re-audits on a BLOCKER or a
+HIGH; round four returned neither, and its one finding was an arithmetic slip checkable in a
+subtraction. Weigh that against the cost: rounds two, three and four found nothing wrong with any
+observation and spent themselves entirely on the prose, which is the migration this file documents.
+
+Not one finding across the three was a fabricated observation. Every hash, timestamp, count,
+branch tip, census figure and relay source claim was independently re-derived, several of them
+twice, and all held. Every finding was instead a claim reaching past what had been checked, and
+all are repaired where they live rather than gathered here.
+
+Two are worth the reading because they are the same defect twice. Round 1: a suppression was
+offered as the explanation for a silence that began eight hours before it could have been serving.
+Round 3: the repair for that kept a premise ordering a hand deploy after its commit, which this
+file documents is false. Both times the conclusion was right and the premise was not, which is
+READ FORTY-FIRST's point that the premise is the part a future run inherits.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `e79339b`, `f20ec16`,
+`0c7a3f3`, `4a4d6bf`, `8ccb4f0`, `787863b3`, `20d11b77` and `fa6ec76`; the branch names
+`sentry-fix/FLUTTER-Q`, `sentry-fix/FLUTTER-Q-onerror`, `sentry-fix/FLUTTER-Q-copy` and the
+`sentry-fix/FLUTTER-2` prefix; the function `openstates-orchestrator`; the
+constraint `legislation_bill_sponsors_unique`; the relay internals `isConnectionProbe`, `sev`,
+`appRows`, `sendSentryEvent`, `probes_suppressed`, `PROBE_BURST_THRESHOLD` and the connection
+parameter `application_name`; the Sentry search field `timestamp` used as an explicit range, whose
+carve out is READ FORTY-SEVENTH's; the Dart symbol `onError`; the files `auth_refresh_guard.dart`, `password_screen.dart` and
+`auth_callback_screen.dart`, the first two with their line numbers, the symbol
+`AuthCallbackScreen` and the error code `link_wrong_browser`;
+the package name gotrue; the word droplet, in the note that there is no droplet access; the issue
+ids and project names; the git commands and ref names, and the
+two stale refs `67ce142` and `ad24682`; the verification commands `npx tsc --noEmit` and
+`flutter analyze`; this repo's tip `b9a4a4e`; and the auditor model name Fable 5, whose cover per
+READ TWENTY-EIGHTH is prior publication BOTH in this file and in this public repo's own commit log.
+
+`203f5db` is the PRIVATE sibling's tip and its cover IS prior publication: READ FIFTY-SEVENTH
+published it, as its own deliberate first publication. The first draft of this paragraph claimed a
+FIRST publication that is a second, in the paragraph whose whole job is that check, and an auditor
+caught it. Check WHICH repo published a thing, and then WHETHER it did, before citing prior
+publication as cover or declining to, per READ SEVENTEENTH and READ THIRTY-SIXTH. Everything else
+already appears in this file or is committed in this public repo's own tree.
+
+Quoted PROSE, declared separately per the practice READ TWENTIETH set: the member facing copy
+substring "has to be opened in the same browser you requested it from", `f20ec16`'s own subject
+line, and the relay comment phrase about telling "none in this window" from "this build does not
+know about them". ALL THREE are committed in THIS repo, the public one, the third verbatim at the
+`probes_suppressed` comment. Say that rather than leaving the third's provenance unstated, which
+insinuates a private sibling origin it does not have. Apply READ SEVENTEENTH's test rather than the
+lazy version, since "already committed" would be an argument for WITHHOLDING had any come from the
+sibling.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is the bare rollup title form
+`Postgres errors: N (ERROR level)`, which is the relay's own generated title rather than upstream
+text and is published in this file from READ FOURTH onward. It names no table, column, row, person
+or address. The duplicate key message and the `includes FATAL` fragment are NOT quoted in this
+body, which refers to the burst and to FATAL carrying rollups by description, so they are not
+listed; carrying them forward from a section whose body did quote them is the copied list defect
+READ TWENTY-EIGHTH rules on. Quantities are enumerated together per READ THIRTY-SIXTH: the census
+figures, the clock values, the 32 line burst, the two commit distances in the branch paragraph, the
+auditor's finding tally, and every remaining quantity elsewhere in the section, OF WHATEVER KIND.
+All are bare and name nothing.
+
+No credential, no DSN, no project reference, no probe source address, no policy body, no RPC name
+and no raw upstream error body appears, and nothing here widens access to anything. Withheld per
+the practice READ SIXTH set: the state of the live endorsement vote, the identity of the exec on
+FLUTTER-Q, and any operational read on production sessions.
