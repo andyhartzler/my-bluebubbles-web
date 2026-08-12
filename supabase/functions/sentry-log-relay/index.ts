@@ -184,6 +184,25 @@ const PROBE_PATTERNS: readonly RegExp[] = [
 // through and stops the drip.
 const PROBE_BURST_THRESHOLD = 20;
 
+// A single 429 in a five minute window is not an incident, and firing on one is
+// the "alarm on a single observation" mistake this relay has already made twice
+// elsewhere. Supabase's own limiters are PER USER: the OTP limiter answers 429
+// when one member asks for a second login code too quickly, and the CRM shows
+// that member "you can only request this after N seconds", which is the system
+// working. SUPABASE-PLATFORM-2 exists entirely because of that. Both events it
+// has ever produced carried count_429 = 1, and its last one, 2026-07-31 20:35,
+// was one 429 out of 53 requests, from one member retrying a login code. It
+// paired with a client-side FLUTTER-2 event 68 seconds earlier, so one person
+// mistyping a code opened error-level issues in two projects.
+//
+// A real rate-limiting incident is a SUSTAINED refusal rate: an attack, a
+// runaway client, or a platform limit we are genuinely up against. Ten refusals
+// inside one five minute window is that; one is a person. Nothing is lost below
+// the floor either way, because count_429, top_429_ips and top_429_paths still
+// ride along on any traffic event the burst branch fires, and http_429 is in
+// the run summary on every run regardless.
+const RATE_LIMIT_THRESHOLD = 10;
+
 // The severity guard matters. These strings are only ever FATAL when the
 // postmaster raises them, so requiring FATAL means an ERROR level line that
 // merely quotes one (a RAISE, a probe harness, an application log) is never
@@ -405,9 +424,10 @@ Deno.serve(async (req: Request) => {
       if (id) sent.push(`api-5xx:${id}`);
     }
 
-    if (tooMany.length > 0 || totalRequests > BURST_THRESHOLD) {
+    const rateLimited = tooMany.length >= RATE_LIMIT_THRESHOLD;
+    if (rateLimited || totalRequests > BURST_THRESHOLD) {
       const id = await sendSentryEvent({
-        message: tooMany.length > 0
+        message: rateLimited
           ? `Rate limiting: ${tooMany.length} requests hit 429 (total ${totalRequests} reqs in window)`
           : `Traffic burst: ${totalRequests} requests in window (threshold ${BURST_THRESHOLD})`,
         level: "warning",
