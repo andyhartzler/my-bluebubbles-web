@@ -11565,3 +11565,196 @@ No credential, no DSN, no project reference, no probe source address, no policy 
 and no raw upstream error body appears, and nothing here widens access to anything. Withheld per
 the practice READ SIXTH set: the state of the live endorsement vote, the identity of the exec on
 FLUTTER-Q, and any operational read on production sessions.
+
+## READ SIXTIETH: the 08:21 UTC sweep, and a deleted function whose source was still loaded
+
+Swept the 24 hours to 2026-08-12 08:21:26 UTC. One code change, in the SITE repo: `aa2d513`
+removes the source of `download-apple-pass`. The previous sweep closed at 06:27:18, so 1 hour 54
+minutes is new observation, and the new slice is EMPTY across every project. An org-wide query
+carrying no `level` and no project filter, which is READ FORTY-SEVENTH's form for avoiding the
+rewrite trap READ FIFTH documents, returned zero events in it, not even the watchdog.
+
+THE FIND CAME OUT OF A LINE EARLIER SWEEPS WOULD HAVE FILED AS AD HOC NOISE
+A uuid line fired at 2026-08-11 16:59:32 and its value is `download-apple-pass`. READ NINTH
+separates `"pl"` from the hourly `"cron"` line on exactly this ground, so the value is worth
+reading rather than assuming. Here it is neither, and it names an edge function.
+
+Mechanism, from the source rather than inferred. The function took
+`pathParts[pathParts.length - 1]` as its member id, so a bare invocation of the function root
+yielded the literal string `download-apple-pass`. Be exact about which form: a TRAILING SLASH
+yields an empty segment and IS caught by the `if (!memberId)` guard, so the bare root is the
+specific signature. That fell through to `.eq('member_id', ...)` against a column declared
+`UUID NOT NULL`, and Postgres raised 22P02 verbatim.
+
+The function was already deleted from production on 2026-08-11, which
+`20260811_06_membership_cards_bucket_private.sql` records in its own header: `verify_jwt=false`
+with a service-role client and no auth check, serving any member's pass anonymously by UUID,
+probed live with zero credentials before deletion. Only the SOURCE survived, in two copies, and
+the second is labelled "Copy/Paste This Entire File ... ready for dashboard deployment".
+
+So the fix is deletion and not a uuid guard. A guard would harden an endpoint that must never run
+again, and per READ FIRST a bulk `supabase functions deploy` is exactly how source in this tree
+gets back into production. Checked before removing: no caller in either repo, no `.invoke()`, no
+`functions/v1` URL, no pg_net or trigger reference, no manifest entry, and the live Apple path is
+the `getApplePassUrl` server action minting a signed URL per signed-in caller.
+
+RATE IT HONESTLY, WHICH IS LOWER THAN IT FIRST READS AND STILL WORTH DOING
+This is ONE occurrence, not a recurring fault, and it sits inside the 16:56 to 17:10 operator
+verification session that deleted the function. So it is best read as the operator probing the
+root, and production deletion already prevents recurrence. The rationale that survives is
+removing the resurrection vector, not stopping an error. An auditor supplied that correction and
+it is the honest framing.
+
+One thing this does NOT establish. Production state is asserted from a migration comment, not
+read. This container has no Supabase credentials, and removing source undeploys nothing, so if
+that comment were wrong the endpoint would still be live and the change would be correct but
+INSUFFICIENT. `supabase functions list` is the check and it is on the ask list.
+
+Do not restore either file. If a future run sees this uuid value again, the function is back.
+
+Left as a pointer rather than acted on: `supabase/functions-standalone/` still holds six other
+dashboard-paste wallet files. They write rather than serve, so they are a different risk class
+and correctly not in that commit, but the same resurrection reasoning will eventually reach them.
+The third repo, `moyd-ops`, is not in this container and was not searched; any caller there would
+be calling the already-deleted deployed function, so source deletion changes nothing for it.
+
+THE SPONSORS INSTRUMENT HAS DEGRADED, WHICH IS WORTH MORE THAN THIS WINDOW'S DATA
+Re-read rather than inherited, per READ FOURTEENTH: the 12:05:10 rollup of 2026-08-11 carries
+`window_start` 11:59:02.814 to `window_end` 12:04:05.982, ONE `by_message` key at 32, `count` 32,
+`by_severity` ERROR 32, and no `42P10`. So `e79339b` is still undeployed, and per the GitHub
+path-history API it is still the last commit to touch `openstates-orchestrator/index.ts`.
+
+READ FIFTY-SEVENTH and READ FIFTY-NINTH found the burst absent at 18:00 and 00:00 and left 06:00
+open. It is still open and now harder: nothing has been emitted since 03:00:04, a 5 hour 21
+minute silence at the close, so a relay that stopped then explains the 06:00 absence on its own.
+That is READ TWENTY-FIRST's non-independence, so the count stays at TWO, which READ TWENTIETH's
+threshold says is not worth believing.
+
+The reason it is harder is structural and inheritable. `f20ec16` suppressed the pre-auth probe
+FATALs, and those probes were the relay's de facto heartbeat: they fired around the clock, so a
+rollup landed most windows and "no rollup covering the boundary" was a meaningful negative. With
+them suppressed the relay is legitimately silent for hours whenever the database is quiet. The
+instrument still works in the POSITIVE direction, since a 32 row burst forces its own rollup, but
+its NEGATIVE direction now needs liveness evidence that is no longer routinely available. Expect
+long empty stretches, and do not read one as a dead relay or as a fix.
+
+A NEW CHECK ON THE SPONSORS ASK, AND IT NARROWS WHAT THIS CONTAINER CAN EVER SETTLE
+No pg_cron job in this repo schedules the openstates orchestrator. Enumerated rather than
+asserted: 17 distinct job names across `supabase/migrations` and `supabase/migrations_manual`,
+none matching openstates, bill, sponsor or legislation. That is the same shape READ TWENTY-EIGHTH
+found for the calendar cron, and it means the "the 6 hourly cron stopped" branch is not merely
+unchecked here, it is structurally uncheckable. Do not spend another run trying.
+
+One trap if you repeat that grep: the job name sits on the line AFTER `cron.schedule(`, so a
+single line pattern returns zero and reads like an absence. It bit this run first time.
+
+The ask is unchanged and is one dashboard read: the deployed version of
+`openstates-orchestrator`, or whether bills are still syncing.
+
+THE 17:00 BOUNDARY IS AN EVIDENCED CRON MISS
+The rollup carrying the `download-apple-pass` line has `window_start` 16:59:03.275 to
+`window_end` 17:04:01.035, so it covers 17:00, and its single `by_message` key is that uuid line.
+No `"cron"` line in it. No consecutive total is claimed: the roughly three day loop gap READ
+FIFTY-THIRD records leaves the span unenumerated, per READ FIFTY-FIFTH.
+
+`1cdb96e` stays OPEN at 17 days and `e79339b` at 16, both floored per READ TWELFTH and both
+absent from this shallow clone, so both dates came from the GitHub commits API per READ
+FORTY-SEVENTH. `0d2963e` and `285a05f` are deployed, per READ FIFTY-SEVENTH.
+
+THE SCOPE HOLE READ FIFTY-SEVENTH LEFT IS CLOSED FOR THIS WINDOW
+That sweep read 3 of its events and classified the rest by title, recording that seven title-less
+rollups were invisible to it. All that remain in this window were read directly: 08:35:03 is
+three probe families and is the last FATAL carrying rollup on record, 12:05:10 is the sponsors
+burst above, 16:45:09 and 16:55:02 are one ad hoc `column "?" does not exist` line each, and
+16:40:07 was read by that section's own auditor. Nothing in them is new.
+
+NOTHING ELSE NEEDED ACTION
+FLUTTER-Q fired once at 15:15:20 on 08-11 and `8ccb4f0` landed 03:01:16 on 08-12, so the fix
+postdates it. SUPABASE-PLATFORM-3's two events at 13:20:02 and 15:05:02 both predate the v13
+relay deploy at 03:06 on 08-12. SUPABASE-PLATFORM-4's three are the 17:00 to 17:10 bucket flip
+verification READ FIFTY-SIXTH documents. The three `mautic` issues are the probe harness, already
+resolved, and there is no droplet access. ENDORSEMENT-SCORER-4 is the expected n8n watchdog,
+correctly ignored. Nothing was resolved or re-resolved.
+
+THE CENSUS, CROSS FOOTED PER READ TWELFTH, BOTH AXES PER READ FIFTY-THIRD
+
+    by project   endorsement-scorer 131, supabase-platform 27, mautic 7, flutter 1  = 166
+    by issue     ENDORSEMENT-SCORER-4 131                                           = 131
+                 SUPABASE-PLATFORM-1 22, -4 3, -3 2                                 =  27
+                 MAUTIC-J 4, -M 2, -K 1                                             =   7
+                 FLUTTER-Q 1                                                        =   1
+                                                                                      166
+
+Both axes agree exactly. `website`, `moydforms`, `n8n` and `supabase-edge` at zero. The issue axis
+was queried with NO status filter per READ EIGHTH, which is how the three resolved `mautic`
+issues, the resolved FLUTTER-Q and the ignored watchdog stayed visible.
+
+THE BRANCH REF TRAP BIT AGAIN, IN BOTH REPOS
+`master` at `67ce142` against a real `ebeda1e`, and `main` at `ad24682` against a real `203f5db`,
+both with `HEAD` detached at the true tip. Checked in the form READ TWENTY-SECOND prescribes,
+local side the NAMED BRANCH and not `HEAD`, and repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH. READ NINTH's cwd trap also bit, in its
+harmless direction: a two part grep without a second `cd` ran both halves in one repo and made a
+site-only file look present in both.
+
+A CONTAINER NOTE THAT IS NOT A GIT PROBLEM
+The container arrives with `user.email` set to an address this project does not commit under, and
+a stop hook asks for it to be normalised and for already-pushed commits to be rebased to match.
+Set the identity this project requires and do NOT rebase: those commits are the real remote
+history, rewriting them needs a force push, and READ SECOND's prohibition on force-pushing here
+is not negotiable for a cosmetic badge. Raise it instead.
+
+VERIFICATION
+`npx tsc --noEmit` exits 0. `npm run build` fails at "Collecting page data" with
+`supabaseUrl is required` on an unrelated route, which is the environmental baseline the site
+repo's own notes record; the same build with throwaway placeholder env values supplied on the
+command line, and committed nowhere, exits 0, which shows the failure is the container and not
+the diff. `node_modules` was absent and needed `npm ci` first.
+
+The auditor was Fable 5, available this run, and returned no blocker and no high, with two MEDIUM
+and two LOW. It independently confirmed the mechanism against the Sentry event and the caller
+search against both trees. Both MEDIUMs were applied: the stale rescue index line in
+`MEMBER-PORTAL-FUNCTIONS.md`, which that deletion is what makes wrong and so belongs in the same
+commit, and the production-state caveat above. One LOW was applied, the `Refs` trailer and the
+single-occurrence framing; the other is the out-of-scope residue recorded above. Shipped on that
+pass rather than re-auditing, since the standing gate re-audits on a blocker or a high and this
+returned neither.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `1cdb96e`, `e79339b`,
+`0d2963e`, `285a05f`, `f20ec16`, `8ccb4f0` and `aa2d513`; the deleted function
+`download-apple-pass`, the function `openstates-orchestrator` and its `index.ts`, the server
+action `getApplePassUrl`, and the docs `MEMBER-PORTAL-FUNCTIONS.md` and
+`RESCUED-FUNCTIONS-2026-07-23.md`; the migration
+`20260811_06_membership_cards_bucket_private.sql` and the phrases quoted from its header, which
+are the evidence for the deletion; the table `membership_cards` and its columns `member_id` and
+`apple_wallet_pass_url`; the flag `verify_jwt`; the SQLSTATE codes `22P02` and `42P10`; the
+migration directories, the `cron.schedule` form and the pg_cron job count; the relay internals
+`window_start`, `window_end`, `by_message`, `by_severity`, `count` and `level`; the issue ids and
+project names; the names Sentry, GitHub and Supabase, and the GitHub path-history and commits
+APIs; the git and verification commands; the stale refs `67ce142` and `ad24682`, this repo's tip
+`ebeda1e` and the sibling's tip `203f5db`; and the auditor model name Fable 5, whose cover per
+READ TWENTY-EIGHTH is prior publication both in this file and in this public repo's commit log.
+Everything else already appears in this file or is committed in one of the two trees.
+
+The 17 pg_cron job names are deliberately NOT reproduced: the finding is which name is ABSENT,
+and a ready made list of scheduled jobs is more useful to somebody probing than to the next run.
+The membership-cards bucket key shape is likewise not repeated; READ FIFTY-SIXTH already weighed
+and published what that finding needed.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is
+`invalid input syntax for type uuid: "download-apple-pass"`, the normalized duplicate key
+message, `column "?" does not exist`, and the probe shapes named only to record which fired. The
+uuid value is new to this file and is weighed rather than swept in: it is the name of a function
+this public tree already committed and has now deleted, and it carries no member id, row, person
+or address. The member UUIDs a real invocation would have logged are not reproduced, and neither
+is the project reference the `server_name` tag carries, per READ THIRTY-FIFTH.
+
+Quantities are enumerated together per READ THIRTY-SIXTH: the census figures, the clock values,
+the two day counts, the 32 line burst, the 17 job names, the standalone file count, the auditor
+finding tally, and every remaining quantity, OF WHATEVER KIND. All are bare and name nothing.
+
+No credential, no DSN, no project reference, no probe source address, no policy body and no raw
+upstream error body appears, and nothing here widens access to anything. Withheld per the
+practice READ SIXTH set: the state of the live endorsement vote, and any operational read on
+production sessions.
