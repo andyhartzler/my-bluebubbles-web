@@ -11758,3 +11758,298 @@ No credential, no DSN, no project reference, no probe source address, no policy 
 upstream error body appears, and nothing here widens access to anything. Withheld per the
 practice READ SIXTH set: the state of the live endorsement vote, and any operational read on
 production sessions.
+
+## READ SIXTY-FIRST: the 10:21 UTC sweep, all four fixes were deployed on 2026-08-11, and the calendar question is CLOSED on the expensive branch
+
+Swept the 24 hours to 2026-08-12 10:21:00 UTC. No code change and no unfixed defect. The
+previous sweep closed at 08:21:26, so 1 hour 59 minutes is new observation, and the new slice
+is empty: an org wide query carrying no `level` and no project filter, per READ FORTY-SEVENTH,
+returned zero events in it, watchdog included. That instrument alone cannot establish "every
+project", per READ FIFTY-THIRD, so the issue axis was run as well and shows no issue with
+activity inside the slice.
+
+Nothing new fired. Everything below comes from ground earlier sweeps already had and never
+read, and it retires the two longest running open questions in this file.
+
+THE FOUR "UNDEPLOYED FIXES" WERE DEPLOYED ON 2026-08-11. STOP TRACKING THEM
+The body of `263528b` opens: "Deploying the four undeployed edge-function fixes turned up a live
+feature outage that had been hiding behind one of them." The commit is dated 2026-08-11T16:53:29
+UTC. Say the BODY opens: the commit opens with its subject line, and a draft got that wrong.
+
+So the day counts every sweep from READ TWELFTH onward has carried, and the single item ask for
+a `SUPABASE_ACCESS_TOKEN` that went with them, are both closed. Do not recompute those ages and
+do not re-ask. The four this file tracked are `1cdb96e`, `e79339b`, `0d2963e` and `285a05f`. The commit names
+`1cdb96e` by hash, so that one rests on the commit itself; `0d2963e` and `285a05f` are
+independently established by READ FIFTY-SEVENTH; only `e79339b` rests on this file's own
+tracking of what the four were, plus the bracket below.
+
+`1cdb96e` IS DEPLOYED AND CONFIRMED LIVE, WHICH IS THE OPPOSITE OF WHAT THIS SWEEP FIRST WROTE
+The same commit, in its last substantive paragraph, records the audit row "that has failed on
+this path for sixteen days now lands:
+actor_id NULL, actor_role service_role, fetched 39, updated 39, which is exactly the shape
+1cdb96e writes and confirms that fix live rather than by inference."
+
+Record how this nearly went wrong, because it is this file's most catalogued failure in its
+worst position. The first draft of this section read only the MIGRATION HEADER, which says
+correctly that the past quiet "was not" a deploy, extended that past tense clause into a present
+tense "1cdb96e remains undeployed", and armored it with "Do not reopen this." An adversarial
+auditor caught it as a BLOCKER by reading the commit MESSAGE wrapped around the header. A
+migration header and its commit message are two sources, and quoting one at length is not
+reading the other.
+
+THE HOURLY uuid LINE: THE ANSWER WAS THE EXPENSIVE BRANCH, AND IT IS FIXED
+From READ TWENTIETH onward most sweeps held two readings open and refused to choose: either
+`1cdb96e` was hand deployed, or the calendar cron was disabled or failing. It was the second.
+Say most and not every, and do not enumerate the exceptions: a draft tried, and the criterion
+for "states neither reading" is not sharp enough to make the list checkable.
+
+`trigger_calendar_sync()` sent an `x-cron-secret` literal that no longer matched the
+`sync-google-calendar` function's `CRON_SECRET`, so the cron branch never fired, the request
+fell through to the user JWT path, and with no Authorization header the gate refused it. Every
+hourly run returned 401 from 2026-08-05 06:00 UTC, confirmed in the edge logs. `calendar_events`
+`max(synced_at)` sat at 2026-08-05 06:00:06 for six days. The commit's own words: "Six days of
+no calendar data, invisible from every dashboard."
+
+The hourly line vanished because the function never got far enough to attempt the audit insert,
+not because its fix shipped. The commit says so and adds the sentence this file has been
+repeating on faith since READ TWENTY-SECOND: an error going quiet is not by itself good news.
+No count is given for how many sections carry it. Two drafts of this sentence gave one and both
+were wrong, the second because a line based grep of this file undercounts a phrase that wraps. It was right, and being right cost six days of a dead
+feature that no dashboard showed.
+
+Fixed by reading the secret from the vault at call time. Verified on the running system rather
+than on an HTTP 200: invoking the routine returned a synced result and moved `max(synced_at)` to
+2026-08-11 16:52:42 with 39 rows touched.
+
+THE CHECK THIS FILE KEPT PRESCRIBING WOULD HAVE COME BACK CLEAN AND BEEN WRONG
+Ten sweeps asked Andrew to confirm "whether the calendar job still exists and is enabled in
+`cron.job`", READ TWENTY-NINTH through THIRTY-FOURTH and THIRTY-SEVENTH through FORTIETH. Count
+them rather than writing "every sweep since", which is false: twenty two later sweeps carry no
+such ask in any wording. `263528b` records that `cron.job_run_details` showed 644
+consecutive "succeeded" runs across the entire outage, because pg_cron records only that
+`net.http_post` was QUEUED and never the HTTP outcome.
+
+A queued POST is not a completed sync. For any cron driven edge function the sound check is
+`max()` of the write timestamp on the table the job populates, never the job's own run history.
+`20260811_09` makes the same point from the other side and closes it going forward: fifteen
+pg_cron jobs carried the service_role JWT as a literal, and it changes them to RAISE on a
+missing vault secret rather than post unauthenticated, its header saying a silent 401 was how
+this class of bug stayed invisible. Inherit that check, not the one this file kept asking for.
+
+THE SPONSORS BURST STOPPED BECAUSE `e79339b` WAS DEPLOYED. THAT CLOSES WHICH FIX, NOT WHETHER
+THE SYNC IS ALIVE
+READ FIFTY-SEVENTH, FIFTY-NINTH and SIXTIETH held three readings open: `e79339b` deployed at
+last, the six hourly openstates cron stopped, or the relay lost the windows. READ FIFTY-EIGHTH
+is not in that list; its window closes before the first absent cycle. The first reading is
+right.
+
+The bracket fits and needs no dashboard. The last 32 line `legislation_bill_sponsors_unique`
+burst is 2026-08-11T12:05:10, the commit recording the deploys is 16:53:29, and the first absent
+cycle is 18:00. Call that the COMMIT time and not the deploy time, per READ FIFTY-NINTH: a commit
+instant orders nothing about a hand deploy. It is direction safe here, since the commit describes
+the deploys in the past tense and the burst itself pins them after 12:05.
+
+Do not lean on the `42P10` discriminator here, which an earlier draft did. READ TWENTY-SECOND's
+version of it is an IN WINDOW control, 32 dup key lines and no `42P10` in the same emitted
+rollup. The three slots where a mismatch branch `42P10` would land emitted no rollup at all, and
+per READ TWENTY-FIRST an absent rollup cannot separate an empty window from a swallowed query.
+No `42P10` appears in any window that DID emit, which is worth stating and is weaker than the
+citation would make it sound.
+
+NOW THE PART THIS SWEEP GOT WRONG ONCE AND AN AUDITOR CAUGHT
+An earlier draft wrote "there is no silent legislation sync outage" and told the next run not to
+ask. That is a claim about production health, and nothing here observes it. What is observed is
+the ABSENCE of an error, and the 32 line burst was this file's only passive evidence that the
+openstates job runs at all, so a deployed fix removes that signal BY DESIGN. Post deploy silence
+is equally consistent with a healthy sync and a dead job.
+
+The section's own headline finding is the proof: 644 consecutive "succeeded" runs over a feature
+that had been dead for six days. A deployed function plus quiet logs is exactly what a silent
+outage looks like from here.
+
+So the WHICH FIX question is closed and the SYNC HEALTH question is open, and it needs the check
+this section just spent two paragraphs establishing: `max()` of the write timestamp on the bill
+sponsors table. That is a one time read rather than a standing escalation, and it is a real ask
+that must not be dropped because the error stopped.
+
+THE 17:04 TO 17:34 CLUSTER, DECOMPOSED FOR THE FIRST TIME
+A first audit round caught this sweep asserting the whole window was already covered when five
+rollups in it had never been read by any sweep. READ FIFTY-SEVENTH classified them by title and
+said so; READ SIXTIETH's scope hole closure reached only the title-less rollups. Read directly
+now, twelve lines reconciling against the five per event `count` fields:
+
+    17:10:02 rollup, window 17:04:01.035 to 17:09:00.955
+        3  permission denied for table candidates, form_submissions and members
+           all three inside 0.672 seconds at 17:08:15 to 17:08:16
+    17:15:05 rollup, window 17:09:00.955 to 17:14:00.751
+        1  permission denied for table fec_superseded_filings   17:13:07
+        2  column "fec_cand_id" does not exist   17:11:12
+           column "file_number" does not exist   17:11:14
+    17:20:03 rollup, window 17:14:00.751 to 17:19:01.324
+        1  column "name" does not exist   17:15:40
+    17:30:06 rollup, window 17:24:01.706 to 17:29:02.796
+        1  column fs.submitted_at does not exist   17:24:45
+    17:35:04 rollup, window 17:29:02.796 to 17:34:01.674
+        2  "array_agg" is an aggregate function   17:30:16 and 17:30:20
+        1  column "status" does not exist   17:33:10
+        1  column "jobname" does not exist   17:33:40
+
+Three tables denied inside 0.672 seconds is the anon revoke verification shape READ FORTY-FIRST
+decodes, and the cluster sits immediately after the 16:56 to 17:06 bucket flip verification READ
+FIFTY-SIXTH documents, so it reads as the same operator session continuing through the deploy
+batch above. The column errors are the ad hoc hand SQL family.
+
+Both of the FEC identifiers are the plausible guess shape READ SIXTH documents, and an earlier
+draft got one of them backwards. `fec_cand_id` is NOT a committed column: it exists in this repo
+only as a jsonb result key in a 2026-07-23 migration and as a SUBSTRING of the RPC parameter
+`p_fec_cand_id`, which is what every Dart call site actually passes. The real column is
+`cand_id`. Reading `p_fec_cand_id` hits as `fec_cand_id` usage is the different identifier trap
+READ THIRTY-FIRST catalogues for `message_ts` against `slack_message_ts`, and an auditor caught
+it here. `file_number` appears nowhere in either repo at the time of writing, which is READ
+SIXTH's standard, and per that same section's caveat a grep run after this commits will hit this
+section and nothing else. Either way the clearance is unchanged and there is nothing to fix.
+
+The `fec_superseded_filings` denial at 17:13:07 needs no action. `ac5cb61`, committed 17:06:04
+UTC, restores read on that table to `authenticated`, its header recording the same 42501 reached
+by impersonation and noting the table's creating migration already carried the grant, so this
+was drift rather than a deliberate closure. It is a GRANT plus an RLS policy rather than a grant
+alone, and its own header calls the row visibility half the load bearing one. The denial lands 7 minutes 3 seconds after the
+commit, consistent with the grant being applied after it was committed and not established
+either way.
+
+`jobname` is a pg_cron catalog column and the line is recorded rather than interpreted.
+
+EVERYTHING ELSE IN THE WINDOW
+The 16:56 to 17:10 bucket flip verification READ FIFTY-SIXTH documents, the `download-apple-pass`
+uuid line READ SIXTIETH fixed in `aa2d513`, the 22:55 to 23:45 and 02:25 to 03:00 sessions READ
+FIFTY-SEVENTH covers, the two relay 502s predating the v13 relay deploy, the three resolved
+`mautic` probe issues and FLUTTER-Q's single event predating `8ccb4f0`. Note the scope honestly:
+READ FIFTY-SEVENTH read three of its events directly and classified the rest by title, so
+"covered" there means classified rather than decomposed. Nothing was resolved or re-resolved.
+
+The relay silence is 7 hours 20 minutes at the close, its newest event of any kind being
+03:00:04. Per READ SIXTIETH the probe FATALs `f20ec16` suppressed were its de facto heartbeat,
+so a quiet database now produces long empty stretches. With the sponsors burst legitimately gone
+there is one less recurring emitter, so expect these stretches to lengthen rather than to signal
+anything.
+
+THE CENSUS, CROSS FOOTED PER READ TWELFTH, BOTH AXES PER READ FIFTY-THIRD
+
+    by project   endorsement-scorer 101, supabase-platform 26, mautic 7, flutter 1  = 135
+    by issue     ENDORSEMENT-SCORER-4 101                                           = 101
+                 SUPABASE-PLATFORM-1 21, -4 3, -3 2                                 =  26
+                 MAUTIC-J 4, -M 2, -K 1                                             =   7
+                 FLUTTER-Q 1                                                        =   1
+                                                                                      135
+
+Both axes agree exactly. `website`, `moydforms`, `n8n` and `supabase-edge` at zero. The issue
+axis was queried with NO status filter per READ EIGHTH, which is how the three resolved `mautic`
+issues, the resolved FLUTTER-Q and the ignored watchdog stayed visible.
+
+THE BRANCH REF TRAP BIT AGAIN, IN BOTH REPOS
+`master` at `67ce142` against a real `970faac`, and `main` at `ad24682` against a real `aa2d513`,
+both with `HEAD` detached at the true tip. Checked in the form READ TWENTY-SECOND prescribes,
+local side the NAMED BRANCH and not `HEAD`, and repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH. The cosmetic ahead counts after the
+repair are the stale `origin/<branch>` talking, per READ TWENTY-SIXTH; do not act on them.
+
+WHAT THE AUDITOR CAUGHT
+Fable 5, four rounds, NOT CLEAN each time: 9 findings, then 11, then 10, then 8. No Sentry side
+figure was overturned on any round. All four independently re-derived the census on both axes,
+the slice emptiness, the last sponsors burst, the relay's newest event, every duration and the
+branch refs, and the later rounds re-derived every row of the cluster decomposition against the
+event extras, to the millisecond, and found it right.
+
+No itemisation of the 38 follows, deliberately. Three drafts of this paragraph tried to reconcile
+one and an auditor falsified each in turn, the last on three separate counting conventions at
+once, while every finding it was miscounting sat in the apparatus rather than in an observation.
+READ FORTIETH's rule is that the audit account is not itself a finding. This is what it costs to
+ignore that rule: an inventory of corrections that generates its own corrections. Record the
+lessons and stop.
+
+Four are worth inheriting, and each is written into the paragraph it corrects rather than only
+here. Round one's BLOCKER was a container note describing this agent's own reporting tooling in a
+PUBLIC file, which READ EIGHTEENTH records as a BLOCKER class and READ TWENTY-SEVENTH deleted
+rather than trimmed; deleted here too. Round one's false universal that the window was already
+covered is what produced the decomposition above, so the auditor did not just correct a sentence,
+it found unread ground. Round two's BLOCKER is the reason this section says what it says: quoting
+a migration header at length while never reading the commit message wrapped around it, which
+settled both open questions and settled `1cdb96e` in the opposite direction from the assertion.
+And round three's HIGH is the overcorrection that followed, a flat "there is no silent
+legislation sync outage" that nothing observes and that this section's own centerpiece refutes.
+
+That pair is the pattern worth more than any single fix. Two rounds landed on the same question
+in opposite directions, and both times the error was a production state asserted past what was
+observed. The remaining rounds found almost nothing else: round four returned no blocker and no
+high, and every one of its findings was a repair of a round three finding that was itself
+defective, which is exactly the migration this file documents.
+
+This shipped on that fourth round rather than on a clean one. The standing gate re-audits on a
+BLOCKER or a HIGH and round four returned neither, so this is within the gate rather than a
+departure from it, unlike READ FIFTY-FOURTH, FIFTY-FIFTH, FIFTY-EIGHTH and FIFTY-NINTH, which
+each record shipping past a finding the gate did cover.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Re-derived against the body in both directions,
+which round two caught the previous draft claiming and not doing.
+
+Named above: the commits `1cdb96e`, `e79339b`, `0d2963e`, `285a05f`, `f20ec16`, `8ccb4f0`,
+`aa2d513`, `263528b` and `ac5cb61`; the migration `20260811_09` by short name and the phrases
+quoted from `263528b` and from that migration's header; the functions `sync-google-calendar`,
+`openstates-orchestrator` and the deleted `download-apple-pass`; the routine
+`trigger_calendar_sync`, the header name `x-cron-secret`, the secret NAME `CRON_SECRET`, and the
+pg_cron objects `cron.job`, `cron.job_run_details` and `net.http_post`; the tables
+`calendar_events`, `candidates`, `form_submissions`, `members` and `fec_superseded_filings`, and
+the columns `synced_at`, `fec_cand_id`, `cand_id`, `file_number`, `name`, `jobname`, `status`
+and `fs.submitted_at`, the RPC parameter `p_fec_cand_id`, and the pair `message_ts` and
+`slack_message_ts` cited from READ THIRTY-FIRST; the constraint `legislation_bill_sponsors_unique`; the SQLSTATEs `42501` and
+`42P10`; the roles `authenticated`, `service_role` and `anon`; the audit row fields `actor_id` and
+`actor_role`; the vault, named as the store the secret is read from, and the SQL keyword `RAISE`;
+the header name `Authorization`; this repo's Dart call sites for that RPC, named by role rather than by path; the relay field `count`
+and the search field `level`; the tag `server_name`, named only in the withholding sentence
+below, its cover being READ FIRST and READ TWELFTH; the product names Supabase and Sentry; the
+env var name `SUPABASE_ACCESS_TOKEN`; the issue ids and project
+names; the git commands and ref names, the stale refs `67ce142` and `ad24682`, this repo's tip
+`970faac` and the sibling's tip `aa2d513`; and the auditor model name Fable 5, whose cover per
+READ TWENTY-EIGHTH is prior publication both in this file and in this public repo's own commit
+log.
+
+Every one is already committed in THIS repo, the public one, or already appears in this file,
+with two carve outs. `fs.submitted_at` in its qualified form appears nowhere in either repo and
+nowhere earlier in this file, so prior publication is NOT its cover: it is published here for
+the first time and needs none, naming a column that does not exist and therefore describing
+nothing real, which is the same call `file_number` gets. `aa2d513` is the private sibling's tip
+and its cover IS prior publication, in READ SIXTIETH. Apply READ SEVENTEENTH's test rather than
+the lazy version: "already committed" would be an argument for WITHHOLDING had any of the rest
+come from the private sibling, and none did.
+
+The quoted commit and header prose is this public repo's own committed text and carries no
+secret VALUE. `263528b` deliberately keeps the secret out of the migration, and its stated
+reason is that the old hardcoded literal did not, which is a fact about this public repo that it
+publishes about itself.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is `invalid input syntax for type uuid:
+"cron"`, which the body names in bare form and this paragraph quotes in full, published in this
+file since READ FIRST;
+`column "?" does not exist` and its listed identifiers, published since READ FOURTH;
+`"array_agg" is an aggregate function`, published since READ SEVENTH; and
+`permission denied for table ?`, published since READ FORTY-FIRST rather than READ FOURTH, which
+READ FIFTY-SEVENTH already corrected once. None names a row, value, person or address. The
+normalized duplicate key message is referred to by description and not quoted.
+
+Quantities are enumerated together per READ THIRTY-SIXTH: the census figures, the clock values,
+the durations, the 32 line burst, the 644 succeeded runs, the 39 rows, the fifteen cron jobs,
+the auditor tallies and every remaining quantity, OF WHATEVER KIND. All are bare and name
+nothing.
+
+No credential, no DSN, no project reference, no probe source address, no policy body and no raw
+upstream error body appears. The "no RPC name" clause prior sections carry is DROPPED here, per
+READ FORTY-FIRST and READ FIFTY-SEVENTH, which drop it whenever their bodies name a callable
+function: `trigger_calendar_sync` is one, it is committed in this public repo, and its name
+discloses nothing its own migration does not. Nothing here widens access to anything. The
+`server_name` tag on every event read this run carries the Supabase project reference and is
+deliberately NOT reproduced, per READ THIRTY-FIFTH, and neither is the project host that appears
+in the quoted migrations. Withheld per the practice READ SIXTH set: the state of the live
+endorsement vote, any operational read on production sessions, and anything describing this
+container's own reporting or credential tooling, which READ EIGHTEENTH records as a BLOCKER
+class and which this run's own blocked first draft is the reason to restate here.
