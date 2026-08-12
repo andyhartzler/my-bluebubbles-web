@@ -213,43 +213,50 @@ function isConnectionProbe(r: PgRow): boolean {
 
 // Statements typed by an operator through the Supabase Management API.
 //
-// `mgmt-api` is the application_name Postgres records for a connection opened
-// by POST /v1/projects/:ref/database/query and its migrations sibling. Reaching
-// that endpoint requires a personal access token, so no product code and no end
-// user can ever appear under it: the CRM and the website both reach Postgres as
-// `postgrest`, edge functions and scripts connect under their own names, and
-// pg_cron background workers carry none at all. Verified rather than assumed,
-// by reading application_name back through that same endpoint.
+// SUPPRESSION BY application_name WAS REMOVED. DO NOT REINTRODUCE IT.
 //
-// The consequence is that an error under this name has already been delivered
-// to a human, synchronously, as the HTTP response to the statement that raised
-// it. Reporting it again five minutes later tells nobody anything they do not
-// have. Over 2026-08-11 it was 18 of the 155 non-probe lines but NINE of the
-// twenty five-minute windows that fired an event, because ad-hoc SQL arrives in
-// ones and twos across many windows while product errors arrive in bursts.
+// An earlier revision of this file dropped ERROR rows whose application_name was
+// `mgmt-api`, on the reasoning that the Supabase Management API query endpoint
+// requires a personal access token, so only an operator could appear under that
+// name, and an operator has already seen the error synchronously as the HTTP
+// response to their own statement.
 //
-// This is the same category as PROBE_PATTERNS above and it is a REPORTING
-// change, not a defect fix: nothing here is broken, and the two families it
-// removes are a security-hardening verification harness deliberately calling
-// just-revoked functions to prove they are blocked, and operator introspection
-// with column-name typos.
+// Every sentence of that is true about who LEGITIMATELY uses the name. None of it
+// is true about who can CLAIM it, and that is the only question that matters for a
+// suppression rule.
 //
-// Scope it narrowly, in two ways that both matter.
+// application_name is a client-supplied connection parameter. It is self-asserted
+// and never authenticated. Any session can simply say
+//   SET application_name = 'mgmt-api';
+// and Postgres records it. Verified on this database, not reasoned about: an
+// ordinary session issued exactly that statement and current_setting read the new
+// value straight back.
 //
-// It does NOT reach the same harness's probes through PostgREST. Verifying a
-// revoke with the publishable anon key raises `permission denied for function
-// ...` under `postgrest`, on the exact path a genuine refused caller uses, and
-// those two are indistinguishable by construction. That family stays reported,
-// for the same reason storage 401 and 403 stay reported: it is the RLS and
-// grant regression case worth waking up for.
+// So the rule handed any client a one-line switch for turning off its own error
+// reporting. That inverts the purpose of the relay. The population most motivated
+// to set it is exactly the population the relay exists to surface.
 //
-// And it is ERROR only. A FATAL or PANIC on an operator session describes the
-// server rather than the statement, so it still reports.
-const OPERATOR_APPS = new Set(["mgmt-api"]);
-
-function isOperatorSession(r: PgRow): boolean {
-  return r.sev === "ERROR" && r.app !== null && OPERATOR_APPS.has(r.app);
-}
+// This is not hypothetical on this project. AGENTS.md records that port 5432 is
+// reachable from the open internet and is actively probed, and this repo is public
+// and has published both the `postgres` superuser password and a live service_role
+// key in its history. Neither has been rotated yet. An attacker holding either one
+// could open a direct session, name itself `mgmt-api`, and enumerate the schema
+// with every resulting ERROR line invisible in Sentry.
+//
+// Weigh what the rule bought against that. It removed 18 of 155 non-probe lines on
+// 2026-08-11. The reporting saving is real and small. The detection loss is
+// unbounded, because it is silent and it is chosen by the attacker rather than by
+// us. That trade is not close.
+//
+// The attribution the same change added is KEPT, in the `by_app` tally below, and
+// it is pure gain. Recording which application_name a row arrived under tells a
+// reader what was previously only inferred from message shape and timing. Labelling
+// a row is safe precisely because a reader can weigh a self-asserted label; dropping
+// the row on the strength of one is not, because then there is nothing left to weigh.
+//
+// If operator SQL noise ever needs reducing again, filter on something the client
+// cannot choose. The authenticated role, the client address, or a Sentry-side
+// inbound filter are all candidates. Never the client's own label for itself.
 
 // Storage statuses that describe the CALLER rather than storage health.
 //
@@ -449,12 +456,12 @@ Deno.serve(async (req: Request) => {
       m.replace(/"[^"]*"/g, '"?"').replace(/\d+/g, "N").slice(0, 160);
 
     const probeRows = pgRows.filter(isConnectionProbe);
-    const operatorRows = pgRows.filter((r) =>
-      !isConnectionProbe(r) && isOperatorSession(r)
-    );
-    const appRows = pgRows.filter((r) =>
-      !isConnectionProbe(r) && !isOperatorSession(r)
-    );
+    // Every non-probe row is reported. Operator sessions are no longer split out
+    // and dropped; see the note on OPERATOR_APPS above for why that rule was
+    // removed and must not come back. isConnectionProbe stays, because it keys on
+    // the postmaster's own message text for a pre-authentication connection, which
+    // no client can author.
+    const appRows = pgRows.filter((r) => !isConnectionProbe(r));
 
     if (appRows.length > 0) {
       const byMessage = tally(appRows, (r) => norm(r.msg), 15);
@@ -481,10 +488,9 @@ Deno.serve(async (req: Request) => {
           // it before reaching for any of that.
           by_app: tally(appRows, (r) => r.app ?? "none"),
           sample: appRows.slice(0, 5),
-          // Both carried even when zero, so a reader can tell "none in this
-          // window" from "this build does not know about them".
+          // Carried even when zero, so a reader can tell "none in this window"
+          // from "this build does not know about them".
           probes_suppressed: probeRows.length,
-          operator_suppressed: operatorRows.length,
           ...windowTag,
         },
       });
@@ -523,11 +529,9 @@ Deno.serve(async (req: Request) => {
         api_5xx: any5xx.length,
         http_429: tooMany.length,
         postgres_errors: appRows.length,
+        // A window whose postgres rows are ALL connection probes sends no event,
+        // so this count rides only here and the runtime log is the record.
         connection_probes: probeRows.length,
-        // A window whose postgres rows are ALL operator or probe rows sends no
-        // event, so these two counts ride only here. That is the same trade the
-        // probe suppression already makes, and the runtime log is the record.
-        operator_sessions: operatorRows.length,
       },
       sentry_events: sent,
     };
