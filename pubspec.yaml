@@ -12,7 +12,11 @@ description: Send iMessages on Android using BlueBubbles!
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 
-version: 1.15.0+70
+# netlify-build.sh derives SENTRY_RELEASE from this line and sentry_flutter
+# derives `dist` from the build number, so a build shipped without bumping it
+# is indistinguishable in Sentry from every build before it. Bump the build
+# number whenever a change is meant to be measurable in Sentry.
+version: 1.15.0+71
 publish_to: none
 
 environment:

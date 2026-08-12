@@ -148,9 +148,7 @@ class MessagesViewState extends OptimizedState<MessagesView> {
   /// read Focus status, which most likely describes the server rather than one
   /// recipient, since it repeats on every conversation opened. That inference
   /// is why this disables the lookup for the whole session rather than for one
-  /// address. Each failed request files three Sentry events: the sentry_dio
-  /// FailedRequestInterceptor, ApiInterceptor's own log, and the catchError
-  /// below. Asking once per session is enough to notice a server that can
+  /// address. Asking once per session is enough to notice a server that can
   /// answer, and a reload clears this. Static because a new state object is
   /// built for every conversation opened.
   static bool _focusStateUnsupported = false;
@@ -179,7 +177,25 @@ class MessagesViewState extends OptimizedState<MessagesView> {
         if (error is dio.Response && error.statusCode == 500 && _isServerError(error.data)) {
           _focusStateUnsupported = true;
         }
-        Logger.error('Failed to get focus state!', error: error, trace: stack);
+        // Warn, never error, because there is no branch left where an event
+        // from here is the first one. `addSentry()` swaps dio's
+        // httpClientAdapter for SentryDioClientAdapter, which captures any
+        // response inside failedRequestStatusCodes, 500-599 by default, at the
+        // transport layer with full request and response context and before
+        // any interceptor runs; that capture is the FLUTTER-X shape and it is
+        // the one worth keeping. A 4xx sits outside that range and is captured
+        // instead by ApiInterceptor.onError, which still logs error for a
+        // server-answered status sentry_dio ignores. What is left is a timeout
+        // or an unanswered host, and `fa1dccf91` ruled deliberately that those
+        // are a transport condition rather than a defect of this app and
+        // dropped them to warn one layer up; capturing them again from here
+        // would reinstate the exact volume that commit removed.
+        //
+        // So this call was the second event on every path and the third on
+        // some. Warn keeps the identical on-device line and leaves a Sentry
+        // breadcrumb, so the failure still rides along with whatever event a
+        // caller reports next.
+        Logger.warn('Failed to get focus state!', error: error, trace: stack);
       });
     }
   }
