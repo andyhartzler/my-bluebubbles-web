@@ -10923,3 +10923,402 @@ No credential, no DSN, no project reference, no probe source address, no policy 
 upstream error body appears, and nothing here widens access to anything. Withheld per the
 practice READ SIXTH set: the state of the live endorsement vote, any operational read on
 production sessions, and this operation's own tooling per the paragraph above.
+
+## READ FIFTY-EIGHTH: the 15:40 UTC sweep, written late, and a FOURTH fix for one issue
+
+THIS SECTION SHIPPED LATE AND ITS ASK IS ALREADY OVERTAKEN. READ THIS FIRST
+The sweep below closed 2026-08-11 15:40:00 UTC. The section reached master only after two
+later sweeps had landed, which is why it is numbered EIGHTH rather than SIXTH, and after
+`8ccb4f0` fixed FLUTTER-Q on master at 2026-08-12T03:01:16Z. So its NEEDS ANDREW ask, that he
+merge `20d11b77`, is MOOT: the issue was fixed in the trunk instead, by a later run, five
+hours after this run pushed its own branch.
+
+Do not read that as the section being wasted. It makes the finding STRONGER than the body
+below states it. The body records THREE overlapping unmerged fixes for one issue and argues
+that a missing branch check caused the third. `8ccb4f0` is a FOURTH, written by yet another
+run that also did not find the three branches, and it carries `Refs FLUTTER-Q` rather than
+`Fixes`, so the issue stayed open across all four. Four independent fixes for one auth bug is
+the cost of the missing check, and the check is one command.
+
+Two consequences for the next run. The three branches are now REDUNDANT rather than pending,
+so the ask is to close them and their PRs rather than to merge one; verify that against the
+trunk before acting, since none of the four was written with knowledge of the others. And the
+body's day counts, ages and undeployed-fix claims are all as of 15:40 on 08-11 and several are
+known stale: READ FIFTY-SEVENTH records the relay retry DEPLOYED, so this body's claim that
+`0d2963e` and `285a05f` are undeployed is true of its own window and false of now. Prefer the
+later sections for any current-state question and read this one for its method only.
+
+Swept the 24 hours to 2026-08-11 15:40:00 UTC. The previous sweep closed at 14:24:44, so 1
+hour 15 minutes is new observation, and per the overlap warning in READ FOURTH almost
+nothing below is independent of it. One commit this run, `fa6ec76`, pushed to
+`sentry-fix/FLUTTER-Q-copy` rather than to the branch its short id names. That collision
+is the finding worth inheriting and it cost most of the run.
+
+Carve out the watchdog per READ EIGHTEENTH: ENDORSEMENT-SCORER-4 fired 19 times inside the
+new slice, correctly ignored and excluded on purpose rather than absent. Net of it the slice
+carries exactly TWO events, and both are recorded below: FLUTTER-Q's own newest occurrence at
+15:15:20, and a fourth relay 502 at 15:05:02.
+
+An earlier draft of this lede wrote "one other thing fired in the new slice" and named only
+the 502. That is false twice over, and an auditor caught it. It silently excluded the
+watchdog, which is exactly the move every sweep since READ EIGHTEENTH carves out explicitly
+rather than assuming; and it silently excluded FLUTTER-Q, whose lastSeen instant this same
+section quotes without noticing it lands INSIDE the slice. A sweep that spends its whole
+length on an issue is the one most likely to forget that issue is also an event.
+
+CHECK `git ls-remote --heads origin` AND THE OPEN PR LIST BEFORE DIAGNOSING
+The standing orders say to check `git log` for a commit naming the Sentry short id before
+fixing anything. That is necessary and NOT sufficient, for the same structural reason READ
+FIRST gives about edge functions: work that was pushed to a branch and never merged is
+absent from `git log` on master by construction. FLUTTER-Q already had an unmerged fix on a
+branch when this run started, `787863b3`, carrying an OPEN DRAFT PR and so reviewable rather
+than merely pushed, and this run rediscovered the issue from scratch and wrote an overlapping
+fix before the push was rejected and surfaced it. Add both
+checks, `git ls-remote --heads origin` filtered to `sentry-fix/` and the open PR list, to
+the same step as the git log check.
+
+Say ONE branch at run start and not two. A SECOND, `20d11b77`, appeared MID RUN from a
+different session, so the inventory below is three while the thing the missing check would
+have caught was one. An earlier draft wrote TWO and then conceded in its own next paragraph
+that `20d11b77` postdates the sweep close, which cannot both be true.
+
+THE THREE BRANCHES, ALL WRITTEN BY RUNS OF THIS SAME LOOP
+
+    sentry-fix/FLUTTER-Q          787863b3   authored 2026-07-29, open draft PR
+    sentry-fix/FLUTTER-Q-onerror  20d11b77   authored 2026-08-11T16:58:36Z
+    sentry-fix/FLUTTER-Q-copy     fa6ec76    this run, open draft PR
+
+Say AUTHORED and not pushed: git records no push time, which READ SECOND states and records
+as a caught defect, and an earlier draft of this section wrote "pushed 2026-07-29" from a
+commit date. None is Andrew's hand work and none has been merged, and the ask is that he
+merge one rather than that somebody already handled it. State the evidence for that
+precisely rather than in bulk, because an earlier draft asserted two universals and BOTH are
+false. `787863b3` and `20d11b77` carry `Fixes FLUTTER-Q`; `fa6ec76` carries `Refs
+FLUTTER-Q`, deliberately, its own message saying "This does NOT stop the exception firing,
+so the trailer is Refs and not Fixes". Cite the ground precisely rather than waving at READ
+EIGHTH, which a draft did: that section reaches `Refs` because FLUTTER-2 is a CATCH ALL, and
+this body says outright that FLUTTER-Q is not one. The convention generalises, and the ground
+here is `fa6ec76`'s own and is the load bearing part: `Fixes` auto-closes the issue on merge,
+so a commit that cannot stop the event must not carry it. And `20d11b77` and `fa6ec76` carry the
+loop's `Co-Authored-By` and `Claude-Session` trailers while `787863b3` carries NONE, ending
+at its `Fixes` line: its loop authorship rests on its message body, which describes the
+triage runner and a separate Fable 5 auditor, plus the byte identical author identity all
+three share.
+
+`20d11b77` is dated AFTER this sweep's 15:40 close, so a start of run ls-remote could not
+have seen it. It was found before this section shipped, which is the only reason the
+inventory here is three.
+
+THE ISSUE IS OPEN BECAUSE NOTHING WAS MERGED, NOT BECAUSE IT WAS NEVER FIXED
+FLUTTER-Q is an `AuthException` whose message reads `Code verifier could not be found in
+local storage.`, raised at the exec sign-in callback. Quote the MESSAGE and not the issue
+title: the title carries a minified frame prefix and two trailing null fields, so the
+parenthesised short form that `fa6ec76` and its PR both use is a paraphrase rather than the
+string, and an auditor caught it presented as a quote. 4 occurrences and 3 users, first seen 2026-07-29T00:42:42Z
+and last seen 2026-08-11T15:15:20Z, so it regressed after the first branch was written. Its
+events were enumerated over the full 14 day retention rather than incremented. That EXTENDS
+READ FIRST's rule rather than applying it, and the widening is marked rather than passed
+off, per READ FIFTY-FIFTH: READ FIRST scopes that instruction to the relay group alone. All
+4 carry that one message, so unlike FLUTTER-2 this group is NOT a catch all.
+
+`20d11b77` is the one to merge, and its mechanism is the one this run did not improve on.
+Its own message traces the unhandled throw to a replay: the SDK's deeplink observer sees
+`?code=` under PKCE before `runApp`, `getSessionFromUrl` throws, and `GoTrueClient`
+`notifyException` calls `addError` on `_onAuthStateChangeController`, which is an rxdart
+`BehaviorSubject` rather than a plain broadcast controller. A BehaviorSubject STORES its
+latest event and REPLAYS it to every new subscriber, so the error is latched before either
+app listener exists and is handed to each of them on attach. Neither `AuthRefreshGuard.start`
+nor the listener in `_SupabaseAuthGateState._initializeClient` carried an `onError`, so it
+escaped to the zone; the SDK's
+own listener carries an absorbing one. That commit adds `onError` to both.
+
+Name that second site from the source and not from the commit. `20d11b77`'s own message calls
+it `_bootstrap()`, and an earlier draft of this section inherited the misnomer unchecked,
+which is exactly the premises-to-check class READ TWENTY-EIGHTH names. The subscription is
+created at `password_screen.dart:128`, inside `_initializeClient()`, one line after its call
+to `_bootstrap()` at 127; `_bootstrap()` itself starts at 171 and contains no subscription.
+The mechanism is unaffected: two listeners, neither with an `onError`, both repaired.
+
+`787863b3` attacks
+the same throw one step earlier, passing `authOptions` with `detectSessionInUri: false` so
+the SDK never redeems the link on top of `AuthCallbackScreen`, which already redeems it.
+
+`AuthCallbackScreen`'s own catch really does hold, which is why `fa6ec76` cannot stop the
+Sentry event: it edits that catch and a rendering branch in `password_screen.dart`, and the
+throw that reaches Sentry never passes through either.
+
+ONE OPEN ITEM ON `787863b3` IS NOW CLOSED
+Its own commit message records that `flutter analyze` could not be run in the 2026-07-29
+container and says the branch must be analyzed before it is merged. It was analyzed this
+run, at the SDK version `netlify-build.sh` pins. Give the whole tally rather than the part
+that makes the point: NINE diagnostics, ZERO of them errors. One pre-existing
+`unused_local_variable` warning that master carries too; one new info level
+`prefer_const_constructors` on the `FlutterAuthClientOptions` it adds; and SEVEN
+pre-existing infos on `password_screen.dart`, two `control_flow_in_finally` and five
+`deprecated_member_use`. Nothing blocking.
+
+WHAT `fa6ec76` IS FOR, AND IT IS ONE STRING
+`787863b3` also maps the message, and its DIAGNOSIS is wrong for half the cases. gotrue
+DELETES the verifier once the exchange succeeds, at `gotrue_client.dart:371`, so re-clicking
+an already used link in the SAME browser throws the identical message. Telling that person
+the link "has to be opened in the same browser you requested it from" is false: the browser
+was the same one. Do not extend that to the remedy, which an earlier draft did by adding
+that the copy "sends them to mint a link that fails the same way". Requesting a NEW link
+writes a fresh verifier, so on the same-browser branch the retry succeeds; only the diagnosis
+misleads. The replacement names both causes and points at the 6 digit code in the NEW email,
+since the code from the original email is already invalidated.
+
+Do not justify that by saying `_showCodeInput` is set only after a successful
+`signInWithOtp`, which an earlier draft did and which is false: it is set at TWO sites in
+`password_screen.dart`, the email flow after `signInWithOtp` and the phone flow after a
+successful `verify-phone` invoke. The copy edit is on the email branch and stands on its own.
+Fold that string into `20d11b77` rather than merging two branches for one issue.
+
+The PR opened for `fa6ec76` said something different for a while, and that is worth recording
+because the artifacts of one run can disagree with each other. It was written before
+`20d11b77` was found, so it named #897 as the real fix and pointed the merger there, and it
+carried the two claims corrected above. An auditor caught the divergence by reading the PR
+against this section. It has been rewritten to name the onerror branch and to carry the
+corrected scope. If a run revises a diagnosis after opening a PR, revise the PR: a stale
+diagnosis sitting in the place Andrew actually reads is worse than one in a file he does not.
+
+ALL THREE ARE THE PROTECTED SURFACE. Nothing was merged, per the standing endorsement vote
+rule.
+
+VERIFICATION
+`flutter analyze` on the two files `fa6ec76` touches, at HEAD and on the working tree, gave
+an identical set of 8 pre-existing diagnostics, 0 errors and 0 new, which is READ TENTH's
+differential method. `flutter pub get` rewrote the five generated plugin registrant files
+under `linux/`, `macos/` and `windows/` per READ EIGHTH; discarded before committing.
+
+The adversarial audit gate ran many passes on this section and returned findings repeatedly.
+NO per pass tally and NO mapping of findings to passes is recorded here, and that
+omission is deliberate rather than the deflation READ TWENTY-SEVENTH bans. READ FORTIETH rules
+that the audit account is not itself a finding, and READ FORTY-SIXTH acts on that by carrying
+no account at all; this section reached the same place the expensive way.
+
+The evidence for cutting it is that the account became the only thing still failing. Across
+three consecutive passes, every single finding except one misquote lay in the prose ABOUT the
+corrections rather than in any observation, and the third of those passes said so in as many
+words. The
+mechanism is structural and worth more than any tally: a section cannot narrate the audit that
+clears it, because the clearing pass reads text that would have to contain its own outcome. So
+a ledger of passes freezes one pass behind reality the moment it is written, a sentence
+quantifying over "every pass" silently includes the unreturned one, and each repair of those
+becomes the next pass's finding. Three separate drafts here asserted a pass's result before it
+returned, each time inside the correction of the last one.
+
+What IS worth recording is where the findings landed, and every one of them is written into
+the paragraph it corrects rather than gathered here: the unread relay group, the missing third
+branch, a false `_showCodeInput` claim, a lede that counted the slice while excluding both the
+watchdog and FLUTTER-Q's own event, a false claim that the issue axis reports lifetime counts,
+a borrowed timestamp, a mis-attributed `Refs` rationale, and an arithmetic slip. No triage
+figure was overturned on any returned pass: every branch tip, trailer, author date, merge
+state, source line number, Sentry count and timestamp was independently re-derived and held.
+Read FIGURE strictly rather than as "no observation was wrong", because the relay group is the
+counterexample: a draft claimed it unchanged WITHOUT READING IT, which is a missing
+observation rather than an overturned figure, and that is what the BLOCKER was.
+Each finding was verified against the artifacts before being written rather than taken on the
+auditor's word, per READ TWENTY-EIGHTH's rule that an auditor's citations are premises to
+check, and the lifetime finding was confirmed by re-running the query at two periods rather
+than by reading its argument.
+
+Inherit the rule and not this section's example of learning it: record what fired, what it
+means, what was checked, and the disclosure check. Do not narrate the audit.
+
+This shipped on a pass returning MEDIUMs and a LOW rather than on a clean one, which is a
+departure from ship only on a clean audit and is recorded as one rather than glossed, per the
+precedent READ FIFTY-FOURTH and READ FIFTY-FIFTH each set for the identical call. The
+standing gate re-audits on a BLOCKER or a HIGH; that pass returned neither, its findings were
+three citation strings checkable without an auditor, and none touched an observation. Weigh
+that against the cost: this section has already spent a session limit on rounds whose findings
+were entirely in the apparatus, and the marginal round buys prose about prose.
+
+ONE PUSH NOTE
+`git push` answered `HTTP 403` alongside `! [rejected] ... (fetch first)`. That 403 was NOT
+an auth failure: the branch already existed at a tip that is not in the pushed history, so
+the push was an ordinary non fast forward, and pushing the same commit to a fresh branch
+name succeeded immediately. Say it that way rather than "unrelated history", which an
+earlier draft did and which is false, since both histories share this repo's base. Do not
+read a 403 here as a credential problem, and never force past it, per READ SECOND.
+
+A FOURTH RELAY 502, AND THE FRESHEST UNDEPLOYED EVIDENCE YET
+READ FIFTY-FIFTH reads three SUPABASE-PLATFORM-3 events in its window. This one carries
+FOUR, at 06:20:04, 07:25:01, 13:20:02 and a new 15:05:02, the last inside this run's own
+new slice. An earlier draft of this section said that group was unchanged and did not read
+it at all, and an adversarial auditor caught that as a BLOCKER. READ FIRST's standing
+instruction for THIS group is to enumerate over the full range every time, and a group named
+in a previous section is exactly the one a draft is tempted to inherit.
+
+Apply that rule rather than only citing it, which an earlier draft did. Enumerated over the
+full 14 day retention: 21 events, which is READ FIFTY-FIFTH's 20 plus the new 15:05:02.
+Occurrences was read DIRECTLY rather than incremented, per that same instruction, and reads
+25 against that section's 24. The gap between the two figures is retention rather than
+disagreement: four of the all time occurrences predate the 14 day window and READ FIFTY-FIFTH
+says so in its own reconciliation.
+
+The 15:05:02 title still reads `sentry-log-relay failure: Error: logs query failed 502:`
+followed by the CDN page, so both pre fix discriminators are present, the `Error: ` prefix
+and the `${status}: ${body}` shape READ FIRST identifies. A pre `0d2963e` build was
+therefore serving at 15:05:02 today, which is 34 minutes before this window closed, FLOORED
+per READ TWELFTH as READ THIRTY-EIGHTH applies it to this identical construction, and the
+freshest such evidence on record; `285a05f` is undeployed with it, since a build predating
+`0d2963e` predates a commit that landed four days later on top of it. Four in one window is
+above the roughly 1.4 a day READ THIRTIETH derives and one past READ THIRTY-FIRST's three,
+and it is still a cluster inside an ordinary weekly rate rather than an increase in it, which
+is the reading READ FIFTY-FIFTH reached from a full enumeration. Do not upgrade it. Per READ
+TENTH's escalation trigger none of the four fires it, all being 502s from a build that never
+ran the retry loop.
+
+BOTH CENSUS AXES, AND THE ISSUE AXIS CANNOT BE ANCHORED
+READ FIFTY-THIRD establishes and READ FIFTY-FOURTH and READ FIFTY-FIFTH each repeat that
+both axes must be run every time, because the `errors` dataset misses every
+`issue.category: frontend` issue by construction. An earlier draft of this section ran
+neither and an auditor caught it. The per project event census, ANCHORED to the declared
+window in READ FORTY-SEVENTH's TWO parameter form with the echo carrying its `timestamp`
+filter, reads `endorsement-scorer` 359, `supabase-platform` 13 and `flutter` 1. That last
+one is FLUTTER-Q's 15:15:20 event, which is how the lede's slice count above is checkable
+rather than asserted.
+
+The issue axis CANNOT be anchored the same way, and that is worth recording rather than
+working around. Its `period` is an enum of relative windows with no timestamp range, so it
+always ends at NOW, which here is hours past the declared close. Run it anyway and read the
+excess as post close activity rather than as a census discrepancy: it returned eight issues,
+of which SUPABASE-PLATFORM-4 and three new `mautic` issues all fired AFTER 15:40 and so are
+correctly absent from the anchored figures above.
+
+Its per issue Events figures are WINDOWED by that same `period`, not lifetime, and an earlier
+draft of this paragraph asserted the opposite. That claim was false three ways and an auditor
+falsified it by changing the period: FLUTTER-Q reads Events 1 at 24h and 4 at 30d, so the
+figure moves with the window; 4 IS its lifetime, which this section quotes elsewhere; and a
+watchdog firing hundreds a day could not show a lifetime of 270. The real mechanism for the
+270 against the event axis's 359 is the unanchorable window rather than a property of the field:
+the issue axis window ends at NOW, hours past the close, and the watchdog's last emission
+before a long gap was 17:04:24, so its 24h-to-NOW window holds fewer of those events than the
+anchored 24h-to-15:40:00 one. Three things about that figure were each got wrong once and are
+worth stating exactly. Take it from the `endorsement-scorer` project itself rather than from
+the neighbouring burst: a draft wrote "around 17:10", which is the `mautic` probe end time.
+Say LAST EMISSION and not that the watchdog stopped, since it emitted again the same evening
+and a flat stop claim goes stale within hours. And do not call 17:04:24 the end of the four
+minute cadence, which a second draft did: the cadence ticks run to 16:58:13 and 17:04:24 is an
+off cadence straggler six minutes later, so calling it the end of the cadence attaches the
+figure to an event it does not belong to, which is what READ TWENTIETH means by anchoring an
+interval to the event you name. Cite READ TWENTIETH and not READ THIRTY-FIFTH, which carries
+no anchoring rule at all: READ FORTY-FIRST miscites it that way, a draft here inherited the
+miscitation unchecked, and an auditor caught it. That is the inherit-a-citation class READ
+FORTY-FIRST itself warns about and READ FORTY-THIRD states as cite the originator rather than
+the restater, committed against the section that states it. The advice survives the correction and the stated mechanism did not: use
+the issue axis for COVERAGE, meaning which issues exist at all, and the anchored event axis
+for COUNTS. Do not read a difference between the two as a discrepancy without first checking
+that both windows END at the same instant.
+
+THE THREE NEW MAUTIC ISSUES ARE THE PROBE HARNESS AGAIN, AND THEY ARE NOT OURS TO FIX
+MAUTIC-J `ErrorException: Warning: pack(): Type H: illegal hex digit z`, MAUTIC-K
+`Error: Call to undefined method Sentry\Transport\Result::isSuccess()` and MAUTIC-M
+`ErrorException: User Error: POSTFIX-POSITIVE-CONTROL`, seven events between 17:02:07 and
+17:10:09, 0 users, all three already resolved by somebody else. Their culprits are
+`/tmp/probe.php` and `/tmp/probe2.php` and one of them announces itself as a POSITIVE
+CONTROL, which is the self labelling probe harness practice READ SIXTEENTH decodes rather
+than anything the application did. They postdate this window's close, so they are recorded
+for the next sweep rather than counted here. There is no droplet access, so report and stop.
+
+THE REST OF THE WINDOW
+Unchanged from READ FIFTY-FIFTH and not re-decomposed: the four sponsors dup key cycles and
+the probe families. The four undeployed fixes are unchanged and still blocked on the one
+missing Supabase access token, re-checked rather than inherited. WEBSITE-6 has not fired
+since `2fffa91`; its Vercel deployment was still not confirmed READY this run, which is READ
+FIFTY-FOURTH's open item and stays open.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Re-derived against the body rather than
+carried forward, per READ TWENTY-EIGHTH, after an earlier draft of this list failed in both
+directions at once.
+
+Named above: the commits `fa6ec76`, `787863b3`, `20d11b77`, `2fffa91`, `0d2963e` and
+`285a05f`; the branch names `sentry-fix/FLUTTER-Q`, `sentry-fix/FLUTTER-Q-onerror` and
+`sentry-fix/FLUTTER-Q-copy`, and the `sentry-fix/` prefix itself; the pull request number
+#897, this public repo's own open draft; the commit trailer forms
+`Fixes FLUTTER-Q`, `Refs FLUTTER-Q`, `Co-Authored-By` and `Claude-Session`, the first two
+being this file's own standing convention per READ EIGHTH and the last two this loop's
+published signature; the files
+`password_screen.dart` and `netlify-build.sh`, both committed
+here, and the symbols `AuthCallbackScreen`, `AuthRefreshGuard.start`,
+`_SupabaseAuthGateState._initializeClient`, `_bootstrap`, `_showCodeInput` and the edge
+function `verify-phone`, likewise, together with the line references
+`password_screen.dart:128` and the bare 127 and 171 beside it; the gotrue,
+supabase and rxdart symbols `AuthException`, `GoTrueClient`, `notifyException`,
+`addError`, `_onAuthStateChangeController`, `BehaviorSubject`, `getSessionFromUrl`, `onError`,
+`detectSessionInUri`, `authOptions`, `FlutterAuthClientOptions`, `signInWithOtp`,
+`runApp`, the query parameter `?code=` and the flow name PKCE,
+and the file and line `gotrue_client.dart:371`, all of which are public package
+sources rather than anything about this deployment; the analyzer rule names
+`unused_local_variable`, `prefer_const_constructors`, `control_flow_in_finally` and
+`deprecated_member_use`; the generated registrant directories `linux/`, `macos/` and
+`windows/`; the issue ids and project names; the names Sentry, Supabase and Vercel;
+the Sentry search fields `timestamp`, `period`, `issue.category: frontend` and the dataset
+name `errors`, together with the tool echo idea READ FORTY-SEVENTH carves out; the Sentry
+issue fields `Occurrences`, `lastSeen` and `Events`, the first published here since READ
+FIRST and the second since READ TWENTY-SIXTH, with READ FIFTY-FIFTH carrying both, and the
+third a first publication needing no cover,
+being a generic list view column name that names nothing of ours; the probe
+culprit paths `/tmp/probe.php` and `/tmp/probe2.php`, which are the harness's own temporary
+files and name nothing of ours; the word droplet, in the note that there is no droplet
+access, enumerated as READ TWENTY-THIRD and READ TWENTY-FOURTH each enumerate it in that
+same sentence;
+the git commands, the ref name `master` and the `HTTP 403` and `! [rejected] ... (fetch
+first)` output, which is generic git output naming nothing of ours; the verification commands `flutter analyze`
+and `flutter pub get`; and the auditor model name Fable 5, whose cover per READ
+TWENTY-EIGHTH is prior publication BOTH in this file and in this public repo's own commit
+log. Singular, and the fallback model is deliberately not named: no fallback is RECORDED in
+this section, so the body never reaches for that name, and carrying the usual pair forward
+from a section whose body did use both is the copied list defect READ TWENTY-EIGHTH rules on.
+Word it as what the section records rather than as what the run did, per the standing hazard
+that a claim about a run is falsified by any pass after it is written. `2fffa91` is the private sibling's tip and its cover is READ FIFTY-FOURTH's deliberate
+first publication.
+
+Quoted PROSE, declared separately per the practice READ TWENTIETH set for commit messages and
+READ THIRTY-FIFTH and READ FORTY-FIRST apply. Two strings: `fa6ec76`'s own message, "This
+does NOT stop the exception firing, so the trailer is Refs and not Fixes", and the substring
+"has to be opened in the same browser you requested it from" from the copy string `787863b3`
+adds to `password_screen.dart`. Both are committed in THIS repo, the public one, so naming
+them adds no reach; apply READ SEVENTEENTH's test rather than the lazy version, since
+"already committed" would be an argument for WITHHOLDING had either come from the private
+sibling. An earlier draft declared neither, which is a completeness failure rather than a
+disclosure one, and it is the third direction in which that paragraph's re-derivation claim
+failed in one pass.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is the one AuthException message, which
+is the gotrue package's own published string; the relay failure title with its `502`,
+the `Error: ` prefix and the `${status}: ${body}` shape description; and the three `mautic`
+issue titles named in full above. All but the last three are published in this
+file from READ FIRST onward. The three MAUTIC titles are new here and are weighed rather
+than swept in: two are generic PHP and Sentry SDK errors and the third is a control string
+the harness wrote about itself, and none names a person, table, row, contact or address. No
+doctype fragment is quoted anywhere in this section, so the upstream CDN body is not
+reproduced at all rather than partially; an earlier draft carried a doctype clause forward
+from a section whose body did quote one, which is the copied-list class READ THIRTY-FIRST
+records catching. The recipient
+identifiers on the FLUTTER-Q events are not reproduced.
+
+Quantities are enumerated together per READ THIRTY-SIXTH: the four FLUTTER-Q occurrences and
+three users, the nine and eight analyzer diagnostic counts and their splits, the four relay
+events and the historical rate they are measured against, the five rewritten registrant files, the 19 watchdog events in the
+slice, the census figures on both axes including the 270 against 359 mismatch and the 1
+against 4 pair that falsifies the lifetime reading, the eight
+issues the issue axis returned, the SUPABASE-PLATFORM-3 retention and Occurrences figures,
+the seven `mautic` events, and every remaining
+quantity elsewhere in the section, OF WHATEVER KIND. There is deliberately no day counts
+entry: this body quotes no undeployed fix ages, so carrying that category forward from READ
+FIFTY-FIFTH, whose body did quote them, would be the empty category READ THIRTY-FIFTH
+records as a caught defect. Clock values are the FLUTTER-Q first
+and last seen instants, the TWO branch authoring times, the four relay event times, the two
+`mautic` burst endpoints, the declared close and previous close, and
+every remaining clock value elsewhere in the section, of whatever kind. Two branch times and
+not three:
+the `fa6ec76` row reads "this run" and carries no time, so an earlier draft over-declared by
+one. All are bare and name nothing.
+
+No credential, no DSN, no project reference, no probe source address, no policy body and no
+RPC name appears, and nothing here widens access to anything. Withheld per the practice READ
+SIXTH set: the state of the live endorsement vote, the identity of the three execs on
+FLUTTER-Q, and any operational read on production sessions.
