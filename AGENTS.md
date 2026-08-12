@@ -10712,3 +10712,214 @@ FIFTH. Quantities are enumerated together per READ THIRTY-SIXTH: the event and o
 the row counts, the clock values and the deployed version number. All are bare and name
 nothing. No credential, no DSN, no project reference, no probe source address, no policy body
 and no raw upstream error body appears, and nothing here widens access to anything.
+
+## READ FIFTY-SEVENTH: the sponsors burst is absent from two cycles, and the relay retry is deployed
+
+Swept the 24 hours to 2026-08-12 04:19:52 UTC. No code change: nothing in the window is an
+unfixed defect in committed code. Short on purpose, per READ TWELFTH and READ FORTIETH.
+
+Per the overlap warning in READ FOURTH: the previous sweep closed at 2026-08-11T14:24:44, so
+13 hours 55 minutes is new observation and about 10 hours is shared with READ FIFTY-FIFTH.
+Nothing below treats shared ground as independent confirmation. READ FIFTY-SIXTH is NOT in that
+shared band and carries no window of its own: its subjects, the 16:56 to 17:10 storage probes
+and the relay body it read at 03:06, both fall in this window's NEW slice and are counted here.
+
+SCOPE OF THIS SWEEP, WHICH IS NARROWER THAN READ FOURTH REQUIRES
+READ FOURTH says to read `by_message` on every event rather than on a sample, and it is right.
+This run did not. It read three events directly, the newest SUPABASE-PLATFORM-1 rollup and two
+others, and classified the remaining twenty-one by title.
+
+State the hole rather than implying there is none, per READ SIXTH. Titles now carry the TOP
+message, which is new and useful, but a title carries ONE key, so a multi-key window hides the
+rest. Worse, seven in-window events predate that relay change and carry no message at all:
+06:05:10, 07:15:06, 08:35:03, 12:05:10, 16:40:07, 16:45:09 and 16:55:02. An auditor read
+16:40:07 directly and found three ad hoc `column "?" does not exist` lines this section would
+otherwise never have mentioned. They are benign, and that is luck rather than method. A run
+needing completeness should redo the full sweep rather than inherit this one.
+
+THE SPONSORS BURST IS ABSENT FROM TWO CONSECUTIVE CYCLES
+Enumerated over 7 days rather than inferred: the 32-line `legislation_bill_sponsors_unique`
+burst is present on every 6 hour boundary from 2026-08-06 through 2026-08-11T12:05:10, and
+then absent at 18:00 and at 00:00. Two of those windows carry 34 and 35 lines rather than 32
+because unrelated rows shared them; the burst inside is exactly 32 in each.
+
+Word it as absent rather than stopped, and keep the heading there too. READ TWENTIETH's
+threshold is that three or four consecutive misses is a step change worth believing and two is
+not, so a heading asserting a stop would outrun the body's own citation, which is the failure
+READ TWENTY-FIRST catalogues at length.
+
+THREE readings, not two, and nothing here separates them. `e79339b` may finally have been
+hand-deployed to `openstates-orchestrator`, which no commit records because a hand deploy
+leaves no trace in this repo, per READ FIRST. Or the 6-hourly openstates cron stopped, which is
+a silent legislation-sync outage. Or the relay lost those two windows: per READ FIRST a
+swallowed `postgres_logs` query and a null ingest both send nothing while advancing the
+watermark. Read it the way READ TWENTY-SECOND insists: an error going quiet is not by itself
+good news.
+
+The third branch is the weakest of the three and is recorded rather than dismissed. A 32-row
+burst is self-evidencing, since those rows alone would force a rollup, and the relay
+demonstrably emitted at 17:35, across 22:55 to 23:45 and across 02:25 to 03:00. That does not
+cover the two windows in question, which is exactly why it stays on the list.
+
+The next boundaries are 06:00 and 12:00, so a sweep in that range gets a third and fourth data
+point cheaply. What would settle it outright is one dashboard read Andrew can do and this
+container cannot: the deployed version of `openstates-orchestrator`, or whether bills are still
+syncing.
+
+One thing IS excluded, and its own caveat is the relay-health one above: a deployed copy whose
+ON CONFLICT target matched no unique index would raise `42P10` on the same schedule, per READ
+TWENTY-SECOND, and no `42P10` appears in any window that did emit.
+
+`0d2963e` AND `285a05f` ARE NOW DEPLOYED, AT 12 AND 7 DAYS
+Not from a message-shape read, which is unavailable because the group has been quiet SINCE the
+deploys rather than quiet outright, but from file identity. Enumerate it over the full range
+whenever it is discussed, per READ FIRST, or the record inherits a stale count: the group fired
+FOUR times inside this window, at 06:20:04, 07:25:01, 13:20:02 and 15:05:02 on 2026-08-11, and
+every one carries the pre-fix `${status}: ${body}` shape. READ FIFTY-FIFTH's enumeration closed
+at 14:24:44 with `lastSeen` 13:20:02, so the 15:05:02 occurrence appears in this file for the
+first time here; it predates both deploys and so does not disturb the conclusion below, but a
+run that had incremented that section's count rather than re-enumerating would have missed it.
+
+`0c7a3f3` and `4a4d6bf` each record hand-deploying `sentry-log-relay` to v11 and v13
+with the deployed body verified, and `supabase functions deploy` ships the whole current source
+file. Both retry commits touch that one `index.ts` and nothing else, confirmed through the
+GitHub API because both are absent from this shallow clone, so a verified v13 body carries them
+necessarily. Independently corroborated: the 03:00:04 event carries the `by_app` and
+`operator_suppressed` extras that exist only in `0c7a3f3`'s code, so v11 or later was serving.
+
+Compute those ages rather than copying a neighbour's, which is READ TWELFTH's class and which
+an auditor caught here: `0d2963e` landed 2026-07-31T02:31:19Z and is 12 days at this close,
+`285a05f` 2026-08-04T12:43:21Z and is 7. Fifteen is `e79339b`, the sponsors commit in the
+paragraph above, and it does not belong to either of these.
+
+`by_app` ATTRIBUTES THE CONNECTION PATH, WHICH IS LESS THAN ATTRIBUTING THE EMITTER
+The newest rollup, the same 03:00:04 event named above rather than a second one, carries three
+`permission denied for table members` lines under `by_app: {"postgrest": 3}`, sampled at
+02:54:46 inside its 02:54:00 to 02:59:02 window. Name a rollup by its emission time, as every
+prior section does: a sample-line timestamp is not an identifier, and an auditor caught this
+section using both for one event, which a future run could read as two. That attribution is a
+real gain over inferring from message shape, and it is NOT the settlement an earlier draft of
+this section claimed.
+
+`0c7a3f3` says so in its own words: a hardening harness verifying a revoke with the anon key
+raises its denial under `postgrest`, on the exact path a genuine refused caller uses, and the
+two are indistinguishable by construction. So `by_app` places this line INSIDE that
+indistinguishable class rather than outside it. The harness reading rests on timing and on the
+company the line keeps, and remains an inference.
+
+Be precise about which commit governs, too. `efa22ec` revokes anon EXECUTE on RPCs and
+`bccbc7c` closes the dashboard-metrics wrapper; neither governs table SELECT on `members`,
+which `a9e4f65` settled on 08-07 and which READ FORTY-FIRST records was never granted at all.
+So this line does not verify either of those two commits.
+
+Get the DIRECTION right for the family that does sit near them, which an auditor caught this
+section asserting backwards. The `staff role required` rollups are 22:55:02, 23:20:03 and
+23:30:04, and the `sync_dashboard_metrics_to_knowledge` one is 23:45:02, against `efa22ec`
+landing 23:25:32 and `bccbc7c` 23:40:31. Two of those four rollups close wholly BEFORE
+`efa22ec` and the other two straddle a landing rather than follow it. So the session STRADDLES
+the commits, with the change applied by hand and exercised before it was committed, which is
+exactly the shape READ TWENTIETH and READ THIRTY-FIFTH record for this operation. That is a
+better supported reading than a verification run afterwards, and it is not the same claim.
+Anchor an interval to the event you name, per READ TWENTIETH, which is where that rule is
+stated and which READ THIRTY-FOURTH restates. Cite the originator, per READ THIRTY-SEVENTH, and
+follow the pointer back rather than trusting it: READ FORTY-FIRST attributes this rule to READ
+THIRTY-FIFTH, which does not contain it, and a draft of this sentence inherited that citation
+as evidence instead of grepping. A restater's pointer is a claim to check like any other.
+
+Nothing to fix either way, 0 users impacted, `website` silent. The standing prohibition is
+unchanged and has teeth here: do not grant any of it back.
+
+THIS CONTAINER HAS NO SUPABASE CREDENTIALS, WHICH THE PREVIOUS RUN DID
+READ FIFTY-SIXTH read the deployed relay body directly and `0c7a3f3` ran live SQL against the
+analytics endpoint, so recent runs have had access. This one does not: nothing matching
+`SUPABASE` or `PROJECT_REF` is in the environment. Test it rather than inherit it in either
+direction, per READ TWELFTH; access differs per run and the previous section is not evidence
+about this container.
+
+ALREADY HANDLED, LISTED SO THE NEXT RUN DOES NOT RE-OPEN THEM
+FLUTTER-Q last fired 2026-08-11T15:15:20 and `8ccb4f0` landed 03:01:16 today, so the fix
+postdates it. The three `mautic` issues are all hand probes run from TWO throwaway scripts on
+that host, all already resolved, and one of them is an unintended error inside the probe rather
+than the shape it meant to emit. The `syntax error in tsquery` line at 02:25 predates `c38597b` at
+02:53. SUPABASE-PLATFORM-4's three events are the 17:00 to 17:10 bucket-flip verification READ
+FIFTY-SIXTH documents in full, not recurrences. ENDORSEMENT-SCORER-4 is the expected n8n
+watchdog, correctly ignored.
+
+THE CENSUS, CROSS FOOTED PER READ TWELFTH, BOTH AXES PER READ FIFTY-THIRD
+
+    by project   endorsement-scorer 191, supabase-platform 31, mautic 7, flutter 1  = 230
+    by issue     ENDORSEMENT-SCORER-4 191                                           = 191
+                 SUPABASE-PLATFORM-1 24, -3 4, -4 3                                 =  31
+                 MAUTIC-J 4, -M 2, -K 1                                             =   7
+                 FLUTTER-Q 1                                                        =   1
+                                                                                      230
+
+Both axes agree exactly. `website`, `moydforms`, `n8n` and `supabase-edge` at zero. The issue
+axis was queried with NO status filter, per READ EIGHTH, which is how the three resolved
+`mautic` issues and the ignored watchdog stayed visible; the per project event census alone
+would also have missed any frontend or replay category issue, per READ FIFTY-THIRD.
+
+THE BRANCH REF TRAP BIT AGAIN, IN BOTH REPOS
+`master` at `67ce142` against a real `3a44bbe`, and `main` at `ad24682` against a real
+`203f5db`, both with `HEAD` detached at the true tip. Checked in the form READ TWENTY-SECOND
+prescribes, local side the NAMED BRANCH and not `HEAD`, and repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Enumerated rather than waved at, per READ
+EIGHTEENTH, and re-derived against the body in both directions after an auditor found this
+paragraph false in four places.
+
+Named above: the commits `e79339b`, `0d2963e`, `285a05f`, `0c7a3f3`, `4a4d6bf`, `8ccb4f0`,
+`c38597b`, `efa22ec`, `bccbc7c` and `a9e4f65`; the functions `openstates-orchestrator` and
+`sentry-log-relay` with its `index.ts`, and the deploy command form; the constraint
+`legislation_bill_sponsors_unique`; the table `members` and the RPC
+`sync_dashboard_metrics_to_knowledge`; the SQLSTATE `42P10` and the `ON CONFLICT` clause it is
+raised against, listed together per READ TWENTY-SECOND's precedent, which READ TWENTY-FIFTH
+follows; the relay fields `by_message`, `by_app` and `operator_suppressed`, the Sentry issue
+field `lastSeen`, and the log source `postgres_logs`; the connection label
+`postgrest` and the role anon; the issue ids and project names; the git commands and ref names,
+and the two stale refs `67ce142` and `ad24682`; the GitHub API; and the env var name patterns
+`SUPABASE` and `PROJECT_REF`. Every one already appears in this file or is committed in this
+public repo's own tree, with the two carve outs below. Enumerate the stale hashes explicitly
+rather than folding them under "ref names", which an auditor caught: every prior section names
+them, and a completeness claim fails in the omission direction as readily as the other.
+
+`3a44bbe` is this PUBLIC repo's own current tip and is therefore already readable by anyone who
+can read this sentence. `203f5db` is the PRIVATE sibling's tip and appears nowhere earlier in
+this file, so "already published" is NOT its cover: it is published here for the first time,
+deliberately, on the same call READ TWENTIETH made for `308ef92` and READ FIFTY-FOURTH for
+`2fffa91`, that a bare commit hash of a private repo names no table, route or person and this
+file has published sibling hashes before. Check WHICH repo published a thing, and then WHETHER
+it did, before citing prior publication as cover, per READ SEVENTEENTH.
+
+THREE THINGS AN EARLIER DRAFT NAMED AND THIS ONE DELIBERATELY DOES NOT
+The harness temp table observed in the 23:40 rollup, and the two throwaway probe script paths
+on the mautic host. All three are uncommitted operator tooling that exists in neither repo, so
+prior publication was never available for them, and READ THIRTEENTH and READ EIGHTEENTH both
+rule that describing this operation's own tooling serves nobody but someone probing it. Each
+finding survives on the shape and the timing without the name, so none is named.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is `permission denied for table members`,
+`syntax error in tsquery`, `column "?" does not exist`, `staff role required`, and the relay
+title's `${status}: ${body}` shape together with its `Error: ` prefix, the prefix named only to
+record that the substantive body does not otherwise quote it. Listing it as though the body
+used it was the copied-list over-inclusion READ TWENTY-EIGHTH rules on; striking it by name
+while claiming it absent is the shape READ TWENTY-SEVENTH and READ THIRTIETH forbid, so it is
+counted in instead, per the "named only to record its absence" pattern READ THIRTY-EIGHTH set
+and READ FORTIETH follows. Both are
+published in this file from READ FIRST onward. The `column` FAMILY is published from READ FOURTH
+onward and this exact normalized string from READ TWENTY-FIFTH, and `staff role required` from
+READ TENTH; keep the family qualifier, per READ THIRTY-FIFTH, since READ FOURTH publishes only
+specific members of it. The first two are NOT published here before, and are weighed rather
+than swept in: the
+denial names a table this public repo commits throughout and carries no row, value, person or
+address, and the tsquery line names nothing at all and is already public verbatim in this
+repo's own `c38597b` commit message. Quantities are enumerated together per READ THIRTY-SIXTH:
+the census figures, the clock values, the day counts, the relay version numbers, the 32 line
+burst and every remaining quantity, OF WHATEVER KIND. All are bare and name nothing.
+
+No credential, no DSN, no project reference, no probe source address, no policy body and no raw
+upstream error body appears, and nothing here widens access to anything. Withheld per the
+practice READ SIXTH set: the state of the live endorsement vote, any operational read on
+production sessions, and this operation's own tooling per the paragraph above.
