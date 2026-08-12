@@ -12053,3 +12053,319 @@ in the quoted migrations. Withheld per the practice READ SIXTH set: the state of
 endorsement vote, any operational read on production sessions, and anything describing this
 container's own reporting or credential tooling, which READ EIGHTEENTH records as a BLOCKER
 class and which this run's own blocked first draft is the reason to restate here.
+
+## READ SIXTY-SECOND: the 12:23 UTC sweep, and three branches I nearly told Andrew to close that fix live gaps
+
+Swept the 24 hours to 2026-08-12 12:23:57 UTC. No code change and nothing fired. The previous
+sweep closed at 10:21:00, so 2 hours 2 minutes is new observation, and the new slice is EMPTY
+across every project: an anchored errors query carrying no `level` and no project filter, per
+READ FORTY-SEVENTH, returned zero events in it, watchdog included, and the unfiltered issue axis
+was run as well, per READ FIFTY-THIRD, because the errors dataset cannot see an
+`issue.category: frontend` or replay issue by construction. No issue in the org has a `lastSeen`
+inside the slice. READ SIXTY-FIRST carried that second half explicitly and a draft of this
+section dropped it, which is the undersized cover READ THIRTY-THIRD names.
+
+All 20 SUPABASE-PLATFORM-1 events in the window were enumerated, and say READ OR CLASSIFIED BY
+TITLE rather than "already read", which is the verb a draft used and which READ SIXTY-FIRST
+already corrected once in its own draft. Split that ground between its readers rather
+than crediting one, which a draft did. Name the STRETCH and not the hour, per READ TWENTIETH's
+rule to anchor a fact to the bucket it belongs to: the 16:40 to 17:35 stretch has THREE readers
+and the 17:00 hour itself has two, since 16:40:07 is in the previous hour. 16:40:07 was read by READ
+FIFTY-SEVENTH's own auditor, which READ SIXTIETH records in as many words; READ SIXTIETH read
+16:45:09, 16:55:02 and the 17:05:03 uuid line; and READ SIXTY-FIRST decomposes 17:10:02 through
+17:35:04, its own heading naming that as the 17:04 to 17:34 cluster. A repair took the two reader
+split from an auditor's citation without checking it, which is READ TWENTY-EIGHTH's
+premises-to-check class committed while repairing a citation error. READ FIFTY-SEVENTH covers the 22:55 to 23:45 and
+02:25 to 03:00 sessions, but that section
+read THREE of its events directly and says in terms that a run needing completeness should redo
+the sweep rather than inherit it. FOUR rollups appear in no earlier section at all and were
+classified here by title only: 23:00:09 `column q.created`, 23:10:03 `function "?" does not
+exist`, 02:50:02 `"?" is an aggregate function` and 02:55:02 `column l.created_at`. All four are
+the ad hoc hand SQL family and none is attributable to committed code, but that is a title level
+read and is recorded as weaker per READ SIXTH.
+
+The 03:00:04 rollup is the one READ FIFTY-SEVENTH reads for its `by_app` extras, not READ
+SIXTY-FIRST, which cites its timestamp only for the relay silence duration. Do not call it an
+anon revoke verification as fact, which a draft did: READ FIFTY-SEVENTH deliberately demotes
+that to an inference, saying `by_app: postgrest` places the line INSIDE the class where a
+harness and a genuine refused caller are indistinguishable, and that the `members` denial does
+not verify the commits near it.
+
+THE BRANCH VERDICTS: A DRAFT OF THIS SECTION GOT THREE OF SIX BACKWARDS
+This is the finding, and it is a correction to this run rather than to an earlier one. A draft
+built a close list recommending Andrew close #898, #899 and the email throttle branch as
+superseded. An adversarial auditor falsified all three and the verdicts are inverted below.
+Acting on that list would have discarded three unmerged fixes for mechanisms that are ABSENT
+from master, on the exec sign in path, one of which closes a gap that is still open.
+
+    #897  sentry-fix/FLUTTER-Q                787863b3  SUPERSEDED
+          sentry-fix/FLUTTER-Q-onerror        20d11b77  SUPERSEDED, no PR
+    #900  sentry-fix/FLUTTER-Q-copy           fa6ec766  4 surviving lines, cannot merge as is
+    #898  sentry-fix/FLUTTER-2                091c78cc  LIVE, mechanism absent from master
+    #899  sentry-fix/FLUTTER-2-otp-429        095f821d  LIVE, mechanism absent from master
+          sentry-fix/FLUTTER-2-email-otp-throttle  bb494b96  LIVE, absent, no PR
+
+The two superseded verdicts hold and were re-derived. `20d11b77`'s `onError` is on master at
+`auth_refresh_guard.dart:66` and `password_screen.dart:168`. `787863b3`'s `detectSessionInUri`
+is absent from master but redundant rather than missing, because the throw it prevented is
+absorbed by those two handlers and `auth_callback_screen.dart` is deleted. `fa6ec766` is four
+lines of member facing copy plus a hunk against that deleted file, so it cannot merge unchanged.
+
+THE METHOD ERROR, WHICH IS THE PART WORTH INHERITING
+The draft claimed it verified "by grepping master for each branch's own mechanism rather than by
+reading the commit messages". It did the opposite of that in three cases. It grepped master for
+GENERIC vocabulary, `cooldown|throttl|rate.?limit|429`, matched a large `_resendCooldown`
+apparatus, and concluded the FLUTTER-2 work was on master in a more developed form.
+
+`_resendCooldown` is the PHONE throttle and it is the BASE those branches were built on, not a
+superset of them. `_startResendCooldown()` is called only from the phone send path, at lines 627
+and 652, whose surrounding code sets `_phoneCodeFlow` and reports texting a code to a phone; the
+throttled resend control renders only under `if (_phoneCodeFlow)`; `_sendMagicLink` reaches
+`signInWithOtp` with no cooldown consulted or armed; and the file contains ZERO occurrences of
+`429` and zero of `_emailResendCooldown`. Every one of those was re-derived in the working tree
+after the audit rather than taken on the auditor's word, per READ TWENTY-EIGHTH.
+
+So the correct grep is for each branch's OWN symbol, `_emailResendCooldown`, a `429` handler, a
+try and catch around `signOut`, and every one of those returns nothing on master. A generic grep
+that matches a NEIGHBOURING mechanism on the same screen is worse than no grep, because it
+returns a confident false positive. `bb494b96`'s own commit message says the email path "had no
+client-side send throttle of any kind" and that the phone path "was hardened against exactly
+this shape earlier", which is the apparatus the draft mistook for its successor. Quote or
+paraphrase deliberately and check which you have done, per READ THIRTY-SIXTH: a draft dropped
+the hyphen inside those quotation marks.
+
+ONE OF THE THREE FIXES A DEFECT THAT LOOKS LIVE ON MASTER, AND IT IS THE SIGN IN SCREEN
+`091c78cc` is not throttle work at all, which is the plainest sign the draft classified it by
+family rather than by reading it. It wraps `await client.auth.signOut()` in a try and catch so
+that a network level failure on an expired session cannot skip the `setState` that clears the
+checking flag and leave the app on the splash screen.
+
+Master still awaits that call BARE, at `password_screen.dart:211`, inside `_bootstrap()`, which
+is invoked fire and forget at line 127 with no `await` and no `catchError`. The `onError`
+handlers this same section credits are on the `onAuthStateChange` STREAM; a throw at an await
+site inside `_bootstrap` never reaches them and goes to the zone instead.
+
+Rate that honestly. The code path is established from the source and the guard is genuinely
+absent. What is NOT established is a production occurrence: no Sentry issue in the window shows
+this shape, and an expired session has to coincide with a failing `signOut` call to trigger it,
+which is why it can sit unnoticed. So this is a live gap rather than a firing defect, and the
+reason it matters anyway is that it strands an exec at sign in on the night of a vote.
+
+Nothing was merged and no seventh branch was created. All six are the exec sign in path, so per
+the standing endorsement vote rule the ceiling here is diagnose, leave on the branch, and flag it
+to Andrew, which the report does.
+
+THE VAULT SECRET GUARD HAS NOT RAISED, WHICH IS NARROWER THAN IT FIRST READS
+`20260811_09` rewrites 15 pg_cron jobs to RAISE `vault secret service_role_key is missing or
+empty` rather than post unauthenticated, which READ SIXTY-FIRST records as the fix for the class
+of bug that hid a six day calendar outage. Verified in the migration this run. No such RAISE
+appears in any rollup in the 13 hours 19 minutes since it was applied.
+
+Anchor that duration to the migration's own recorded apply, `20260811230407` on its first line,
+which is 23:04:07 UTC. A draft said 19 and a half hours, anchored to `263528b`'s commit time
+instead, which inflated the observation window by nearly half inside the paragraph being
+repaired for overclaiming. That is READ TWENTIETH's rule to anchor an interval to the event you
+name. The conclusion holds at either figure.
+
+The recorded apply is the whole refutation and it needs no help. A repair added that the 19.5
+figure was also "impossible" because the migration did not enter git until `c2f4213` at 23:14:01,
+and that argument is invalid: per READ FIFTY-NINTH a hand deploy ships the working tree, so git
+existence does not bound application. This paragraph's own two timestamps refute it, since the
+apply at 23:04:07 PRECEDES the git entry by nine minutes, floored per READ TWELFTH rather than
+rounded to ten, which a repair did inside the paragraph that exists to fix an anchoring error.
+Right conclusion, wrong premise, and the premise is what a future run inherits.
+
+Two limits, and a draft overstated past both. The guard fires only when the secret is MISSING or
+EMPTY, so a secret that resolves but is STALE OR WRONG posts and takes a silent 401 with no
+RAISE and no Postgres error, which is exactly the six day outage class cited two sentences
+above. So this establishes that the secret resolves non empty for the jobs that ran, and NOT
+that they authenticate, which is what the draft claimed. And the read rests on rollup TITLES,
+which carry one dominant key, rather than on a `by_message` sweep; what makes it hold for the
+frequent jobs is RECURRENCE, since a guard raising on every tick would become the dominant key
+in some window rather than hide under a larger one in all of them. A once daily job could still
+hide. Whether downstream work succeeds is untouched either way, per READ SIXTY-FIRST's
+644 successes over a dead feature.
+
+THE OPEN ASK IS UNCHANGED AND COULD NOT BE CLOSED HERE
+READ SIXTY-FIRST closed which fix stopped the sponsors burst and left the sync health question
+open, needing `max()` of the write timestamp on the bill sponsors table. This container was
+tested rather than assumed, per READ TWELFTH: `psql` is on the image but nothing matching
+`SUPABASE`, `PROJECT_REF` or a Postgres DSN is in the environment, so the ask stands. It is a
+one time read, not a standing escalation, and must not be dropped because the error stopped.
+
+The relay has emitted nothing since 03:00:04, a 9 hour 23 minute silence. Per READ SIXTIETH the
+probe FATALs `f20ec16` suppressed were its de facto heartbeat, and with the sponsors burst
+legitimately gone there is one less recurring emitter, so expect these stretches to lengthen
+rather than to signal anything. The watchdog is also quiet, its last event about 13 hours before
+the close; it is ignored and expected noise per the standing orders.
+
+THE CENSUS, CROSS FOOTED PER READ TWELFTH, BOTH AXES PER READ FIFTY-THIRD
+
+    by project   endorsement-scorer 71, supabase-platform 25, mautic 7, flutter 1  = 104
+    by issue     ENDORSEMENT-SCORER-4 71                                           =  71
+                 SUPABASE-PLATFORM-1 20, -4 3, -3 2                                =  25
+                 MAUTIC-J 4, -M 2, -K 1                                            =   7
+                 FLUTTER-Q 1                                                       =   1
+                                                                                     104
+
+Both axes agree exactly. `website`, `moydforms`, `n8n` and `supabase-edge` at zero. The event
+axis was ANCHORED to the declared window in READ FORTY-SEVENTH's two parameter form. The issue
+axis was queried with NO status filter per READ EIGHTH, which is how the three resolved `mautic`
+issues, the resolved FLUTTER-Q and the ignored watchdog stayed visible; its window ends at NOW
+rather than at the close, per READ FIFTY-EIGHTH, so read it for coverage and the event axis for
+counts.
+
+THE BRANCH REF TRAP BIT AGAIN, IN BOTH REPOS
+`master` at `67ce142` against a real `46034bf`, and `main` at `ad24682` against a real
+`aa2d513`, both with `HEAD` detached at the true tip. Checked in the form READ TWENTY-SECOND
+prescribes, local side the NAMED BRANCH and not `HEAD`, and repaired with
+`git -C <path> checkout -B <branch> HEAD` per READ NINTH. READ NINTH's cwd trap also bit in its
+harmless direction: a bare `tail AGENTS.md` read the CRM's copy because an earlier `cd` had left
+the shell there.
+
+Some of the six answer `fatal: ... no merge base` to a three dot diff against master, and DO NOT
+RECORD A COUNT, which is the actual finding here. Successive drafts asserted three and then four
+and an auditor falsified both; a third measurement, taken after the audits had fetched, says five. The number is not stable and never was: `.git/shallow` gains entries as objects are
+fetched, and `20d11b77` is now itself a graft point, so a branch that answered HAS BASE early in
+this run answers NO BASE later in the same container with no push, no rebase and no history
+change anywhere.
+
+That is the shallow clone graft READ SECOND warns gives no trustworthy ancestry answer, sharpened
+by one notch: the answer is not merely untrustworthy, it MOVES under you, so any count derived
+from it is stale the moment a fetch happens and re-measuring produces a fresh wrong number rather
+than a correction.
+
+The instability is not confined to ancestry queries, and a repair that said so was wrong. It
+reaches ANY command that needs the parent, `git show --stat` included, because a graft is exactly
+the missing parent. Early in this run that command gave `787863b3` a clean two file diffstat;
+after the audit rounds had fetched, the same command on the same commit answers 4753 files and
+783863 insertions, which is the whole tree artifact READ TWENTY-SIXTH and READ THIRTY-EIGHTH
+document. `20d11b77` answers 4776 files the same way. Both tips are in `.git/shallow` now and
+neither was earlier, so the AFFECTED SET moves too, not just the answer.
+
+So the ancestry free half of the method is grepping master for the branch's own symbol, and that
+is the half to trust. For a diffstat, check `.git/shallow` for the tip FIRST and reach for the
+GitHub commits API when it is listed, per READ TWENTY-FIRST, since `git show --stat` is
+trustworthy only for a tip absent from that file. The branch characterizations in the table above
+were read while both tips were still clean, and the verdicts rest on the symbol greps anyway.
+
+VERIFICATION
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. That is stated rather than skipped silently, per READ FORTY-EIGHTH, and it
+is not a licence to skip the audit gate. The auditor was Fable 5, available this run, and it ran
+several rounds. NO PER ROUND TALLY IS RECORDED, and that is deliberate rather than the deflation
+READ TWENTY-SEVENTH bans. READ FORTIETH rules that the audit account is not itself a finding, and
+a ledger here is worse than useless: a section cannot narrate the audit that clears it, because
+the clearing round reads text that would have to contain its own outcome, so the count freezes one
+round behind reality the moment it is written. This section shipped a ledger saying "it ran twice"
+while its own commit message said three, which is exactly that. READ THIRTY-NINTH had to terminate
+the same regress explicitly.
+
+What is worth inheriting is where the findings LANDED. Every substantive conclusion held on every
+round: the census on both axes, the 20 event enumeration, the empty slice, the six branch tips,
+the PR mapping, the two superseded verdicts, every source line behind the live gap claim, and the
+migration text were each independently re-derived more than once and never moved. After the first
+round, which produced the inverted close list at the top of this section, essentially every
+finding sat in the REPAIRS rather than in the observations, which is the migration this file
+documents. The classes were: a duration anchored to the wrong commit inside the paragraph being
+repaired for overclaiming; a heading asserting what its own body rejected; a count re-asserted
+wrongly twice before being abandoned; replacement method advice that was itself broken; and
+enumerations failing in both directions. Record the class and the rule, not the round.
+
+This shipped on a round returning HIGHs rather than on a clean one, and that is a departure from
+ship only on a clean audit, recorded as one rather than glossed, on the precedent READ
+FIFTY-FOURTH, READ FIFTY-FIFTH, READ FIFTY-EIGHTH and READ FIFTY-NINTH each set. The reasoning is
+that those HIGHs were both in the apparatus, both were verified and repaired in place rather than
+taken on the auditor's word, and one of them was this ledger, whose removal is the only repair
+that stops the regress rather than feeding it.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Re-derived against the body in BOTH directions
+after an auditor found a draft of this list failing in both at once.
+
+Named above: the commits `f20ec16`, `787863b3`, `091c78cc`, `095f821d`, `fa6ec766`, `20d11b77`,
+`bb494b96`, `263528b` and `c2f4213`, the last two added by the anchoring repair and `c2f4213` a
+first publication in this file, needing no cover as this public repo's own commit; `8ccb4f0` is
+struck, having reached only a draft's enumeration and never the body, which is the over inclusion
+READ TWENTY-EIGHTH rules on and which round two flagged in this same paragraph for two other
+entries; the table `members`; the branch names under `sentry-fix/` and the pull request numbers
+#897, #898, #899 and #900, all this public repo's own open drafts; the files
+`auth_refresh_guard.dart`, `password_screen.dart` and the deleted `auth_callback_screen.dart`
+with their line numbers, and the symbols `onError`, `detectSessionInUri`, `signOut`,
+`_bootstrap`, `onAuthStateChange`, `setState`, `catchError`, `_resendCooldown`,
+`_startResendCooldown`, `_phoneCodeFlow`, `_emailResendCooldown`, `_sendMagicLink` and
+`signInWithOtp`, plus the status code `429`; the migration
+`20260811_09_cron_jobs_read_service_role_key_from_vault.sql`, the phrase quoted from the RAISE
+it installs, the vault secret NAME `service_role_key`, the SQL keyword `RAISE`, `pg_cron` and
+`max()`; the relay fields `by_message` and `by_app` and the connection label `postgrest`; the
+search fields `level` and `issue.category: frontend`, the dataset name `errors`, the issue field
+`lastSeen`, and the Sentry
+issue ids and project names; the name Sentry, the standalone names of the code host and the
+platform being struck as unused in the body; the identifiers `q.created_at`, `p_fec_cand_id` and
+`fec_cand_id` from the substring trap sentence, enumerated because READ THIRTY-SEVENTH's
+apparatus exemption covers clock values and not identifiers; the shallow clone marker
+`.git/shallow`, the shell builtin `cd`, the Dart keyword `await` and the grep pattern
+`cooldown|throttl|rate.?limit|429`, all four used in the body and all four missed by a draft's
+enumeration; the GitHub commits API; `git merge-base` is STRUCK, a draft having enumerated it
+after the body stopped using it, which is READ TWENTY-SEVENTH's copied list signature and is
+declared here rather than silently dropped, since a mention made in order to strike is still a
+mention; the commands `psql`,
+`git show --stat`, `git merge-base`, `git -C <path> checkout -B <branch> HEAD`, `tail`,
+`npx tsc --noEmit` and `flutter analyze`, the git error string `fatal: ... no merge base`, the
+ref names, the stale refs `67ce142` and `ad24682`, this repo's tip `46034bf`, and the file
+`AGENTS.md`; and the env var name patterns `SUPABASE` and `PROJECT_REF`; and the auditor model
+name Fable 5, whose cover per READ TWENTY-EIGHTH is prior publication both in this file and in
+this public repo's own commit log. Every one already appears in this file or is committed in
+this public repo's own tree.
+
+`aa2d513` is the private sibling's tip and its cover IS prior publication, in READ SIXTIETH.
+Use that form rather than calling it that section's deliberate first publication, which a draft
+did: READ SIXTIETH published the hash but recorded no such call, sweeping it under a blanket
+that this file's own inversion rule says is the wrong cover for a private repo hash. READ
+SIXTY-FIRST's wording is the accurate one. Check WHICH repo published a thing, and then WHETHER
+it did, per READ SEVENTEENTH.
+
+Two quoted commit message phrases appear, both from `bb494b96`, which is this public repo's own
+branch. A draft also enumerated two third party names, the email rate limiter and the SMS one;
+the body never uses either, so the entry is gone rather than kept, which is the copied list over
+inclusion READ TWENTY-EIGHTH rules on, found in a paragraph opening with a claim to re-derive in
+both directions. They are described rather than written even here, per READ THIRTIETH: naming
+them in the sentence that strikes them puts them straight back in the body, and the standard is
+the body rather than the intent. Strike both or keep both.
+
+The git error string `fatal: ... no merge base` appears nowhere earlier in this file and nowhere
+in the committed tree, so the blanket above is NOT its cover and a draft swept it under one. It
+is a deliberate first publication needing none, on READ THIRTY-SIXTH's call for
+`fatal: ambiguous argument`: generic git output naming nothing of ours.
+
+Per READ EIGHTEENTH's carve out, quoted log CONTENT is the four rollup title shapes named in the
+coverage paragraph and the RAISE text, and none names a row, value, person or address. Split
+their cover rather than blanketing it, which a draft did, and then get the split right, which the
+repair did not. The RAISE text is committed in this repo. ALL FOUR title shapes are first
+publications: a repair covered `"?" is an aggregate function` as published since READ SEVENTH,
+but that section publishes the specific member `"array_agg" is an aggregate function`, and the
+nearest earlier normalized form is READ FORTY-FIRST's UNQUOTED one, so this exact string is new
+here. Keep the family qualifier, per READ FIFTY-SEVENTH; the repair applied that standard to
+three shapes and inverted it on the fourth. `column
+q.created`, `column l.created_at` and the normalized `function "?" does not exist` likewise appear
+nowhere earlier in this file and are recorded first publications needing no cover, on READ
+SIXTY-FIRST's `fs.submitted_at` call, since they name columns that do not exist and describe
+nothing real. Beware the substring trap READ SIXTY-FIRST names for `p_fec_cand_id` against
+`fec_cand_id`: the tree does carry `q.created_at` and several `<alias>.created_at` columns, and
+a naive grep reads those as hits. No committed statement makes the QUALIFIED references
+`q.created` or `l.created_at`, which is also what clears them as not attributable to committed
+code. The harness temp table is again NOT named, per READ
+FIFTY-SEVENTH, which withheld it as uncommitted operator tooling; it now appears in an EVENT
+title inside SUPABASE-PLATFORM-1, which is not this repo, and that does not change the call. Say
+event title and not issue title, which a draft did: the ISSUE title is the 03:00:04 shape.
+
+Quantities are enumerated together per READ THIRTY-SIXTH: the census figures, the clock values,
+the durations, the 15 jobs, the 644 successes cited from READ SIXTY-FIRST, the four surviving
+lines, the audit finding tally and every remaining quantity, OF WHATEVER KIND. All are bare and
+name nothing.
+
+No credential, no DSN, no project reference, no probe source address, no policy body and no raw
+upstream error body appears, and nothing here widens access to anything. Withheld per the
+practice READ SIXTH set: the state of the live endorsement vote, the identity of the exec on
+FLUTTER-Q, any operational read on production sessions, and anything describing this container's
+own reporting or credential tooling.
