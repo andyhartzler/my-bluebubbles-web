@@ -178,18 +178,22 @@ class MessagesViewState extends OptimizedState<MessagesView> {
           _focusStateUnsupported = true;
         }
         // Warn, never error, because there is no branch left where an event
-        // from here is the first one. `addSentry()` swaps dio's
-        // httpClientAdapter for SentryDioClientAdapter, which captures any
-        // response inside failedRequestStatusCodes, 500-599 by default, at the
-        // transport layer with full request and response context and before
-        // any interceptor runs; that capture is the FLUTTER-X shape and it is
-        // the one worth keeping. A 4xx sits outside that range and is captured
-        // instead by ApiInterceptor.onError, which still logs error for a
-        // server-answered status sentry_dio ignores. What is left is a timeout
-        // or an unanswered host, and `fa1dccf91` ruled deliberately that those
-        // are a transport condition rather than a defect of this app and
-        // dropped them to warn one layer up; capturing them again from here
-        // would reinstate the exact volume that commit removed.
+        // from here is the first one. `addSentry()` inserts sentry_dio's
+        // FailedRequestInterceptor at index 0, so it sees the DioException
+        // before ApiInterceptor resolves it away and captures any response
+        // inside failedRequestStatusCodes, 500-599 by default, with the
+        // request and response attached. That capture is the FLUTTER-X shape
+        // and it is the one worth keeping. Do not read its `mechanism` tag,
+        // `SentryDioClientAdapter`, as naming the layer: the adapter
+        // `addSentry()` also installs captures nothing, and the string is just
+        // the label the interceptor stamps on the event. A 4xx sits outside
+        // that range and is captured instead by ApiInterceptor.onError, which
+        // still logs error for a server-answered status sentry_dio ignores.
+        // What is left is a timeout or an unanswered host, and `fa1dccf91`
+        // ruled deliberately that those are a transport condition rather than
+        // a defect of this app and dropped them to warn one layer up;
+        // capturing them again from here would reinstate the exact volume that
+        // commit removed.
         //
         // So this call was the second event on every path and the third on
         // some. Warn keeps the identical on-device line and leaves a Sentry
