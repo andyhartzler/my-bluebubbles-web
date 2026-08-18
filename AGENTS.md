@@ -12559,3 +12559,72 @@ name and no raw upstream error body appears, and nothing here widens access to a
 Withheld per the practice READ SIXTH set: the state of the live endorsement vote, the identity
 of the exec on FLUTTER-Q, any operational read on production sessions, and anything describing
 this container's own reporting or credential tooling.
+
+## READ SIXTY-FOURTH: the 2026-08-18 run, which could NOT triage, and a six day gap nobody caught
+
+No triage was possible and no code changed. This section exists to record a blocker and a
+gap, not an observation, and it makes NO claim about production health in either direction.
+
+THE BLOCKER: SENTRY IS UNREACHABLE FROM THIS CONTAINER
+The Sentry connector is present but NOT AUTHORIZED in this session, so none of its tools
+loaded. This session is non-interactive, so the OAuth flow cannot be run from here, and
+nothing matching `SENTRY` is in the environment either, so there is no token route around
+it. Steps 1 through 3 of the standing loop, list issues, read `by_message`, diagnose, are
+all impossible.
+
+Record the absence and stop there, per READ THIRTEENTH. Do not invent a fallback, and in
+particular do not substitute repo state for observation: this run knows nothing about what
+fired in the last 24 hours, and neither does the next one until the connector is
+reauthorized. That is the single item ask, and it is the whole reason this section exists.
+
+THE GAP: NO SWEEP HAS LANDED IN SIX DAYS
+The last sweep record is `dbc5a8a`, 2026-08-12T15:08:27Z, which is READ SIXTY-THIRD. Zero
+commits have landed in EITHER repo since, checked with `--since=2026-08-13` on both. At a 2
+hour cadence that is roughly seventy runs unaccounted for.
+
+Two readings and nothing here separates them: the loop did not fire, or it fired and failed
+on the same blocker without committing anything. A run that hit this blocker and simply gave
+up would leave the identical trace, which is a reason to write this section rather than to
+give up quietly. Do not read the silence as "nothing fired", which is the same error READ
+TWENTY-SECOND names for a quiet log: an absent report is not an absent error.
+
+WHAT WAS CHECKABLE, AND IT IS THIN
+The branch ref trap did NOT bite, which is rare in this record: both named branches are AT
+their true remote tips, `master` at `dbc5a8a` and `main` at `aa2d513`, checked in the form
+READ TWENTY-SECOND prescribes with the local side being the NAMED BRANCH. Both remote tips
+are unchanged since 08-12, so Andrew has pushed nothing either.
+
+The six `sentry-fix/` branches READ SIXTY-SECOND and READ SIXTY-THIRD inventory are all
+still present and unchanged. Nothing was merged, and nothing should be from here: grepped
+again this run, no commit or note in either repo says the endorsement vote has closed, so
+per the standing rule it is treated as OPEN and the exec sign in path stays untouched.
+
+THE ASKS, CARRIED FORWARD UNCHANGED AND UNVERIFIABLE FROM HERE
+Reauthorize the Sentry connector, which blocks everything above. Decide the three FLUTTER-2
+and FLUTTER-Q branches, which READ SIXTY-THIRD establishes fix live gaps rather than stale
+ones and which have now waited six days longer. And READ SIXTY-FIRST's open one, `max()` of
+the write timestamp on the bill sponsors table, since the deployed `e79339b` removed the
+burst that was that job's only passive signal; nothing matching `SUPABASE`, `PROJECT_REF` or
+a Postgres DSN is in this container's environment, tested rather than inherited per READ
+TWELFTH.
+
+VERIFICATION
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only
+file touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No
+adversarial audit was run, and that is recorded as a departure rather than glossed: this
+diff carries no diagnosis, no mechanism and no code, so there is nothing of the class the
+gate exists to catch, and the run had no observation to be wrong about.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `dbc5a8a`,
+`aa2d513` and `e79339b`; the branch prefix `sentry-fix/` and the ref names; the git commands
+and the `--since` flag; the verification commands `npx tsc --noEmit` and `flutter analyze`;
+the product name Sentry; and the env var name patterns `SENTRY`, `SUPABASE` and
+`PROJECT_REF`. Every one already appears in this file or is committed in this public repo's
+own tree, `aa2d513` being the private sibling's tip whose cover is prior publication in READ
+SIXTIETH. No log content is quoted, because none was readable. Quantities are the two clock
+values, the gap duration, the run estimate and the branch count, all bare and naming
+nothing. No credential, no DSN, no project reference, no policy body and no raw upstream
+error appears, and nothing here widens access to anything. Withheld per the practice READ
+SIXTH set: the state of the live endorsement vote, and any operational read on production
+sessions.
