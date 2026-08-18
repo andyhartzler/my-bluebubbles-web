@@ -12725,3 +12725,92 @@ content is quoted, because none was readable. Quantities are the clock values, t
 report's age, the branch count and the two commit distance, all bare and naming nothing.
 Withheld per the practice READ SIXTH set: the state of the live endorsement vote, and any
 operational read on production sessions.
+
+## READ SIXTY-SIXTH: the 14:22 UTC run, a third consecutive block, and one notification on a channel nobody had tried
+
+Deliberately short. This adds three facts to READ SIXTY-FIFTH and nothing else. No triage was
+possible and no code changed, so this section makes NO claim about production health in either
+direction: an absent report is not an absent error, per READ TWENTY-SECOND.
+
+THE BLOCKER IS UNCHANGED AT THREE CONSECUTIVE RUNS
+Tested rather than inherited, per READ TWELFTH. The Sentry connector is present and NOT
+AUTHORIZED, so none of its tools loaded; this session is non-interactive, so the OAuth flow
+cannot be run from here; and nothing matching `SENTRY`, `SUPABASE`, `PROJECT_REF` or a Postgres
+DSN is in the environment. Steps 1 through 3 of the standing loop are impossible for the third
+run running. READ SIXTY-FIFTH could tell a one off from a standing condition; three runs make it
+a standing condition that is not self clearing.
+
+THE SIX DAY GAP IS NOT AN ONGOING SCHEDULER FAILURE, WHICH NARROWS ONE END ONLY
+READ SIXTY-FOURTH left two readings for the 2026-08-12 to 2026-08-18 silence: the loop did not
+fire, or it fired and failed without committing. Three runs have now fired today, at 11:37,
+12:23 and 14:22 UTC, so whatever produced the gap is not still suppressing the schedule.
+
+Scope that to what it reaches. It says nothing about WHICH reading explains the gap itself, and
+a future run must not inherit it as closed. The two are still live and still unseparated.
+
+NO SECOND EMAIL. ONE NOTIFICATION, AND THAT IS A DEPARTURE RECORDED RATHER THAN GLOSSED
+`MOYD Sentry triage 2026-08-18` was sent at 11:37:14Z and was still UNREAD at this run's close,
+2 hours 44 minutes later. It already carries the blocker, the gap and the three carried asks, so
+per READ SIXTY-FIFTH no second email was sent: a duplicate alarm against an unread first one
+buries it rather than adding to it.
+
+One push notification WAS sent, which no previous run has done. READ SIXTY-FIFTH's suppression
+rule is about the EMAIL thread, the loop's designated reporting channel, so a first use of a
+different channel is not the duplicate that rule forbids. The case for spending it: the
+designated channel is demonstrably not reaching him, three consecutive runs are fully blocked,
+and a routine that cannot run at all is the exact class a notification exists for.
+
+The rule for the next run is READ SIXTY-FIFTH's, now covering BOTH channels. While that email is
+unread AND the blocker is unchanged, send neither an email nor a notification, and add a line
+here instead. Report when the connector returns, or when a fact appears that the sent report
+does not carry. Check what has already been sent before assuming nothing has.
+
+THE VOTE GATE IS UNCHANGED AND THE BRANCH BACKLOG IS UNTOUCHED
+Grepped again rather than inherited: nothing in either repo says the endorsement vote has
+closed. Three hits, none of them such a note. One is this file's own record in READ SIXTY-FIFTH;
+one is a doc comment in `auto_inferred_assignments_service.dart` describing what happens WHEN
+voting closes; and one is a UI template string in the site repo's voting page that renders a
+closed vote's date, which is a render path rather than a statement about this vote. So the vote
+is treated as OPEN and the six `sentry-fix/` branches stay unmerged, their tips unchanged from
+READ SIXTY-THIRD's inventory. Three of them fix live gaps rather than stale ones, per that
+section, and they have now waited a further two days.
+
+Andrew has pushed nothing either: the site repo tip is still `aa2d513` from 2026-08-12, and this
+repo's tip is this loop's own last sweep record.
+
+THE BRANCH REF TRAP BIT IN THE CLASSIC FORM, AND THE ADDENDUM EARNED ITS PLACE AGAIN
+Local `master` was stale at `dbc5a8a` against a real remote tip of `d8e8533`, with `HEAD`
+detached AT that tip. Checked in the form READ TWENTY-SECOND prescribes, local side the NAMED
+BRANCH and not `HEAD`, and repaired with `git checkout -B master HEAD` BEFORE committing, per
+READ SIXTY-FOURTH's addendum rather than READ NINTH's conditional repair.
+
+The site repo is the case that addendum was written for: its named `main` was already AT the
+true tip, so the comparison agreed, and `HEAD` was detached anyway. Nothing was committed there,
+so no repair was needed; had anything been, the agreeing check would not have made the repair
+optional.
+
+After the repair `git status` reports ahead of `origin/master` by 3. That is the stale
+remote-tracking cache talking, per READ TWENTY-SIXTH, and `git ls-remote` shows the remote at
+`d8e8533` already. Do not act on it.
+
+VERIFICATION
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No adversarial
+audit was run, recorded as a departure rather than glossed, on the call READ SIXTY-FOURTH and
+READ SIXTY-FIFTH each made for the identical case: this diff carries no diagnosis, no mechanism
+and no code, so it holds nothing of the class the gate exists to catch.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `dbc5a8a`, `d8e8533`
+and `aa2d513`, the last being the private sibling's tip whose cover is prior publication in READ
+SIXTIETH; the branch prefix `sentry-fix/`; the file `auto_inferred_assignments_service.dart`,
+committed here, and the site repo's voting page named by role rather than by path; the git
+commands and ref names; the verification commands `npx tsc --noEmit` and `flutter analyze`; the
+product name Sentry; and the env var name patterns `SENTRY`, `SUPABASE` and `PROJECT_REF`. Every
+one already appears in this file or is committed in this public repo's own tree. The report is
+named by its subject line only, which is this loop's own published convention, and no transport,
+credential or container tooling is described, which READ EIGHTEENTH records as a BLOCKER class.
+No log content is quoted, because none was readable. Quantities are the clock values, the unread
+report's age, the three run count, the branch count and the commit distance, all bare and naming
+nothing. Withheld per the practice READ SIXTH set: the state of the live endorsement vote, and
+any operational read on production sessions.
