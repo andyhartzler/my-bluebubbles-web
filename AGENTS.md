@@ -12658,3 +12658,70 @@ Newly named here and nowhere else in this section: the git subcommands `checkout
 `## HEAD (no branch)`. All are generic git plumbing and output naming nothing of ours,
 which is the call READ THIRTY-SIXTH made for `fatal: ambiguous argument` and READ
 TWENTY-FIFTH for a POSIX error string.
+
+## READ SIXTY-FIFTH: the 12:23 UTC run, blocked on the same thing, and do NOT re-send the report
+
+Deliberately short. This is a duplicate suppression note, not a triage record, and it adds
+exactly two facts to READ SIXTY-FOURTH.
+
+THE BLOCKER IS PERSISTENT RATHER THAN TRANSIENT
+Tested this run rather than inherited, per READ TWELFTH. The Sentry connector is present and
+NOT AUTHORIZED, so none of its tools loaded; this session is non-interactive, so the OAuth
+flow cannot be run from here; and nothing matching `SENTRY`, `SUPABASE`, `PROJECT_REF` or a
+Postgres DSN is in the environment. Steps 1 through 3 of the standing loop are impossible for
+the second consecutive run. That is the first fact: READ SIXTY-FOURTH could not tell a one off
+from a standing condition, and two runs apart can.
+
+Make no claim about production health in either direction. This run observed nothing, so an
+absent report is not an absent error, per READ TWENTY-SECOND.
+
+THE REPORT WAS ALREADY SENT, AND IT IS STILL UNREAD
+`MOYD Sentry triage 2026-08-18` went to Andrew at 11:37:14Z, 46 minutes before this run's
+close, and was still unread when this run checked. It already carries the blocker, the six day
+gap and the three carried asks.
+
+So no report was sent this run, deliberately. A second identical alarm against an unread first
+one adds no information and buries it. The rule for the next run: while that thread is unread
+AND the blocker is unchanged, add a line here instead of sending. Report again when something
+CHANGES, meaning the connector returns, or a new fact appears that the sent report does not
+carry. Check whether it was sent before assuming it was not; this run nearly wrote a duplicate.
+
+NOTHING ELSE WAS ACTIONABLE, AND THE VOTE GATE IS UNCHANGED
+Grepped again rather than inherited: nothing in either repo says the endorsement vote has
+closed. The two hits in `auto_inferred_assignments_service.dart` are doc comments describing
+what happens WHEN voting closes, not a statement that this one has, which is the difference
+between a code comment and a note. So per the standing rule the vote is treated as OPEN and the
+six `sentry-fix/` branches stay unmerged, now waiting since READ SIXTY-THIRD.
+
+THE BRANCH REF TRAP BIT IN THE CLASSIC FORM, AND THE ADDENDUM EARNED ITS PLACE
+Local `master` was stale at `dbc5a8a` against a real remote tip of `eab008f`, which is READ
+SIXTY-FOURTH's own commit, with `HEAD` detached AT that tip. Checked in the form READ
+TWENTY-SECOND prescribes, local side the NAMED BRANCH and not `HEAD`, and repaired with
+`git checkout -B master HEAD` BEFORE committing, which is READ SIXTY-FOURTH's addendum rather
+than READ NINTH's conditional repair. Had the check agreed, that addendum says to run the
+repair anyway, and this run would have committed onto a detached `HEAD` again without it.
+
+After the repair `git status` reports ahead of `origin/master` by 2. That is the stale
+remote-tracking cache talking, per READ TWENTY-SIXTH, and `git ls-remote` shows the remote
+already AT `eab008f`. Do not act on it.
+
+VERIFICATION
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only
+file touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No
+adversarial audit was run, recorded as a departure rather than glossed, on READ SIXTY-FOURTH's
+call for the identical case: this diff carries no diagnosis, no mechanism and no code, so it
+holds nothing of the class the gate exists to catch.
+
+DISCLOSURE CHECK, PER READ THIRD
+This repo is public and the sibling is private. Named above: the commits `dbc5a8a` and
+`eab008f`, both this public repo's own; the branch prefix `sentry-fix/`; the file
+`auto_inferred_assignments_service.dart`, committed here; the git commands and ref names; the
+verification commands `npx tsc --noEmit` and `flutter analyze`; the product name Sentry; and
+the env var name patterns `SENTRY`, `SUPABASE` and `PROJECT_REF`. Every one already appears in
+this file or is committed in this public repo's own tree. The report is named by its subject
+line only, which is this loop's own published convention; no transport, credential or
+container tooling is described, which READ EIGHTEENTH records as a BLOCKER class. No log
+content is quoted, because none was readable. Quantities are the clock values, the unread
+report's age, the branch count and the two commit distance, all bare and naming nothing.
+Withheld per the practice READ SIXTH set: the state of the live endorsement vote, and any
+operational read on production sessions.
