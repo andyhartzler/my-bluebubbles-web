@@ -12628,3 +12628,33 @@ nothing. No credential, no DSN, no project reference, no policy body and no raw 
 error appears, and nothing here widens access to anything. Withheld per the practice READ
 SIXTH set: the state of the live endorsement vote, and any operational read on production
 sessions.
+
+ADDENDUM, WRITTEN AFTER THE PUSH: THE BRANCH CHECK PASSED AND THE TRAP BIT ANYWAY
+The paragraph above says the branch ref trap did not bite. That is true of the CHECK and
+false of the RUN, and the difference is a new variant worth more than the rest of this
+section.
+
+`HEAD` was detached AT the true remote tip, so comparing the NAMED BRANCH against
+`git ls-remote` agreed, and this run read that agreement as "no repair needed" and skipped
+the `git checkout -B <branch> HEAD` step. It then committed onto the detached `HEAD`, which
+left `master` behind at the old tip, and `git push -u origin master` answered
+`Everything up-to-date` and exited 0.
+
+That answer is the hazard. It is not a refusal like the non fast forward READ SECOND
+documents, it reads as success, and the commit was reachable from nothing but a detached
+`HEAD` in a container that gets reclaimed. Repaired by `git checkout -B master HEAD` after
+the fact and pushed for real.
+
+So the inheritable rule is narrower than READ TWENTY-SECOND's and does not replace it. That
+section is about which REF you compare, after a false pass from comparing `HEAD` to the
+remote. This is about what you DO once the comparison agrees: the repair is not conditional
+on the check failing, because the container starts detached whether or not the named branch
+is stale. Run `git checkout -B <branch> HEAD` unconditionally before committing, and read
+`Everything up-to-date` on a push you expected to move something as a symptom rather than as
+a result.
+
+Newly named here and nowhere else in this section: the git subcommands `checkout -B`,
+`status` and `push -u`, and the git output strings `Everything up-to-date` and
+`## HEAD (no branch)`. All are generic git plumbing and output naming nothing of ours,
+which is the call READ THIRTY-SIXTH made for `fatal: ambiguous argument` and READ
+TWENTY-FIFTH for a POSIX error string.
