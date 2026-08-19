@@ -13099,3 +13099,82 @@ quoted, because none was readable. Quantities are the clock values, the unread r
 eight run count, the branch count and the commit distance, all bare and naming nothing. Withheld
 per the practice READ SIXTH set: the state of the live endorsement vote, and any operational read
 on production sessions.
+
+## READ SEVENTY-SECOND: the 02:20 UTC run, a ninth consecutive block, and one inherited figure corrected
+
+Deliberately very short, per READ TWELFTH and READ FORTIETH. No triage was possible and no code
+changed, so this makes NO claim about production health in either direction: an absent report is
+not an absent error, per READ TWENTY-SECOND.
+
+The blocker is unchanged at nine consecutive runs, tested rather than inherited per READ TWELFTH.
+The Sentry connector is present and NOT AUTHORIZED, so none of its tools loaded; this session is
+non-interactive, so the OAuth flow cannot be run from here; and an exact-count grep for `SENTRY`,
+`SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the environment returns zero. Steps 1 through 3
+of the standing loop are impossible for the ninth run running.
+
+THE ONE CORRECTION: READ SEVENTY-FIRST'S DURATION FIGURES ARE WRONG
+That section says the report was "still UNREAD 26 hours later" and that the loop "has now been
+fully blind for more than 24 hours". Both are false against its own commit time. `MOYD Sentry
+triage 2026-08-18` was sent 2026-08-18T11:37:14Z and that section committed at 2026-08-19T00:21:53Z,
+so the report was 12 hours 44 minutes old there, not 26, and the blocked-run streak was the same
+12 hours 44 minutes rather than more than 24. At this run's close, 02:20:44Z, the report is 14
+hours 43 minutes unread, computed from `date -u` against the thread's own timestamp and FLOORED
+per READ TWELFTH.
+
+What survives of that finding is only the CALENDAR crossing, which is what its own heading claims:
+every section before it was written on 2026-08-18 and it was written on 2026-08-19. That is a date
+change and not a duration, and the duration it reached for was never checked. This is the drift
+READ SEVENTEENTH names, in the one paragraph of that section written to record something new.
+
+Two things a future run should take from it rather than the number. Compute an age against a clock
+read this run, not against a remembered send time: `date -u` plus the thread timestamp is two
+commands. And a "blind for N hours" figure has two possible anchors, the first blocked run and the
+last SUCCESSFUL triage, which is READ SIXTY-THIRD at 2026-08-12T15:08:27Z; those differ by nearly a
+week, so name the anchor or the figure means nothing. Neither anchor gives 26.
+
+Nothing was sent, which is the rule rather than an omission. Per READ SIXTY-SIXTH's rule, covering
+BOTH the email thread and the notification channel, neither was used: the connector has not
+returned and no fact has appeared that the sent report does not carry. A correction to this file's
+own arithmetic is not such a fact, since the report carries no duration figure at all. READ
+SEVENTY-FIRST's instruction to re-weigh rather than copy was followed and reached the same answer;
+at 14 hours 43 minutes the unread report is not yet old enough to change it.
+
+Nothing else moved. Both remote tips are unchanged, `master` at this loop's own last record and
+`main` at `aa2d513` from 2026-08-12, so Andrew has pushed nothing. The six `sentry-fix/` branch
+tips were enumerated rather than inherited and are unchanged from READ SIXTY-THIRD's inventory.
+Grepped both repos again rather than inherited: nothing says the endorsement vote has closed, the
+three hits being the doc comment in `auto_inferred_assignments_service.dart` and the two render
+paths in `VoteStatusMessage.tsx` and the members dashboard voting page, every one describing what
+is shown WHEN a vote closes rather than stating that this one has. So the vote is treated as OPEN
+and nothing was merged.
+
+The branch ref trap bit in the classic form: local `master` stale at `dbc5a8a` against a real tip
+of `f5a81a0`, with `HEAD` detached AT that tip. Checked in the form READ TWENTY-SECOND prescribes,
+local side the NAMED BRANCH, and repaired with `git checkout -B master HEAD` BEFORE committing, per
+READ SIXTY-FOURTH's addendum rather than READ NINTH's conditional repair. After the repair
+`git status` reports ahead of `origin/master` by 9, which is the stale remote-tracking cache
+talking, per READ TWENTY-SIXTH. Do not act on it.
+
+VERIFICATION AND DISCLOSURE
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No adversarial
+audit was run, recorded as a departure rather than glossed, on the call READ SIXTY-FOURTH through
+READ SEVENTY-FIRST each made for the identical case: this diff carries no diagnosis, no mechanism
+and no code, so it holds nothing of the class the gate exists to catch. The one substantive claim
+in it, the corrected durations, is arithmetic over two timestamps printed above and checkable
+without an auditor.
+
+This repo is public and the sibling is private. Named above: the commits `dbc5a8a`, `f5a81a0` and
+`aa2d513`, the last being the private sibling's tip whose cover is prior publication in READ
+SIXTIETH; the branch prefix `sentry-fix/`; the files `auto_inferred_assignments_service.dart`,
+committed here, and `VoteStatusMessage.tsx` with the members dashboard voting page named by role
+rather than by path, both in the private sibling and both published in READ SEVENTY-FIRST; the git
+commands and ref names; the shell command `date -u`; the verification commands `npx tsc --noEmit`
+and `flutter analyze`; the product name Sentry; and the env var name patterns `SENTRY`, `SUPABASE`,
+`PROJECT_REF`, `POSTGRES` and `DSN`. Everything else already appears in this file or is committed
+in this public repo's own tree. The report is named by its subject line only, which is this loop's
+own published convention, and no transport, credential or container tooling is described, which
+READ EIGHTEENTH records as a BLOCKER class. No log content is quoted, because none was readable.
+Quantities are the clock values, the corrected and inherited report ages, the nine run count, the
+branch count and the commit distance, all bare and naming nothing. Withheld per the practice READ
+SIXTH set: the state of the live endorsement vote, and any operational read on production sessions.
