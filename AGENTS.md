@@ -13577,3 +13577,81 @@ Quantities are the clock values, the unread report's age, the blind-since durati
 instant, the fifteen run count, the branch count and the commit distance, all bare and naming
 nothing. Withheld per the practice READ SIXTH set: the state of the live endorsement vote, and any
 operational read on production sessions.
+
+## READ SEVENTY-NINTH: the 16:20 UTC run, a sixteenth consecutive block, and the send trigger fired
+
+No triage was possible and no code changed, so this makes NO claim about production health in either
+direction: an absent report is not an absent error, per READ TWENTY-SECOND.
+
+The blocker is unchanged at sixteen consecutive runs, tested rather than inherited per READ TWELFTH.
+The Sentry connector is present and NOT AUTHORIZED, so none of its tools loaded; this session is
+non-interactive, so the OAuth flow cannot be run from here; and an exact-count grep for `SENTRY`,
+`SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the environment returns zero.
+
+A REPORT WAS SENT, WHICH IS THE TRIGGER FIRING RATHER THAN A JUDGEMENT CALL
+READ SEVENTY-EIGHTH registered a concrete trigger rather than leaving a sixteenth run to re-weigh
+from scratch: the blind-since anchor crosses SEVEN DAYS at 2026-08-19T15:08:27Z, measured from the
+last SUCCESSFUL triage at READ SIXTY-THIRD, and every run after that is past it. This run closed at
+16:20, so it fired. `MOYD Sentry triage 2026-08-19` was sent, and a push notification with it.
+
+Name the ANCHOR, per READ SEVENTY-SECOND, because the two differ by nearly a week. Blind-since is
+7 days 1 hour. Report-age is 1 day 4 hours 43 minutes, since `MOYD Sentry triage 2026-08-18` went at
+2026-08-18T11:37:14Z and was confirmed still UNREAD this run, computed from `date -u` against the
+thread's own timestamp and FLOORED per READ TWELFTH. The report-age anchor alone would NOT have
+justified sending, being short of READ SEVENTY-FIRST's few-days threshold. It was the other anchor.
+
+The push notification is the second ever spent on this, after READ SIXTY-SIXTH's. Justified on the
+same ground READ SEVENTY-EIGHTH gives for the email, plus one it does not: the designated channel is
+demonstrably not reaching him, since the 08-18 report has now been unread through sixteen runs.
+
+REGISTER THE NEXT TRIGGER RATHER THAN LEAVING IT OPEN, WHICH IS THE HALF THAT MADE THIS WORK
+READ SEVENTY-EIGHTH's registration is why this run acted on a threshold instead of re-weighing "not
+yet" a sixteenth time. Do the same here. Both reports are now sent and the suppression rule resumes,
+per READ SIXTY-SIXTH covering BOTH channels: send nothing further while the 08-19 report is unread
+AND the blocker is unchanged. The next trigger is FOURTEEN DAYS blind, at 2026-08-26T15:08:27Z, or
+sooner if the connector returns, if Andrew pushes anything, or if the vote is recorded closed. A
+run seeing any of those has a fact the sent reports do not carry.
+
+Nothing else moved. Both remote tips are unchanged in substance, `master` at this loop's own last
+record and `main` at `aa2d513` from 2026-08-12, so Andrew has pushed nothing. The six `sentry-fix/`
+branch tips were enumerated rather than inherited and are unchanged from READ SIXTY-THIRD's
+inventory. Grepped both repos again rather than inherited: nothing says the endorsement vote has
+closed, so it is treated as OPEN and nothing was merged.
+
+Two hits are worth naming so a future run does not re-open them. `lib/features/forms/README.md`
+documents an RPC named `close_expired_votes()`, which is a mechanism description rather than a
+statement that this vote closed. And the three `endorsement_hub` hits are the SUBSTRING trap READ
+THIRTY-FIRST names for `message_ts` against `slack_message_ts`: they match on the widget name
+`VoterRollDisclosure`, whose "clos" is inside "Disclosure", and one CRM hit is `Icons.close`. A
+naive vote-closure grep returns all four and none is a note.
+
+The branch ref trap bit in the classic form: local `master` stale at `dbc5a8a` against a real tip
+of `180b7ab`, with `HEAD` detached AT that tip. Checked in the form READ TWENTY-SECOND prescribes,
+local side the NAMED BRANCH, and repaired with `git checkout -B master HEAD` BEFORE committing, per
+READ SIXTY-FOURTH's addendum rather than READ NINTH's conditional repair.
+
+VERIFICATION AND DISCLOSURE
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No adversarial
+audit was run, recorded as a departure rather than glossed, on the call READ SIXTY-FOURTH through
+READ SEVENTY-EIGHTH each made for the identical case: this diff carries no diagnosis, no mechanism
+and no code, so it holds nothing of the class the gate exists to catch. Its substantive claims, the
+two durations and the trigger crossing, are arithmetic over timestamps printed above and checkable
+without an auditor.
+
+This repo is public and the sibling is private. Named above: the commits `dbc5a8a`, `180b7ab` and
+`aa2d513`, the last being the private sibling's tip whose cover is prior publication in READ
+SIXTIETH; the branch prefix `sentry-fix/`; the file `lib/features/forms/README.md` and the RPC name
+`close_expired_votes` it documents, the widget `VoterRollDisclosure`, the Flutter constant
+`Icons.close` and the directory `endorsement_hub`, all committed here, the RPC and widget names
+first publications in this file and needing none, since both are already committed in this public
+tree and the finding is that neither is a closure note; the git commands and ref names; the shell
+command `date -u`; the verification commands `npx tsc --noEmit` and `flutter analyze`; the product
+name Sentry; and the env var name patterns `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and
+`DSN`. Everything else already appears in this file or is committed in this public repo's own tree.
+Both reports are named by subject line only, which is this loop's own published convention, and no
+transport, credential or container tooling is described, which READ EIGHTEENTH records as a BLOCKER
+class. No log content is quoted, because none was readable. Quantities are the clock values, the
+two anchor durations and the next trigger instant, the sixteen run count and the branch count, all
+bare and naming nothing. Withheld per the practice READ SIXTH set: the state of the live
+endorsement vote, and any operational read on production sessions.
