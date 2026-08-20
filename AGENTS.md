@@ -14413,3 +14413,79 @@ was readable. Quantities are the clock values, the two report ages, the blind-si
 its eight-day crossing instant and the next trigger instant, the twenty-seven run count, the branch
 count and the commit distance, all bare and naming nothing. Withheld per the practice READ SIXTH
 set: the state of the live endorsement vote, and any operational read on production sessions.
+
+## READ NINETY-FIRST: the 16:20 UTC run, a twenty-eighth consecutive block, and nothing sent
+
+Deliberately very short, per READ TWELFTH and READ FORTIETH. No triage was possible and no code
+changed, so this makes NO claim about production health in either direction: an absent report is
+not an absent error, per READ TWENTY-SECOND.
+
+The blocker is unchanged at twenty-eight consecutive runs, tested rather than inherited per READ
+TWELFTH. The Sentry connector is present and NOT AUTHORIZED, so none of its tools loaded; this
+session is non-interactive, so the OAuth flow cannot be run from here; and an exact-count grep for
+`SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the environment returns zero. Steps 1
+through 3 of the standing loop are impossible for the twenty-eighth run running.
+
+Nothing was sent, which is the suppression rule rather than an omission. Both reports were checked
+rather than assumed and BOTH are still UNREAD: `MOYD Sentry triage 2026-08-19`, sent at
+2026-08-19T16:22:13Z on READ SEVENTY-NINTH's blind-since trigger, at 23 hours 58 minutes, and
+`MOYD Sentry triage 2026-08-18`, sent 2026-08-18T11:37:14Z, at 2 days 4 hours 43 minutes. Both
+computed from `date -u` against their own thread timestamps and FLOORED per READ TWELFTH.
+
+The trigger to act on is the one READ SEVENTY-NINTH registered rather than a fresh judgement call:
+FOURTEEN DAYS blind, at 2026-08-26T15:08:27Z, or sooner if the connector returns, if Andrew pushes
+anything, or if the vote is recorded closed. None of those happened this run. Blind-since is now
+8 days 1 hour, measured from the last SUCCESSFUL triage at READ SIXTY-THIRD; name the ANCHOR when
+quoting a figure, per READ SEVENTY-SECOND, since report-age and blind-since differ by nearly a
+week. This is the first run past the EIGHT DAYS crossing READ NINETIETH forewarned, at
+2026-08-20T15:08:27Z; per that section's reading, and READ EIGHTY-NINTH's before it on the two-day
+crossing, a round number on an anchor whose trigger has already fired once is not itself a fresh
+send condition. It is not, and the 08-19 report reaching its own one-day mark at 23 hours 58
+minutes is not either.
+
+Nothing else moved. The site tip is unchanged at `aa2d513` from 2026-08-12, and the CRM tip is
+`5fa2ae8`, which is this loop's own READ NINETIETH record and not Andrew's work, checked by
+reading its subject rather than inferring from the hash being new, per READ EIGHTY-THIRD. So Andrew
+has pushed nothing. The six `sentry-fix/` branch tips were enumerated rather than inherited and are
+unchanged from READ SIXTY-THIRD's inventory. Grepped both repos again rather than inherited:
+nothing says the endorsement vote has closed. The CRM hits are the doc comment in
+`auto_inferred_assignments_service.dart` and the branch comment in `vote_detail_screen.dart`, and
+the site hits are the render paths in `VoteStatusMessage.tsx` and the members dashboard voting
+page, every one describing what is shown WHEN a vote closes rather than stating that this one has.
+So the vote is treated as OPEN and nothing was merged.
+
+The branch ref trap bit in the classic form: local `master` stale at `dbc5a8a` against a real tip
+of `5fa2ae8`, with `HEAD` detached AT that tip. Checked in the form READ TWENTY-SECOND prescribes,
+local side the NAMED BRANCH, and repaired with `git checkout -B master HEAD` BEFORE committing, per
+READ SIXTY-FOURTH's addendum rather than READ NINTH's conditional repair. The cosmetic ahead count
+READ TWENTY-SIXTH names did NOT appear this run: after the repair `git status` reported "up to
+date with 'origin/master'", so this container's remote-tracking ref was already fresh. That is a
+DEPARTURE from the recent pattern and not a mechanism, so keep running the check per READ SECOND.
+
+VERIFICATION AND DISCLOSURE
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No adversarial
+audit was run, recorded as a departure rather than glossed, on the call READ SIXTY-FOURTH through
+READ NINETIETH each made for the identical case: this diff carries no diagnosis, no mechanism and
+no code, so it holds nothing of the class the gate exists to catch. Its substantive claims, the
+two report ages and the blind-since duration, are arithmetic over timestamps printed above and
+checkable without an auditor.
+
+This repo is public and the sibling is private. Named above: the commits `dbc5a8a`, `5fa2ae8` and
+`aa2d513`, the last being the private sibling's tip whose cover is prior publication in READ
+SIXTIETH; the branch prefix `sentry-fix/`; the files `auto_inferred_assignments_service.dart` and
+`vote_detail_screen.dart`, both committed here, and `VoteStatusMessage.tsx` with the members
+dashboard voting page named by role rather than by path, both in the private sibling and both
+published in READ SEVENTY-FIRST; the git commands and ref names, plus the git status output string
+"up to date with 'origin/master'" named only to record that this run's remote-tracking ref was
+fresh, generic git output naming nothing of ours; the shell command `date -u`; the verification
+commands `npx tsc --noEmit` and `flutter analyze`; the product name Sentry; and the env var name
+patterns `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN`. Everything else already appears
+in this file or is committed in this public repo's own tree. Both reports are named by subject
+line only, which is this loop's own published convention, and no transport, credential or
+container tooling is described, which READ EIGHTEENTH records as a BLOCKER class. No log content
+is quoted, because none was readable. Quantities are the clock values, the two report ages, the
+blind-since duration with its eight-day crossing instant and the next trigger instant, the
+twenty-eight run count and the branch count, all bare and naming nothing. Withheld per the
+practice READ SIXTH set: the state of the live endorsement vote, and any operational read on
+production sessions.
