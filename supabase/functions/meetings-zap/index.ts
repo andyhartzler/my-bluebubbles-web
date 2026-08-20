@@ -1279,7 +1279,16 @@ serve(async (req)=>{
     }
     console.log('Created meeting record:', meeting.id);
     const attendanceResults = await processAttendance(supabaseClient, meeting.id, uniqueParticipants);
-    const successfulMatches = attendanceResults.filter((r)=>r.status === 'success').length;
+    // 'already_recorded' counts as a match. On a FIRST run this status never
+    // occurs, so first-run behaviour is unchanged. On a REPLAY every attendee
+    // already has a row, processAttendance returns 'already_recorded' for each,
+    // and counting only 'success' made successfulMatches 0 — which the update
+    // below then wrote over a previously correct attendance_count. Observed
+    // 2026-08-20 replaying the 2026-08-12 Executive Committee meeting: four
+    // attendees matched by exact name, all four already recorded, and the row's
+    // attendance_count went 4 → 0 while meeting_attendance still held the four
+    // matched rows. An already-recorded attendee IS a matched member.
+    const successfulMatches = attendanceResults.filter((r)=>r.status === 'success' || r.status === 'already_recorded').length;
     const nonMemberCount = attendanceResults.filter((r)=>r.status === 'non_member' || r.status === 'non_member_phone' || r.status === 'non_member_device').length;
     await supabaseClient.from('meetings').update({
       attendance_count: successfulMatches,
