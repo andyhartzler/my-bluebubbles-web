@@ -1354,8 +1354,24 @@ serve(async (req)=>{
     // matched rows. An already-recorded attendee IS a matched member.
     const successfulMatches = attendanceResults.filter((r)=>r.status === 'success' || r.status === 'already_recorded').length;
     const nonMemberCount = attendanceResults.filter((r)=>r.status === 'non_member' || r.status === 'non_member_phone' || r.status === 'non_member_device').length;
+    // attendance_count is a denormalised copy of "how many matched members
+    // attended", so read it back from meeting_attendance rather than from this
+    // run's results. Deriving it from successfulMatches is only right on a
+    // first run: a replay reports 'already_recorded' instead of 'success', and
+    // a run whose participant list came back empty or was rejected by the
+    // occurrence window guard above reports nothing at all. Both wrote a 0 over
+    // a correct count. Observed twice on 2026-08-20, on the 2026-08-12 row
+    // (4 → 0) and the 2026-07-29 row (5 → 0 while five matched rows sat in
+    // meeting_attendance). Counting the rows is correct in every case.
+    const { count: matchedAttendanceRows } = await supabaseClient
+      .from('meeting_attendance')
+      .select('id', { count: 'exact', head: true })
+      .eq('meeting_id', meeting.id)
+      .not('member_id', 'is', null);
+    const attendanceCount = typeof matchedAttendanceRows === 'number' ? matchedAttendanceRows : successfulMatches;
+    console.log(`attendance_count for ${meeting.id}: ${attendanceCount} (this run matched ${successfulMatches})`);
     await supabaseClient.from('meetings').update({
-      attendance_count: successfulMatches,
+      attendance_count: attendanceCount,
       processing_status: 'completed'
     }).eq('id', meeting.id);
     console.log(`Attendance processed: ${successfulMatches} matched, ${nonMemberCount} non-members`);
