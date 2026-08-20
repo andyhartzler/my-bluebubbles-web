@@ -14627,3 +14627,118 @@ class. No log content is quoted, because none was readable. Quantities are the c
 two report ages, the blind-since duration and the next trigger instant, the thirty run count and
 the branch count, all bare and naming nothing. Withheld per the practice READ SIXTH set: the state
 of the live endorsement vote, and any operational read on production sessions.
+
+## READ NINETY-FOURTH: the 22:19 UTC run, a thirty-first consecutive block, and Andrew is back at the keyboard
+
+No triage was possible and no code changed here, so this makes NO claim about production
+health in either direction: an absent report is not an absent error, per READ TWENTY-SECOND.
+
+The blocker is unchanged at thirty-one consecutive runs, tested rather than inherited per READ
+TWELFTH. The Sentry connector is present and NOT AUTHORIZED, so none of its tools loaded; this
+session is non-interactive, so the OAuth flow cannot be run from here; and an exact-count grep
+for `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the environment returns zero.
+
+THE REGISTERED TRIGGER FIRED: ANDREW PUSHED
+This repo's tip is `37db045`, authored `Andy Hartzler <andrew@hartzler.us>` at
+2026-08-20T21:54:15Z, which is 25 minutes before this run closed. It is a real change of his
+own and NOT one of this loop's sweep records, checked by reading its subject rather than
+inferring from the hash being new, per READ EIGHTY-THIRD. It is the first push by him since
+2026-08-12, and it fires one of the three conditions READ SEVENTY-NINTH registered: the
+connector returning, Andrew pushing anything, or the vote being recorded closed.
+
+So a report went out, `MOYD Sentry triage 2026-08-20`, with a push notification. That is the
+suppression rule releasing rather than being overridden: READ SIXTY-SIXTH's rule covers both
+channels and its condition is that something CHANGE, meaning a fact appears that the sent
+reports do not carry.
+
+The new fact is not the push itself, and a future run should take the DISTINCTION rather than
+the instance. Both earlier reports are still UNREAD, `MOYD Sentry triage 2026-08-19` at
+1 day 5 hours 57 minutes and `MOYD Sentry triage 2026-08-18` at 2 days 10 hours 42 minutes,
+computed from `date -u` against their own thread timestamps and FLOORED per READ TWELFTH. What
+changed is WHY they are unread. Until now that was consistent with him being away, which is the
+reading under which a further alarm is noise. A commit from his own machine 25 minutes ago,
+carrying a hand deploy and a deployed-body verification, establishes he is present and working
+in exactly this tooling while the loop has been blind for 8 days 7 hours, measured from the
+last SUCCESSFUL triage at READ SIXTY-THIRD. Name the ANCHOR when quoting a figure, per READ
+SEVENTY-SECOND, since report-age and blind-since differ by more than a week now.
+
+HIS COMMIT IS HIS WORK, NOT THIS LOOP'S, AND ONE OPEN ITEM IN IT IS NOT MINE TO CLOSE
+Recorded so the next run does not re-diagnose it or mistake it for something to act on.
+`37db045` fixes the Zoom to CRM fan-out, which had been half broken since 2026-07-22: the
+fan-out forwarded neither Zoom signature header, both downstream workflows verify the signature
+themselves and refuse without it, and because the fan-out is fire-and-forget the row still ended
+up marked completed with a recording and nothing else. His own message states it is deployed and
+the deployed body verified.
+
+Its explicit NOT-fixed item is that three executive meetings are still stranded and need a
+targeted replay, which the reconcile function skips because it diffs on a key those rows already
+carry. That is left alone here rather than attempted: it needs droplet or database access this
+container does not have, it is outside the Sentry loop, and it is his own recorded next step
+rather than an unnoticed defect. It is repeated to him in the report so it does not fall through.
+
+THE METHOD NOTE, WHICH CORROBORATES READ FIRST FROM THE OTHER DIRECTION
+Worth inheriting rather than the incident. His message records that his first deploy of that fix
+was itself broken, declaring two constants inside a conditional block while the call sites sat
+outside it, which is a ReferenceError on every event that the handler's outer catch would have
+swallowed into a 200. It would have failed exactly as silently as the bug it was fixing. What
+caught it was reading the DEPLOYED body back, and he notes `tsc` reported zero errors on that
+Deno file both before and after.
+
+That is this file's own standing point reached independently: READ ELEVENTH records that
+`tsconfig.json` EXCLUDES `supabase/functions`, so the required type check does not read a changed
+edge function at all, and READ TENTH prescribes a differential type check plus extracted unit
+tests as the substitute. Add his half to it. For an edge function the type check is not a gate in
+either direction, and the gate that holds is reading the deployed body back after deploying.
+A fire-and-forget call site plus a catch-all handler means a broken deploy reports success.
+
+Nothing else moved. The site tip is unchanged at `aa2d513` from 2026-08-12. The six
+`sentry-fix/` branch tips were enumerated rather than inherited and are unchanged from READ
+SIXTY-THIRD's inventory, so the three fixes it establishes are live gaps have now waited a
+further eight days. Grepped both repos again rather than inherited: nothing says the endorsement
+vote has closed. The CRM hits are the doc comments and the dashboard card render path in
+`auto_inferred_assignments_service.dart` and the branch comment in `vote_detail_screen.dart`, and
+the site hits are the render paths in `VoteStatusMessage.tsx` and the members dashboard voting
+page, every one describing what is shown WHEN a vote closes rather than stating that this one
+has. So the vote is treated as OPEN and nothing was merged.
+
+The branch ref trap bit in the classic form: local `master` stale at `dbc5a8a` against a real tip
+of `37db045`, with `HEAD` detached AT that tip. Checked in the form READ TWENTY-SECOND
+prescribes, local side the NAMED BRANCH and not `HEAD`, and repaired with
+`git checkout -B master HEAD` BEFORE committing, per READ SIXTY-FOURTH's addendum rather than
+READ NINTH's conditional repair. After the repair `git status` reports ahead of `origin/master`
+by 32, which is the stale remote-tracking cache talking, per READ TWENTY-SIXTH. Do not act on it.
+
+VERIFICATION AND DISCLOSURE
+No code changed in this diff, so `npx tsc --noEmit` and `flutter analyze` have nothing to read:
+the only file touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH.
+No adversarial audit was run, recorded as a departure rather than glossed, on the call READ
+SIXTY-FOURTH through READ NINETY-THIRD each made for the identical case: this diff carries no
+diagnosis of a Sentry issue, no mechanism of its own and no code. Its factual claims are the
+three durations, which are arithmetic over timestamps printed above, and a characterization of
+`37db045` taken from that commit's own message in this public repo's log, both checkable without
+an auditor.
+
+This repo is public and the sibling is private. Named above: the commits `dbc5a8a`, `37db045`
+and `aa2d513`, the last being the private sibling's tip whose cover is prior publication in READ
+SIXTIETH; the branch prefix `sentry-fix/`; the files `auto_inferred_assignments_service.dart` and
+`vote_detail_screen.dart`, both committed here, and `VoteStatusMessage.tsx` with the members
+dashboard voting page named by role rather than by path, both in the private sibling and both
+published in READ SEVENTY-FIRST; the file `tsconfig.json` and the directory
+`supabase/functions`, both published here since READ ELEVENTH; the git commands and ref names;
+the shell command `date -u`; the verification commands `npx tsc --noEmit` and `flutter analyze`;
+the product names Sentry, Zoom, Deno and n8n, every one already published in this file; and the
+env var name patterns `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN`. Everything else
+already appears in this file or is committed in this public repo's own tree.
+
+Deliberately WITHHELD from the account of `37db045`, though all of it is already public in this
+repo's own commit log, because the finding survives without it and READ SIXTH's practice is to
+publish only what the finding needs: the n8n webhook path, the HMAC construction the signature
+covers, the two header names, the two constant names, the deployed version numbers, the column
+and key names, and the meeting dates. The two Zoom-side function names are likewise described by
+role rather than named. All three reports are named by subject line only, which is this loop's
+own published convention, and no transport, credential or container tooling is described, which
+READ EIGHTEENTH records as a BLOCKER class. No log content is quoted, because none was readable.
+Quantities are the clock values, the three report ages, the blind-since duration, the thirty-one
+run count, the branch count, the commit distance and the three stranded meetings, all bare and
+naming nothing. Withheld per the practice READ SIXTH set: the state of the live endorsement vote,
+and any operational read on production sessions.
