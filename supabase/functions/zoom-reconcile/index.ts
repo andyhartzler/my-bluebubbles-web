@@ -25,8 +25,18 @@
 // CST in winter — pg_cron on Supabase schedules in UTC only). Deployed WITH
 // JWT verification (default), so only service-role callers can trigger it.
 //
-// Optional POST body: { "days": 7, "dry_run": false }
-//   dry_run lists misses without replaying or alerting.
+// Optional POST body: { "days": 7, "dry_run": false, "force_uuids": [] }
+//   dry_run     lists misses without replaying or alerting.
+//   force_uuids replays those specific Zoom occurrence UUIDs even though
+//               public.meetings already knows them. Added 2026-08-20 for rows
+//               that carry a uuid (so the normal diff skips them) but whose n8n
+//               enrichment never landed — the 401-on-missing-signature class of
+//               failure fixed in zoom-webhook v38, which left three Executive
+//               Committee rows with a recording_url and nothing else while
+//               reading processing_status='completed'. A forced uuid still has
+//               to appear in the Zoom listing for the chosen window, so widen
+//               `days` to cover it; any that Zoom does not return come back in
+//               `force_uuids_not_found` rather than being silently dropped.
 //
 // Env required:
 //   ZOOM_RECORDINGS_CLIENT_ID / _SECRET / _ACCOUNT_ID  (preferred; proven scopes:
@@ -165,16 +175,21 @@ serve(async (req) => {
   const startedAt = new Date().toISOString();
   let days = 7;
   let dryRun = false;
+  let forceUuids = new Set<string>();
   try {
     const body = await req.json().catch(() => ({}));
     if (Number.isFinite(Number(body?.days)) && Number(body.days) > 0 && Number(body.days) <= 30) {
       days = Math.floor(Number(body.days));
     }
     dryRun = body?.dry_run === true;
+    if (Array.isArray(body?.force_uuids)) {
+      forceUuids = new Set(body.force_uuids.map((u: unknown) => String(u)).filter((u: string) => u.length > 0));
+    }
   } catch (_) { /* defaults */ }
 
   const errors: string[] = [];
-  const replayed: { id: string; topic: string; status?: number }[] = [];
+  const replayed: { id: string; topic: string; status?: number; forced?: boolean }[] = [];
+  const forcedSeen = new Set<string>();
   let recordings: any[] = [];
 
   try {
@@ -220,16 +235,20 @@ serve(async (req) => {
         errors.push(`recording ${id} (${m.topic}) missing uuid — cannot reconcile`);
         continue;
       }
-      if (known.has(uuid) || seen.has(uuid)) continue;
+      const forced = forceUuids.has(uuid);
+      if (forced) forcedSeen.add(uuid);
+      // A forced uuid overrides the "already known" skip and nothing else. The
+      // per-run `seen` dedupe still applies, so one occurrence is replayed once.
+      if ((known.has(uuid) && !forced) || seen.has(uuid)) continue;
       seen.add(uuid);
-      console.log(`[zoom-reconcile] MISS zoom_meeting_uuid=${uuid} id=${id} topic=${m.topic} start=${m.start_time}`);
+      console.log(`[zoom-reconcile] ${forced ? 'FORCED' : 'MISS'} zoom_meeting_uuid=${uuid} id=${id} topic=${m.topic} start=${m.start_time}`);
       if (dryRun) {
-        replayed.push({ id, topic: m.topic });
+        replayed.push({ id, topic: m.topic, forced });
         continue;
       }
       try {
         const r = await replayToZoomWebhook(m, accountId);
-        replayed.push({ id, topic: m.topic, status: r.status });
+        replayed.push({ id, topic: m.topic, status: r.status, forced });
         if (r.status !== 200) errors.push(`replay ${id} (${m.topic}) → HTTP ${r.status}: ${r.text}`);
       } catch (e) {
         errors.push(`replay ${id} (${m.topic}) threw: ${String(e?.message || e)}`);
@@ -239,11 +258,21 @@ serve(async (req) => {
     errors.push(String(e?.message || e));
   }
 
+  // A forced uuid Zoom did not return is a requested replay that did NOT happen.
+  // Surface it as an error rather than returning 200 on a silent no-op, which is
+  // the exact failure shape this function exists to catch.
+  const forceNotFound = [...forceUuids].filter((u) => !forcedSeen.has(u));
+  for (const u of forceNotFound) {
+    errors.push(`force_uuid ${u} not present in Zoom recordings for the last ${days} day(s) — not replayed`);
+  }
+
   const result = {
     started_at: startedAt,
     window_days: days,
     dry_run: dryRun,
     zoom_recordings_found: recordings.length,
+    force_uuids_requested: [...forceUuids],
+    force_uuids_not_found: forceNotFound,
     misses_replayed: replayed,
     errors
   };
