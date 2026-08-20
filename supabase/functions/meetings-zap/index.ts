@@ -1151,8 +1151,42 @@ serve(async (req)=>{
       finalParticipants = await fetchZoomParticipants(payload.meeting_id);
       finalParticipants = filterIgnoredAttendees(finalParticipants);
     }
-    const uniqueParticipants = deduplicateParticipants(finalParticipants);
+    let uniqueParticipants = deduplicateParticipants(finalParticipants);
     console.log(`Unique attendees after deduplication: ${uniqueParticipants.length}`);
+    // OCCURRENCE WINDOW GUARD. Zoom's /past_meetings/{id}/participants endpoint
+    // takes the NUMERIC meeting id, and for a recurring meeting that returns the
+    // LATEST occurrence's participants regardless of which occurrence is being
+    // processed. Both callers hit this: the n8n leg fetches by numeric id and
+    // sends the result in the payload, and the fallback above does the same.
+    //
+    // Observed 2026-08-20 replaying the 2026-07-22 Executive Committee meeting:
+    // four attendees were written onto it whose first_join_time was 2026-08-12,
+    // i.e. the 08-12 occurrence's attendees attributed to a meeting three weeks
+    // earlier. That meeting genuinely had none.
+    //
+    // Somebody who joined outside this meeting's own time window cannot be an
+    // attendee of it. Anything with no join time is kept, because absence of a
+    // timestamp is not evidence of the wrong occurrence.
+    if (meetingStartTime) {
+      const startMs = new Date(meetingStartTime).getTime();
+      const SLACK_MS = 60 * 60 * 1000;
+      const windowStart = startMs - SLACK_MS;
+      const windowEnd = startMs + (meetingDuration > 0 ? meetingDuration : 0) * 60 * 1000 + SLACK_MS;
+      const before = uniqueParticipants.length;
+      uniqueParticipants = uniqueParticipants.filter((p)=>{
+        if (!p.firstJoin) return true;
+        const joinMs = new Date(p.firstJoin).getTime();
+        if (!Number.isFinite(joinMs)) return true;
+        const inWindow = joinMs >= windowStart && joinMs <= windowEnd;
+        if (!inWindow) {
+          console.log(`Dropping out-of-window attendee ${p.name}: joined ${p.firstJoin}, meeting starts ${meetingStartTime}`);
+        }
+        return inWindow;
+      });
+      if (before !== uniqueParticipants.length) {
+        console.log(`Occurrence window guard dropped ${before - uniqueParticipants.length} attendee(s) from another occurrence`);
+      }
+    }
     // HOST IDENTIFICATION WITH AUTO-ADD TO PARTICIPANTS
     let meetingHostMemberId = null;
     let meetingHostName = null;
