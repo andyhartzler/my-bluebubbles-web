@@ -393,14 +393,43 @@ async function runLegASummary(obj: any, meetingId: string, meetingUuid: string, 
 // body so n8n's existing "Zoom New Recording" / summary Code nodes see exactly
 // what Zoom would have sent. Non-2xx or network failure → alert (the n8n
 // pipeline does the enrichment: Google Doc, minutes, Notion, attendance).
-function forwardToN8n(event: string, rawBody: string, topic?: string, zoomMeetingId?: string) {
+// THE SIGNATURE HEADERS MUST BE FORWARDED. This is what broke the pipeline.
+//
+// Both n8n workflows verify the Zoom signature themselves and answer
+// `401 missing Zoom signature` without them. This function used to send only
+// Content-Type and User-Agent, so every fan-out was refused, and because the fan
+// out is fire-and-forget the relay still answered Zoom 200 and still wrote the
+// minimal row. The result was a meetings row with a recording and nothing else:
+// no transcript, no minutes, no recap, and processing_status reading 'completed'.
+// Three executive meetings landed that way (2026-07-22, 07-29, 08-12).
+//
+// Forwarding the ORIGINAL headers is correct rather than re-signing. The signature
+// is an HMAC over `v0:{timestamp}:{rawBody}` with ZOOM_WEBHOOK_SECRET_TOKEN, and
+// this function forwards that same rawBody byte for byte, so the original pair
+// still verifies downstream. It also keeps one signer: zoom-reconcile already
+// signs its replays with the same secret, so replayed events carry a valid pair
+// too and take the identical path as organic ones.
+//
+// Verified against the running n8n before and after: an unsigned POST to
+// /webhook/zoom/recording-completed answers 401 missing Zoom signature, which is
+// exactly what the relay was sending.
+function forwardToN8n(
+  event: string,
+  rawBody: string,
+  zoomSignature: string,
+  zoomTimestamp: string,
+  topic?: string,
+  zoomMeetingId?: string,
+) {
   const path = event === 'meeting.summary_completed' ? 'meeting-summary' : 'recording-completed';
   const url = `${N8N_FORWARD_BASE}/${path}`;
   background(fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'User-Agent': FANOUT_USER_AGENT
+      'User-Agent': FANOUT_USER_AGENT,
+      'x-zm-signature': zoomSignature,
+      'x-zm-request-timestamp': zoomTimestamp
     },
     body: rawBody
   }).then(async (r) => {
@@ -444,9 +473,14 @@ serve(async (req) => {
   }
 
   // 2. Signature verification (Zoom signs every request). Skip if no secret configured.
+  //
+  // Read OUTSIDE the `if (secretToken)` block on purpose. The n8n fan-out below
+  // forwards this pair verbatim, and its call sites are outside this block, so
+  // declaring them inside it puts them out of scope there and every event throws
+  // a ReferenceError before the fan-out can run.
+  const ts = req.headers.get('x-zm-request-timestamp') || '';
+  const sig = req.headers.get('x-zm-signature') || '';
   if (secretToken) {
-    const ts = req.headers.get('x-zm-request-timestamp') || '';
-    const sig = req.headers.get('x-zm-signature') || '';
     const message = `v0:${ts}:${rawBody}`;
     const computed = `v0=${await hmacSha256Hex(secretToken, message)}`;
     if (!sig || sig !== computed) {
@@ -495,7 +529,7 @@ serve(async (req) => {
       background(runLegARecording(obj, meetingId, meetingUuid, event));
 
       // STEP 3 — leg B: fan out original event to n8n for enrichment.
-      if (!skipN8n) forwardToN8n(event, rawBody, topic, meetingId);
+      if (!skipN8n) forwardToN8n(event, rawBody, sig, ts, topic, meetingId);
 
       return json(200, {
         received: event,
@@ -530,7 +564,7 @@ serve(async (req) => {
         }
         background(runLegASummary(obj, meetingId, meetingUuid, event));
       }
-      if (!skipN8n) forwardToN8n(event, rawBody, topic, meetingId);
+      if (!skipN8n) forwardToN8n(event, rawBody, sig, ts, topic, meetingId);
 
       return json(200, {
         received: event,
