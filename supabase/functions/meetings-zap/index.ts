@@ -1260,12 +1260,42 @@ serve(async (req)=>{
       }, { onConflict: 'zoom_meeting_uuid' }).select().single());
     } else {
       // Legacy caller without a per-occurrence UUID (current n8n leg B).
-      const { data: existing } = await supabaseClient.from('meetings')
-        .select('id')
-        .eq('zoom_meeting_id', zoomMeetingId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      //
+      // Match the OCCURRENCE by numeric id + start time first. The payload
+      // always carries start_time, and meetings.meeting_date is written from
+      // that same value, so for a recurring meeting the pair identifies the
+      // occurrence exactly even though the numeric id does not.
+      //
+      // The most-recently-created fallback below is only correct when the row
+      // the relay just created IS the occurrence being enriched, which holds
+      // for a live meeting and FAILS for a replay of an older one. Observed
+      // 2026-08-20: replaying the 2026-07-29 Executive Committee meeting sent
+      // its enrichment to the 2026-08-12 row, because 08-12 was the most
+      // recently created row for numeric id 99334786595. That overwrote a
+      // correct 08-12 record and left 07-29 still stranded.
+      let existing = null;
+      if (meetingStartTime) {
+        const { data: byStart } = await supabaseClient.from('meetings')
+          .select('id')
+          .eq('zoom_meeting_id', zoomMeetingId)
+          .eq('meeting_date', meetingStartTime)
+          .limit(1)
+          .maybeSingle();
+        if (byStart) {
+          existing = byStart;
+          console.log(`Matched occurrence by zoom_meeting_id + start_time: ${byStart.id}`);
+        }
+      }
+      if (!existing) {
+        const { data: byRecent } = await supabaseClient.from('meetings')
+          .select('id')
+          .eq('zoom_meeting_id', zoomMeetingId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        existing = byRecent;
+        if (byRecent) console.log(`Fell back to most-recently-created row: ${byRecent.id}`);
+      }
       if (existing) {
         ({ data: meeting, error: meetingError } = await supabaseClient.from('meetings')
           .update(meetingFields).eq('id', existing.id).select().single());
