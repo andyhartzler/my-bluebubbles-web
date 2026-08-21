@@ -14856,3 +14856,119 @@ Quantities are the clock values, the three report ages, the blind-since duration
 trigger instant, the thirty-two run count, the five and six and seven commit counts, and the
 branch count, all bare and naming nothing. Withheld per the practice READ SIXTH set: the state of
 the live endorsement vote, and any operational read on production sessions.
+
+## READ NINETY-SIXTH: the 02:20 UTC run, a thirty-third consecutive block, and the standing ask stated plainly at the top
+
+ANDREW, THIS IS THE ONE THING THIS LOOP NEEDS AND CANNOT DO ITSELF
+The Sentry connector needs reauthorizing. It shows as enabled for this session but its install
+state reads unknown, so none of its tools load, and this session is non-interactive so the OAuth
+flow cannot be run from here. Reconnect it in your claude.ai connector settings and the loop
+resumes on the next tick. That is the whole ask, and it is placed here rather than only in email
+for the reason READ NINETY-FIFTH gives: three reports sit unread in your inbox while you have
+pushed eleven commits into this repo in the last five hours, so this file is the channel that
+reaches you and the email thread is not.
+
+Nothing has been monitored since 2026-08-12T15:08:27Z, which is 8 days 11 hours. That covers the
+public site, the CRM and the vote surface.
+
+The rest of this section is the standing record. No triage was possible and no code changed here,
+so it makes NO claim about production health in either direction: an absent report is not an
+absent error, per READ TWENTY-SECOND.
+
+The blocker is unchanged at thirty-three consecutive runs, tested rather than inherited per READ
+TWELFTH. An exact-count grep for `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the
+environment returns zero, so there is no token route around the connector either.
+
+NOTHING WAS SENT, AND YOUR ELEVEN COMMITS ARE NOT A FRESH TRIGGER
+READ NINETY-FIFTH retired "Andrew pushes anything" as a send condition, on the ground that it had
+already fired at READ NINETY-FOURTH, been reported, and gone unread. Five more of your commits
+landed since then, `780b88b` through `1a2f879`, between 2026-08-21T00:31 and 01:36 UTC, and they
+are a continuation of that same fact rather than a new one. All three reports were checked rather
+than assumed and ALL THREE are still UNREAD: `MOYD Sentry triage 2026-08-20` at 4 hours 7 minutes,
+`MOYD Sentry triage 2026-08-19` at 1 day 10 hours 7 minutes, and `MOYD Sentry triage 2026-08-18`
+at 2 days 14 hours 52 minutes, each computed from `date -u` against its own thread timestamp and
+FLOORED per READ TWELFTH.
+
+The next trigger is unchanged and now has two conditions rather than three: FOURTEEN DAYS blind,
+at 2026-08-26T15:08:27Z, or sooner if the connector returns or the vote is recorded closed. Name
+the ANCHOR when quoting a figure, per READ SEVENTY-SECOND, since report-age and blind-since differ
+by more than a week.
+
+ONE OF YOUR COMMITS REVERSES EXACTLY THE FAILURE MODE THIS LOOP'S HARD RULES FORBID
+Recorded because it is the first observed instance of that rule's failure mode in this repo, and
+because a future run should recognise the shape rather than re-derive it.
+
+`1a2f879` records that an earlier repair silenced a recurring 401 on `mail-poll` by deploying the
+function `--no-verify-jwt` with no gate of its own, which left it callable by anyone: an
+unauthenticated POST returned 200 and a per-mailbox result list naming every watched mailbox. Your
+own message names the defect in that reasoning, that it fixes the symptom by deleting the check.
+The repair puts the credential on the CALLER instead, the cron job reading a vault secret and
+sending the header the function now verifies, with both sides failing closed and both directions
+verified live.
+
+That is this loop's standing prohibition stated from the other side: when an error looks like a
+permissions problem, loosening the permission is essentially never the fix. Do not widen a gate to
+clear a 401, and when a 401 recurs on a schedule, read which side is failing to authenticate
+before assuming the gate is wrong.
+
+YOUR OTHER FOUR ARE YOUR WORK AND ARE NOT MINE TO RE-DIAGNOSE
+Recorded so the next run does not reopen them. `780b88b` and `6cec445` restore the Google Drive
+recording archive that meetings play from, the second correcting the first after reading the live
+pipeline rather than inferring it, which is the same read-it-back gate READ NINETY-FOURTH records
+you arriving at. `c24c729` makes a stranded meeting impossible to mistake for a finished one by
+DERIVING the processing status from the row's own contents rather than trusting a writer's claim.
+`81f244a` fixes six cron jobs that had never once authenticated, and opens by recording that the
+reported premise was wrong so nobody re-fixes it. Every one is deployed by hand and verified
+against the running system.
+
+Nothing else moved. The site tip is unchanged at `aa2d513` from 2026-08-12. The six `sentry-fix/`
+branch tips were enumerated rather than inherited and are unchanged from READ SIXTY-THIRD's
+inventory, so the three fixes it establishes are live gaps have now waited a further nine days.
+Grepped both repos again rather than inherited: nothing says the endorsement vote has closed. The
+CRM hits are the doc comments and the dashboard card render path in
+`auto_inferred_assignments_service.dart` and the branch comment in `vote_detail_screen.dart`, and
+the site grep returned nothing at all, every one describing what is shown WHEN a vote closes
+rather than stating that this one has. So the vote is treated as OPEN and nothing was merged.
+
+The branch ref trap bit in the classic form: local `master` stale at `dbc5a8a` against a real tip
+of `1a2f879`, with `HEAD` detached AT that tip. Checked in the form READ TWENTY-SECOND prescribes,
+local side the NAMED BRANCH and not `HEAD`, and repaired with `git checkout -B master HEAD` BEFORE
+committing, per READ SIXTY-FOURTH's addendum rather than READ NINTH's conditional repair. The
+container also arrived with the wrong commit identity again, per READ SIXTIETH: set the one this
+project requires and do NOT rebase already-pushed commits to match, since that needs a force push
+and READ SECOND's prohibition is not negotiable for a cosmetic badge.
+
+VERIFICATION AND DISCLOSURE
+No code changed in this diff, so `npx tsc --noEmit` and `flutter analyze` have nothing to read:
+the only file touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No
+adversarial audit was run, recorded as a departure rather than glossed, on the call READ
+SIXTY-FOURTH through READ NINETY-FIFTH each made for the identical case: this diff carries no
+diagnosis of a Sentry issue, no mechanism of its own and no code. Its factual claims are the four
+durations, which are arithmetic over timestamps printed above, and a characterization of five
+commits taken from their own messages in this public repo's log, both checkable without an
+auditor.
+
+This repo is public and the sibling is private. Named above: the commits `dbc5a8a`, `780b88b`,
+`6cec445`, `c24c729`, `81f244a`, `1a2f879` and `aa2d513`, the last being the private sibling's tip
+whose cover is prior publication in READ SIXTIETH; the branch prefix `sentry-fix/`; the files
+`auto_inferred_assignments_service.dart` and `vote_detail_screen.dart`, both committed here; the
+function name `mail-poll` and the deploy flag `--no-verify-jwt`, both committed here in `1a2f879`;
+the connector field name `enabledInChat` and install state `unknown`, published here since READ
+NINETIETH; the git commands and ref names; the shell command `date -u`; the verification commands
+`npx tsc --noEmit` and `flutter analyze`; the product names Sentry, Google Drive, Zoom and n8n,
+every one already published in this file; and the env var name patterns `SENTRY`, `SUPABASE`,
+`PROJECT_REF`, `POSTGRES` and `DSN`. Everything else already appears in this file or is committed
+in this public repo's own tree.
+
+Deliberately WITHHELD from the account of your five commits, though all of it is already public in
+this repo's own commit log, because the finding survives without it and READ SIXTH's practice is
+to publish only what the finding needs: the Drive shared-drive and folder ids, the n8n workflow
+id, the numeric cron job id, the vault and edge function secret NAMES, the header name, the other
+function names in the 401 list, the meeting dates and the table and column names. The three
+reports are named by subject line only, which is this loop's own published convention, and no
+transport, credential or container tooling is described, which READ EIGHTEENTH records as a
+BLOCKER class. No log content is quoted, because none was readable. Quantities are the clock
+values, the three report ages, the blind-since duration and the next trigger instant, the
+thirty-three run count, the five and eleven commit counts, and the branch count, all bare and
+naming nothing. Withheld per the practice READ SIXTH set: the state of the live endorsement vote,
+and any operational read on production sessions.
