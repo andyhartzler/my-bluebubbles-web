@@ -22,8 +22,12 @@
 //      archive-meeting-recording, which is what makes it playable in the CRM.
 //      See the block above archiveStrandedRecordings for why this lives here
 //      and not in zoom-webhook. Bounded to ARCHIVE_MAX_PER_RUN per run.
-//   5. Sends a Telegram summary ONLY when it replayed misses, archived a
-//      recording, or hit errors. Fully reconciled days are silent.
+//   5. Sweeps for INCOMPLETE rows, not just missing ones. See the block above
+//      sweepStuckMeetings. This is the leg that would have caught the three
+//      stranded Executive Committee meetings on day one.
+//   6. Sends a Telegram summary ONLY when it replayed misses, archived a
+//      recording, newly found a stuck meeting, or hit errors. Fully reconciled
+//      days are silent.
 //
 // Invocation: pg_cron job `zoom-reconcile-daily` (see cron.job) calls this via
 // net.http_post daily at 12:00 UTC (07:00 America/Chicago during DST, 06:00
@@ -240,6 +244,102 @@ async function archiveStrandedRecordings(
   return done;
 }
 
+// ==================== stuck-meeting sweep ====================
+// The diff above answers "does a row exist for this recording". That question
+// read TRUE for the three Executive Committee meetings (2026-07-22, 07-29,
+// 08-12) that carried a recording and nothing else for a month, so this function
+// reported a clean reconcile every single day while the pipeline was broken.
+// Row EXISTENCE is not row COMPLETENESS, and diffing only on existence is the
+// third of the three defects that let that hide.
+//
+// So: a meeting older than the grace period, with no transcript AND no recap
+// AND no recorded processing_error, is STUCK. Since 20260821_01 that is exactly
+// the set reading processing_status='recorded' or 'received', because the status
+// is derived from the row rather than claimed by a writer — but the predicate is
+// written out against the underlying columns here on purpose, so this sweep
+// does not depend on the trigger being present to be correct.
+//
+// GRACE PERIOD, chosen deliberately. Enrichment is not instant: n8n waits on
+// Zoom's transcript, then generates minutes, then uploads the recording to
+// Drive. On the observed live path that lands within roughly an hour of the
+// recording completing. Six hours is comfortably past that and still catches a
+// failure the same day, before the next meeting.
+//
+// ALERT ONCE PER STUCK MEETING, NOT ONCE PER SWEEP. This is the project rule
+// learned the hard way: judge ENTITIES, not EVENTS. A watchdog that re-reports
+// the same meeting every night trains its reader to ignore it and burns quota
+// (96 percent of Sentry's, once). meetings.stuck_alerted_at is the latch: set
+// on first report, and cleared by the derive trigger the moment the row reaches
+// 'completed', so a meeting that is repaired and later regresses can alert
+// again. Already-alerted meetings are still returned in the JSON result for
+// anyone reading it, they just do not raise a new Telegram message.
+const STUCK_GRACE_HOURS = 6;
+const STUCK_MAX_REPORTED = 50;
+
+type StuckMeeting = {
+  id: string;
+  title: string;
+  meeting_date: string;
+  zoom_meeting_uuid: string | null;
+  has_recording: boolean;
+  status: string | null;
+  already_alerted: boolean;
+};
+
+async function sweepStuckMeetings(
+  supabase: ReturnType<typeof createClient>,
+  errors: string[],
+  dryRun: boolean,
+): Promise<{ stuck: StuckMeeting[]; newlyStuck: StuckMeeting[] }> {
+  const cutoff = new Date(Date.now() - STUCK_GRACE_HOURS * 60 * 60 * 1000).toISOString();
+  // Explicit limit: a bare select() silently caps at 1000 rows, and an invisible
+  // cap on a growing table is the same class of bug this whole function exists
+  // to prevent. 50 stuck meetings at once is already a pipeline-wide outage.
+  const { data, error } = await supabase
+    .from('meetings')
+    .select('id, meeting_title, meeting_date, zoom_meeting_uuid, recording_url, processing_status, stuck_alerted_at')
+    .lt('meeting_date', cutoff)
+    .is('transcript_file_path', null)
+    .is('executive_recap', null)
+    .is('processing_error', null)
+    .order('meeting_date', { ascending: false })
+    .limit(STUCK_MAX_REPORTED);
+  if (error) {
+    errors.push(`stuck-sweep lookup failed: ${error.message}`);
+    return { stuck: [], newlyStuck: [] };
+  }
+
+  const stuck: StuckMeeting[] = (data || []).map((r: any) => ({
+    id: String(r.id),
+    title: r.meeting_title,
+    meeting_date: r.meeting_date,
+    zoom_meeting_uuid: r.zoom_meeting_uuid ?? null,
+    has_recording: r.recording_url != null,
+    status: r.processing_status ?? null,
+    already_alerted: r.stuck_alerted_at != null,
+  }));
+  const newlyStuck = stuck.filter((m) => !m.already_alerted);
+
+  // Stamp the latch BEFORE the Telegram send would happen, so a Telegram outage
+  // cannot turn one stuck meeting into a nightly repeat. The cost of that
+  // ordering is a missed first alert if Telegram is down; the JSON result and
+  // the row itself both still carry it, and a repeating alarm is the failure
+  // mode that actually destroyed a monitor here.
+  if (!dryRun && newlyStuck.length > 0) {
+    const now = new Date().toISOString();
+    const { error: stampError } = await supabase
+      .from('meetings')
+      .update({ stuck_alerted_at: now })
+      .in('id', newlyStuck.map((m) => m.id));
+    if (stampError) errors.push(`stuck-sweep latch update failed: ${stampError.message}`);
+  }
+
+  for (const m of newlyStuck) {
+    console.log(`[zoom-reconcile] STUCK id=${m.id} uuid=${m.zoom_meeting_uuid} date=${m.meeting_date} status=${m.status} topic=${m.title}`);
+  }
+  return { stuck, newlyStuck };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -264,6 +364,17 @@ serve(async (req) => {
   const forcedSeen = new Set<string>();
   let recordings: any[] = [];
   let driveArchived: { meeting_id: string; title: string; status: number; detail: string }[] = [];
+  let stuck: StuckMeeting[] = [];
+  let newlyStuck: StuckMeeting[] = [];
+
+  // Built OUTSIDE the try on purpose. The stuck sweep below needs only the
+  // database, so a Zoom OAuth or listing failure must not blind the
+  // completeness check as well as the existence check.
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
 
   try {
     const accountId = Deno.env.get('ZOOM_RECORDINGS_ACCOUNT_ID') || Deno.env.get('ZOOM_ACCOUNT_ID') || '';
@@ -274,12 +385,6 @@ serve(async (req) => {
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
     recordings = await listRecordings(token, me.id, fmt(from), fmt(to));
     console.log(`[zoom-reconcile] zoom reports ${recordings.length} cloud recording(s) ${fmt(from)}..${fmt(to)}`);
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
 
     // Diff on the per-occurrence Zoom UUID, not the numeric meeting id. Recurring
     // meetings reuse one numeric id for every occurrence; only the uuid is unique
@@ -338,6 +443,17 @@ serve(async (req) => {
     errors.push(String(e?.message || e));
   }
 
+  // Runs regardless of whether the Zoom half above succeeded, per the comment on
+  // the client construction. A row that is present but empty is invisible to the
+  // diff by construction, so this is the only leg that can see it.
+  try {
+    const swept = await sweepStuckMeetings(supabase, errors, dryRun);
+    stuck = swept.stuck;
+    newlyStuck = swept.newlyStuck;
+  } catch (e) {
+    errors.push(`stuck-sweep threw: ${String(e?.message || e)}`);
+  }
+
   // A forced uuid Zoom did not return is a requested replay that did NOT happen.
   // Surface it as an error rather than returning 200 on a silent no-op, which is
   // the exact failure shape this function exists to catch.
@@ -355,21 +471,35 @@ serve(async (req) => {
     force_uuids_not_found: forceNotFound,
     misses_replayed: replayed,
     drive_archived: driveArchived,
+    stuck_grace_hours: STUCK_GRACE_HOURS,
+    stuck_meetings: stuck,
+    stuck_meetings_new: newlyStuck.map((m) => m.id),
     errors
   };
   console.log('[zoom-reconcile] result:', JSON.stringify(result));
 
   // Telegram ONLY when something happened — silent when fully reconciled.
-  if (!dryRun && (replayed.length > 0 || driveArchived.length > 0 || errors.length > 0)) {
+  // newlyStuck rather than stuck: a meeting already reported stays in the JSON
+  // result and out of the alert, which is what makes this a per-entity watchdog
+  // instead of a nightly repeat.
+  if (!dryRun && (replayed.length > 0 || driveArchived.length > 0 || newlyStuck.length > 0 || errors.length > 0)) {
     const lines = [
-      replayed.length > 0
-        ? '🔁 Zoom reconcile: replayed missing meetings'
-        : (driveArchived.length > 0 ? '🎬 Zoom reconcile: archived recordings to Drive' : '⚠️ Zoom reconcile ran with errors'),
+      newlyStuck.length > 0
+        ? '🛑 Zoom reconcile: meeting stuck without minutes'
+        : (replayed.length > 0
+          ? '🔁 Zoom reconcile: replayed missing meetings'
+          : (driveArchived.length > 0 ? '🎬 Zoom reconcile: archived recordings to Drive' : '⚠️ Zoom reconcile ran with errors')),
       `Window: last ${days} day(s), ${recordings.length} cloud recording(s)`,
+      ...newlyStuck.map((m) =>
+        `🛑 no transcript and no recap ${STUCK_GRACE_HOURS}h+ after ${String(m.meeting_date).slice(0, 16)}: ${m.title}`
+        + ` (status=${m.status}, recording=${m.has_recording ? 'yes' : 'no'}, uuid=${m.zoom_meeting_uuid ?? 'none'})`),
       ...replayed.map((r) => `• ${r.topic} (${r.id}) → ${r.status ?? 'dry-run'}`),
       ...driveArchived.map((d) => `🎬 archived to Drive: ${d.title} → ${d.status}`),
       ...errors.map((e) => `❌ ${e}`)
     ];
+    if (stuck.length > newlyStuck.length) {
+      lines.push(`(${stuck.length - newlyStuck.length} more still stuck, already reported)`);
+    }
     await sendTelegram(lines.join('\n').slice(0, 4000));
   }
 
