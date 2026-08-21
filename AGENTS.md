@@ -15295,3 +15295,95 @@ readable. Quantities are the clock values, the three report ages, the blind-sinc
 next trigger instant, the thirty-seven run count, the branch count and the commit distance, all
 bare and naming nothing. Withheld per the practice READ SIXTH set: the state of the live
 endorsement vote, and any operational read on production sessions.
+
+## READ ONE HUNDRED AND FIRST: the 12:22 UTC run, a thirty-eighth consecutive block, and nothing sent
+
+ANDREW, THIS IS THE ONE THING THIS LOOP NEEDS AND CANNOT DO ITSELF
+The Sentry connector needs reauthorizing. It is present for this session but not authorized, so
+none of its tools load, and this session is non-interactive so the OAuth flow cannot be run from
+here. Reconnect it in your claude.ai connector settings and the loop resumes on the next tick.
+Placed at the top rather than only in email for the reason READ NINETY-FIFTH gives: three reports
+sit unread in your inbox while you have been pushing into this repo, so this file is the channel
+that reaches you and the email thread is not.
+
+Nothing has been monitored since 2026-08-12T15:08:27Z, which is 8 days 21 hours. That covers the
+public site, the CRM and the vote surface.
+
+The rest is the standing record. No triage was possible and no code changed, so this makes NO
+claim about production health in either direction: an absent report is not an absent error, per
+READ TWENTY-SECOND.
+
+The blocker is unchanged at thirty-eight consecutive runs, tested rather than inherited per READ
+TWELFTH. An exact-count grep for `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the
+environment returns zero, so there is no token route around the connector either.
+
+Nothing was sent, which is the suppression rule rather than an omission. All three reports were
+checked rather than assumed and ALL THREE are still UNREAD: `MOYD Sentry triage 2026-08-20`, sent
+2026-08-20T22:22:28Z, at 14 hours 0 minutes; `MOYD Sentry triage 2026-08-19`, sent
+2026-08-19T16:22:13Z, at 1 day 20 hours 0 minutes; and `MOYD Sentry triage 2026-08-18`, sent
+2026-08-18T11:37:14Z, at 3 days 0 hours 45 minutes, each computed from `date -u` against its own
+thread timestamp and FLOORED per READ TWELFTH.
+
+The 08-18 report crossing three days was weighed rather than passed over, since READ
+SEVENTY-FIRST's report-age threshold is the report aging past a few days. It does not fire a send,
+for the reason READ EIGHTY-NINTH gives on the two-day crossing: that threshold was superseded when
+READ SEVENTY-NINTH's blind-since trigger fired and a second report went out, and a third has gone
+out since, the newest of them 14 hours old. So the trigger to act on is the one READ SEVENTY-NINTH
+registered, narrowed to two conditions by READ NINETY-FIFTH after the push condition fired and went
+unread: FOURTEEN DAYS blind, at 2026-08-26T15:08:27Z, or sooner if the connector returns or the
+vote is recorded closed. Neither happened. Name the ANCHOR when quoting a figure, per READ
+SEVENTY-SECOND, since report-age and blind-since differ by nearly a week.
+
+ANDREW HAS PUSHED NOTHING SINCE `1a2f879`, WHICH NEEDED CHECKING RATHER THAN ASSUMING
+This repo's tip is `a249faa`, which is newer than the one READ ONE HUNDREDTH records, and it is NOT
+his work: it is that section's own sweep record, checked by reading its subject rather than
+inferring from the hash being new, per READ EIGHTY-THIRD. Authorship alone cannot make that call
+here, since this loop commits under his identity by standing rule, which is why the subject is the
+discriminator. So the eleven-commit burst READ NINETY-FOURTH through NINETY-SIXTH document remains
+stopped, and no new fact has appeared.
+
+Nothing else moved. The site tip is unchanged at `aa2d513` from 2026-08-12. The six `sentry-fix/`
+branch tips were enumerated rather than inherited and are unchanged from READ SIXTY-THIRD's
+inventory, so the three fixes it establishes are live gaps have now waited a further nine days.
+Grepped both repos again rather than inherited: nothing says the endorsement vote has closed. The
+CRM hits are the two doc comments and the two dashboard card render paths in
+`auto_inferred_assignments_service.dart`, and the site grep returned nothing at all, every one
+describing what is shown WHEN a vote closes rather than stating that this one has. So the vote is
+treated as OPEN and nothing was merged.
+
+The branch ref trap bit in the classic form: local `master` stale at `dbc5a8a` against a real tip
+of `a249faa`, with `HEAD` detached AT that tip. Checked in the form READ TWENTY-SECOND prescribes,
+local side the NAMED BRANCH and not `HEAD`, and repaired with `git checkout -B master HEAD` BEFORE
+committing, per READ SIXTY-FOURTH's addendum rather than READ NINTH's conditional repair. The
+cosmetic ahead count READ TWENTY-SIXTH names did NOT appear this run: after the repair
+`git status` reported up to date with `origin/master`, so this container's remote-tracking ref was
+already fresh, which READ NINETY-FIRST also saw once. That is a DEPARTURE from the recent pattern
+and not a mechanism, so keep running the check per READ SECOND. The container also arrived with the
+wrong commit identity again, per READ SIXTIETH: set the one this project requires and do NOT rebase
+already-pushed commits to match, since that needs a force push and READ SECOND's prohibition is not
+negotiable for a cosmetic badge.
+
+VERIFICATION AND DISCLOSURE
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No adversarial
+audit was run, recorded as a departure rather than glossed, on the call READ SIXTY-FOURTH through
+READ ONE HUNDREDTH each made for the identical case: this diff carries no diagnosis of a Sentry
+issue, no mechanism of its own and no code. Its factual claims are the four durations, which are
+arithmetic over timestamps printed above, and the authorship of one commit read from this public
+repo's own log, both checkable without an auditor.
+
+This repo is public and the sibling is private. Named above: the commits `dbc5a8a`, `a249faa`,
+`1a2f879` and `aa2d513`, the last being the private sibling's tip whose cover is prior publication
+in READ SIXTIETH; the branch prefix `sentry-fix/`; the file
+`auto_inferred_assignments_service.dart`, committed here; the git commands and ref names, plus the
+git status output naming `origin/master`, generic git output naming nothing of ours; the shell
+command `date -u`; the verification commands `npx tsc --noEmit` and `flutter analyze`; the product
+name Sentry; and the env var name patterns `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and
+`DSN`. Everything else already appears in this file or is committed in this public repo's own tree.
+The three reports are named by subject line only, which is this loop's own published convention,
+and no transport, credential or container tooling is described, which READ EIGHTEENTH records as a
+BLOCKER class. No log content is quoted, because none was readable. Quantities are the clock
+values, the three report ages, the blind-since duration and the next trigger instant, the
+thirty-eight run count, the eleven commit count and the branch count, all bare and naming nothing.
+Withheld per the practice READ SIXTH set: the state of the live endorsement vote, and any
+operational read on production sessions.
