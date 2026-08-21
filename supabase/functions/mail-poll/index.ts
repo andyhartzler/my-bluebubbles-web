@@ -198,9 +198,38 @@ async function pollOne(
   };
 }
 
+// Shared-secret gate. THIS FUNCTION IS DEPLOYED --no-verify-jwt, so without a gate
+// of its own it is callable by anyone on the internet.
+//
+// It was open. An unauthenticated POST returned 200 and a per-mailbox result list
+// naming every mailbox we watch, which discloses internal addresses and lets a
+// stranger drive Gmail history walks against them on demand.
+//
+// The route here matters. The cron was posting URL-only with no Authorization
+// header at all and taking 401 every five minutes, 288 times a day, for months.
+// Making the function public silences that 401 and is the wrong direction: it
+// fixes the symptom by removing the check. The right fix is to give the CRON a
+// credential, which is what job 87 now does, and to verify it here.
+//
+// x-cron-secret rather than a JWT because pg_cron sends a header it can build from
+// the vault, and because this is the pattern sentry-log-relay and the onboarding
+// jobs already use on this project. The secret lives in vault as cron_secret.
+const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
+
 Deno.serve(async (req) => {
   const _cors = handleCors(req);
   if (_cors) return _cors;
+
+  // Fail CLOSED when the secret is unset. An empty expected value must never
+  // compare equal to an empty supplied header, or the gate silently disappears
+  // the moment the secret goes missing.
+  if (!CRON_SECRET || req.headers.get("x-cron-secret") !== CRON_SECRET) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const sb = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
