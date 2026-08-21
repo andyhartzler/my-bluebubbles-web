@@ -28,7 +28,7 @@ const SUPABASE_SERVICE_ROLE_KEY =
 const corsHeaders = {
   "Access-Control-Allow-Origin": "https://moyd.app",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
 
 // ── Auth helper: validate user JWT + require executive_committee membership ──
@@ -125,12 +125,38 @@ serve(async (req) => {
   }
 
   try {
-    // Staff-gated: caller must hold a valid user JWT + executive_committee=true.
-    const gate = await requireStaffUser(req);
-    if ("error" in gate) return gate.error;
-    const actorId = gate.user.id;
+    // Body is read BEFORE the gate because the cron path below is scoped to a
+    // single action. req.json() may only be called once.
+    const { action, ...params } = await req.json().catch(() => ({} as Record<string, unknown>));
 
-    const { action, ...params } = await req.json();
+    // 2026-08-20: cron path, deliberately NARROW.
+    //
+    // requireStaffUser() calls auth.getUser(), which by design accepts only a
+    // *user* JWT. Job 74 (plaid-daily-sync) posts the service_role key, which
+    // has no `sub`, so GoTrue rejected it and this function answered its own
+    // 401 to every run. Confirmed on the running system: POST | 401 |
+    // .../plaid at 2026-08-20T06:00:01Z. The daily transaction sync has never
+    // completed.
+    //
+    // The x-cron-secret is accepted ONLY for `sync_transactions`, which pulls
+    // transactions from Plaid into our tables. Every other action -- link
+    // tokens, MEC report generation and the rest -- still requires a real
+    // exec user JWT, so this does not widen access to the finance surface
+    // beyond the one job that was already meant to run.
+    const cronSecret = Deno.env.get("CRON_SECRET");
+    const presentedCronSecret = req.headers.get("x-cron-secret") ?? "";
+    const isCron = !!cronSecret &&
+      presentedCronSecret === cronSecret &&
+      action === "sync_transactions";
+
+    let actorId: string | null = null;
+    if (!isCron) {
+      // Staff-gated: caller must hold a valid user JWT + executive_committee=true.
+      const gate = await requireStaffUser(req);
+      if ("error" in gate) return gate.error;
+      actorId = gate.user.id;
+    }
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Fire-and-forget audit log for this action

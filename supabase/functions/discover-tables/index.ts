@@ -8,11 +8,31 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret"
 };
 
 // Wave 2 access-audit 2026-04-24: require staff user JWT.
-async function requireStaffUser(req) {
+//
+// 2026-08-20: added the x-cron-secret path. The gate below calls
+// auth.getUser(), which by design accepts only a *user* JWT; job 29
+// (discover-new-tables, weekly) posts the service_role key, which has no
+// `sub`, so GoTrue rejected it and this function answered its own
+// 401 {"error":"Invalid or expired JWT"} to every run.
+//
+// NOTE: unlike the analyze-bill-local and plaid cases, this one is NOT
+// confirmed against the running system. The job fires 00:00 Sunday, and the
+// last run predates the 24h edge-log retention window, so the evidence here is
+// the source read plus the identical shape. Treat it as very likely rather
+// than proven until a Sunday run is observed.
+async function requireAuthorized(req) {
+  // Path A: cron shared secret
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const presented = req.headers.get("x-cron-secret") ?? "";
+  if (cronSecret && presented && presented === cronSecret) {
+    return { userId: null, actorRole: "service_role" };
+  }
+
+  // Path B: staff user JWT
   const authHeader = req.headers.get("Authorization") ?? "";
   const jwt = authHeader.replace(/^Bearer /i, "").trim();
   if (!jwt) {
@@ -54,7 +74,7 @@ async function requireStaffUser(req) {
       })
     };
   }
-  return { userId: userData.user.id };
+  return { userId: userData.user.id, actorRole: "authenticated" };
 }
 
 serve(async (req)=>{
@@ -63,7 +83,7 @@ serve(async (req)=>{
       headers: corsHeaders
     });
   }
-  const gate = await requireStaffUser(req);
+  const gate = await requireAuthorized(req);
   if ("error" in gate) return gate.error;
   try {
     // Call the discover function
@@ -73,7 +93,7 @@ serve(async (req)=>{
     supabase.from("audit_log").insert({
       action: "EDGE_FN",
       actor_id: gate.userId,
-      actor_role: "authenticated",
+      actor_role: gate.actorRole,
       schema_name: "public",
       table_name: "edge_fn:discover-tables",
       row_id: null,

@@ -14,20 +14,35 @@ const AI_MODEL = "gemma4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
 
 // Wave 2 access-audit 2026-04-24: gate on authenticated user (any member).
 // Bill analysis is expensive (AI calls) but reads-only on the bills table.
-async function requireAuthenticatedUser(req: Request): Promise<
-  | { userId: string }
+//
+// 2026-08-20: added the x-cron-secret path. The gate below calls
+// auth.getUser(), which by design only accepts a *user* JWT: a service_role
+// key has no `sub`, so GoTrue rejects it and this function answered its own
+// 401 {"error":"Invalid or expired JWT"} to every pg_cron tick. Job 78
+// (analyze-bills-local, */5) had therefore never once processed the queue.
+// Same two-path shape as openstates-sync-tracked-bills.
+async function requireAuthorized(req: Request): Promise<
+  | { userId: string | null; actorRole: string }
   | { error: Response }
 > {
+  // Path A: cron shared secret
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const presented = req.headers.get("x-cron-secret") ?? "";
+  if (cronSecret && presented && presented === cronSecret) {
+    return { userId: null, actorRole: "service_role" };
+  }
+
+  // Path B: authenticated user JWT
   const authHeader = req.headers.get("Authorization") ?? "";
   const jwt = authHeader.replace(/^Bearer /i, "").trim();
   if (!jwt) {
     return {
-      error: new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+      error: new Response(JSON.stringify({ error: "Missing Authorization header or x-cron-secret" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }),
@@ -45,7 +60,7 @@ async function requireAuthenticatedUser(req: Request): Promise<
       }),
     };
   }
-  return { userId: userData.user.id };
+  return { userId: userData.user.id, actorRole: "authenticated" };
 }
 
 const ANALYSIS_SYSTEM_PROMPT = `You are a legislative analyst for Missouri Young Democrats (MOYD), a progressive Democratic youth organization focused on empowering young Missourians (ages 14-36) in politics.
@@ -144,9 +159,10 @@ serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const gate = await requireAuthenticatedUser(req);
+  const gate = await requireAuthorized(req);
   if ("error" in gate) return gate.error;
   const actorId = gate.userId;
+  const actorRole = gate.actorRole;
 
   try {
     const body = await req.json();
@@ -158,7 +174,7 @@ serve(async (req: Request) => {
     supabase.from("audit_log").insert({
       action: "EDGE_FN",
       actor_id: actorId,
-      actor_role: "authenticated",
+      actor_role: actorRole,
       schema_name: "public",
       table_name: "edge_fn:analyze-bill-local",
       row_id: billId ?? null,
