@@ -14742,3 +14742,117 @@ Quantities are the clock values, the three report ages, the blind-since duration
 run count, the branch count, the commit distance and the three stranded meetings, all bare and
 naming nothing. Withheld per the practice READ SIXTH set: the state of the live endorsement vote,
 and any operational read on production sessions.
+
+## READ NINETY-FIFTH: the 00:20 UTC run, a thirty-second consecutive block, and the record reaches him where email does not
+
+No triage was possible and no code changed here, so this makes NO claim about production
+health in either direction: an absent report is not an absent error, per READ TWENTY-SECOND.
+
+The blocker is unchanged at thirty-two consecutive runs, tested rather than inherited per READ
+TWELFTH. The Sentry connector is present and NOT AUTHORIZED, so none of its tools loaded; this
+session is non-interactive, so the OAuth flow cannot be run from here; and an exact-count grep
+for `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the environment returns zero.
+
+NOTHING WAS SENT, AND THE TRIGGER FIRING TWICE IS NOT A REASON TO SEND TWICE
+Andrew pushed FIVE more commits, `49bd78c` through `45ec55e`, between 22:23 and 23:59 UTC on
+08-20. That is the same registered condition READ SEVENTY-NINTH named and READ NINETY-FOURTH
+already fired on, two hours ago, with a report and a push notification. It is a continuation of
+that fact rather than a new one, so it does not re-fire.
+
+State the reasoning rather than the outcome, because the tempting error is to treat each new
+push as a fresh trigger. A trigger fires once. Firing it again on the same condition, against a
+report sent two hours earlier and still unread, is exactly the duplicate alarm READ SIXTY-SIXTH's
+rule exists to prevent, and it buries the first rather than adding to it. All three reports were
+checked rather than assumed and ALL THREE are still UNREAD: `MOYD Sentry triage 2026-08-20` at
+1 hour 58 minutes, `MOYD Sentry triage 2026-08-19` at 1 day 7 hours 58 minutes, and
+`MOYD Sentry triage 2026-08-18` at 2 days 12 hours 43 minutes, every one computed from `date -u`
+against its own thread timestamp and FLOORED per READ TWELFTH.
+
+The next trigger is unchanged: FOURTEEN DAYS blind, at 2026-08-26T15:08:27Z, or sooner if the
+connector returns or the vote is recorded closed. Drop "Andrew pushes anything" from that list
+going forward: it has now fired, been reported, and gone unread, so it is spent as a send
+condition until something else changes. Blind-since is 8 days 9 hours, measured from the last
+SUCCESSFUL triage at READ SIXTY-THIRD; name the ANCHOR when quoting a figure, per READ
+SEVENTY-SECOND, since report-age and blind-since differ by nearly a week.
+
+THE OBSERVATION WORTH INHERITING: THIS FILE IS THE CHANNEL THAT REACHES HIM
+He pushed six commits in the two hours after the 08-20 report landed in his own inbox and did not
+open it. He has pushed seven since 21:54 UTC, all to THIS repo, whose `AGENTS.md` every one of his
+sessions reads. So the evidence now says the email thread is not reaching him and the committed
+record is.
+
+Do not read that as licence to stop sending. Weigh it as a placement decision: a run with
+something that genuinely needs him should put the ask at the TOP of its section, in plain words,
+rather than burying it under the apparatus, because that is the surface he actually opens. The
+email stays the designated channel and the suppression rule still governs it.
+
+HIS OWN WORK, RECORDED SO THE NEXT RUN DOES NOT RE-DIAGNOSE IT OR REPEAT A CLOSED ASK
+All five commits are his, deployed by hand, each verified against the running system with the
+deployed body read back, which is the gate READ NINETY-FOURTH records him arriving at
+independently. Three findings in them were observed rather than reasoned about, which is worth
+noting given how often this file has to correct the opposite.
+
+READ NINETY-FOURTH flagged three stranded executive meetings as an open item explicitly NOT
+mine to close. He closed it: `49bd78c` adds a `force_uuids` override so the reconcile sweep can
+replay occurrences its diff would skip, and the replay then surfaced three further defects he
+fixed in turn, a replay zeroing a denormalised attendance count, a uuid-less enrichment routing
+onto the newest row rather than the matching occurrence, and Zoom returning the latest
+occurrence's participants for a recurring meeting. Do not carry that ask forward.
+
+One item in `598ba15` is left UNRESOLVED by him and is not mine either: an n8n workflow edit that
+sits in the stored definition but does not reach the running engine, across an edit and a
+container restart. He reports it rather than guessing at it. There is no droplet access here, so
+it is recorded and stopped at, per the standing rule.
+
+Nothing else moved. The site tip is unchanged at `aa2d513` from 2026-08-12. The six `sentry-fix/`
+branch tips were enumerated rather than inherited and are unchanged from READ SIXTY-THIRD's
+inventory, so the three fixes it establishes are live gaps have now waited a further eight days.
+Grepped both repos again rather than inherited: nothing says the endorsement vote has closed. The
+CRM hits are the doc comments and the dashboard card render path in
+`auto_inferred_assignments_service.dart` and the branch comment in `vote_detail_screen.dart`, and
+the site hits are the render paths in `VoteStatusMessage.tsx` and the members dashboard voting
+page, every one describing what is shown WHEN a vote closes rather than stating that this one
+has. So the vote is treated as OPEN and nothing was merged.
+
+The branch ref trap bit in the classic form: local `master` stale at `dbc5a8a` against a real tip
+of `45ec55e`, with `HEAD` detached AT that tip. Checked in the form READ TWENTY-SECOND
+prescribes, local side the NAMED BRANCH and not `HEAD`, and repaired with
+`git checkout -B master HEAD` BEFORE committing, per READ SIXTY-FOURTH's addendum rather than
+READ NINTH's conditional repair. The container also arrived with the wrong commit identity again,
+per READ SIXTIETH: set the one this project requires and do NOT rebase already-pushed commits to
+match, since that needs a force push and READ SECOND's prohibition is not negotiable for a
+cosmetic badge.
+
+VERIFICATION AND DISCLOSURE
+No code changed in this diff, so `npx tsc --noEmit` and `flutter analyze` have nothing to read:
+the only file touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No
+adversarial audit was run, recorded as a departure rather than glossed, on the call READ
+SIXTY-FOURTH through READ NINETY-FOURTH each made for the identical case: this diff carries no
+diagnosis of a Sentry issue, no mechanism of its own and no code. Its factual claims are the four
+durations, which are arithmetic over timestamps printed above, and a characterization of five
+commits taken from their own messages in this public repo's log, both checkable without an
+auditor.
+
+This repo is public and the sibling is private. Named above: the commits `dbc5a8a`, `45ec55e`,
+`49bd78c`, `598ba15` and `aa2d513`, the last being the private sibling's tip whose cover is prior
+publication in READ SIXTIETH; the branch prefix `sentry-fix/`; the files `AGENTS.md`,
+`auto_inferred_assignments_service.dart` and `vote_detail_screen.dart`, all committed here, and
+`VoteStatusMessage.tsx` with the members dashboard voting page named by role rather than by path,
+both in the private sibling and both published in READ SEVENTY-FIRST; the parameter name
+`force_uuids`, committed here in `49bd78c`; the git commands and ref names; the shell command
+`date -u`; the verification commands `npx tsc --noEmit` and `flutter analyze`; the product names
+Sentry, Zoom and n8n, every one already published in this file; and the env var name patterns
+`SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN`. Everything else already appears in
+this file or is committed in this public repo's own tree.
+
+Deliberately WITHHELD from the account of his five commits, though all of it is already public in
+this repo's own commit log, because the finding survives without it and READ SIXTH's practice is
+to publish only what the finding needs: the attendee names, the numeric Zoom meeting id, the
+deployed version numbers, the n8n execution id and workflow names, the table and column names,
+and the meeting dates. The three reports are named by subject line only, which is this loop's own
+published convention, and no transport, credential or container tooling is described, which READ
+EIGHTEENTH records as a BLOCKER class. No log content is quoted, because none was readable.
+Quantities are the clock values, the three report ages, the blind-since duration and the next
+trigger instant, the thirty-two run count, the five and six and seven commit counts, and the
+branch count, all bare and naming nothing. Withheld per the practice READ SIXTH set: the state of
+the live endorsement vote, and any operational read on production sessions.
