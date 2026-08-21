@@ -17,8 +17,13 @@
 //      minimal row immediately and fans out to n8n for full enrichment
 //      (minutes, Google Doc, Notion, attendance) — identical to an organic
 //      Zoom event.
-//   4. Sends a Telegram summary ONLY when it replayed misses or hit errors.
-//      Fully reconciled days are silent.
+//   4. Backstop for the Google Drive recording archive: any meetings row still
+//      pointing at a zoom.us recording is copied into the shared drive via
+//      archive-meeting-recording, which is what makes it playable in the CRM.
+//      See the block above archiveStrandedRecordings for why this lives here
+//      and not in zoom-webhook. Bounded to ARCHIVE_MAX_PER_RUN per run.
+//   5. Sends a Telegram summary ONLY when it replayed misses, archived a
+//      recording, or hit errors. Fully reconciled days are silent.
 //
 // Invocation: pg_cron job `zoom-reconcile-daily` (see cron.job) calls this via
 // net.http_post daily at 12:00 UTC (07:00 America/Chicago during DST, 06:00
@@ -168,6 +173,73 @@ async function sendTelegram(text: string) {
   }
 }
 
+// ==================== Drive archive backstop ====================
+// The CRM plays whatever `meetings.recording_embed_url` holds, in an iframe.
+// A zoom.us link there does not play: fetched unauthenticated, an aged share /
+// play URL returns Zoom's "Error - Zoom" page, because those links are passcode
+// and expiry gated. A Drive `/preview` link returns the file and a video player
+// with no framing restriction, which is why every meeting that plays holds one.
+//
+// Putting the Drive copy there is n8n's job on the live path: workflow
+// gthxKZBBsAcnr9aB ("Meeting Minutes - Google Doc & Supabase") carries
+// Extract MP4 URL → Fetch MP4 Binary → Upload to Drive and then writes the row.
+// This is the backstop for when that does not happen, which is what left eight
+// meetings between 2026-01 and 2026-07 pointing at Zoom.
+//
+// It belongs HERE rather than in zoom-webhook. n8n uploads after a Wait node,
+// so an immediate archive from the webhook would win the race and n8n would
+// then upload a SECOND copy of every recording — hundreds of megabytes per
+// meeting, forever. By the time this daily sweep runs, n8n has either done the
+// upload (row holds a Drive link, archive-meeting-recording skips) or it has
+// not (row still holds Zoom, and this repairs it). No duplicates either way.
+//
+// Bounded per run because each copy moves 150-450 MB and this function has its
+// own wall clock. A backlog drains over consecutive days.
+const ARCHIVE_MAX_PER_RUN = 2;
+
+async function archiveStrandedRecordings(
+  supabase: ReturnType<typeof createClient>,
+  errors: string[],
+): Promise<{ meeting_id: string; title: string; status: number; detail: string }[]> {
+  const done: { meeting_id: string; title: string; status: number; detail: string }[] = [];
+  const { data, error } = await supabase
+    .from('meetings')
+    .select('id, meeting_title, meeting_date')
+    .not('recording_url', 'is', null)
+    .like('recording_url', '%zoom.us%')
+    .order('meeting_date', { ascending: false })
+    .limit(ARCHIVE_MAX_PER_RUN);
+  if (error) {
+    errors.push(`drive-archive lookup failed: ${error.message}`);
+    return done;
+  }
+  if (!data || data.length === 0) return done;
+
+  const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/archive-meeting-recording`;
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  for (const row of data as any[]) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`,
+          'apikey': key,
+        },
+        body: JSON.stringify({ meeting_id: row.id }),
+      });
+      const text = (await res.text()).slice(0, 300);
+      done.push({ meeting_id: row.id, title: row.meeting_title, status: res.status, detail: text });
+      if (!res.ok) {
+        errors.push(`drive-archive ${row.meeting_title} (${row.id}) → HTTP ${res.status}: ${text}`);
+      }
+    } catch (e) {
+      errors.push(`drive-archive ${row.meeting_title} (${row.id}) threw: ${String(e?.message || e)}`);
+    }
+  }
+  return done;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -191,6 +263,7 @@ serve(async (req) => {
   const replayed: { id: string; topic: string; status?: number; forced?: boolean }[] = [];
   const forcedSeen = new Set<string>();
   let recordings: any[] = [];
+  let driveArchived: { meeting_id: string; title: string; status: number; detail: string }[] = [];
 
   try {
     const accountId = Deno.env.get('ZOOM_RECORDINGS_ACCOUNT_ID') || Deno.env.get('ZOOM_ACCOUNT_ID') || '';
@@ -254,6 +327,13 @@ serve(async (req) => {
         errors.push(`replay ${id} (${m.topic}) threw: ${String(e?.message || e)}`);
       }
     }
+
+    // Backstop: repair any meeting still pointing at a zoom.us recording.
+    // Deliberately independent of the replay diff above — the rows this catches
+    // are ones Zoom and the CRM both already know about, so the diff skips them.
+    if (!dryRun) {
+      driveArchived = await archiveStrandedRecordings(supabase, errors);
+    }
   } catch (e) {
     errors.push(String(e?.message || e));
   }
@@ -274,16 +354,20 @@ serve(async (req) => {
     force_uuids_requested: [...forceUuids],
     force_uuids_not_found: forceNotFound,
     misses_replayed: replayed,
+    drive_archived: driveArchived,
     errors
   };
   console.log('[zoom-reconcile] result:', JSON.stringify(result));
 
   // Telegram ONLY when something happened — silent when fully reconciled.
-  if (!dryRun && (replayed.length > 0 || errors.length > 0)) {
+  if (!dryRun && (replayed.length > 0 || driveArchived.length > 0 || errors.length > 0)) {
     const lines = [
-      replayed.length > 0 ? '🔁 Zoom reconcile: replayed missing meetings' : '⚠️ Zoom reconcile ran with errors',
+      replayed.length > 0
+        ? '🔁 Zoom reconcile: replayed missing meetings'
+        : (driveArchived.length > 0 ? '🎬 Zoom reconcile: archived recordings to Drive' : '⚠️ Zoom reconcile ran with errors'),
       `Window: last ${days} day(s), ${recordings.length} cloud recording(s)`,
       ...replayed.map((r) => `• ${r.topic} (${r.id}) → ${r.status ?? 'dry-run'}`),
+      ...driveArchived.map((d) => `🎬 archived to Drive: ${d.title} → ${d.status}`),
       ...errors.map((e) => `❌ ${e}`)
     ];
     await sendTelegram(lines.join('\n').slice(0, 4000));

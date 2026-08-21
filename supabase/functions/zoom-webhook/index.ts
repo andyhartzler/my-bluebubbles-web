@@ -305,38 +305,6 @@ async function invokeMeetingsZap(payload: Record<string, unknown>): Promise<Resp
   return await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
 }
 
-// ==================== leg C: Drive archive ====================
-// Copies the Zoom MP4 into the shared drive and repoints the row at it, which
-// is what makes the recording playable in the CRM: the CRM embeds
-// recording_embed_url in an iframe, and a zoom.us link cannot be framed and
-// expires. This is the step the retired Zapier zap performed and the reason
-// meetings since 2026-06 do not play.
-//
-// MUST run AFTER meetings-zap, which writes the raw zoom.us URLs onto the row
-// and would otherwise overwrite the Drive link.
-//
-// Deliberately non-fatal. A failed copy costs the video archive and nothing
-// else; the minutes, recap and attendance are already written by this point.
-// Re-run by hand with {"meeting_id": "..."} against archive-meeting-recording.
-async function archiveRecordingToDrive(meetingUuid: string, meetingId: string) {
-  const url = `${Deno.env.get('SUPABASE_URL')}/functions/v1/archive-meeting-recording`;
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${key}`,
-      'apikey': key,
-    },
-    body: JSON.stringify(
-      meetingUuid ? { zoom_uuid: meetingUuid } : { zoom_meeting_id: meetingId },
-    ),
-  });
-  const text = await res.text();
-  console.log(`[zoom-webhook] drive archive: ${res.status} ${text.slice(0, 300)}`);
-  return { ok: res.ok, status: res.status, detail: text.slice(0, 300) };
-}
-
 // Heavy leg-A work for recording.completed — runs in the background after the
 // 200 has been returned to Zoom.
 async function runLegARecording(obj: any, meetingId: string, meetingUuid: string, event: string) {
@@ -377,23 +345,6 @@ async function runLegARecording(obj: any, meetingId: string, meetingUuid: string
       await reportFailure({
         leg: 'leg-A meetings-zap', event, topic, zoomMeetingId: meetingId,
         status: zap.status, detail: text.slice(0, 300)
-      });
-    }
-
-    // Leg C. Runs after leg A on purpose: meetings-zap writes the zoom.us URLs
-    // and this replaces them with the Drive copy.
-    try {
-      const archive = await archiveRecordingToDrive(meetingUuid || obj.uuid || '', meetingId);
-      if (!archive.ok) {
-        await reportFailure({
-          leg: 'leg-C drive archive', event, topic, zoomMeetingId: meetingId,
-          status: archive.status, detail: archive.detail
-        });
-      }
-    } catch (e) {
-      await reportFailure({
-        leg: 'leg-C drive archive', event, topic, zoomMeetingId: meetingId,
-        status: 'exception', detail: String(e?.message || e)
       });
     }
   } catch (e) {
