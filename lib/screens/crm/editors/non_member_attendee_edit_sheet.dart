@@ -110,7 +110,10 @@ class _NonMemberAttendeeEditSheetState extends State<NonMemberAttendeeEditSheet>
                       child: ListTile(
                         leading: const Icon(Icons.link_outlined),
                         title: const Text('Link to Member Profile'),
-                        subtitle: const Text('Convert this guest into a tracked member attendee.'),
+                        subtitle: const Text(
+                          'Convert this guest into a tracked member attendee, and remember this '
+                          'Zoom display name so future meetings match it automatically.',
+                        ),
                         onTap: _saving ? null : _linkToMember,
                       ),
                     ),

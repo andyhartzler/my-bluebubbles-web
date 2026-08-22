@@ -88,11 +88,136 @@ const NON_MEMBER_CONFLICT_TARGET = 'meeting_id,display_name,email';
 /**
  * Extract owner name from device name (e.g., "John's iPhone" -> "John")
  */ function extractOwnerFromDevice(displayName) {
-  const possessiveMatch = displayName.match(/^([^']+)'s\s+/i);
+  // Possessive form: "Sarah's iPad", "Karen’s iPhone". Straight and curly
+  // apostrophes both occur in real Zoom display names.
+  const possessiveMatch = displayName.match(/^(.+?)['’]s\s+/i);
   if (possessiveMatch && possessiveMatch[1]) {
     return possessiveMatch[1].trim();
   }
-  return null;
+  // Bare trailing-device form: "James iPhone", "Dana Galaxy S23". This is the
+  // shape that put an executive committee member in Guest Participants every
+  // month: isDeviceName() fired, no possessive existed, and the participant
+  // was written straight to non_member_attendees without ANY match attempt.
+  // Strip the device words off the end and hand the remainder back. A name
+  // that is nothing but device words ("iPhone", "iPad (2)", "Zoom user")
+  // returns null and is still treated as a device.
+  const cleaned = displayName
+    .replace(/\s*\(\d+\)\s*$/, '')
+    .trim();
+  const deviceTail = /(?:'s|’s)?\s*\b(?:iphone|ipad|ipod|android|galaxy|pixel|tablet|mobile|phone|desktop|laptop|macbook|surface|chromebook)\b[\s\d\w+-]*$/i;
+  const remainder = cleaned.replace(deviceTail, '').trim();
+  if (!remainder || remainder.length < 2) return null;
+  // Refuse to treat a leftover that is itself a device/placeholder word as a
+  // person. Also refuse anything with no letters.
+  if (!/[a-z]/i.test(remainder)) return null;
+  if (/^(?:zoom|user|guest|my|the|new)$/i.test(remainder)) return null;
+  return remainder;
+}
+// ==================== DURABLE ALIASES ====================
+// public.meeting_attendee_aliases maps a Zoom display name to a member once a
+// human has confirmed it. It is consulted BEFORE every heuristic below,
+// including the device short-circuit, because a confirmed answer outranks any
+// guess. See supabase/migrations/20260822_02_meeting_attendee_aliases.sql.
+async function findMemberByAlias(supabaseClient, displayName) {
+  if (!displayName) return null;
+  const key = normalizeString(displayName);
+  if (!key) return null;
+  try {
+    const { data, error } = await supabaseClient
+      .from('meeting_attendee_aliases')
+      .select('member_id')
+      .eq('display_name_key', key)
+      .maybeSingle();
+    if (error) {
+      console.error(`Alias lookup failed for "${displayName}": ${error.message}`);
+      return null;
+    }
+    if (!data || !data.member_id) return null;
+    const { data: member, error: memberError } = await supabaseClient
+      .from('members')
+      .select('id, name')
+      .eq('id', data.member_id)
+      .maybeSingle();
+    if (memberError || !member) {
+      console.error(`Alias for "${displayName}" points at a member that could not be read`);
+      return null;
+    }
+    console.log(`✓ Matched by confirmed alias: "${displayName}" -> ${member.name}`);
+    return {
+      id: member.id,
+      name: member.name,
+      matched_by: 'alias'
+    };
+  } catch (error) {
+    console.error(`Alias lookup threw for "${displayName}": ${error.message}`);
+    return null;
+  }
+}
+// ==================== MEMBER ROSTER FETCH ====================
+// The name-matching path used to read `.limit(300)` from a 424-row members
+// table, so 124 arbitrary members were invisible to it and a member could
+// silently drop out of matching as the roster grew or as rows moved in the
+// heap. Chloé Ray matched by normalized name on 2026-06-10 and 2026-07-15 and
+// then appeared as a GUEST on 2026-07-22, 07-29 and 08-12 with no code change
+// in between. Page the whole roster instead of capping it.
+async function fetchAllMembers(supabaseClient) {
+  const pageSize = 1000;
+  const all = [];
+  for(let from = 0;; from += pageSize){
+    const { data, error } = await supabaseClient
+      .from('members')
+      .select('id, name, email, school_email, committee, executive_committee')
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) {
+      console.error(`Failed to fetch members page at offset ${from}: ${error.message}`);
+      break;
+    }
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+  }
+  console.log(`Fetched ${all.length} members for matching`);
+  return all;
+}
+// A meeting's plausible attendee set: members carrying a committee that maps
+// to the meeting title, plus every executive when the meeting is an executive
+// meeting. Used only to DISAMBIGUATE, never to widen a match.
+function isExecutiveMeetingTitle(meetingTitle) {
+  return normalizeString(meetingTitle || '').includes('exec');
+}
+function membersOnMeetingCommittee(allMembers, meetingTitle) {
+  if (!meetingTitle) return [];
+  const execMeeting = isExecutiveMeetingTitle(meetingTitle);
+  return allMembers.filter((m)=>committeesMatch(meetingTitle, m.committee) || execMeeting && m.executive_committee === true);
+}
+// First name alone resolves ONLY when exactly one member with that first name
+// sits on the meeting's committee. "James" is ambiguous across three members
+// org-wide, so it resolves on the executive committee (where only one James
+// sits) and nowhere else. A tie refuses rather than guessing: a wrong match
+// silently credits attendance to the wrong person, which is worse than a
+// guest row.
+function resolveByFirstNameOnCommittee(allMembers, firstName, meetingTitle) {
+  const key = normalizeString(firstName || '');
+  if (key.length < 2) return null;
+  const scoped = membersOnMeetingCommittee(allMembers, meetingTitle);
+  if (scoped.length === 0) return null;
+  const hits = scoped.filter((m)=>{
+    const parts = (m.name || '').trim().split(/\s+/);
+    return parts.length > 0 && normalizeString(parts[0]) === key;
+  });
+  if (hits.length !== 1) {
+    if (hits.length > 1) {
+      console.log(`✗ First name "${firstName}" is ambiguous on this committee (${hits.length} members) — refusing to guess`);
+    }
+    return null;
+  }
+  console.log(`✓ Matched by unique first name on meeting committee: ${hits[0].name}`);
+  return {
+    id: hits[0].id,
+    name: hits[0].name,
+    matched_by: 'first_name_committee'
+  };
 }
 // ==================== DATE/TIME PARSING HELPERS ====================
 /**
@@ -698,21 +823,28 @@ async function findMemberByPhoneNumber(supabaseClient, phoneNumber) {
   return null;
 }
 // ==================== ATTENDANCE PROCESSING ====================
-async function processAttendance(supabaseClient, meetingId, participants) {
+async function processAttendance(supabaseClient, meetingId, participants, meetingTitle) {
   const results = [];
+  // One roster read for the whole meeting rather than one per participant.
+  const allMembers = await fetchAllMembers(supabaseClient);
   for (const participant of participants){
     try {
       let originalDisplayName = participant.name;
       let cleanedName = participant.name;
       let extractedPronouns = null;
       let phoneNumber = null;
+      let deviceDerivedName = false;
+      // STEP 0: Confirmed alias on the RAW display name. Checked before the
+      // device short-circuit below, which otherwise skips matching entirely.
+      const aliasMember = await findMemberByAlias(supabaseClient, originalDisplayName);
       // STEP 1: Handle device names
-      if (isDeviceName(originalDisplayName)) {
+      if (isDeviceName(originalDisplayName) && !aliasMember) {
         const ownerName = extractOwnerFromDevice(originalDisplayName);
         if (ownerName) {
           console.log(`Device name detected: "${originalDisplayName}" -> Owner: "${ownerName}"`);
           cleanedName = ownerName;
           participant.name = ownerName;
+          deviceDerivedName = true;
         } else {
           console.log(`Device name without owner: "${originalDisplayName}" - will create non-member record`);
           // Create non-member record for device without owner
@@ -743,7 +875,7 @@ async function processAttendance(supabaseClient, meetingId, participants) {
         }
       }
       // STEP 2: Handle phone numbers
-      if (isPhoneNumber(cleanedName)) {
+      if (isPhoneNumber(cleanedName) && !aliasMember) {
         phoneNumber = extractPhoneNumber(cleanedName);
         console.log(`Phone number detected: "${cleanedName}" -> ${phoneNumber}`);
         if (phoneNumber) {
@@ -824,7 +956,9 @@ async function processAttendance(supabaseClient, meetingId, participants) {
       }
       // STEP 4: Check if participant already has memberId (from host identification)
       let member = null;
-      if (participant.memberId) {
+      if (aliasMember) {
+        member = aliasMember;
+      } else if (participant.memberId) {
         console.log(`Using pre-identified member ID for ${cleanedName}: ${participant.memberId}`);
         member = {
           id: participant.memberId,
@@ -833,7 +967,7 @@ async function processAttendance(supabaseClient, meetingId, participants) {
         };
       } else {
         // STEP 5: Try to find member match
-        member = await findMemberWithFallback(supabaseClient, cleanedName, participant.email);
+        member = await findMemberWithFallback(supabaseClient, cleanedName, participant.email, allMembers, meetingTitle);
       }
       if (!member) {
         console.log(`No member match found for: ${cleanedName} (${participant.email || 'no email'})`);
@@ -843,8 +977,12 @@ async function processAttendance(supabaseClient, meetingId, participants) {
         // Only create non-member record if:
         // 1. Has email, OR
         // 2. Has last name (at least 2 name parts), OR
-        // 3. Has pronouns extracted
-        if (participant.email || !isSingleName || extractedPronouns) {
+        // 3. Has pronouns extracted, OR
+        // 4. The single name came from stripping a device suffix. Without
+        //    this, "James iPhone" would resolve to the one-word "James",
+        //    fail the committee rule, and then be dropped entirely rather
+        //    than staying visible as an unresolved guest.
+        if (participant.email || !isSingleName || extractedPronouns || deviceDerivedName) {
           console.log(`Creating non-member record for: ${cleanedName}`);
           const { error: nonMemberError } = await supabaseClient.from('non_member_attendees').upsert({
             meeting_id: meetingId,
@@ -961,8 +1099,13 @@ async function processAttendance(supabaseClient, meetingId, participants) {
   return results;
 }
 // ==================== MEMBER MATCHING ====================
-async function findMemberWithFallback(supabaseClient, zoomName, zoomEmail) {
+async function findMemberWithFallback(supabaseClient, zoomName, zoomEmail, preloadedMembers, meetingTitle) {
   console.log(`Matching: ${zoomName} | ${zoomEmail || 'no email'}`);
+  // A display name of one word carries no surname, so every substring and
+  // similarity rule below can only ever be a guess. Single-word names take
+  // exact-normalized equality and the committee-scoped unique-first-name rule,
+  // and nothing else.
+  const isSingleWord = zoomName.trim().split(/\s+/).length === 1;
   // STEP 1: Email matching
   if (zoomEmail && zoomEmail.trim().length > 0) {
     const normalizedEmail = normalizeEmail(zoomEmail);
@@ -995,7 +1138,7 @@ async function findMemberWithFallback(supabaseClient, zoomName, zoomEmail) {
   }
   // STEP 3: Normalized name matching
   const normalizedZoomName = normalizeString(zoomName);
-  const { data: allMembers } = await supabaseClient.from('members').select('id, name, email, school_email').limit(300);
+  const allMembers = preloadedMembers && preloadedMembers.length > 0 ? preloadedMembers : await fetchAllMembers(supabaseClient);
   if (allMembers && allMembers.length > 0) {
     // STEP 3a: Exact normalized match
     for (const member of allMembers){
@@ -1008,6 +1151,17 @@ async function findMemberWithFallback(supabaseClient, zoomName, zoomEmail) {
           matched_by: 'fuzzy_exact'
         };
       }
+    }
+    // STEP 3a2: A one-word display name has no surname to check against, so
+    // exact equality above was the only safe full-name rule. Try the
+    // committee-scoped unique first name and then stop, rather than falling
+    // through to substring and similarity rules that would happily bind
+    // "James" to whichever James the roster listed first.
+    if (isSingleWord) {
+      const byFirstName = resolveByFirstNameOnCommittee(allMembers, zoomName, meetingTitle);
+      if (byFirstName) return byFirstName;
+      console.log(`✗ No safe match for single-word name: ${zoomName}`);
+      return null;
     }
     // STEP 3b: Concatenated name match (for names without spaces)
     for (const member of allMembers){
@@ -1023,19 +1177,29 @@ async function findMemberWithFallback(supabaseClient, zoomName, zoomEmail) {
         }
       }
     }
-    // STEP 3c: Partial name match
+    // STEP 3c: Partial name match. Substring containment is the one rule here
+    // that can bind a display name to more than one member at once, and it
+    // used to return whichever the roster happened to list first. Collect
+    // every candidate and refuse on a tie.
+    const partialHits = [];
     for (const member of allMembers){
       const normalizedMemberName = normalizeString(member.name);
       if (normalizedMemberName.length >= 5 && normalizedZoomName.length >= 5) {
         if (normalizedMemberName.includes(normalizedZoomName) || normalizedZoomName.includes(normalizedMemberName)) {
-          console.log(`✓ Matched by partial name: ${member.name}`);
-          return {
-            id: member.id,
-            name: member.name,
-            matched_by: 'fuzzy_partial'
-          };
+          partialHits.push(member);
         }
       }
+    }
+    if (partialHits.length === 1) {
+      console.log(`✓ Matched by partial name: ${partialHits[0].name}`);
+      return {
+        id: partialHits[0].id,
+        name: partialHits[0].name,
+        matched_by: 'fuzzy_partial'
+      };
+    }
+    if (partialHits.length > 1) {
+      console.log(`✗ Partial name "${zoomName}" is ambiguous across ${partialHits.length} members — refusing to guess`);
     }
     // STEP 3d: First + Last name match
     const zoomParts = zoomName.toLowerCase().split(/\s+/);
@@ -1356,7 +1520,7 @@ serve(async (req)=>{
       throw new Error(`Failed to create meeting: ${meetingError.message}`);
     }
     console.log('Created meeting record:', meeting.id);
-    const attendanceResults = await processAttendance(supabaseClient, meeting.id, uniqueParticipants);
+    const attendanceResults = await processAttendance(supabaseClient, meeting.id, uniqueParticipants, meeting.meeting_title);
     // 'already_recorded' counts as a match. On a FIRST run this status never
     // occurs, so first-run behaviour is unchanged. On a REPLAY every attendee
     // already has a row, processAttendance returns 'already_recorded' for each,

@@ -554,6 +554,29 @@ class MeetingRepository {
         throw const FormatException('Failed to create attendance record');
       }
 
+      // Remember the answer. Without this the same Zoom display name lands in
+      // Guest Participants again after the next meeting, and somebody has to
+      // resolve it by hand every month. meetings-zap reads this table before
+      // any heuristic matching, so one confirmation here is permanent.
+      final displayName = attendeeJson['display_name'] as String?;
+      if (displayName != null && displayName.trim().isNotEmpty) {
+        try {
+          await client.from('meeting_attendee_aliases').upsert({
+            'display_name': displayName,
+            'member_id': memberId,
+            'learned_from_meeting_id': meetingId,
+            'confirmed_by': client.auth.currentUser?.id,
+            'confirmed_by_label': client.auth.currentUser?.email,
+            'confirmed_at': DateTime.now().toUtc().toIso8601String(),
+            'note': 'Resolved from the meeting detail screen.',
+          }, onConflict: 'display_name_key');
+        } catch (e) {
+          // A failed alias write must not lose the attendance record that was
+          // just created. Surface it and carry on.
+          debugPrint('⚠️ Attendance linked but alias not recorded for "$displayName": $e');
+        }
+      }
+
       if (removeAttendee) {
         await client.from('non_member_attendees').delete().eq('id', attendeeId);
       }
