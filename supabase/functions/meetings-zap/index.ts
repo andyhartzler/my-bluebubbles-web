@@ -17,6 +17,14 @@ const IGNORED_ATTENDEES = {
     'missouri young democrats'
   ]
 };
+// Arbiter for the non_member_attendees unique constraint
+// (non_member_attendees_meeting_person_key, UNIQUE NULLS NOT DISTINCT).
+// One row per guest per meeting: a rejoin belongs in number_of_joins and
+// total_duration_minutes, which this function already aggregates per participant
+// before writing. Re-enrichment of the same meeting must refresh that row rather
+// than insert a second one, which is what produced 6 identical rows per guest on
+// the 2026-08-12 executive meeting.
+const NON_MEMBER_CONFLICT_TARGET = 'meeting_id,display_name,email';
 // ==================== PRONOUN & NAME PARSING HELPERS ====================
 /**
  * Extract pronouns from a display name
@@ -708,7 +716,7 @@ async function processAttendance(supabaseClient, meetingId, participants) {
         } else {
           console.log(`Device name without owner: "${originalDisplayName}" - will create non-member record`);
           // Create non-member record for device without owner
-          const { error: nonMemberError } = await supabaseClient.from('non_member_attendees').insert({
+          const { error: nonMemberError } = await supabaseClient.from('non_member_attendees').upsert({
             meeting_id: meetingId,
             display_name: originalDisplayName,
             email: participant.email || null,
@@ -718,8 +726,10 @@ async function processAttendance(supabaseClient, meetingId, participants) {
             first_join_time: participant.firstJoin,
             last_leave_time: participant.lastLeave,
             number_of_joins: participant.numberOfJoins
+          }, {
+            onConflict: NON_MEMBER_CONFLICT_TARGET
           });
-          if (nonMemberError && nonMemberError.code !== '23505') {
+          if (nonMemberError) {
             console.error(`Error creating non-member record for device: ${nonMemberError.message}`);
           }
           results.push({
@@ -777,7 +787,7 @@ async function processAttendance(supabaseClient, meetingId, participants) {
             continue;
           } else {
             // Phone number but no member match - create non-member record
-            const { error: nonMemberError } = await supabaseClient.from('non_member_attendees').insert({
+            const { error: nonMemberError } = await supabaseClient.from('non_member_attendees').upsert({
               meeting_id: meetingId,
               display_name: originalDisplayName,
               email: participant.email || null,
@@ -787,8 +797,10 @@ async function processAttendance(supabaseClient, meetingId, participants) {
               first_join_time: participant.firstJoin,
               last_leave_time: participant.lastLeave,
               number_of_joins: participant.numberOfJoins
+            }, {
+              onConflict: NON_MEMBER_CONFLICT_TARGET
             });
-            if (nonMemberError && nonMemberError.code !== '23505') {
+            if (nonMemberError) {
               console.error(`Error creating non-member record for phone: ${nonMemberError.message}`);
             }
             results.push({
@@ -834,7 +846,7 @@ async function processAttendance(supabaseClient, meetingId, participants) {
         // 3. Has pronouns extracted
         if (participant.email || !isSingleName || extractedPronouns) {
           console.log(`Creating non-member record for: ${cleanedName}`);
-          const { error: nonMemberError } = await supabaseClient.from('non_member_attendees').insert({
+          const { error: nonMemberError } = await supabaseClient.from('non_member_attendees').upsert({
             meeting_id: meetingId,
             display_name: originalDisplayName,
             email: participant.email || null,
@@ -844,8 +856,10 @@ async function processAttendance(supabaseClient, meetingId, participants) {
             first_join_time: participant.firstJoin,
             last_leave_time: participant.lastLeave,
             number_of_joins: participant.numberOfJoins
+          }, {
+            onConflict: NON_MEMBER_CONFLICT_TARGET
           });
-          if (nonMemberError && nonMemberError.code !== '23505') {
+          if (nonMemberError) {
             console.error(`Error creating non-member record: ${nonMemberError.message}`);
           }
           results.push({
