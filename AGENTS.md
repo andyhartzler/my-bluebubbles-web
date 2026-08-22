@@ -16276,3 +16276,160 @@ ages, the blind-since duration and the next trigger instant, the forty-eight run
 commit count, the branch count and the commit distances, all bare and naming nothing. Withheld per
 the practice READ SIXTH set: the state of the live endorsement vote, and any operational read on
 production sessions.
+
+## READ ONE HUNDRED AND TWELFTH: the 10:20 UTC run, a forty-ninth consecutive block, and one of Andrew's own commits overturns this file's attribution of the `column ? does not exist` family
+
+ANDREW, THIS IS THE ONE THING THIS LOOP NEEDS AND CANNOT DO ITSELF
+The Sentry connector needs reauthorizing. It is present for this session but not authorized, so
+none of its tools load, and this session is non-interactive so the OAuth flow cannot be run from
+here. Reconnect it in your claude.ai connector settings and the loop resumes on the next tick.
+Placed at the top rather than only in email for the reason READ NINETY-FIFTH gives, and this run
+is more evidence for it: you pushed four commits into this repo between 09:06 and 10:01 UTC this
+morning, roughly ninety minutes before this run, and the three reports in your inbox are still
+unread.
+
+Nothing has been monitored since 2026-08-12T15:08:27Z, which is 9 days 19 hours. That covers the
+public site, the CRM and the vote surface.
+
+The rest is the standing record. No triage was possible and no code changed here, so this makes NO
+claim about production health in either direction: an absent report is not an absent error, per
+READ TWENTY-SECOND.
+
+The blocker is unchanged at forty-nine consecutive runs, tested rather than inherited per READ
+TWELFTH. An exact-count grep for `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the
+environment returns zero, so there is no token route around the connector either.
+
+`3545f67` CORRECTS A STANDING ATTRIBUTION IN THIS FILE, AND THAT IS THE FINDING WORTH INHERITING
+Every sweep from READ SIXTH onward reads the `column "?" does not exist` family in
+SUPABASE-PLATFORM-1 as somebody typing SQL by hand, and READ SEVENTEENTH attributes the sessions it
+names to Andrew's own audit work from the commit prose. Each of those sections is careful to call
+it an inference, and READ NINETEENTH says in as many words to inherit that attribution at its
+stated scope and no wider, and never to treat the family as pre-cleared. That caution was right and
+the family was NOT all one thing.
+
+`3545f67`, authored 2026-08-22T10:01:41Z, establishes from the running system that
+`findMemberByPhoneNumber` in the `meetings-zap` edge function queried `members.phone_number` in all
+three of its queries. That column has never existed on that table, which carries `phone` and
+`phone_e164`, so PostgREST answered 400 with SQLSTATE 42703 on every call and each one wrote
+`column members.phone_number does not exist` into the Postgres logs, where the relay rolled it into
+SUPABASE-PLATFORM-1. His own message states the consequence for this record plainly: some of that
+family was committed application code, all along.
+
+Take the METHOD lesson rather than only the fact. The instrument this file has leaned on hardest
+for that family is READ SIXTH's standard, that no committed statement makes the reference, and
+READ THIRTEENTH's discriminator, that PostgREST renders a filter or order as the TABLE QUALIFIED
+name so a BARE identifier cannot come from either app's data layer. Note which of the two failed.
+The observed line is QUALIFIED, `members.phone_number`, so READ THIRTEENTH's discriminator was
+never in play and pointed correctly all along; what failed is the grep negative, because a repo
+search for the identifier HITS, on `non_member_attendees`, where `phone_number` is the correct
+column and this same file writes it three times. So the identifier is right on one table and wrong
+on the other, and a grep that stops at the bare name reads as confirmation.
+
+The inheritable rule: when clearing an identifier by grep, check the TABLE the hit belongs to and
+not just the name. READ THIRTY-FIRST already records the neighbouring trap, a SUBSTRING match
+(`message_ts` against `slack_message_ts`) reading as a hit; this is its mirror, an EXACT match on
+the wrong relation reading as a clearance. Both produce a confident false negative.
+
+Scope it correctly and do not over-correct in the other direction. This attributes ONE identifier
+to committed code. It does not retroactively attribute the rest of the family, most of whose
+identifiers are bare and unqualified and so still fall under READ THIRTEENTH's discriminator, and
+several of which name columns that exist nowhere in either tree. What it does retire is any
+future sweep writing that family off as wholly not-ours without checking the qualified ones
+against the specific table named.
+
+Nothing here is mine to fix: he found it, fixed it, deployed it as v144 and read the deployed body
+back, which is the gate READ NINETY-FOURTH records him arriving at independently.
+
+HIS OTHER THREE ARE HIS WORK AND ARE NOT MINE TO RE-DIAGNOSE
+Recorded so the next run does not reopen them. `caeb3b2` dedupes non-member attendees and makes
+re-enrichment idempotent; `62a9f19` stops executive committee members landing in the guest bucket;
+`7c87374` adds a scored transcript inference for who actually chaired each meeting. That last one
+is worth one line for its method rather than its subject: it declines to measure a new inference
+against the 41 existing host labels, on the ground that those labels were themselves written by an
+earlier model call with nothing recording that they were guesses, so scoring against them would be
+one model checked against another. It measures agreement, hand-adjudicates the disagreement, and
+records that determinism is NOT established. That is the same premises-to-check discipline READ
+TWENTY-EIGHTH states for auditor citations, applied to a dataset.
+
+NOTHING WAS SENT, WHICH IS THE SUPPRESSION RULE RATHER THAN AN OMISSION
+All three reports were checked rather than assumed and ALL THREE are still UNREAD:
+`MOYD Sentry triage 2026-08-20`, sent 2026-08-20T22:22:28Z, at 1 day 11 hours 57 minutes;
+`MOYD Sentry triage 2026-08-19`, sent 2026-08-19T16:22:13Z, at 2 days 17 hours 57 minutes; and
+`MOYD Sentry triage 2026-08-18`, sent 2026-08-18T11:37:14Z, at 3 days 22 hours 42 minutes, each
+computed from a clock read this run against its own thread timestamp and FLOORED per READ TWELFTH.
+
+His four commits do NOT fire a send. READ NINETY-FIFTH retired "Andrew pushes anything" as a
+condition precisely because it had already fired at READ NINETY-FOURTH, been reported, and gone
+unread, and this is a continuation of that same fact rather than a new one. So the trigger to act
+on is unchanged: FOURTEEN DAYS blind, at 2026-08-26T15:08:27Z, or sooner if the connector returns
+or the vote is recorded closed. Name the ANCHOR when quoting a figure, per READ SEVENTY-SECOND,
+since report-age and blind-since differ by nearly a week. The 08-18 report crosses FOUR DAYS at
+11:37:14 today, about 77 minutes after this run closed, so the next run is past it; per READ
+EIGHTY-NINTH and READ ONE HUNDRED AND THIRD on the identical crossings, a round number on a report
+whose own threshold was superseded by a later send is not itself a fresh send condition.
+
+Nothing else moved. The site tip is unchanged at `aa2d513` from 2026-08-12. The six `sentry-fix/`
+branch tips were enumerated rather than inherited and are unchanged from READ SIXTY-THIRD's
+inventory, so the three fixes it establishes are live gaps have now waited a further ten days.
+Grepped both repos again rather than inherited: nothing says the endorsement vote has closed. The
+CRM hits are the doc comments and the dashboard card render path in
+`auto_inferred_assignments_service.dart` and the branch comment in `vote_detail_screen.dart`, and
+the site hits are the render paths in `VoteStatusMessage.tsx` and the members dashboard voting
+page, every one describing what is shown WHEN a vote closes rather than stating that this one has.
+So the vote is treated as OPEN and nothing was merged.
+
+The branch ref trap bit in the classic form: local `master` stale at `dbc5a8a` against a real tip
+of `3545f67`, with `HEAD` detached AT that tip. Checked in the form READ TWENTY-SECOND prescribes,
+local side the NAMED BRANCH and not `HEAD`, and repaired with `git checkout -B master HEAD` BEFORE
+committing, per READ SIXTY-FOURTH's addendum rather than READ NINTH's conditional repair. The
+cosmetic ahead count READ TWENTY-SIXTH names did NOT appear this run: after the repair
+`git status` reported up to date with `origin/master`, so this container's remote-tracking ref was
+already fresh, which READ NINETY-FIRST, READ ONE HUNDRED AND FIRST, READ ONE HUNDRED AND FOURTH
+and READ ONE HUNDRED AND SEVENTH also saw. That is a DEPARTURE and not a mechanism, so keep
+running the check per READ SECOND. The container also arrived with the wrong commit identity
+again, per READ SIXTIETH: set the one this project requires and do NOT rebase already-pushed
+commits to match, since that needs a force push and READ SECOND's prohibition is not negotiable
+for a cosmetic badge.
+
+VERIFICATION AND DISCLOSURE
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No adversarial
+audit was run, recorded as a departure rather than glossed, on the call READ SIXTY-FOURTH through
+READ ONE HUNDRED AND ELEVENTH each made for the identical case: this diff carries no diagnosis of
+a Sentry issue, no mechanism of its own and no code. Its factual claims are the four durations,
+which are arithmetic over timestamps printed above, and a characterization of four commits taken
+from their own messages in this public repo's log, both checkable without an auditor.
+
+This repo is public and the sibling is private. Named above: the commits `dbc5a8a`, `3545f67`,
+`7c87374`, `62a9f19`, `caeb3b2` and `aa2d513`, the last being the private sibling's tip whose cover
+is prior publication in READ SIXTIETH; the branch prefix `sentry-fix/`; the edge function
+`meetings-zap` and its helper `findMemberByPhoneNumber`, the tables `members` and
+`non_member_attendees` with the columns `phone`, `phone_e164` and `phone_number`, the SQLSTATE
+`42703`, and the identifier pair `message_ts` and `slack_message_ts` cited from READ THIRTY-FIRST,
+every one committed in THIS repo, the public one, by `3545f67` and earlier; the files
+`auto_inferred_assignments_service.dart` and `vote_detail_screen.dart`, both committed here, and
+`VoteStatusMessage.tsx` with the members dashboard voting page named by role rather than by path,
+both in the private sibling and both published in READ SEVENTY-FIRST; the git commands and ref
+names; the verification commands `npx tsc --noEmit` and `flutter analyze`; the product names
+Sentry, PostgREST and Zoom; and the env var name patterns `SENTRY`, `SUPABASE`, `PROJECT_REF`,
+`POSTGRES` and `DSN`. Apply READ SEVENTEENTH's test rather than the lazy version: "already
+committed" would be an argument for WITHHOLDING had any of these come from the private sibling,
+and none did. Everything else already appears in this file or is committed in this public repo's
+own tree.
+
+Deliberately WITHHELD from the account of his four commits, though all of it is already public in
+this repo's own commit log, because the finding survives without it and READ SIXTH's practice is
+to publish only what the finding needs: the n8n workflow id, the row and page limit figures, the
+model and prompt details of the host inference, the transcript quotation, and above all the NAME
+of the executive committee member whose host label the adjudication moved and the name of the
+member dropped from three meetings by the roster cap. The three reports are named by subject line
+only, which is this loop's own published convention, and no transport, credential or container
+tooling is described, which READ EIGHTEENTH records as a BLOCKER class. No log content is quoted
+except `column members.phone_number does not exist`, which is the error text his own commit
+message publishes verbatim in this public repo and which names a table this tree commits
+throughout and a column that does not exist, so it carries no row, value, person or address.
+Quantities are the clock values, the three report ages with the 08-18 four-day crossing instant,
+the blind-since duration and the next trigger instant, the forty-nine run count, the four commit
+count, the deployed version number, the branch count and the 41 host labels, all bare and naming
+nothing. Withheld per the practice READ SIXTH set: the state of the live endorsement vote, and any
+operational read on production sessions.
