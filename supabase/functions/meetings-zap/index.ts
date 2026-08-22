@@ -787,10 +787,31 @@ async function storeTranscript(supabaseClient, meetingTitle, meetingDate, transc
   }
 }
 // ==================== PHONE NUMBER MATCHING ====================
+// COLUMN NAME. public.members has `phone` and `phone_e164`. It has never had a
+// column called `phone_number`.
+//
+// Every query in this function asked for `phone_number`, so PostgREST answered
+// 400 with `42703 column members.phone_number does not exist` on every call, and
+// the whole phone-matching step has never matched anybody. Verified live against
+// the REST endpoint, not inferred from the schema.
+//
+// It failed quietly twice over. supabase-js returns { data, error } rather than
+// throwing, and each call site destructured only `data`, so the error was
+// discarded and the miss looked like "no member has this number".
+//
+// It was also not silent where it counted, and that is worth recording: each
+// failed call writes `column members.phone_number does not exist` into the
+// Postgres logs, which the relay rolls up into SUPABASE-PLATFORM-1. Sweeps have
+// been attributing that family to ad-hoc operator SQL for weeks. Some of it was
+// this dead code path all along.
+//
+// phone_e164 is the right column. Zoom hands us a dialled number, and phone_e164
+// is the normalised E.164 form that phone sign-in already keys on.
 async function findMemberByPhoneNumber(supabaseClient, phoneNumber) {
   console.log(`Searching for member by phone number: ${phoneNumber}`);
   // Try exact match first
-  const { data: exactMatch } = await supabaseClient.from('members').select('id, name, phone_number').eq('phone_number', phoneNumber).limit(1).maybeSingle();
+  const { data: exactMatch, error: exactErr } = await supabaseClient.from('members').select('id, name, phone_e164').eq('phone_e164', phoneNumber).limit(1).maybeSingle();
+  if (exactErr) console.error(`phone exact-match query failed: ${exactErr.message}`);
   if (exactMatch) {
     console.log(`✓ Matched by phone number: ${exactMatch.name}`);
     return {
@@ -803,11 +824,30 @@ async function findMemberByPhoneNumber(supabaseClient, phoneNumber) {
   const normalizedPhone = phoneNumber.replace(/\D/g, '');
   // Get last 10 digits (US phone numbers)
   const lastTenDigits = normalizedPhone.slice(-10);
-  const { data: allMembers } = await supabaseClient.from('members').select('id, name, phone_number').not('phone_number', 'is', null).limit(500);
+  // Paged, not `.limit(500)`. The name-matching path in this same file was capped
+  // at 300 against a 424-row roster, which is what dropped a sitting executive
+  // committee member out of three consecutive meetings. Do not reintroduce a cap
+  // here: it would fail the same way, silently, once the roster outgrows it.
+  const allMembers = [];
+  const phonePageSize = 1000;
+  for (let from = 0; ; from += phonePageSize) {
+    const { data: page, error: pageErr } = await supabaseClient
+      .from('members')
+      .select('id, name, phone_e164')
+      .not('phone_e164', 'is', null)
+      .range(from, from + phonePageSize - 1);
+    if (pageErr) {
+      console.error(`phone roster page at offset ${from} failed: ${pageErr.message}`);
+      break;
+    }
+    if (!page || page.length === 0) break;
+    allMembers.push(...page);
+    if (page.length < phonePageSize) break;
+  }
   if (allMembers && allMembers.length > 0) {
     for (const member of allMembers){
-      if (!member.phone_number) continue;
-      const memberNormalized = member.phone_number.replace(/\D/g, '');
+      if (!member.phone_e164) continue;
+      const memberNormalized = member.phone_e164.replace(/\D/g, '');
       const memberLastTen = memberNormalized.slice(-10);
       if (lastTenDigits === memberLastTen) {
         console.log(`✓ Matched by normalized phone number: ${member.name}`);
