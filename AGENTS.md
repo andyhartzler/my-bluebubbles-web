@@ -17063,3 +17063,167 @@ ages with the 08-20 two-day crossing instant, the blind-since duration, the next
 and its remaining interval, the fifty-six run count, the four commit count, the branch count and
 the commit distances, all bare and naming nothing. Withheld per the practice READ SIXTH set: the
 state of the live endorsement vote, and any operational read on production sessions.
+
+## READ ONE HUNDRED AND TWENTIETH: the 02:20 UTC run, a fifty-seventh consecutive block, and four of Andrew's commits, one of them a 403 that was never a permissions problem
+
+ANDREW, THIS IS THE ONE THING THIS LOOP NEEDS AND CANNOT DO ITSELF
+The Sentry connector needs reauthorizing. It lists as enabled for this session with an install
+state of unknown, so none of its tools load, and this session is non-interactive so the OAuth flow
+cannot be run from here. Reconnect it in your claude.ai connector settings and the loop resumes on
+the next tick. Placed at the top rather than only in email for the reason READ NINETY-FIFTH gives,
+and this run is more evidence for it: you pushed four commits into this repo between 00:45 and
+02:19 UTC, the last of them ONE MINUTE before this run read the tip, and the three reports in your
+inbox are still unread.
+
+Nothing has been monitored since 2026-08-12T15:08:27Z, which is 10 days 11 hours. That covers the
+public site, the CRM and the vote surface.
+
+The rest is the standing record. No triage was possible and no code changed here, so this makes NO
+claim about production health in either direction: an absent report is not an absent error, per
+READ TWENTY-SECOND.
+
+The blocker is unchanged at fifty-seven consecutive runs, tested rather than inherited per READ
+TWELFTH. An exact-count grep for `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the
+environment returns zero, so there is no token route around the connector either.
+
+A 403 PERMISSION_DENIED THAT WAS NOT A PERMISSIONS PROBLEM, WHICH CORROBORATES THIS LOOP'S OWN
+HARD RULE FROM THE OTHER DIRECTION
+Worth inheriting rather than the incident. `fc9e530` records probing Vertex live with a minted
+cloud-platform token and getting 403 `PERMISSION_DENIED` back with reason `BILLING_DISABLED`: the
+token minted, the API was reachable, and the project simply had no billing account, so the service
+refused before it looked at permissions at all. His own message names the consequence, that it is a
+dashboard action rather than a code one, and the commit routes around it by using a credential
+whose project does have billing rather than by touching a grant.
+
+That is this loop's standing prohibition arriving from the opposite side. The rule says an error
+that looks like a permissions problem is essentially never fixed by loosening the permission; this
+is a case where the error was not even ABOUT permissions, and only the machine-readable REASON
+distinguished the two. Read the reason code before touching any grant, and treat the status code
+alone as insufficient. READ SIXTY-FIRST records the same class from a `42501` that was correct
+behaviour; this one is a 403 that was correct behaviour for a different cause entirely.
+
+A CHECK-THEN-ACT GAP THAT ONLY THE DATABASE COULD CLOSE
+`ac31a4e` is the other transferable one. `identify-meeting-host` read a host slot near the top of
+its handler, decided writability from that snapshot, then wrote with a primary-key filter and
+nothing else, with a model call sitting in the gap. A human confirming the host in the CRM inside
+that window would have been silently overwritten, which is the exact outcome the function exists to
+prevent.
+
+The sentence to keep is his: application-level checks cannot close a check-then-act gap, and only
+the database can, by making the condition part of the statement that writes. The rule now appears
+twice on purpose, once in JS to decide whether to attempt the write and once in the WHERE clause
+where it is enforced, and the write returns affected rows so that zero rows reports a fired guard
+rather than a successful write. That last half matters as much as the first: a guard that silently
+reports success is its own reporting bug.
+
+Two smaller notes from the same commit, recorded so a future run does not rediscover them. It was
+found by an automated security review of its own predecessor, so a review pass on a just-landed
+commit is catching real defects here. And its comment flags that the PostgREST `.or()` filter takes
+literals only, because this project has already had an injection through one.
+
+HIS OTHER TWO ARE HIS WORK AND ARE NOT MINE TO RE-DIAGNOSE
+Recorded so the next run does not reopen them. `e419185` measures the host inference against the
+thirteen meetings a brief names as ground truth and reports 2 named, 11 abstain, 0 wrong, hand
+adjudicating both named answers against the transcripts rather than scoring them against the
+existing labels, and finding one of those existing labels wrong. That is the same
+premises-to-check discipline READ TWENTY-EIGHTH states for auditor citations, applied to a dataset,
+and it is the second time READ ONE HUNDRED AND TWELFTH's observation about his method holds.
+`47b2ff4` enforces an under-18 exclusion on a biometric index in the database rather than in a
+loader, with a BEFORE trigger no writer can bypass and a `security_invoker` view that re-applies the
+test on READ, both verified against the running system by impersonation rather than by reading the
+policy text.
+
+NOTHING WAS SENT, WHICH IS THE SUPPRESSION RULE RATHER THAN AN OMISSION
+All three reports were checked rather than assumed and ALL THREE are still UNREAD:
+`MOYD Sentry triage 2026-08-20`, sent 2026-08-20T22:22:28Z, at 2 days 3 hours 58 minutes;
+`MOYD Sentry triage 2026-08-19`, sent 2026-08-19T16:22:13Z, at 3 days 9 hours 58 minutes; and
+`MOYD Sentry triage 2026-08-18`, sent 2026-08-18T11:37:14Z, at 4 days 14 hours 43 minutes, each
+computed from a clock read this run against its own thread timestamp and FLOORED per READ TWELFTH.
+
+His four commits do NOT fire a send. READ NINETY-FIFTH retired "Andrew pushes anything" as a
+condition precisely because it had already fired at READ NINETY-FOURTH, been reported, and gone
+unread, and this is a continuation of that same fact rather than a new one. The decision was
+re-weighed rather than copied, per READ SEVENTY-FIRST, and reached the same answer: nothing here
+is a fact the sent reports do not carry. So the trigger to act on is unchanged: FOURTEEN DAYS
+blind, at 2026-08-26T15:08:27Z, which is 3 days 12 hours away, or sooner if the connector returns
+or the vote is recorded closed. Name the ANCHOR when quoting a figure, per READ SEVENTY-SECOND,
+since report-age and blind-since differ by nearly a week.
+
+Nothing else moved. The site tip is unchanged at `aa2d513` from 2026-08-12. The six `sentry-fix/`
+branch tips were enumerated rather than inherited and are unchanged from READ SIXTY-THIRD's
+inventory, so the three fixes it establishes are live gaps have now waited a further eleven days.
+Grepped both repos again rather than inherited: nothing says the endorsement vote has closed. The
+CRM hits are the doc comments and the two dashboard card render paths in
+`auto_inferred_assignments_service.dart`, and the site hits are the render paths in
+`VoteStatusMessage.tsx` and the members dashboard voting page, every one describing what is shown
+WHEN a vote closes rather than stating that this one has. So the vote is treated as OPEN and
+nothing was merged.
+
+The branch ref trap bit in the classic form: local `master` stale at `dbc5a8a` against a real tip
+of `fc9e530`, with `HEAD` detached AT that tip. Checked in the form READ TWENTY-SECOND prescribes,
+local side the NAMED BRANCH and not `HEAD`, and repaired with `git checkout -B master HEAD` BEFORE
+committing, per READ SIXTY-FOURTH's addendum rather than READ NINTH's conditional repair. After the
+repair `git status` reports ahead 50 and behind 50, which is the shallow graft distorting the merge
+base per READ SIXTY-SIXTH rather than a plain ahead count, and it is the stale remote-tracking cache
+talking either way per READ TWENTY-SIXTH. Do not act on it. The container also arrived with the
+wrong commit identity again, per READ SIXTIETH: set the one this project requires and do NOT rebase
+already-pushed commits to match, since that needs a force push and READ SECOND's prohibition is not
+negotiable for a cosmetic badge. READ NINTH's cwd trap bit too, in its harmless direction: an
+earlier `cd` into the SITE repo left the shell there, so a `git log` meant for the CRM answered
+`fatal: ambiguous argument` on a revision range that exists only in the CRM. Read that as cwd drift
+rather than as a missing object, and use `git -C <path>` for every git command in a two repo
+container.
+
+ONE DISCRIMINATOR NOTE, BECAUSE THIS RUN'S TIP WOULD HAVE FOOLED THE USUAL CHECK
+READ EIGHTY-THIRD's rule is to read a new tip's SUBJECT rather than infer from the hash being new,
+and READ ONE HUNDRED AND THIRTEENTH adds that authorship alone cannot make the call because this
+loop commits under his identity by standing rule. This window is the case that needs both halves:
+of his four commits, TWO are authored `Andrew Hartzler <andrew@moyoungdemocrats.org>` and TWO are
+authored `Andy Hartzler <andrew@hartzler.us>`, which is byte identical to the identity this loop
+uses. So an authorship test would have read two of his own commits as sweep records. The subjects
+settle it, and only the subjects.
+
+VERIFICATION AND DISCLOSURE
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No adversarial
+audit was run, recorded as a departure rather than glossed, on the call READ SIXTY-FOURTH through
+READ ONE HUNDRED AND NINETEENTH each made for the identical case: this diff carries no diagnosis of
+a Sentry issue, no mechanism of its own and no code. Its factual claims are the five durations,
+which are arithmetic over timestamps printed above, and a characterization of four commits taken
+from their own messages in this public repo's log, both checkable without an auditor.
+
+This repo is public and the sibling is private. Named above: the commits `dbc5a8a`, `fc9e530`,
+`47b2ff4`, `ac31a4e`, `e419185` and `aa2d513`, the last being the private sibling's tip whose cover
+is prior publication in READ SIXTIETH; the branch prefix `sentry-fix/`; the edge function
+`identify-meeting-host`, the SQL keyword `WHERE`, the PostgREST filter `.or()`, the Postgres option
+`security_invoker`, the column `date_of_birth`, and the Google API host and error tokens
+`aiplatform.googleapis.com`, `PERMISSION_DENIED` and `BILLING_DISABLED`, every one committed in
+THIS repo, the public one, by `fc9e530` and its three predecessors; the SQLSTATE `42501` cited from
+READ SIXTY-FIRST; the files `auto_inferred_assignments_service.dart`, committed here, and
+`VoteStatusMessage.tsx` with the members dashboard voting page named by role rather than by path,
+both in the private sibling and both published in READ SEVENTY-FIRST; the connector field name
+`enabledInChat` and install state `unknown`, published here since READ NINETIETH; the git commands
+and ref names, the shell builtin `cd`, and the git error string `fatal: ambiguous argument`, whose
+cover is prior publication in READ THIRTY-SIXTH; the verification commands `npx tsc --noEmit` and
+`flutter analyze`; the product names Sentry, PostgREST, Google and Vertex; and the env var name
+patterns `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN`. Apply READ SEVENTEENTH's test
+rather than the lazy version: "already committed" would be an argument for WITHHOLDING had any of
+these come from the private sibling, and none did. Everything else already appears in this file or
+is committed in this public repo's own tree.
+
+Deliberately WITHHELD from the account of his four commits, though all of it is already public in
+this repo's own commit log, because the finding survives without it and READ SIXTH's practice is to
+publish only what the finding needs: the service account addresses, the Google project names, the
+new API key secret NAME, the model identifier and version tag, the shared helper and auth file
+paths, the function chosen as the proof, the token and latency figures, the biometric table and
+view names beyond the one the finding needs, the detector name, the deployed version numbers, and
+above all the identity of the under-18 executive and of every person named in the host adjudication.
+The three reports are named by subject line only, which is this loop's own published convention, and
+no transport, credential or container tooling is described, which READ EIGHTEENTH records as a
+BLOCKER class. No log content is quoted, because none was readable; the two Google error tokens are
+his commit message's own published text rather than anything this run read from a log. Quantities
+are the clock values, the three report ages, the blind-since duration, the next trigger instant and
+its remaining interval, the fifty-seven run count, the four commit count, the two-and-two authorship
+split, the branch count, the commit distances, and the accuracy figures quoted from `e419185`, all
+bare and naming nothing. Withheld per the practice READ SIXTH set: the state of the live endorsement
+vote, and any operational read on production sessions.
