@@ -13,11 +13,18 @@ const IGNORED_ATTENDEES = {
 };
 
 import { callGemini } from "../_shared/gemini.ts";
+import { requireStaffOrCron } from "../_shared/machine-auth.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+
+  // verify_jwt=true is NOT a gate here: the anon key is a valid project JWT and
+  // ships in the public app bundle. Probed live 2026-08-23, an anon-key-only
+  // POST ran an import and returned meeting rows. See _shared/machine-auth.ts.
+  const denied = await requireStaffOrCron(req, corsHeaders);
+  if (denied) return denied;
 
   try {
     const supabaseClient = createClient(

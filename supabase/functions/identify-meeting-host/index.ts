@@ -59,6 +59,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callGemini } from "../_shared/gemini.ts";
+import { requireStaffOrCron } from "../_shared/machine-auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -285,6 +286,12 @@ async function infer(
 }
 
 Deno.serve(async (req: Request) => {
+  // verify_jwt=true is NOT a gate here: the anon key is a valid project JWT and
+  // ships in the public app bundle. Probed live 2026-08-23, an anon-key-only
+  // POST reached this handler. See _shared/machine-auth.ts.
+  const denied = await requireStaffOrCron(req, {});
+  if (denied) return denied;
+
   try {
     const { meeting_id, dry_run = true } = await req.json();
     if (!meeting_id) {
