@@ -1,5 +1,8 @@
 [build]
   command = "bash netlify-build.sh"
+  # Skip the build when no file that can affect build/web changed.
+  # See netlify-should-build.sh for the measurement that motivated it.
+  ignore = "bash netlify-should-build.sh"
   publish = "build/web"
 
 [build.environment]
