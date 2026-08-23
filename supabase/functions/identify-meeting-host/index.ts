@@ -38,6 +38,24 @@
 // where the chair sat and no longer decides anything. An unidentified host is
 // still a fine outcome. A named person in a meeting they did not chair is still
 // not.
+//
+// MEASURED ON gemini-3.6-flash, 2026-08-23. DO NOT RE-RUN THIS TO FIND OUT.
+// 45 meetings that already carry a host and have a transcript, three passes each,
+// 135 calls. 27 named, 18 abstained, 0 unstable: the matched member was identical
+// across all three passes on all 45. Every one of the 27 was hand adjudicated
+// against the transcript. 26 hold outright, 1 is thin, 0 are wrong, and 4
+// disagree with the stored label, of which 3 are the STORED LABEL being wrong.
+//
+// Confidence came back bimodal with a wide empty band: abstains 0.10 to 0.20,
+// named answers 0.80 to 0.95, nothing at all between. Any threshold in that gap
+// produces identical output, so WRITE_THRESHOLD is left at 0.75 and there is no
+// value in tuning it. It cannot be used to separate the strong named answers
+// from the thin ones either: the thin ones sit at 0.80 and are not stable enough
+// at that edge to be excluded by a number. Exclude them by reading the
+// transcript, which is what meeting_host_evidence is stored for.
+//
+// The earlier warning that this inference was NON-DETERMINISTIC came from the
+// Anthropic build. It did not carry over.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callGemini } from "../_shared/gemini.ts";
@@ -377,8 +395,7 @@ Deno.serve(async (req: Request) => {
       resolved &&
       result.confidence >= WRITE_THRESHOLD;
 
-    // THE GUARD IS REPEATED IN THE WHERE CLAUSE ON PURPOSE. Do not simplify this
-    // back to .eq("id", meeting_id) alone.
+    // THE GUARD IS ENFORCED BY THE DATABASE, IN THE STATEMENT THAT WRITES.
     //
     // hostSlotWritable above is computed from a row read near the top of this
     // handler, and a model call sits between that read and this write. That gap
@@ -386,37 +403,36 @@ Deno.serve(async (req: Request) => {
     // CRM inside that window would be silently overwritten by a machine guess,
     // which is the one outcome this whole function is written to prevent.
     //
-    // Checking in application code cannot close that. Only the database can, by
-    // making the condition part of the statement that writes. So the same rule
-    // appears twice: once in JS to decide whether to attempt the write at all,
-    // and once here where it is actually enforced.
+    // Checking in application code cannot close that. Only the database can. So
+    // the same rule appears twice: once in JS to decide whether to attempt the
+    // write at all, and once inside claim_meeting_host where it is enforced.
     //
-    // The .or() takes literals, never user input. This project has already had a
-    // PostgREST .or() filter injection, so if you ever interpolate into this
-    // string, escape it.
+    // DO NOT PUT THIS BACK AS A .or() FILTER. It was written as
+    //   .update({...}).eq("id", id).or("meeting_host.is.null,meeting_host_source.eq.transcript")
+    // and that NEVER WORKED. Probed live on 2026-08-23: a PATCH carrying an `or=`
+    // filter naming any column other than `id` answers 42703 "column
+    // meetings.meeting_host does not exist", while the identical filter on a GET
+    // returns the row and the same column as a plain `meeting_host=is.null`
+    // filter on the same PATCH succeeds. Every write attempt this function made
+    // came back as HTTP 500 "write failed: column meetings.meeting_host does not
+    // exist", so nothing was ever backfilled. See migration
+    // 20260823_02_claim_meeting_host.sql.
     if (write && matched) {
-      const { data: updated, error: uErr } = await db
-        .from("meetings")
-        .update({
-          meeting_host: matched.id,
-          meeting_host_source: "transcript",
-          meeting_host_confidence: result.confidence,
-          // The resolution is part of the evidence a human needs: "named by
-          // another attendee" is a materially weaker claim than "spoke under
-          // their own name", and the confidence alone does not say which.
-          meeting_host_evidence:
-            `[${result.resolution ?? "unspecified"}] ${result.reasoning} | ${result.evidence}`
-              .slice(0, 1000),
-          meeting_host_inferred_at: new Date().toISOString(),
-        })
-        .eq("id", meeting_id)
-        .or("meeting_host.is.null,meeting_host_source.eq.transcript")
-        .select("id");
+      const { data: claimed, error: uErr } = await db.rpc("claim_meeting_host", {
+        p_meeting_id: meeting_id,
+        p_host: matched.id,
+        p_confidence: result.confidence,
+        // The resolution is part of the evidence a human needs: "named by
+        // another attendee" is a materially weaker claim than "spoke under
+        // their own name", and the confidence alone does not say which.
+        p_evidence:
+          `[${result.resolution ?? "unspecified"}] ${result.reasoning} | ${result.evidence}`,
+      });
       if (uErr) return json({ error: `write failed: ${uErr.message}` }, 500);
-      // Zero rows means the guard fired: somebody set a host while we were
+      // A NULL id back means the guard fired: somebody set a host while we were
       // thinking. That is a correct outcome, not an error, and it must be
       // visible rather than reported as a successful write.
-      if (!updated || updated.length === 0) {
+      if (!claimed) {
         return json({
           meeting_id,
           wrote: false,
