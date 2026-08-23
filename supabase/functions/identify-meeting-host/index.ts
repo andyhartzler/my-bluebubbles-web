@@ -284,8 +284,25 @@ Deno.serve(async (req: Request) => {
       !result.shared_account_chaired &&
       result.confidence >= WRITE_THRESHOLD;
 
+    // THE GUARD IS REPEATED IN THE WHERE CLAUSE ON PURPOSE. Do not simplify this
+    // back to .eq("id", meeting_id) alone.
+    //
+    // hostSlotWritable above is computed from a row read near the top of this
+    // handler, and an OpenAI call sits between that read and this write. That gap
+    // is seconds, sometimes tens of seconds. A human confirming the host in the
+    // CRM inside that window would be silently overwritten by a machine guess,
+    // which is the one outcome this whole function is written to prevent.
+    //
+    // Checking in application code cannot close that. Only the database can, by
+    // making the condition part of the statement that writes. So the same rule
+    // appears twice: once in JS to decide whether to attempt the write at all,
+    // and once here where it is actually enforced.
+    //
+    // The .or() takes literals, never user input. This project has already had a
+    // PostgREST .or() filter injection, so if you ever interpolate into this
+    // string, escape it.
     if (write && matched) {
-      const { error: uErr } = await db
+      const { data: updated, error: uErr } = await db
         .from("meetings")
         .update({
           meeting_host: matched.id,
@@ -294,8 +311,22 @@ Deno.serve(async (req: Request) => {
           meeting_host_evidence: `${result.reasoning} | ${result.evidence}`.slice(0, 1000),
           meeting_host_inferred_at: new Date().toISOString(),
         })
-        .eq("id", meeting_id);
+        .eq("id", meeting_id)
+        .or("meeting_host.is.null,meeting_host_source.eq.transcript")
+        .select("id");
       if (uErr) return json({ error: `write failed: ${uErr.message}` }, 500);
+      // Zero rows means the guard fired: somebody set a host while we were
+      // thinking. That is a correct outcome, not an error, and it must be
+      // visible rather than reported as a successful write.
+      if (!updated || updated.length === 0) {
+        return json({
+          meeting_id,
+          wrote: false,
+          skipped_reason: "host_set_by_another_writer_during_inference",
+          would_have_written: matched.id,
+          confidence: result.confidence,
+        });
+      }
     }
 
     return json({
