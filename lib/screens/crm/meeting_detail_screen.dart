@@ -18,6 +18,7 @@ import 'package:bluebubbles/screens/crm/editors/meeting_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/non_member_attendee_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/editors/member_search_sheet.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/widgets/meeting_commitments_panel.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 import 'package:bluebubbles/services/crm/storage_uri_resolver.dart';
@@ -310,6 +311,17 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
           children
             ..add(const SizedBox(height: 24))
             ..add(resources);
+        }
+
+        // Above the narrative, because this is the part with owners and a
+        // status on it. The Action Items paragraph still renders below and is
+        // still the summariser's own words. Not drawn in the member view: the
+        // rows are executive-committee-only in the database, so a member would
+        // be shown an empty panel that implies there is nothing to see.
+        if (!widget.isMemberView) {
+          children
+            ..add(const SizedBox(height: 24))
+            ..add(MeetingCommitmentsPanel(meetingId: _meeting.id));
         }
 
         if (narrativeSections.isNotEmpty) {
