@@ -5,10 +5,10 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callGemini } from "../_shared/gemini.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY")!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
@@ -241,56 +241,30 @@ Respond ONLY with the JSON object, no additional text.`;
 // ============================================================
 // CALL CLAUDE API
 // ============================================================
-async function analyzeWithClaude(prompt: string): Promise<any> {
+async function analyzeWithModel(prompt: string): Promise<any> {
   const startTime = Date.now();
-  
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": anthropicApiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    }),
-  });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Claude API error: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json();
+  const result = await callGemini({ prompt, maxTokens: 4000 });
+  const content = result.text;
   const duration = Date.now() - startTime;
-  
-  // Extract JSON from response
-  const content = data.content[0].text;
-  
+
   // Try to parse JSON from the response
   let analysis;
   try {
-    // Handle case where Claude wraps in markdown code blocks
-    const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
+    // Handle case where the model wraps it in markdown code blocks
+    const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) ||
                       content.match(/```\s*([\s\S]*?)\s*```/);
     const jsonStr = jsonMatch ? jsonMatch[1] : content;
     analysis = JSON.parse(jsonStr.trim());
   } catch (e) {
-    throw new Error(`Failed to parse Claude response as JSON: ${e.message}\nRaw response: ${content.substring(0, 500)}`);
+    throw new Error(`Failed to parse model response as JSON: ${e.message}\nRaw response: ${content.substring(0, 500)}`);
   }
 
   return {
     analysis,
-    tokensUsed: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+    tokensUsed: result.totalTokens,
     durationMs: duration,
-    modelVersion: "claude-sonnet-4-20250514",
+    modelVersion: result.modelVersion,
   };
 }
 
@@ -364,7 +338,7 @@ serve(async (req) => {
 
     // Build prompt and analyze
     const prompt = buildAnalysisPrompt(bill);
-    const { analysis, tokensUsed, durationMs, modelVersion } = await analyzeWithClaude(prompt);
+    const { analysis, tokensUsed, durationMs, modelVersion } = await analyzeWithModel(prompt);
 
     // Handle category - normalize to single category
     let category = analysis.category;
