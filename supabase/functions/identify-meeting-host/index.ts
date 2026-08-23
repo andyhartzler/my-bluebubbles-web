@@ -10,27 +10,57 @@
 // confidence, no abstain except the literal string "UNKNOWN", and the result was
 // written straight into meetings.meeting_host with nothing recording that it was
 // a guess. Every one of the 41 hosts currently in that column came from it or
-// from the Zoom host-name fallback beside it. This replaces that, scored.
+// from the Zoom host-name fallback beside it. That function was deleted on
+// 2026-08-23 so there is one transcript inferrer and it is this one.
 //
 // THE LIMIT THAT MATTERS, AND WHY ABSTAIN IS THE POINT
 // The whole executive committee shares ONE Zoom account whose display name is
 // "Missouri Young Democrats". In 30 of the 41 transcripts that label is the
 // DOMINANT speaker, and in 25 of 41 the currently-recorded host never appears as
 // a named speaker at all. So when the chair is the one driving the shared
-// account, the transcript physically cannot name them: every word they say is
+// account, the transcript usually cannot name them: every word they say is
 // attributed to an organisation. A model told to "respond with only a name" will
 // pick the most plausible OTHER attendee instead, which is precisely how a
 // confidently wrong host lands in a meeting record.
 //
-// This function is therefore built to return shared_account_chaired=true and no
-// host in that case. An unidentified host is a fine outcome. A named person in a
-// meeting they did not chair is not.
+// USUALLY, NOT ALWAYS, AND THE DIFFERENCE IS WHERE THE COVERAGE IS
+// The first version of this prompt said flatly that a chair on the shared
+// account could not be identified, and told the model to return no host in that
+// case. That is wrong for one specific and common situation: the chair is on the
+// shared account, but another attendee ADDRESSES THEM BY NAME, so the human is
+// in the transcript after all. Every named answer the first measurement produced
+// came from exactly that situation, with the model quietly setting
+// shared_account_chaired=false so its own instructions would let it answer. The
+// behaviour was right and the instruction was wrong.
+//
+// So the prompt now names three outcomes rather than one flag: named_directly,
+// named_by_others, and unidentifiable. shared_account_chaired describes only
+// where the chair sat and no longer decides anything. An unidentified host is
+// still a fine outcome. A named person in a meeting they did not chair is still
+// not.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callGemini } from "../_shared/gemini.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
+
+// THINKING IS ON FOR THIS ONE CALL AND THE BUDGET IS DELIBERATE.
+//
+// _shared/gemini.ts defaults thinking OFF because a caller that ports Claude's
+// max_tokens straight across can otherwise get an empty reply with finishReason
+// MAX_TOKENS, having paid for reasoning and received none of it. This call is
+// the exception the default was written to allow for. It is a judgement call
+// under an instruction to abstain, which is exactly the shape that degrades
+// without reasoning, and the Anthropic call it replaces ran adaptive thinking at
+// medium effort rather than a plain completion.
+//
+// So the budget is raised to match. The JSON answer is a couple of hundred
+// tokens; everything above that is headroom so a hard transcript cannot run the
+// thinking into the ceiling and return nothing. Do not lower this back to the
+// 2000 the Anthropic call used: there, thinking was billed separately from the
+// output cap, and here it is not.
+const INFER_MAX_TOKENS = 8000;
 
 // The shared-account display names. Anything matching these is an ORGANISATION,
 // not a person, and must never be returned as a host.
@@ -55,7 +85,14 @@ interface Candidate {
   name: string;
 }
 
+// The three outcomes the prompt asks for. `named_by_others` is the case this
+// function used to throw away: the chair was on the shared account, so the
+// transcript could not name them DIRECTLY, but somebody else in the room
+// addressed them by name, so the human is recoverable anyway.
+type Resolution = "named_directly" | "named_by_others" | "unidentifiable";
+
 interface Inference {
+  resolution: Resolution | null;
   host_name: string | null;
   confidence: number;
   evidence: string;
@@ -107,17 +144,46 @@ ${roster}
 CRITICAL FACT ABOUT THESE TRANSCRIPTS
 "Missouri Young Democrats" is a SHARED Zoom account used by the whole executive
 committee. It is NOT a person. Whoever is signed into it that day appears under
-that label, and the transcript gives you no way to tell which human it is.
+that label, and the label alone tells you nothing about which human it is.
 
-That matters because the chair is very often the one on the shared account: they
-are the one admitting people from the waiting room, calling the meeting to order
-and running the agenda. If the person doing those things is labelled "Missouri
-Young Democrats", then the transcript CANNOT tell you who chaired, and you must
-say so rather than picking the next most plausible attendee.
+The chair is very often the one on the shared account: they are the one admitting
+people from the waiting room, calling the meeting to order and running the agenda.
+So when you see "Missouri Young Democrats" chairing, that is the START of the
+question, not the answer.
+
+THERE ARE THREE POSSIBLE OUTCOMES. WORK OUT WHICH ONE YOU ARE IN.
+
+1. named_directly
+   The person running the meeting speaks under their own name in the transcript.
+   Ordinary case, nothing special about it.
+
+2. named_by_others
+   The person running the meeting is on the shared account, BUT somebody else in
+   the meeting addresses or refers to them by name, so the human IS recoverable.
+   Examples of what this looks like:
+     - "thanks for running this, Dwayne"
+     - "over to you, Lucy"
+     - "Andrew, can you share your screen"  said to whoever is driving the call
+     - a speaker answering a question that was put to the shared account by name
+   THIS IS A VALID ANSWER. Return the name. Do not throw it away merely because
+   the chair's own tile said "Missouri Young Democrats".
+   You must quote the exact words that name them in the evidence field.
+
+3. unidentifiable
+   The person running the meeting is on the shared account and NOBODY names them.
+   Then the transcript genuinely cannot tell you who chaired, and you must say so
+   rather than picking the next most plausible attendee.
+
+BE STRICT ABOUT THE DIFFERENCE BETWEEN 2 AND 3.
+Outcome 2 needs somebody naming THE PERSON WHO IS RUNNING THE MEETING. A name
+merely occurring in the transcript is not enough: attendees are named all the
+time when they are called on, thanked, or assigned work, and none of that makes
+them the chair. If the only thing you have is that a name appears, you are in
+outcome 3.
 
 WHAT TO LOOK FOR
 - who calls the meeting to order or moves the agenda along
-- who is thanked or addressed by name as the one running it ("thanks for hosting", "over to you, X")
+- who is thanked or addressed by name as the one running it
 - who controls the waiting room, recording, or screen share
 - who assigns action items and closes the meeting
 
@@ -127,19 +193,30 @@ dominate a meeting they did not chair.
 ANSWER FORMAT
 Return ONLY a JSON object, no other text:
 {
+  "resolution": "named_directly" | "named_by_others" | "unidentifiable",
   "host_name": "<exact name from the attendee list, or null>",
   "confidence": <0.0 to 1.0>,
-  "evidence": "<a short quote from the transcript that supports it, or why you cannot tell>",
+  "evidence": "<a short verbatim quote from the transcript that supports it, or why you cannot tell>",
   "reasoning": "<one or two sentences>",
-  "shared_account_chaired": <true if the chair appears to be the person on the shared "Missouri Young Democrats" account>
+  "shared_account_chaired": <true if the person running the meeting appeared under the shared "Missouri Young Democrats" label, whether or not you resolved their name>
 }
 
+CONFIDENCE BANDS, ONE PER OUTCOME. USE THE BAND THAT MATCHES YOUR RESOLUTION.
+- named_directly:  0.75 to 0.95
+- named_by_others: 0.55 to 0.90. Use 0.75 or above only when the person naming
+  them is unmistakably talking to whoever is running the meeting. Use 0.55 to
+  0.70 when it is a reasonable read but another attendee could be meant.
+- unidentifiable:  0.00 to 0.30, and host_name MUST be null.
+
 RULES
-- If shared_account_chaired is true, host_name MUST be null and confidence MUST be at most 0.3.
-- NEVER return "Missouri Young Democrats" as host_name. It is not a person.
+- NEVER return "Missouri Young Democrats" as host_name. It is not a person, and
+  that is true in all three outcomes.
 - host_name must match a name in the attendee list exactly, or be null.
-- If you are guessing, say so with a low confidence. A null answer is a good
-  answer. Naming the wrong person puts them in a permanent meeting record.
+- shared_account_chaired describes WHERE THE CHAIR SAT, not whether you answered.
+  It is true in outcome 3 and it is also true in outcome 2. It does not by itself
+  force host_name to null; only outcome 3 does that.
+- Naming the wrong person puts them in a permanent meeting record. A null answer
+  in outcome 3 is a good answer. A guess dressed up as outcome 2 is not.
 
 TRANSCRIPT
 ${excerpt(transcript)}`;
@@ -151,45 +228,36 @@ async function infer(
   candidates: Candidate[],
   transcript: string,
 ): Promise<Inference> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-opus-5",
-      max_tokens: 2000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium" },
-      messages: [{ role: "user", content: buildPrompt(title, date, candidates, transcript) }],
-    }),
+  // A refusal, or a reply truncated by the token ceiling, arrives from Vertex as
+  // HTTP 200 with no text and a finishReason. callGemini throws and names the
+  // reason rather than handing back an empty string that would fail to parse
+  // three lines below, which is the same guard the Anthropic stop_reason check
+  // here used to provide.
+  const { text } = await callGemini({
+    prompt: buildPrompt(title, date, candidates, transcript),
+    maxTokens: INFER_MAX_TOKENS,
+    thinking: true,
+    // Low on purpose. The instruction this prompt is built around is "abstain
+    // rather than guess", and sampling temperature is the knob that decides how
+    // readily a model reaches for the next most plausible attendee instead.
+    temperature: 0.2,
+    // The prompt already demands a bare JSON object and the regex below already
+    // tolerates stray prose. This makes the fenced-reply case impossible rather
+    // than merely survivable.
+    json: true,
   });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`anthropic ${res.status}: ${body.slice(0, 300)}`);
-  }
-
-  const data = await res.json();
-
-  // Check stop_reason before reading content: a refusal returns HTTP 200 with an
-  // empty content array, so indexing content[0] blindly throws a confusing error.
-  if (data.stop_reason === "refusal") {
-    throw new Error("anthropic declined the request");
-  }
-
-  const text = (data.content ?? [])
-    .filter((b: { type: string }) => b.type === "text")
-    .map((b: { text: string }) => b.text)
-    .join("");
 
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error(`no JSON in model reply: ${text.slice(0, 200)}`);
   const parsed = JSON.parse(match[0]);
 
+  const RESOLUTIONS = ["named_directly", "named_by_others", "unidentifiable"];
+  const resolution = RESOLUTIONS.includes(parsed.resolution)
+    ? (parsed.resolution as Resolution)
+    : null;
+
   return {
+    resolution,
     host_name: parsed.host_name ?? null,
     confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0,
     evidence: String(parsed.evidence ?? ""),
@@ -276,19 +344,44 @@ Deno.serve(async (req: Request) => {
     const hostSlotWritable =
       meeting.meeting_host === null || meeting.meeting_host_source === "transcript";
 
+    // WHY THE GATE IS ON `resolution` AND NO LONGER ON `shared_account_chaired`.
+    //
+    // The old gate refused to write anything whenever the chair sat on the
+    // shared account. That conflated two different situations. In one the chair
+    // is on the shared account and NOBODY names them, so the transcript really
+    // cannot answer and an abstain is correct. In the other the chair is on the
+    // shared account but another attendee addresses them by name, so the human
+    // IS in the transcript and throwing it away is a self-inflicted miss.
+    //
+    // The old prompt had a rule saying shared_account_chaired implied a null
+    // host, and the model was overriding it: every named answer the previous
+    // measurement produced came from the second case, with the model setting
+    // the flag false in order to be allowed to answer. That is the model
+    // routing around a wrong instruction, and it makes the flag mean two things
+    // at once. So the flag now describes only WHERE THE CHAIR SAT, and
+    // `resolution` carries the decision.
+    //
+    // If the model returns no usable resolution, fall back to the old rule
+    // rather than to permissiveness: an unparsed answer must not become a
+    // write.
+    const resolved =
+      result.resolution === null
+        ? !result.shared_account_chaired
+        : result.resolution !== "unidentifiable";
+
     const write =
       !dry_run &&
       hostSlotWritable &&
       matched !== null &&
       matched.id !== "" &&
-      !result.shared_account_chaired &&
+      resolved &&
       result.confidence >= WRITE_THRESHOLD;
 
     // THE GUARD IS REPEATED IN THE WHERE CLAUSE ON PURPOSE. Do not simplify this
     // back to .eq("id", meeting_id) alone.
     //
     // hostSlotWritable above is computed from a row read near the top of this
-    // handler, and an OpenAI call sits between that read and this write. That gap
+    // handler, and a model call sits between that read and this write. That gap
     // is seconds, sometimes tens of seconds. A human confirming the host in the
     // CRM inside that window would be silently overwritten by a machine guess,
     // which is the one outcome this whole function is written to prevent.
@@ -308,7 +401,12 @@ Deno.serve(async (req: Request) => {
           meeting_host: matched.id,
           meeting_host_source: "transcript",
           meeting_host_confidence: result.confidence,
-          meeting_host_evidence: `${result.reasoning} | ${result.evidence}`.slice(0, 1000),
+          // The resolution is part of the evidence a human needs: "named by
+          // another attendee" is a materially weaker claim than "spoke under
+          // their own name", and the confidence alone does not say which.
+          meeting_host_evidence:
+            `[${result.resolution ?? "unspecified"}] ${result.reasoning} | ${result.evidence}`
+              .slice(0, 1000),
           meeting_host_inferred_at: new Date().toISOString(),
         })
         .eq("id", meeting_id)
@@ -333,6 +431,7 @@ Deno.serve(async (req: Request) => {
       meeting_id,
       meeting_title: meeting.meeting_title,
       candidates: candidates.length,
+      resolution: result.resolution,
       inferred_name: result.host_name,
       matched_member_id: matched?.id ?? null,
       matched_name: matched?.name ?? null,

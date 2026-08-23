@@ -12,9 +12,7 @@ const IGNORED_ATTENDEES = {
   names: ['Missouri Young Democrats', 'missouri young democrats']
 };
 
-// OpenAI Configuration
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-const OPENAI_MODEL = 'gpt-4o-mini'; // Cost-effective for batch processing
+import { callGemini } from "../_shared/gemini.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -131,34 +129,44 @@ serve(async (req) => {
           }
         }
 
-        // Process transcript with OpenAI
+        // Process transcript with the summary model
         let aiSummary = null;
-        let inferredHost = null;
 
         if (transcriptText && transcriptText.length > 100) {
-          console.log('🤖 Analyzing transcript with OpenAI...');
-          
+          console.log('🤖 Analyzing transcript...');
+
           // Extract meeting summary sections
           aiSummary = await extractMeetingSummary(transcriptText, zoomMeeting.topic);
           console.log('✓ Summary extracted');
-
-          // Infer meeting host
-          inferredHost = await inferMeetingHost(
-            transcriptText, 
-            zoomMeeting.topic, 
-            uniqueParticipants.map(p => p.name)
-          );
-          console.log(`✓ Inferred host: ${inferredHost || 'unknown'}`);
         } else {
           console.log('⚠️  No transcript available for AI analysis');
         }
 
-        // Identify and match host
+        // Identify and match host.
+        //
+        // THE TRANSCRIPT GUESS THAT USED TO SIT IN FRONT OF THIS IS GONE.
+        // inferMeetingHost() ran one gpt call at temperature 0.1 over the first
+        // 8000 characters, prompted "respond with ONLY the person's name", and
+        // its answer took priority over Zoom's own host field. It carried no
+        // confidence, no abstain except the literal string "UNKNOWN", and no
+        // provenance, so a confident guess was indistinguishable in the CRM
+        // from a fact. Every one of the 41 rows now stamped 'legacy' came from
+        // it or from the fallback below it, which is why those labels are not
+        // ground truth for anything.
+        //
+        // Inferring a host from a transcript is now identify-meeting-host's
+        // job, which returns a confidence, can abstain, and stamps
+        // meeting_host_source='transcript'. Two writers inferring the same
+        // thing by different methods, only one of them recording that it
+        // guessed, is the ambiguity 20260822_03 exists to remove.
+        //
+        // What remains here is Zoom's own host_name, which is a fact about the
+        // Zoom account rather than an inference, and is stamped 'zoom'.
         let meetingHostMemberId = null;
         let meetingHostName = null;
 
-        const hostHint = inferredHost || zoomMeeting.host_name || null;
-        
+        const hostHint = zoomMeeting.host_name || null;
+
         if (hostHint) {
           console.log(`\n🔍 Identifying host from hint: "${hostHint}"`);
           const hostResult = await identifyAndMatchHost(
@@ -235,7 +243,13 @@ serve(async (req) => {
             recording_url: recordingUrl,
             recording_embed_url: recordingEmbedUrl,
             transcript_file_path: transcriptFilePath,
-            meeting_host: meetingHostMemberId,
+            // Never a host without its provenance: meetings_host_needs_source
+            // (20260822_03) is a validated CHECK and rejects the whole row, so
+            // a host written bare here would fail the import rather than just
+            // lose the label.
+            ...(meetingHostMemberId
+              ? { meeting_host: meetingHostMemberId, meeting_host_source: 'zoom' }
+              : {}),
             action_items: aiSummary?.action_items || null,
             executive_recap: aiSummary?.executive_recap || null,
             agenda_reviewed: aiSummary?.agenda_reviewed || null,
@@ -537,16 +551,13 @@ function parseVTTTranscript(vtt: string): string {
   return textLines.join('\n');
 }
 
-// ==================== OPENAI FUNCTIONS ====================
+// ==================== TRANSCRIPT SUMMARY ====================
 
 async function extractMeetingSummary(transcript: string, meetingTitle: string) {
-  if (!OPENAI_API_KEY) {
-    console.log('⚠️  No OpenAI API key - skipping AI summary');
-    return null;
-  }
-
   try {
-    const prompt = `You are analyzing a transcript from a "${meetingTitle}" meeting for Missouri Young Democrats.
+    const prompt = `You are a meeting minutes expert. Extract structured information from transcripts accurately and concisely.
+
+You are analyzing a transcript from a "${meetingTitle}" meeting for Missouri Young Democrats.
 
 Extract the following sections from the transcript:
 
@@ -572,38 +583,27 @@ If a section has no relevant content, use null.
 TRANSCRIPT:
 ${transcript.slice(0, 15000)}`; // Limit to ~15k chars to stay within token limits
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a meeting minutes expert. Extract structured information from transcripts accurately and concisely.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' }
-      })
+    // THE SYSTEM LINE IS NOW THE FIRST LINE OF THE PROMPT, NOT A SEPARATE FIELD.
+    // The OpenAI call carried "You are a meeting minutes expert..." as a system
+    // message. Folding it into the prompt keeps the same instruction in the same
+    // order and is what every other call site here does; nothing about the
+    // extraction depends on it being a distinct role.
+    const { text } = await callGemini({
+      prompt,
+      // Was OpenAI's response_format: { type: 'json_object' }. The JSON.parse
+      // below is bare, with no fence stripping, so without this a ```json fence
+      // would throw into the catch and the meeting would be written with an
+      // empty summary and no error anywhere.
+      json: true,
+      temperature: 0.3,
+      // gpt-4o-mini was capped by its own default. Six prose sections over a
+      // 15k character transcript needs real room, and a truncated reply is not
+      // valid JSON, so it would fail closed to null rather than to a partial
+      // summary.
+      maxTokens: 4096
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`OpenAI API error: ${JSON.stringify(error)}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-    
-    return JSON.parse(content);
+    return JSON.parse(text);
 
   } catch (error) {
     console.error('Error extracting summary:', error);
@@ -611,71 +611,6 @@ ${transcript.slice(0, 15000)}`; // Limit to ~15k chars to stay within token limi
   }
 }
 
-async function inferMeetingHost(transcript: string, meetingTitle: string, participantNames: string[]) {
-  if (!OPENAI_API_KEY) {
-    console.log('⚠️  No OpenAI API key - skipping host inference');
-    return null;
-  }
-
-  try {
-    const prompt = `You are analyzing a meeting transcript to identify the host/chair/leader.
-
-Meeting: "${meetingTitle}"
-Participants: ${participantNames.join(', ')}
-
-Based on the transcript, who was most likely the meeting host/chair? Look for:
-- Who called the meeting to order
-- Who facilitated discussions
-- Who managed the agenda
-- Who had the most speaking time in leadership capacity
-
-Respond with ONLY the person's name from the participant list, or "UNKNOWN" if unclear.
-
-TRANSCRIPT START:
-${transcript.slice(0, 8000)}
-TRANSCRIPT END`;
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert at analyzing meeting dynamics. Identify the meeting host accurately.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 50
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const inferredHost = data.choices[0].message.content.trim();
-    
-    if (inferredHost === 'UNKNOWN' || inferredHost.length === 0) {
-      return null;
-    }
-
-    return inferredHost;
-
-  } catch (error) {
-    console.error('Error inferring host:', error);
-    return null;
-  }
-}
 
 // ==================== FILTER FALSE STARTS ====================
 

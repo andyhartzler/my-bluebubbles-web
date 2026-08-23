@@ -1,11 +1,27 @@
 // Wave 4 access-audit 2026-04-24: user-JWT + is_staff() gate + audit_log.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callGemini } from "../_shared/gemini.ts";
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+// STILL OPENAI, ON PURPOSE, AND ONLY FOR EMBEDDINGS.
+//
+// Every CHAT call in this file has moved to Gemini on Vertex. The embedding call
+// below has not, and must not, until somebody re-embeds the corpus.
+//
+// public.knowledge_documents.embedding is vector(1536) holding 78,717 rows, all
+// of them produced by text-embedding-3-small. A query embedding is only
+// meaningful against document embeddings from the SAME model: similarity is an
+// angle inside one model's space, and two models that happen to agree on 1536
+// dimensions still put "chapter chartering" in unrelated directions. Swapping
+// the query side alone does not error, does not warn, and does not fail a test.
+// It returns confident nonsense, and the only symptom is that search quietly
+// stops working.
+//
+// So this is a corpus migration and not a code change. Re-embedding 78,717 rows
+// is its own project with its own cost, and it is not this one.
 const openaiKey = Deno.env.get("OPENAI_API_KEY");
-const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -674,30 +690,23 @@ Extract the following (return valid JSON only, no markdown):
 }
 
 Return ONLY valid JSON. Return empty arrays if nothing notable to extract.`;
-    const extractionResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
-        messages: [
-          {
-            role: "user",
-            content: extractionPrompt
-          }
-        ]
-      })
-    });
-    if (!extractionResponse.ok) {
-      console.error('Memory extraction API error');
+    let extractedText;
+    try {
+      // json:true rather than relying on the fence stripping below. That
+      // stripping stays as a second line of defence; it is cheap and it costs
+      // nothing if the reply is already clean.
+      extractedText = (await callGemini({
+        prompt: extractionPrompt,
+        json: true,
+        maxTokens: 1024
+      })).text;
+    } catch (apiErr) {
+      // Unchanged in effect: this runs detached from the response via
+      // .catch() at the call site, so a failure here must never surface to the
+      // user. No memories are stored and the answer they already have stands.
+      console.error('Memory extraction API error:', apiErr instanceof Error ? apiErr.message : String(apiErr));
       return;
     }
-    const extractionData = await extractionResponse.json();
-    const extractedText = extractionData.content[0].text;
     let memories;
     try {
       const cleanedText = extractedText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -1201,29 +1210,16 @@ Rate each document's relevance (0-10) and return ONLY a JSON array of indices to
 ${docSummaries}
 
 Return format: [0, 2, 5, ...] (indices of relevant documents)`;
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 256,
-        messages: [
-          {
-            role: "user",
-            content: refinementPrompt
-          }
-        ]
-      })
+    // 512 rather than the 256 the Anthropic call used. The reply is a short
+    // index array either way, but a reply truncated by the cap fails the regex
+    // below and silently falls through to returning EVERY document unrefined,
+    // which is the failure this function exists to prevent. Headroom is cheaper
+    // than that.
+    const { text } = await callGemini({
+      prompt: refinementPrompt,
+      json: true,
+      maxTokens: 512
     });
-    if (!response.ok) {
-      return documents;
-    }
-    const data = await response.json();
-    const text = data.content[0].text;
     const match = text.match(/\[[\d,\s]+\]/);
     if (match) {
       const indices = JSON.parse(match[0]);
@@ -1683,31 +1679,23 @@ ${query}
 Provide a comprehensive, helpful response based on the search results above. The results include data from multiple retrieval methods including structured queries, semantic search, and keyword matching. Prioritize the most relevant results for the user's specific question.
 
 If you notice patterns in the user's questions or preferences from the memories, incorporate that naturally into your response.`;
-  messages.push({
-    role: "user",
-    content: userMessage
-  });
   const maxTokens = classification.scope === 'exhaustive' ? 8192 : 4096;
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: maxTokens,
-      system: buildSystemPrompt(),
-      messages
-    })
+  // `messages` holds up to the last ten turns and is passed through as history
+  // rather than flattened into one string. The turn structure is what lets the
+  // model resolve "them", "that one" and "the second one" against the right
+  // earlier answer, and a transcript pasted into a single prompt loses it.
+  const result = await callGemini({
+    system: buildSystemPrompt(),
+    history: messages,
+    prompt: userMessage,
+    maxTokens
   });
-  if (!response.ok) throw new Error(`Claude error: ${await response.text()}`);
-  const data = await response.json();
   return {
-    response: data.content[0].text,
-    inputTokens: data.usage.input_tokens,
-    outputTokens: data.usage.output_tokens
+    response: result.text,
+    inputTokens: result.promptTokens,
+    outputTokens: result.outputTokens,
+    totalTokens: result.totalTokens,
+    modelVersion: result.modelVersion
   };
 }
 // =============================================================================
@@ -1797,7 +1785,7 @@ serve(async (req)=>{
       history = data || [];
     }
     // Step 9: Generate response
-    const { response, inputTokens, outputTokens } = await generateResponse(query, context, intent, classification, history, learnedPatterns);
+    const { response, inputTokens, outputTokens, totalTokens, modelVersion } = await generateResponse(query, context, intent, classification, history, learnedPatterns);
     const processingTime = Date.now() - startTime;
     console.log(`Response generated in ${processingTime}ms`);
     console.log(`Tokens: ${inputTokens} in / ${outputTokens} out`);
@@ -1848,13 +1836,28 @@ serve(async (req)=>{
     // Step 12: Log usage
     try {
       await supabase.from("knowledge_usage_log").insert({
-        service: "anthropic_generation",
+        service: "gemini_generation",
         operation: classification.scope === 'exhaustive' ? "query_comprehensive" : "query_enhanced",
         user_id: userId,
         input_tokens: inputTokens,
         output_tokens: outputTokens,
-        total_tokens: inputTokens + outputTokens,
-        estimated_cost_cents: inputTokens / 1000000 * 300 + outputTokens / 1000000 * 1500,
+        // Vertex reports a total that INCLUDES thought tokens, so it is not
+        // input + output and must not be recomputed as if it were. It is also
+        // the figure the bill is actually against.
+        total_tokens: totalTokens,
+        // NULL, deliberately, and not zero.
+        //
+        // The number that used to sit here was Anthropic Sonnet's published
+        // per-million rate hardcoded as 300 and 1500 hundredths of a cent. Those
+        // rates are now wrong, and writing a Gemini figure in their place would
+        // mean inventing one: nothing in this container can read Vertex pricing,
+        // and a fabricated rate in a column named estimated_cost_cents reads as
+        // a measurement rather than a guess.
+        //
+        // The whole point of this migration is that the spend lands on the GCP
+        // project, so GCP billing is the source of record for it. The token
+        // counts above are real and are what a rate would be applied to.
+        estimated_cost_cents: null,
         request_metadata: {
           query_length: query.length,
           intent: intent,
@@ -1869,7 +1872,10 @@ serve(async (req)=>{
             org: memories.org.length
           },
           processing_time_ms: processingTime,
-          model: "claude-sonnet-4-20250514"
+          // As REPORTED BY Vertex for this call, not the alias that was asked
+          // for. A pinned point release answering under a floating alias is the
+          // thing worth having in the log.
+          model: modelVersion
         }
       });
     } catch  {
@@ -1896,7 +1902,8 @@ serve(async (req)=>{
       usage: {
         input_tokens: inputTokens,
         output_tokens: outputTokens,
-        model: "claude-sonnet-4-20250514",
+        total_tokens: totalTokens,
+        model: modelVersion,
         processing_time_ms: processingTime
       }
     }), {

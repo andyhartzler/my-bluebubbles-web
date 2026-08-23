@@ -2,10 +2,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { geminiText } from "../_shared/gemini.ts";
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,7 +51,7 @@ async function requireAuthorized(req) {
   }
   return { actorId: userData.user.id, actorRole: "authenticated" };
 }
-// Max file sizes for Claude processing (images are memory-heavy due to base64 overhead)
+// Max file sizes for OCR model processing (images are memory-heavy due to base64 overhead)
 const MAX_IMAGE_SIZE_MB = 4; // Images: PNG, JPG, GIF, WEBP - very memory intensive
 const MAX_PDF_SIZE_MB = 10; // PDFs can be a bit larger
 const MAX_OTHER_SIZE_MB = 20; // Text files, etc.
@@ -71,7 +71,7 @@ function getMaxSizeForExtension(extension) {
   }
   return MAX_OTHER_SIZE_MB;
 }
-async function extractTextWithClaude(fileData, fileName, mediaType) {
+async function extractTextWithModel(fileData, fileName, mediaType) {
   try {
     const arrayBuffer = await fileData.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
@@ -84,85 +84,70 @@ async function extractTextWithClaude(fileData, fileName, mediaType) {
       return null;
     }
     const base64Data = base64Encode(uint8Array);
-    let claudeMediaType = mediaType;
+    // GIF IS DELIBERATELY REFUSED HERE AND ANTHROPIC USED TO ACCEPT IT.
+    //
+    // Gemini's inline image types are png, jpeg, webp, heic and heif. gif is not
+    // one of them, so a gif that used to be OCR'd will now be skipped with this
+    // line in the log rather than 400ing inside the model call. That is the one
+    // capability this migration loses, and it is named out loud rather than
+    // left to be discovered from an error rate.
+    //
+    // Nothing else changes: pdf, png, jpg/jpeg and webp all carry over, and heic
+    // is still refused exactly as before.
+    let modelMediaType = mediaType;
     if (ext === 'pdf') {
-      claudeMediaType = 'application/pdf';
+      modelMediaType = 'application/pdf';
     } else if (ext === 'png') {
-      claudeMediaType = 'image/png';
+      modelMediaType = 'image/png';
     } else if (ext === 'jpg' || ext === 'jpeg') {
-      claudeMediaType = 'image/jpeg';
-    } else if (ext === 'gif') {
-      claudeMediaType = 'image/gif';
+      modelMediaType = 'image/jpeg';
     } else if (ext === 'webp') {
-      claudeMediaType = 'image/webp';
+      modelMediaType = 'image/webp';
+    } else if (ext === 'gif') {
+      console.log(`GIF is not a supported inline type for OCR, skipping: ${fileName}`);
+      return null;
     } else if (ext === 'heic') {
       console.log(`HEIC format not supported for OCR: ${fileName}`);
       return null;
     }
-    const isPdf = claudeMediaType === 'application/pdf';
-    const isImage = claudeMediaType.startsWith('image/');
+    const isPdf = modelMediaType === 'application/pdf';
+    const isImage = modelMediaType.startsWith('image/');
     if (!isPdf && !isImage) {
-      console.log(`Unsupported media type for Claude: ${claudeMediaType}`);
+      console.log(`Unsupported media type for OCR: ${modelMediaType}`);
       return null;
     }
-    console.log(`Sending to Claude: ${fileName} (${fileSizeMB.toFixed(2)}MB, ${claudeMediaType})`);
-    let content;
-    if (isPdf) {
-      content = [
-        {
-          type: "document",
-          source: {
-            type: "base64",
-            media_type: "application/pdf",
-            data: base64Data
-          }
-        },
-        {
-          type: "text",
-          text: "Extract ALL text content from this PDF document. Include all headings, paragraphs, lists, tables, and any other text. Preserve the structure as much as possible. Return ONLY the extracted text, no commentary."
-        }
-      ];
-    } else {
-      content = [
-        {
-          type: "image",
-          source: {
-            type: "base64",
-            media_type: claudeMediaType,
-            data: base64Data
-          }
-        },
-        {
-          type: "text",
-          text: "Extract ALL text visible in this image. This may be a screenshot, document scan, or photo containing text. Return ONLY the extracted text exactly as it appears, preserving structure. If there is no readable text, respond with 'NO_TEXT_FOUND'."
-        }
-      ];
-    }
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": anthropicApiKey,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 8192,
-        messages: [
-          {
-            role: "user",
-            content: content
-          }
-        ]
-      })
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Claude API error: ${response.status} - ${errorText}`);
+    // A contentType passed through from storage can still be a type the model
+    // rejects, for example image/gif or image/svg+xml on a file whose extension
+    // did not match any branch above. Refuse those here rather than in the model.
+    const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+    if (isImage && !ALLOWED_IMAGE_TYPES.includes(modelMediaType)) {
+      console.log(`Unsupported image type for OCR: ${modelMediaType} (${fileName})`);
       return null;
     }
-    const result = await response.json();
-    const extractedText = result.content?.[0]?.text || null;
+    console.log(`Sending for OCR: ${fileName} (${fileSizeMB.toFixed(2)}MB, ${modelMediaType})`);
+    const prompt = isPdf
+      ? "Extract ALL text content from this PDF document. Include all headings, paragraphs, lists, tables, and any other text. Preserve the structure as much as possible. Return ONLY the extracted text, no commentary."
+      : "Extract ALL text visible in this image. This may be a screenshot, document scan, or photo containing text. Return ONLY the extracted text exactly as it appears, preserving structure. If there is no readable text, respond with 'NO_TEXT_FOUND'.";
+    let extractedText;
+    try {
+      extractedText = await geminiText({
+        prompt,
+        media: [{ mimeType: modelMediaType, data: base64Data }],
+        maxTokens: 8192,
+        // OCR is transcription, not composition. The reply should be what is on
+        // the page and nothing invented around it.
+        temperature: 0
+      });
+    } catch (apiErr) {
+      // Preserved from the Anthropic version: a failed extraction returns null
+      // and the file is indexed without OCR text rather than failing the run.
+      // callGemini also throws on an empty reply, which is the case the image
+      // OCR prompt's NO_TEXT_FOUND answer is supposed to cover, so both land
+      // here and both mean the same thing to the caller.
+      console.error(`OCR model error for ${fileName}:`, apiErr instanceof Error ? apiErr.message : String(apiErr));
+      return null;
+    }
+    extractedText = extractedText.trim();
     if (extractedText === "NO_TEXT_FOUND" || !extractedText) {
       console.log(`No text found in: ${fileName}`);
       return null;
@@ -170,7 +155,7 @@ async function extractTextWithClaude(fileData, fileName, mediaType) {
     console.log(`Extracted ${extractedText.length} chars from ${fileName}`);
     return extractedText;
   } catch (err) {
-    console.error(`Error extracting text with Claude:`, err);
+    console.error(`Error extracting text for OCR:`, err);
     return null;
   }
 }
@@ -212,10 +197,10 @@ async function extractTextFromFile(bucket, path, contentType, fileSize) {
     ].includes(extension)) {
       return `Spreadsheet: ${fileName}\nPath: ${path}\nBucket: ${bucket}\nSize: ${data.size} bytes\n\n(Spreadsheet text extraction pending)`;
     }
-    // PDFs - use Claude for extraction
+    // PDFs - use the OCR model for extraction
     if (contentType?.includes("pdf") || extension === "pdf") {
-      console.log(`Extracting PDF text with Claude: ${path}`);
-      const text = await extractTextWithClaude(data, fileName, "application/pdf");
+      console.log(`Extracting PDF text: ${path}`);
+      const text = await extractTextWithModel(data, fileName, "application/pdf");
       if (text) {
         return `PDF: ${fileName}\n\n${text}`;
       }
@@ -228,7 +213,7 @@ async function extractTextFromFile(bucket, path, contentType, fileSize) {
     ].includes(extension)) {
       return `Word Document: ${fileName}\nPath: ${path}\nBucket: ${bucket}\nSize: ${data.size} bytes\n\n(Word document - text extraction pending)`;
     }
-    // Images - use Claude for OCR
+    // Images - use the OCR model
     if (contentType?.startsWith("image/") || [
       "png",
       "jpg",
@@ -236,8 +221,8 @@ async function extractTextFromFile(bucket, path, contentType, fileSize) {
       "gif",
       "webp"
     ].includes(extension)) {
-      console.log(`Extracting image text with Claude OCR: ${path}`);
-      const text = await extractTextWithClaude(data, fileName, contentType || `image/${extension}`);
+      console.log(`Extracting image text with OCR: ${path}`);
+      const text = await extractTextWithModel(data, fileName, contentType || `image/${extension}`);
       if (text) {
         return `Image: ${fileName}\n\n${text}`;
       }
