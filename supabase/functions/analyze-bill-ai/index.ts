@@ -10,13 +10,73 @@ import { callGemini } from "../_shared/gemini.ts";
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+// ============================================================
+// GATE
+// ============================================================
+// This function is deployed verify_jwt=false and had NO gate of its own, so any
+// anonymous caller could make it spend AI budget. Probed live before this change:
+// a POST with no Authorization header at all reached the service-role client and
+// answered 404 "Bill not found" from the database.
+//
+// The pattern is the one analyze-bill already uses and mail-poll was fixed to in
+// 1a2f879: a user JWT that passes is_staff(), OR the x-cron-secret the vault hands
+// to pg_cron. It FAILS CLOSED both ways. An unset CRON_SECRET can never equal an
+// empty supplied header, because the presented value must be non-empty AND equal.
+//
+// No caller had to be fixed first. Checked before gating: no pg_cron job posts this
+// URL, no edge function invokes it, and no Flutter call site names it. The CRM's
+// ai_analysis_service.dart calls analyze-bill and analyze-bills-batch, never this.
+// A CRM caller would work anyway, since supabase.functions.invoke forwards the
+// signed-in user's JWT and every CRM user is exec, which is what is_staff() tests.
+async function requireAuthorized(req: Request) {
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const presented = req.headers.get("x-cron-secret") ?? "";
+  if (cronSecret && presented && presented === cronSecret) {
+    return { actorId: null as string | null, actorRole: "service_role" };
+  }
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const jwt = authHeader.replace(/^Bearer /i, "").trim();
+  if (!jwt) {
+    return {
+      error: new Response(JSON.stringify({ error: "Missing Authorization header or x-cron-secret" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }),
+    };
+  }
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+  });
+  const { data: userData, error: authErr } = await userClient.auth.getUser(jwt);
+  if (authErr || !userData?.user) {
+    return {
+      error: new Response(JSON.stringify({ error: "Invalid or expired JWT" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }),
+    };
+  }
+  const { data: staffCheck, error: staffErr } = await userClient.rpc("is_staff");
+  if (staffErr || staffCheck !== true) {
+    return {
+      error: new Response(JSON.stringify({ error: "Forbidden — staff access required" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }),
+    };
+  }
+  return { actorId: userData.user.id, actorRole: "authenticated" };
+}
 
 // ============================================================
 // MOYD POLICY PLATFORM
@@ -280,8 +340,23 @@ serve(async (req) => {
     return new Response("Method not allowed", { status: 405, headers: corsHeaders });
   }
 
+  const gate = await requireAuthorized(req);
+  if ("error" in gate) return gate.error;
+  const { actorId, actorRole } = gate;
+
   try {
     const { billId, forceReanalyze = false } = await req.json();
+
+    // Audit log (non-blocking), matching analyze-bill.
+    supabase.from("audit_log").insert({
+      action: "EDGE_FN",
+      actor_id: actorId,
+      actor_role: actorRole,
+      schema_name: "public",
+      table_name: "edge_fn:analyze-bill-ai",
+      row_id: null,
+      context: { event: "analyze-bill-ai", bill_id: billId, force_reanalyze: forceReanalyze },
+    }).then(() => {}).catch((e) => console.error("[analyze-bill-ai] audit_log insert failed:", e));
 
     if (!billId) {
       return new Response(
