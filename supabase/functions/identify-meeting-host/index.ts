@@ -267,8 +267,18 @@ Deno.serve(async (req: Request) => {
       matched = byName.get(normalize(result.host_name)) ?? null;
     }
 
+    // Never overwrite a host this function did not itself write. The column
+    // already holds rows stamped 'legacy', which came from the old unscored
+    // OpenAI pass in import-historical-meetings, and it will hold
+    // human-confirmed hosts the moment anyone confirms one. A machine guess
+    // must never displace either. Only an empty slot, or this function's own
+    // earlier inference, may be replaced.
+    const hostSlotWritable =
+      meeting.meeting_host === null || meeting.meeting_host_source === "transcript";
+
     const write =
       !dry_run &&
+      hostSlotWritable &&
       matched !== null &&
       matched.id !== "" &&
       !result.shared_account_chaired &&
@@ -301,6 +311,7 @@ Deno.serve(async (req: Request) => {
       reasoning: result.reasoning,
       threshold: WRITE_THRESHOLD,
       written: write,
+      host_slot_writable: hostSlotWritable,
       existing_host: meeting.meeting_host,
       existing_source: meeting.meeting_host_source,
     });
