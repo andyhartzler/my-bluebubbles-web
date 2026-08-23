@@ -17227,3 +17227,141 @@ its remaining interval, the fifty-seven run count, the four commit count, the tw
 split, the branch count, the commit distances, and the accuracy figures quoted from `e419185`, all
 bare and naming nothing. Withheld per the practice READ SIXTH set: the state of the live endorsement
 vote, and any operational read on production sessions.
+
+## READ ONE HUNDRED AND TWENTY-FIRST: the 04:20 UTC run, a fifty-eighth consecutive block, and a model migration whose one UNTOUCHED call is the finding
+
+ANDREW, THIS IS THE ONE THING THIS LOOP NEEDS AND CANNOT DO ITSELF
+The Sentry connector needs reauthorizing. It is present for this session but not authorized, so
+none of its tools load, and this session is non-interactive so the OAuth flow cannot be run from
+here. Reconnect it in your claude.ai connector settings and the loop resumes on the next tick.
+Placed at the top rather than only in email for the reason READ NINETY-FIFTH gives, and this run
+is more evidence for it: you pushed four commits into this repo between 02:27 and 02:48 UTC, and
+the three reports in your inbox are still unread.
+
+Nothing has been monitored since 2026-08-12T15:08:27Z, which is 10 days 13 hours. That covers the
+public site, the CRM and the vote surface.
+
+The rest is the standing record. No triage was possible and no code changed here, so this makes NO
+claim about production health in either direction: an absent report is not an absent error, per
+READ TWENTY-SECOND.
+
+The blocker is unchanged at fifty-eight consecutive runs, tested rather than inherited per READ
+TWELFTH. An exact-count grep for `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the
+environment returns zero, so there is no token route around the connector either.
+
+A MODEL SWAP THAT CANNOT FAIL LOUDLY, WHICH IS THE ONE WORTH INHERITING
+`d06b6c3` moves four AI callers onto Gemini and deliberately does NOT move the fifth, and his own
+message calls that the finding rather than an omission. `knowledge_documents.embedding` is a
+1536-dimension column holding 78,717 rows, every one produced by one embedding model. Similarity
+is an angle inside a single model's space, so a query embedded by a DIFFERENT model is not
+comparable to those rows even at a matching dimension. Swapping the query side alone does not
+error, does not warn and does not fail a test: search quietly starts returning the wrong
+documents.
+
+Generalise it as a class rather than as this table. A model swap on one side of a stored vector
+comparison is a CORPUS migration wearing the costume of a code change, and it belongs with the
+silent-failure family this file already tracks: READ NINETY-SIXTH's cron jobs that had never once
+authenticated while pg_cron reported success, and READ ONE HUNDRED AND TWENTIETH's check-then-act
+gap that reported a successful write when its guard had fired. In all three the system reports
+success and the wrongness is only visible against the data. Before swapping any model, ask what
+STORED artefact its output is compared against; if there is one, the migration is the stored
+artefact and not the call.
+
+Two smaller things from the same batch, recorded so a future run does not rediscover them.
+`e0b2e58` adds a Netlify build-skip gate and argues the ALLOW list versus deny list direction
+explicitly: a deny list fails OPEN, so a new source directory silently stops deploying while every
+push reports success, whereas an allow list fails CLOSED and an unrecognised path builds. For a
+deploy gate the cheap error is wasting a build and the expensive one is skipping a real deploy;
+pick the direction whose failure is the cheap one. And `88cf416` records checking its own cost
+premise against the database and finding it FALSE: the group queued as highest spend had billed
+nothing for seven months, because every cron in it was inactive and the two batch-check functions
+early-return on an empty set. It migrated the group anyway, on the ground that a re-enabled cron
+would start billing, which is the right call for the right reason rather than the queued one.
+
+None of this is mine to act on: he found all of it, deployed it by hand and read the deployed
+bodies back, which is the gate READ NINETY-FOURTH records him arriving at independently.
+
+THE AUTHORSHIP SPLIT FOOLED THE USUAL DISCRIMINATOR AGAIN, EXACTLY AS BEFORE
+Of his four commits, TWO are authored `Andrew Hartzler <andrew@moyoungdemocrats.org>` and TWO are
+authored `Andy Hartzler <andrew@hartzler.us>`, which is byte identical to the identity this loop
+commits under by standing rule. That is the second window running with a two-and-two split, which
+READ ONE HUNDRED AND TWENTIETH records first. An authorship test would have read two of his own
+commits as sweep records. Read the SUBJECT, per READ EIGHTY-THIRD, and treat authorship as
+carrying no information at all here rather than as weak evidence.
+
+NOTHING WAS SENT, WHICH IS THE SUPPRESSION RULE RATHER THAN AN OMISSION
+All three reports were checked rather than assumed and ALL THREE are still UNREAD:
+`MOYD Sentry triage 2026-08-20`, sent 2026-08-20T22:22:28Z, at 2 days 5 hours 57 minutes;
+`MOYD Sentry triage 2026-08-19`, sent 2026-08-19T16:22:13Z, at 3 days 11 hours 57 minutes; and
+`MOYD Sentry triage 2026-08-18`, sent 2026-08-18T11:37:14Z, at 4 days 16 hours 42 minutes, each
+computed from a clock read this run against its own thread timestamp and FLOORED per READ TWELFTH.
+
+His four commits do NOT fire a send. READ NINETY-FIFTH retired "Andrew pushes anything" as a
+condition precisely because it had already fired at READ NINETY-FOURTH, been reported, and gone
+unread, and this is a continuation of that same fact rather than a new one. The decision was
+re-weighed rather than copied, per READ SEVENTY-FIRST, and reached the same answer: nothing here
+is a fact the sent reports do not carry. So the trigger to act on is unchanged: FOURTEEN DAYS
+blind, at 2026-08-26T15:08:27Z, which is 3 days 10 hours away, or sooner if the connector returns
+or the vote is recorded closed. Name the ANCHOR when quoting a figure, per READ SEVENTY-SECOND,
+since report-age and blind-since differ by nearly a week.
+
+Nothing else moved. The site tip is unchanged at `aa2d513` from 2026-08-12. The six `sentry-fix/`
+branch tips were enumerated rather than inherited and are unchanged from READ SIXTY-THIRD's
+inventory, so the three fixes it establishes are live gaps have now waited a further eleven days.
+Grepped both repos again rather than inherited: nothing says the endorsement vote has closed. The
+CRM hits are the doc comment in `auto_inferred_assignments_service.dart` and the branch comment in
+`vote_detail_screen.dart`, and the site hits are the render paths in `VoteStatusMessage.tsx` and
+the members dashboard voting page, every one describing what is shown WHEN a vote closes rather
+than stating that this one has. So the vote is treated as OPEN and nothing was merged.
+
+The branch ref trap bit in the classic form: local `master` stale at `dbc5a8a` against a real tip
+of `e0b2e58`, with `HEAD` detached AT that tip. Checked in the form READ TWENTY-SECOND prescribes,
+local side the NAMED BRANCH and not `HEAD`, and repaired with `git checkout -B master HEAD` BEFORE
+committing, per READ SIXTY-FOURTH's addendum rather than READ NINTH's conditional repair. After the
+repair `git status` reports ahead 50 and behind 50, which is the shallow graft distorting the merge
+base per READ SIXTY-SIXTH rather than a plain ahead count, and it is the stale remote-tracking cache
+talking either way per READ TWENTY-SIXTH. Do not act on it. The container also arrived with the
+wrong commit identity again, per READ SIXTIETH: set the one this project requires and do NOT rebase
+already-pushed commits to match, since that needs a force push and READ SECOND's prohibition is not
+negotiable for a cosmetic badge.
+
+VERIFICATION AND DISCLOSURE
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No adversarial
+audit was run, recorded as a departure rather than glossed, on the call READ SIXTY-FOURTH through
+READ ONE HUNDRED AND TWENTIETH each made for the identical case: this diff carries no diagnosis of
+a Sentry issue, no mechanism of its own and no code. Its factual claims are the five durations,
+which are arithmetic over timestamps printed above, and a characterization of four commits taken
+from their own messages in this public repo's log, both checkable without an auditor.
+
+This repo is public and the sibling is private. Named above: the commits `dbc5a8a`, `e0b2e58`,
+`d06b6c3`, `88cf416`, `b734a9d` and `aa2d513`, the last being the private sibling's tip whose cover
+is prior publication in READ SIXTIETH; the branch prefix `sentry-fix/`; the table
+`knowledge_documents` and its `embedding` column, the edge functions `generate-embeddings` and
+`query-knowledge-base`, and the build files `netlify.toml` and `netlify-build.sh`, every one
+committed in THIS repo, the public one; the files `auto_inferred_assignments_service.dart` and
+`vote_detail_screen.dart`, both committed here, and `VoteStatusMessage.tsx` with the members
+dashboard voting page named by role rather than by path, both in the private sibling and both
+published in READ SEVENTY-FIRST; `pg_cron`, published here since READ FIRST; the git commands and
+ref names; the verification commands `npx tsc --noEmit` and `flutter analyze`; the product names
+Sentry, Gemini and Netlify; and the env var name patterns `SENTRY`, `SUPABASE`, `PROJECT_REF`,
+`POSTGRES` and `DSN`. Apply READ SEVENTEENTH's test rather than the lazy version: "already
+committed" would be an argument for WITHHOLDING had any of these come from the private sibling, and
+none did. Everything else already appears in this file or is committed in this public repo's own
+tree.
+
+Deliberately WITHHELD from the account of his four commits, though all of it is already public in
+this repo's own commit log, because the finding survives without it and READ SIXTH's practice is to
+publish only what the finding needs: the embedding model identifier, the other model identifiers
+and version tags, the deployed version numbers, the retired function names, the cron job names, the
+history table row counts and dates, the shared helper's field names, and the transcript and
+redaction details of the abstain test. The name of the embedding model is withheld specifically
+because the finding is about model IDENTITY mattering rather than about which model it is. The
+three reports are named by subject line only, which is this loop's own published convention, and no
+transport, credential or container tooling is described, which READ EIGHTEENTH records as a BLOCKER
+class. No log content is quoted, because none was readable. Quantities are the clock values, the
+three report ages, the blind-since duration, the next trigger instant and its remaining interval,
+the fifty-eight run count, the four commit count, the two-and-two authorship split, the branch
+count, the commit distances, and the 78,717 rows and 1536 dimensions quoted from `d06b6c3`, all
+bare and naming nothing. Withheld per the practice READ SIXTH set: the state of the live
+endorsement vote, and any operational read on production sessions.
