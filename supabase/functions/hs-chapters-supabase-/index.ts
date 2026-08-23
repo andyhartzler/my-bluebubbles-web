@@ -29,6 +29,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
 
+// The ONE committee this import is authoritative for. It is never written into
+// the update payload: members.committee gates CRM access through the
+// executive_committee trigger, and `.update({ committee: [...] })` replaces the
+// whole array, so a roster import used to discard every committee a person had
+// been given by hand in the CRM. Committee changes go through
+// public.import_merge_committees, which merges inside one locked statement and
+// refuses to touch anything outside p_managed. See migration
+// 20260824_01_import_committee_merge.sql.
+const MANAGED_COMMITTEES = ['High School Democrats'];
+
 // ============================================
 // MISSOURI COUNTIES AND CITIES LOOKUP
 // ============================================
@@ -1554,7 +1564,7 @@ async function processSingleMember(
       in_school: 'Yes',
       school_name: schoolName,
       high_school: highSchool,  // ← ADDED: High school field
-      committee: ['High School Democrats'],
+      // committee is deliberately absent here. See MANAGED_COMMITTEES.
       date_joined: date_joined
     };
     
@@ -1611,9 +1621,21 @@ async function processSingleMember(
         .eq('id', matchedMember.id);
       
       if (updateError) throw updateError;
-      
+
+      // Merge, never replace. This adds High School Democrats if it is missing
+      // and leaves every other committee on the row exactly as a human set it.
+      const { data: mergedCommittees, error: mergeError } = await supabaseClient
+        .rpc('import_merge_committees', {
+          p_member_id: matchedMember.id,
+          p_managed: MANAGED_COMMITTEES,
+          p_assigned: MANAGED_COMMITTEES
+        });
+
+      if (mergeError) throw mergeError;
+
+      console.log(`✓ Committees now: ${JSON.stringify(mergedCommittees)}`);
       console.log(`✓ Successfully updated member ${matchedMember.id}`);
-      
+
       return {
         name: fullName,
         email: normalizedEmail,
@@ -1628,9 +1650,11 @@ async function processSingleMember(
     } else {
       console.log(`Creating new member: ${fullName}`);
       
+      // A brand new row has no committee list to destroy, so the literal is
+      // safe here and only here.
       const { error: createError } = await supabaseClient
         .from('members')
-        .insert([dbMemberData]);
+        .insert([{ ...dbMemberData, committee: MANAGED_COMMITTEES }]);
       
       if (createError) throw createError;
       
