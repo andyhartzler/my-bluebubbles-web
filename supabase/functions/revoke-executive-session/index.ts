@@ -126,10 +126,29 @@ serve(async (req) => {
   const wasExecutive = member.executive_committee === true;
 
   // ── 5. Mutate DB state (access revoked) ──
+  // REVOKE BY REMOVING THE COMMITTEE ENTRY, NOT BY SETTING THE BOOLEAN.
+  //
+  // members.executive_committee is DERIVED from the committee array by
+  // update_executive_committee_flag(). Writing the boolean directly used to appear
+  // to work and then silently reverse: the trigger was scoped to UPDATE OF committee,
+  // so it stayed quiet here, and the next write that touched committee for any reason
+  // recomputed the flag from an array that still said 'Executive Committee' and handed
+  // the access back. Measured on the live database: start true, after this revoke
+  // false, after any later committee write TRUE again.
+  //
+  // 20260824_04 removed that column scope, so the boolean is now recomputed on every
+  // update and a direct write to it is a no-op. That makes the old line here inert
+  // rather than deceptive, which is better, but it still does not revoke. The array is
+  // the source of truth for CRM access, so revocation has to remove the entry.
+  //
+  // array_remove is used through an RPC rather than read-modify-write on the client
+  // because a SELECT-then-UPDATE would lose a concurrent committee change, and this is
+  // the security path.
   const { error: updErr } = await supabaseAdmin
-    .from("members")
-    .update({ executive_committee: false })
-    .eq("id", targetId);
+    .rpc("slack_remove_committee_force", {
+      p_member_id: targetId,
+      p_committee: "Executive Committee",
+    });
   if (updErr) {
     console.error("[revoke-executive-session] members update error:", updErr);
     return jsonResponse({ error: "Failed to update member row" }, 500);
