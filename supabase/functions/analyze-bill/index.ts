@@ -1,10 +1,10 @@
 // Wave 4 access-audit 2026-04-24: user-JWT + is_staff() gate OR x-cron-secret + audit_log.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callGemini } from "../_shared/gemini.ts";
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -308,50 +308,30 @@ Analyze this bill against MOYD's policy platform and provide your analysis in th
 
 Respond ONLY with the JSON object, no additional text.`;
 }
-// Call Claude API
-async function analyzeWithClaude(prompt) {
+// Call the model. Gemini 3.6 Flash on Vertex, via _shared/gemini.ts.
+async function analyzeWithModel(prompt) {
   const startTime = Date.now();
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": anthropicApiKey,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ]
-    })
+  const result = await callGemini({
+    prompt,
+    maxTokens: 4000
   });
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Claude API error: ${response.status} - ${errorText}`);
-  }
-  const data = await response.json();
+  const content = result.text;
   const duration = Date.now() - startTime;
-  // Extract JSON from response
-  const content = data.content[0].text;
   // Try to parse JSON from the response
   let analysis;
   try {
-    // Handle case where Claude wraps in markdown code blocks
+    // Handle case where the model wraps it in markdown code blocks
     const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/```\s*([\s\S]*?)\s*```/);
     const jsonStr = jsonMatch ? jsonMatch[1] : content;
     analysis = JSON.parse(jsonStr.trim());
   } catch (e) {
-    throw new Error(`Failed to parse Claude response as JSON: ${e.message}`);
+    throw new Error(`Failed to parse model response as JSON: ${e.message}\nRaw response: ${content.substring(0, 500)}`);
   }
   return {
     analysis,
-    tokensUsed: data.usage?.input_tokens + data.usage?.output_tokens,
+    tokensUsed: result.totalTokens,
     durationMs: duration,
-    modelVersion: "claude-sonnet-4-20250514"
+    modelVersion: result.modelVersion
   };
 }
 // Main handler
@@ -433,7 +413,7 @@ serve(async (req)=>{
     }).eq("id", billId);
     // Build prompt and analyze
     const prompt = buildAnalysisPrompt(bill);
-    const { analysis, tokensUsed, durationMs, modelVersion } = await analyzeWithClaude(prompt);
+    const { analysis, tokensUsed, durationMs, modelVersion } = await analyzeWithModel(prompt);
     // Validate categories
     const validCategories = CATEGORIES.map((c)=>c.name);
     const filteredCategories = (analysis.categories || []).filter((c)=>validCategories.includes(c));

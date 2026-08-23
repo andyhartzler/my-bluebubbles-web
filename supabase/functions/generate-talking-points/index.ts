@@ -4,10 +4,10 @@
 // ============================================================
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callGemini } from "../_shared/gemini.ts";
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -236,34 +236,15 @@ ${position === 'support' ? `
 Respond ONLY with the JSON object, no additional text or explanation.`;
 }
 // ============================================================
-// CALL CLAUDE API
+// CALL THE MODEL — Gemini 3.6 Flash on Vertex, via _shared/gemini.ts
 // ============================================================
-async function generateWithClaude(prompt) {
+async function generateWithModel(prompt) {
   const startTime = Date.now();
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": anthropicApiKey,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ]
-    })
+  const modelResult = await callGemini({
+    prompt,
+    maxTokens: 4000
   });
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Claude API error: ${response.status} - ${errorText}`);
-  }
-  const data = await response.json();
-  const content = data.content[0].text;
+  const content = modelResult.text;
   const duration = Date.now() - startTime;
   // Parse JSON from response
   let result;
@@ -272,12 +253,13 @@ async function generateWithClaude(prompt) {
     const jsonStr = jsonMatch ? jsonMatch[1] : content;
     result = JSON.parse(jsonStr.trim());
   } catch (e) {
-    throw new Error(`Failed to parse Claude response as JSON: ${e.message}\nRaw response: ${content.substring(0, 500)}`);
+    throw new Error(`Failed to parse model response as JSON: ${e.message}\nRaw response: ${content.substring(0, 500)}`);
   }
   return {
     result,
-    tokensUsed: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
-    durationMs: duration
+    tokensUsed: modelResult.totalTokens,
+    durationMs: duration,
+    modelVersion: modelResult.modelVersion
   };
 }
 // ============================================================
@@ -413,7 +395,7 @@ serve(async (req)=>{
     }).eq("id", billId);
     // Generate talking points
     const prompt = buildTalkingPointsPrompt(bill);
-    const { result, tokensUsed, durationMs } = await generateWithClaude(prompt);
+    const { result, tokensUsed, durationMs, modelVersion } = await generateWithModel(prompt);
     // Validate structure
     const validation = validateTalkingPoints(result);
     if (!validation.valid) {
@@ -443,7 +425,7 @@ serve(async (req)=>{
       email_snippet: result.email_snippet,
       testimony_outline: result.testimony_outline,
       target_audience_points: result.target_audience_points,
-      model_version: "claude-sonnet-4-20250514",
+      model_version: modelVersion,
       prompt_version: "v1-talking-points",
       position: bill.position || bill.ai_position_recommendation,
       tokens_used: tokensUsed,
