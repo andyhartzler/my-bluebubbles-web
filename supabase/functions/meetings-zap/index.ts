@@ -1491,7 +1491,6 @@ serve(async (req)=>{
       recording_embed_url: payload.recording_embed_url,
       recording_thumbnail_url: payload.recording_thumbnail_url || null,
       transcript_file_path: transcriptFilePath,
-      meeting_host: meetingHostMemberId,
       action_items: summaryFields.action_items || null,
       executive_recap: summaryFields.executive_recap || null,
       agenda_reviewed: summaryFields.agenda_reviewed || null,
@@ -1501,6 +1500,49 @@ serve(async (req)=>{
       attendance_count: 0,
       processing_status: 'processing'
     };
+    // meeting_host IS NOT IN meetingFields AT ALL, AND MUST NOT BE PUT BACK.
+    //
+    // It used to be, conditionally, and the previous note here recorded the
+    // remaining hole as a known gap: when this path DID resolve a host it
+    // overwrote whatever was in the column, a meeting_host_source='human'
+    // confirmation included. That gap is now closed, and it was not
+    // theoretical. public.audit_log for meeting
+    // be6fbb14-cefa-4413-95cd-8455aedeb805 records:
+    //
+    //   2026-08-12 00:41  authenticated, andrew@hartzler.us
+    //                     meeting_host: null -> f1ac8208
+    //   2026-08-20 22:43  service_role, THIS FUNCTION
+    //                     meeting_host: f1ac8208 -> null
+    //   2026-08-21 00:14  service_role, THIS FUNCTION
+    //                     meeting_host: null -> 163cd118
+    //
+    // A person typed the host. This function erased it eight days later and
+    // then wrote a different member into the field.
+    //
+    // THE HOST IS NOW CLAIMED SEPARATELY, AFTER THE ROW EXISTS, THROUGH
+    // claim_meeting_host_from_zoom (20260823_04), whose WHERE clause carries
+    // the rule: it fills the slot only when it is empty. Two reasons that has
+    // to be a separate statement rather than a key in this object.
+    //
+    // 1. There is no read of the existing row here to check against. This is a
+    //    per-occurrence upsert keyed on zoom_meeting_uuid, so adding a read
+    //    would only move the race rather than close it. A check in application
+    //    code cannot close a check-then-act gap; only the database can.
+    // 2. This path RE-RUNS on the same row: recording.completed,
+    //    summary_completed and zoom-reconcile all upsert onto the same
+    //    occurrence. Any key present in this object is written on every leg,
+    //    which is how a leg that resolved no host wrote null over a real one.
+    //
+    // 'zoom' is the honest source for what this function knows: the hint is
+    // Zoom's own host field. It is a weak signal, because the executive
+    // committee shares one Zoom account and that field names whoever's
+    // credentials started the call rather than whoever chaired it, which is
+    // exactly why it may only fill an empty slot.
+    //
+    // meetings_host_needs_source (20260822_03) is also still a validated
+    // CHECK, meeting_host IS NULL OR meeting_host_source IS NOT NULL, and the
+    // RPC sets both together, so that constraint cannot be tripped from here
+    // either.
     let meeting = null;
     let meetingError = null;
     if (zoomMeetingUuid) {
@@ -1560,6 +1602,24 @@ serve(async (req)=>{
       throw new Error(`Failed to create meeting: ${meetingError.message}`);
     }
     console.log('Created meeting record:', meeting.id);
+    // Claim the host slot only if it is empty. The guard lives in the RPC's
+    // WHERE clause, not here; see the note above meetingFields. A null return
+    // means the slot was already filled, which is a CORRECT outcome and is
+    // logged as such rather than as an error, because a claim that silently
+    // reports success is its own reporting bug.
+    if (meetingHostMemberId) {
+      const { data: claimedId, error: claimError } = await supabaseClient.rpc(
+        'claim_meeting_host_from_zoom',
+        { p_meeting_id: meeting.id, p_host: meetingHostMemberId }
+      );
+      if (claimError) {
+        console.error(`[meetings-zap] host claim failed: ${claimError.message}`);
+      } else if (claimedId) {
+        console.log(`[meetings-zap] host claimed from zoom: ${meetingHostMemberId}`);
+      } else {
+        console.log('[meetings-zap] host slot already filled, zoom hint discarded');
+      }
+    }
     const attendanceResults = await processAttendance(supabaseClient, meeting.id, uniqueParticipants, meeting.meeting_title);
     // 'already_recorded' counts as a match. On a FIRST run this status never
     // occurs, so first-run behaviour is unchanged. On a REPLAY every attendee

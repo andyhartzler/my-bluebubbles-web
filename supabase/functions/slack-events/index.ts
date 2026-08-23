@@ -333,45 +333,58 @@ async function archiveMessage(event, supabase) {
     console.error("Failed to archive message:", error);
   }
 }
-// Add committee to member
+// BOTH COMMITTEE WRITES GO THROUGH AN RPC. DO NOT PUT THE READ-MODIFY-WRITE
+// BACK.
+//
+// Each of these used to select members.committee, edit the array in JS, and
+// write the whole array back. Two things were wrong with that and the second
+// one lost data.
+//
+// 1. It is check-then-write on a column. An exec assignment made in the CRM
+//    between the read and the write is discarded, and the write reports
+//    success. The edit now happens INSIDE the update statement, so there is no
+//    window at all.
+// 2. The removal path had no guard. public.audit_log records this function, on
+//    2026-08-12 01:39:39, taking 'Executive Committee' off a member because
+//    they left the mapped Slack channel. members.committee is the source of
+//    truth for CRM access, so that revoked their access, and nothing outside
+//    the audit log recorded it. slack_remove_committee (20260823_05) now
+//    refuses that value in its own WHERE clause, where no caller can route
+//    around it.
+//
+// A null return is the guard firing or the member not having the committee. It
+// is a CORRECT outcome, so it is logged as a refusal rather than reported as a
+// failure, and it is NOT an error: a claim that silently reports success is its
+// own reporting bug, and so is one that reports a correct refusal as a fault.
 async function addCommitteeToMember(memberId, committee, supabase) {
-  const { data: member } = await supabase.from("members").select("committee").eq("id", memberId).single();
-  if (!member) return false;
-  const currentCommittees = member.committee || [];
-  if (currentCommittees.includes(committee)) {
-    console.log(`Member ${memberId} already has committee ${committee}`);
-    return true;
-  }
-  const newCommittees = [
-    ...currentCommittees,
-    committee
-  ];
-  const { error } = await supabase.from("members").update({
-    committee: newCommittees
-  }).eq("id", memberId);
+  const { data, error } = await supabase.rpc("slack_add_committee", {
+    p_member_id: memberId,
+    p_committee: committee
+  });
   if (error) {
     console.error("Failed to add committee:", error);
     return false;
+  }
+  if (!data) {
+    console.log(`Member ${memberId} already has committee ${committee}, or does not exist`);
+    return true;
   }
   console.log(`Added committee ${committee} to member ${memberId}`);
   return true;
 }
 // Remove committee from member
 async function removeCommitteeFromMember(memberId, committee, supabase) {
-  const { data: member } = await supabase.from("members").select("committee").eq("id", memberId).single();
-  if (!member) return false;
-  const currentCommittees = member.committee || [];
-  if (!currentCommittees.includes(committee)) {
-    console.log(`Member ${memberId} doesn't have committee ${committee}`);
-    return true;
-  }
-  const newCommittees = currentCommittees.filter((c)=>c !== committee);
-  const { error } = await supabase.from("members").update({
-    committee: newCommittees
-  }).eq("id", memberId);
+  const { data, error } = await supabase.rpc("slack_remove_committee", {
+    p_member_id: memberId,
+    p_committee: committee
+  });
   if (error) {
     console.error("Failed to remove committee:", error);
     return false;
+  }
+  if (!data) {
+    console.log(`Committee ${committee} not removed from member ${memberId}: refused by guard, or member did not have it`);
+    return true;
   }
   console.log(`Removed committee ${committee} from member ${memberId}`);
   return true;
