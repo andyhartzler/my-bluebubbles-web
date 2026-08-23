@@ -121,13 +121,15 @@ class _MeetingCommitmentsPanelState extends State<MeetingCommitmentsPanel> {
       }
     }
 
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Card(
+        elevation: 0,
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -157,6 +159,7 @@ class _MeetingCommitmentsPanelState extends State<MeetingCommitmentsPanel> {
               _CoverageSummary(coverage: _coverage),
             ],
           ],
+          ),
         ),
       ),
     );

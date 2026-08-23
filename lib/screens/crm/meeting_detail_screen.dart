@@ -318,10 +318,10 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
         // still the summariser's own words. Not drawn in the member view: the
         // rows are executive-committee-only in the database, so a member would
         // be shown an empty panel that implies there is nothing to see.
+        // The panel supplies its own leading gap, so a meeting with no
+        // commitments contributes nothing rather than an empty 24px band.
         if (!widget.isMemberView) {
-          children
-            ..add(const SizedBox(height: 24))
-            ..add(MeetingCommitmentsPanel(meetingId: _meeting.id));
+          children.add(MeetingCommitmentsPanel(meetingId: _meeting.id));
         }
 
         if (narrativeSections.isNotEmpty) {
