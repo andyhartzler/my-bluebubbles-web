@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callGemini } from "../_shared/gemini.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -247,33 +248,17 @@ Generate the email body only. No subject line. No "Dear Attorney General" greeti
     let isDuplicate = true;
 
     while (isDuplicate && attempt < 3) {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY_CAMPAIGN")}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          temperature: 1.0,
-          top_p: 0.95,
-          frequency_penalty: 1.5,
-          presence_penalty: 1.5,
-          max_tokens: 500
-        })
+      // Uniqueness previously leaned on OpenAI's frequency/presence penalties at
+      // 1.5. Gemini has no equivalent, so it now rests on the per-call seed and
+      // timestamp already in the prompt, plus the fingerprint retry loop below.
+      const result = await callGemini({
+        system: systemPrompt,
+        prompt: userPrompt,
+        temperature: 1.0,
+        maxTokens: 500
       });
 
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`OpenAI API error: ${error}`);
-      }
-
-      const data = await response.json();
-      emailBody = data.choices[0].message.content.trim();
+      emailBody = result.text.trim();
       emailBody = emailBody.replace(/—/g, '-').replace(/–/g, '-');
 
       isDuplicate = await checkForDuplicates(emailBody);
@@ -300,24 +285,15 @@ Random seed for uniqueness: ${seed + 1}
 
 Generate ONLY the subject line text, no quotes or extra formatting.`;
 
-    const subjectResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY_CAMPAIGN")}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4",
-        messages: [{ role: "user", content: subjectPrompt }],
-        temperature: 1.0,
-        frequency_penalty: 1.5,
-        presence_penalty: 1.5,
-        max_tokens: 30
-      })
+    // 64 rather than the old 30: that cap was never binding on a 6-12 word
+    // subject, and the extra headroom keeps a long one from truncating mid-word.
+    const subjectResult = await callGemini({
+      prompt: subjectPrompt,
+      temperature: 1.0,
+      maxTokens: 64
     });
 
-    const subjectData = await subjectResponse.json();
-    let subject = subjectData.choices[0].message.content.trim().replace(/^["']|["']$/g, "");
+    let subject = subjectResult.text.trim().replace(/^["']|["']$/g, "");
     subject = subject.replace(/—/g, '-').replace(/–/g, '-');
 
     // Log fingerprint
