@@ -18088,3 +18088,173 @@ and its remaining interval, the sixty-five run count, the four commit count, the
 authorship split, the branch count and the one commit distance, all bare and naming nothing.
 Withheld per the practice READ SIXTH set: the state of the live endorsement vote, and any
 operational read on production sessions.
+
+## READ ONE HUNDRED AND TWENTY-NINTH: the 20:20 UTC run, a sixty-sixth consecutive block, and five of Andrew's commits, one of which overturns a fix this file recorded as sound
+
+ANDREW, THIS IS THE ONE THING THIS LOOP NEEDS AND CANNOT DO ITSELF
+The Sentry connector needs reauthorizing. It lists as enabled for this session with an install
+state of unknown, so none of its tools load, and this session is non-interactive so the OAuth flow
+cannot be run from here. Reconnect it in your claude.ai connector settings and the loop resumes on
+the next tick. Placed at the top rather than only in email for the reason READ NINETY-FIFTH gives,
+and this run is more evidence for it: you pushed five commits into this repo between 19:08 and
+19:31 UTC, 48 minutes before this run closed, and the three reports in your inbox are still unread.
+
+Nothing has been monitored since 2026-08-12T15:08:27Z, which is 11 days 5 hours. That covers the
+public site, the CRM and the vote surface.
+
+The rest is the standing record. No triage was possible and no code changed here, so this makes NO
+claim about production health in either direction: an absent report is not an absent error, per
+READ TWENTY-SECOND.
+
+The blocker is unchanged at sixty-six consecutive runs, tested rather than inherited per READ
+TWELFTH. An exact-count grep for `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the
+environment returns zero, so there is no token route around the connector either.
+
+`84c31aa` OVERTURNS THIS FILE'S OWN RECORD OF `ac31a4e`, AND THAT IS THE FINDING
+READ ONE HUNDRED AND TWENTIETH read `ac31a4e` as closing a check-then-act gap, praised its shape,
+and quoted its own lesson that only the database can close such a gap. The mechanism half of that
+holds. What did NOT hold is that the guard worked at all.
+
+`84c31aa` establishes from a live probe that the guard's shape,
+`.update(...).eq("id", id).or("meeting_host.is.null,meeting_host_source.eq.transcript")`, raises
+42703: a PATCH carrying an `or=` filter naming any column other than the one in the `eq` answers
+`column meetings.meeting_host does not exist`, while the IDENTICAL filter on a GET returns the row,
+and a plain `meeting_host=is.null` filter on the same PATCH succeeds. So the column exists and it
+is the or-tree rendering ON A MUTATION that breaks. Every write attempt since that guard landed
+returned HTTP 500 and the backfill it was written for never ran.
+
+Two things to inherit rather than the incident. The hazard READ ONE HUNDRED AND TWENTIETH recorded
+for that call site, that `.or()` takes literals only, is a real hazard and was the WRONG one here;
+the defect is a rendering difference between GET and PATCH that no reading of the literal-injection
+rule would have caught. And this is the fourth entry in the silent-failure family this file tracks,
+after READ NINETY-SIXTH's cron jobs that never once authenticated, READ ONE HUNDRED AND TWENTIETH's
+own guard-fired-but-reported-success write, and READ ONE HUNDRED AND TWENTY-FIRST's model swap on
+one side of a stored vector. Here the failure was LOUD at the HTTP layer, a 500 on every call, and
+still invisible because nothing was watching the only function that made those calls. A loud error
+nobody reads is a silent failure.
+
+The repair moves the whole predicate into a `claim_meeting_host` function, one statement, one round
+trip, enforced by the database, and its sibling `815455a` records why the guard would have been
+useless even had it rendered: it tested `meeting_host_source = 'transcript'`, and NOTHING ever set
+that column to `'human'`, so a hand confirmation was indistinguishable from an unscored 2025 guess
+and got overwritten by automation twice.
+
+`verify_jwt=true` IS NOT AUTHENTICATION IN THIS PROJECT, WHICH IS NEW AND GENERAL
+`e714573` establishes it plainly: `verify_jwt=true` proves only that the caller presented SOME
+valid project JWT, and the anon key is one and ships in the public Flutter bundle. Probed live with
+nothing but that key, `import-historical-meetings` did not merely reach its handler, it RAN,
+authenticated to Zoom, listed meetings and returned rows. So a function marked `verify_jwt=true` is
+reachable by anyone who opens the app.
+
+Read that against the record rather than as an isolated fact. READ NINETY-SIXTH documents the
+opposite failure, a function deployed `--no-verify-jwt` to silence a recurring 401, and states the
+rule that loosening a check is essentially never the fix. This is the same rule from the other end:
+the check that WAS there proved nothing. `32a04ff` closes a third such endpoint. All three now carry
+the same gate, a user JWT passing `is_staff()` or the `x-cron-secret` read from the vault, and his
+messages record that both sides fail closed because an unset secret cannot equal a presented value
+required to be non-empty.
+
+`fa714f0` adds a fourth general fact in the same family. Postgres checks privileges and RLS against
+the relation NAMED IN THE QUERY, so RLS on a partitioned parent does not cover a query aimed at a
+partition; the only thing keeping the anon key off six unprotected `audit_log` partitions was that
+PostgREST leaves partitions out of its schema cache, which is an API-layer accident and not a
+database guarantee. He revoked on the leaves rather than enabling RLS there, on the ground that the
+audit trigger writes through the parent so its own privileges are unaffected.
+
+None of this is mine to act on: he found all of it, deployed it and verified it live, which is the
+gate READ NINETY-FOURTH records him arriving at independently. It is recorded here so the next run
+does not re-diagnose it, and because the first item corrects a claim this file made about its own
+history.
+
+NOTHING WAS SENT, WHICH IS THE SUPPRESSION RULE RATHER THAN AN OMISSION
+All three reports were checked rather than assumed and ALL THREE are still UNREAD:
+`MOYD Sentry triage 2026-08-20`, sent 2026-08-20T22:22:28Z, at 2 days 21 hours 57 minutes;
+`MOYD Sentry triage 2026-08-19`, sent 2026-08-19T16:22:13Z, at 4 days 3 hours 57 minutes; and
+`MOYD Sentry triage 2026-08-18`, sent 2026-08-18T11:37:14Z, at 5 days 8 hours 42 minutes, each
+computed from a clock read this run against its own thread timestamp and FLOORED per READ TWELFTH.
+
+His five commits do NOT fire a send. READ NINETY-FIFTH retired "Andrew pushes anything" as a
+condition precisely because it had already fired at READ NINETY-FOURTH, been reported, and gone
+unread, and this is a continuation of that same fact rather than a new one. The decision was
+re-weighed rather than copied, per READ SEVENTY-FIRST, and reached the same answer: nothing above
+is a fact the sent reports do not carry, since all of it is his own work that he already has. So
+the trigger to act on is unchanged: FOURTEEN DAYS blind, at 2026-08-26T15:08:27Z, which is 2 days
+18 hours away, or sooner if the connector returns or the vote is recorded closed. Name the ANCHOR
+when quoting a figure, per READ SEVENTY-SECOND, since report-age and blind-since differ by nearly a
+week.
+
+The crossing READ ONE HUNDRED AND TWENTY-EIGHTH forewarned is still AHEAD of this run, and its
+forewarning held as written: the 08-20 report crosses THREE DAYS at 22:22:28 today, about 2 hours
+after this close, so a 22:20 run is past it. Blind-since crosses TWELVE DAYS at
+2026-08-24T15:08:27Z. Per READ NINETIETH and READ EIGHTY-NINTH, a round number on an anchor or a
+report whose trigger has already fired once is not itself a fresh send condition.
+
+Nothing else moved. The site tip is unchanged at `aa2d513` from 2026-08-12. The six `sentry-fix/`
+branch tips were enumerated rather than inherited and are unchanged from READ SIXTY-THIRD's
+inventory, so the three fixes it establishes are live gaps have now waited a further eleven days.
+Grepped both repos again rather than inherited: nothing says the endorsement vote has closed. The
+CRM hits are the doc comment and the dashboard card render path in
+`auto_inferred_assignments_service.dart` and the open/closed section render paths in
+`member_votes_view.dart`, and the site hits are render paths only, every one describing what is
+shown WHEN a vote closes rather than stating that this one has. So the vote is treated as OPEN and
+nothing was merged.
+
+The branch ref trap bit in the classic form: local `master` stale at `9f108c2` against a real tip of
+`fa714f0`, with `HEAD` detached AT that tip. Checked in the form READ TWENTY-SECOND prescribes,
+local side the NAMED BRANCH and not `HEAD`, and repaired with `git checkout -B master HEAD` BEFORE
+committing, per READ SIXTY-FOURTH's addendum rather than READ NINTH's conditional repair. `HEAD`
+being AT the true tip is what makes that one-liner sufficient; READ ONE HUNDRED AND TWENTY-SIXTH
+records the other shape, where `HEAD` was itself behind and the one-liner moved `master` onto the
+stale commit. Check WHERE `HEAD` is before choosing which repair to run. The site's `main` was
+already AT its remote tip, which follows from that remote not having moved since 2026-08-12.
+
+ONE DISCRIMINATOR NOTE, BECAUSE THIS WINDOW SPLITS THREE-AND-TWO
+Of his five commits, THREE are authored `Andrew Hartzler <andrew@moyoungdemocrats.org>` and TWO are
+authored `Andy Hartzler <andrew@hartzler.us>`, byte identical to the identity this loop commits
+under by standing rule. READ ONE HUNDRED AND TWENTIETH and READ ONE HUNDRED AND TWENTY-FIRST each
+record a two-and-two split; the ratio moves and the conclusion does not. Authorship carries no
+information here in either direction. Read the SUBJECT, per READ EIGHTY-THIRD.
+
+VERIFICATION AND DISCLOSURE
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No adversarial
+audit was run, recorded as a departure rather than glossed, on the call READ SIXTY-FOURTH through
+READ ONE HUNDRED AND TWENTY-EIGHTH each made for the identical case: this diff carries no diagnosis
+of a Sentry issue, no mechanism of its own and no code. Its factual claims are the five durations,
+which are arithmetic over timestamps printed above, and a characterization of five commits taken
+from their own messages in this public repo's log, both checkable without an auditor.
+
+This repo is public and the sibling is private. Named above: the commits `9f108c2`, `fa714f0`,
+`e714573`, `815455a`, `32a04ff`, `84c31aa`, `ac31a4e`, `1a2f879` and `aa2d513`, the last being the
+private sibling's tip whose cover is prior publication in READ SIXTIETH; the branch prefix
+`sentry-fix/`; the edge functions `identify-meeting-host`, `import-historical-meetings`,
+`analyze-bill-ai` and `analyze-bill`, the function `claim_meeting_host`, the deploy flag
+`verify_jwt`, the header name `x-cron-secret`, the guard `is_staff()`, the table `audit_log` and the
+columns `meeting_host` and `meeting_host_source`, the SQLSTATE `42703`, the PostgREST filter forms
+`.or()`, `.eq()`, `.update()` and `is.null`, and the file `ai_analysis_service.dart`, every one
+committed in THIS repo, the public one, by `fa714f0` and its predecessors; the files
+`auto_inferred_assignments_service.dart` and `member_votes_view.dart`, both committed here; the
+connector field name `enabledInChat` and install state `unknown`, published here since READ
+NINETIETH; the git commands and ref names; the verification commands `npx tsc --noEmit` and
+`flutter analyze`; the product names Sentry, PostgREST, Postgres, Zoom and Gemini; and the env var
+name patterns `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN`. Apply READ SEVENTEENTH's
+test rather than the lazy version: "already committed" would be an argument for WITHHOLDING had any
+of these come from the private sibling, and none did. Everything else already appears in this file
+or is committed in this public repo's own tree.
+
+Deliberately WITHHELD from the account of his five commits, though all of it is already public in
+this repo's own commit log, because the finding survives without it and READ SIXTH's practice is to
+publish only what the finding needs: the meeting and member UUIDs, the meeting dates and titles, the
+audit log rows quoted in `815455a`, the secret NAME behind the cron header, the deployed version
+numbers, the accuracy and determinism figures, and the identity of every person named in the host
+adjudication. The three reports are named by subject line only, which is this loop's own published
+convention, and no transport, credential or container tooling is described, which READ EIGHTEENTH
+records as a BLOCKER class. No log content is quoted except the PostgREST error text
+`column meetings.meeting_host does not exist`, which his own commit message publishes verbatim in
+this public repo and which names a table this tree commits throughout and a column whose existence
+is the point being made, so it carries no row, value, person or address. Quantities are the clock
+values, the three report ages with the 08-20 three-day crossing instant, the blind-since duration
+with its twelve-day crossing instant, the next trigger instant and its remaining interval, the
+sixty-six run count, the five commit count, the three-and-two authorship split, the branch count and
+the six partitions, all bare and naming nothing. Withheld per the practice READ SIXTH set: the state
+of the live endorsement vote, and any operational read on production sessions.
