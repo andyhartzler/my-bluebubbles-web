@@ -45,9 +45,18 @@ class _MeetingCommitmentsPanelState extends State<MeetingCommitmentsPanel> {
     final commitments = await _repository.getForMeeting(widget.meetingId);
     final hasRegions =
         commitments.any((c) => c.kind == CommitmentKind.region);
-    final coverage = (widget.showCoverage && hasRegions)
-        ? await _repository.getRegionCoverage()
-        : const <RegionCoverage>[];
+    // getRegionCoverage now throws rather than swallowing, so the county tile
+    // can tell a failed fetch from an empty one. This panel's behaviour is
+    // deliberately unchanged: coverage is a secondary section here, and losing
+    // it should not take the commitments list down with it.
+    List<RegionCoverage> coverage = const <RegionCoverage>[];
+    if (widget.showCoverage && hasRegions) {
+      try {
+        coverage = await _repository.getRegionCoverage();
+      } catch (e) {
+        debugPrint('MeetingCommitmentsPanel: coverage unavailable: $e');
+      }
+    }
     if (!mounted) return;
     setState(() {
       _commitments = commitments;

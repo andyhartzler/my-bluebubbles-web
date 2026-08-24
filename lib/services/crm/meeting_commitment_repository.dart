@@ -85,18 +85,22 @@ class MeetingCommitmentRepository {
 
   /// County coverage across the whole membership. Ordered so the gaps with the
   /// most members in them come first, because that is the decision this is for.
+  ///
+  /// No member_count filter. After the eligibility fix an owned county that
+  /// matches zero members is the signature of a mistyped county string in a
+  /// commitment row, and that has to stay VISIBLE rather than vanish.
+  ///
+  /// THROWS rather than returning an empty list. The old version swallowed the
+  /// error, which left every caller unable to tell "the fetch failed" from
+  /// "there are no counties". On a surface whose whole job is to show gaps,
+  /// those two render identically and mean opposite things.
   Future<List<RegionCoverage>> getRegionCoverage() async {
     if (!_isReady) return const [];
-    try {
-      final response = await _supabase.client
-          .from('exec_region_coverage')
-          .select('county, member_count, owner_labels, has_owner, any_unconfirmed')
-          .gt('member_count', 0)
-          .order('member_count', ascending: false);
-      return _rows(response).map(RegionCoverage.fromJson).toList();
-    } catch (e) {
-      debugPrint('❌ Error loading region coverage: $e');
-      return const [];
-    }
+    final response = await _supabase.client
+        .from('exec_region_coverage')
+        .select('county, member_count, phone_count, owner_labels, '
+            'owner_member_ids, has_owner, any_unconfirmed')
+        .order('member_count', ascending: false);
+    return _rows(response).map(RegionCoverage.fromJson).toList();
   }
 }

@@ -1467,6 +1467,46 @@ class MemberRepository {
     return {for (final entry in entries) entry.key: entry.value};
   }
 
+  /// Total eligible members, for the county tile's headline and for deriving
+  /// how many have no county on file.
+  ///
+  /// That derivation is subtraction rather than a query on purpose: PostgREST
+  /// cannot express "county IS NULL OR county = ''" in one filter, and two
+  /// numbers on a tile that do not add up are worse than one number. Total
+  /// minus the sum of the per-county counts is exact by construction.
+  ///
+  /// Applies membership_eligible, matching _applyMemberFilters and the coverage
+  /// view, so every number on that tile counts the same population.
+  Future<int> countEligibleMembers() async {
+    if (!_isReady) return 0;
+    final PostgrestResponse res = await _readClient
+        .from('members')
+        .select('id')
+        .eq('membership_eligible', true)
+        .count(CountOption.exact);
+    return res.count;
+  }
+
+  /// The executive committee roster, id and name only. About fifteen rows.
+  ///
+  /// Deliberately does NOT filter on membership_eligible. An exec who has aged
+  /// out of membership is still an exec, and this list exists to answer who was
+  /// given a county and who was missed. Filtering here would quietly drop the
+  /// person the question is about.
+  ///
+  /// Reads the executive_committee boolean, which is the derived cache of the
+  /// committee array and is what is_staff() itself reads, so this agrees with
+  /// the view's own gate.
+  Future<List<Member>> getExecutiveRoster() async {
+    if (!_isReady) return const [];
+    final data = await _readClient
+        .from('members')
+        .select('id, name')
+        .eq('executive_committee', true)
+        .order('name');
+    return _mapMembers(_coerceList(data));
+  }
+
   /// Get member statistics
   Future<Map<String, dynamic>> getMemberStats() async {
     if (!_isReady) {

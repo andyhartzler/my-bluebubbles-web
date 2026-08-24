@@ -11,6 +11,7 @@ import 'widgets/activity_panel.dart';
 import 'widgets/assignments_panel.dart';
 import 'widgets/avatar_upload_dialog.dart';
 import 'widgets/branded_panel.dart';
+import 'widgets/counties_panel.dart';
 import 'widgets/home_customize_dialog.dart';
 import 'widgets/profile_header.dart';
 
@@ -161,6 +162,20 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // FIRST, above Assignments, and full width on every
+                    // breakpoint. Assignments has held zero rows since it was
+                    // built, so mounting the county tile beneath it would put
+                    // the one panel with real numbers several hundred pixels
+                    // down a phone scroll, behind an empty one. It renders
+                    // nothing at all for a non-executive, so it needs no
+                    // preference flag and no gate here.
+                    if (session.isExecutive) ...[
+                      CountiesPanel(
+                        memberId: member.id,
+                        isExecutive: true,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     // Wide desktop: Assignments + Activity sit side-by-side
                     // in a 50/50 row above the full-width Calendar.
                     if (prefs.showAssignments &&

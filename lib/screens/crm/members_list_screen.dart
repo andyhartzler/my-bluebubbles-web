@@ -28,6 +28,12 @@ class MembersListScreen extends StatefulWidget {
   final ChapterRepository? chapterRepository;
   final int pageSize;
 
+  /// Opens the list already filtered to one county. Set by the Your Counties
+  /// tile so the tap lands on the callable list rather than on all 419 members
+  /// with a filter the exec then has to find. It seeds `_selectedCounty`, so
+  /// the chip renders active and Clear removes it like any other filter.
+  final String? initialCounty;
+
   const MembersListScreen({
     Key? key,
     this.embed = false,
@@ -35,6 +41,7 @@ class MembersListScreen extends StatefulWidget {
     this.memberRepository,
     this.chapterRepository,
     this.pageSize = 50,
+    this.initialCounty,
   }) : super(key: key);
 
   @visibleForTesting
@@ -163,6 +170,10 @@ class _MembersListScreenState extends State<MembersListScreen> {
       ..addListener(_handleSearchTextChanged);
     _crmReady = _supabaseService.isInitialized && CRMConfig.crmEnabled;
     _activeView = widget.showChaptersOnly ? 1 : 0;
+    final seedCounty = widget.initialCounty?.trim();
+    if (seedCounty != null && seedCounty.isNotEmpty) {
+      _selectedCounty = seedCounty;
+    }
     _loadData(refreshMetadata: true, includeMetadata: true);
   }
 
@@ -2221,12 +2232,15 @@ class _MembersListScreenState extends State<MembersListScreen> {
           height: 1.18,
         );
 
+    final dialable = _dialableNumber(member);
     final detailLines = <Widget>[
       _buildDetailLine(
         Icons.phone,
         phoneDisplay ?? '-',
         iconColor: detailIconColor,
         textStyle: detailTextStyle,
+        onTap: dialable == null ? null : () => _dialMember(member),
+        semanticsLabel: dialable == null ? null : 'Call ${member.name} at ${phoneDisplay ?? dialable}',
       ),
     ];
     if (emailDisplay != null) {
@@ -2541,26 +2555,77 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   Widget _buildDetailLine(IconData icon, String value,
-      {Color? iconColor, TextStyle? textStyle}) {
+      {Color? iconColor, TextStyle? textStyle, VoidCallback? onTap, String? semanticsLabel}) {
+    final row = Row(
+      crossAxisAlignment: onTap == null ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+      children: [
+        Icon(icon, size: 18, color: iconColor ?? Colors.white),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: textStyle ??
+                const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
+        ),
+        if (onTap != null)
+          Icon(Icons.call, size: 16, color: iconColor ?? Colors.white),
+      ],
+    );
+
+    if (onTap == null) {
+      return Padding(padding: const EdgeInsets.only(bottom: 8), child: row);
+    }
+
+    // A tappable line inside a card that is ALSO tappable, so the InkWell has to
+    // be here rather than on the text: without it the tap opens the profile.
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: iconColor ?? Colors.white),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              value,
-              style: textStyle ??
-                  const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              softWrap: false,
-            ),
+      child: Semantics(
+        label: semanticsLabel,
+        button: true,
+        excludeSemantics: true,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: row,
           ),
-        ],
+        ),
       ),
+    );
+  }
+
+  /// The number as dialled, not as displayed. `_formatMemberPhone` inserts
+  /// spaces, brackets and a dash for reading, and a `tel:` URI built from that
+  /// is not reliably dialled on every platform.
+  String? _dialableNumber(Member member) {
+    final e164 = member.phoneE164?.trim();
+    if (e164 != null && e164.isNotEmpty) return e164;
+    final fallback = member.phone?.trim();
+    if (fallback != null && fallback.isNotEmpty) return fallback;
+    return null;
+  }
+
+  Future<void> _dialMember(Member member) async {
+    final number = _dialableNumber(member);
+    if (number == null) return;
+    final uri = Uri.parse('tel:$number');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+        return;
+      }
+    } catch (_) {
+      // fall through to the message below
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('This device cannot place calls.')),
     );
   }
 

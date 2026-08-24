@@ -210,22 +210,44 @@ class RegionCoverage {
   const RegionCoverage({
     required this.county,
     required this.memberCount,
+    required this.phoneCount,
     required this.ownerLabels,
+    required this.ownerMemberIds,
     required this.hasOwner,
     required this.anyUnconfirmed,
   });
 
   final String county;
+
+  /// Members with this county on file. Counts ONLY membership_eligible members,
+  /// because that is exactly what the members list shows when you tap through.
+  /// A count that changes when you tap it is worse than no count at all.
   final int memberCount;
+
+  /// How many of [memberCount] have a phone number we could dial. This is the
+  /// number that changes a decision rather than reporting one: Clay at 23 of 25
+  /// is a calling job, Cape Girardeau at 5 of 18 is not one.
+  final int phoneCount;
+
+  /// Free text, straight from the meeting. One of the real values is the
+  /// literal 'Nobody'. Display only.
   final List<String> ownerLabels;
+
+  /// members.id values. Match ownership on THESE, never on [ownerLabels].
+  final List<String> ownerMemberIds;
+
   final bool hasOwner;
   final bool anyUnconfirmed;
+
+  bool isOwnedBy(String memberId) => ownerMemberIds.contains(memberId);
 
   factory RegionCoverage.fromJson(Map<String, dynamic> json) {
     return RegionCoverage(
       county: (json['county'] ?? '').toString(),
       memberCount: (json['member_count'] as num?)?.toInt() ?? 0,
+      phoneCount: (json['phone_count'] as num?)?.toInt() ?? 0,
       ownerLabels: MeetingCommitment._stringList(json['owner_labels']),
+      ownerMemberIds: MeetingCommitment._stringList(json['owner_member_ids']),
       hasOwner: json['has_owner'] == true,
       anyUnconfirmed: json['any_unconfirmed'] == true,
     );
