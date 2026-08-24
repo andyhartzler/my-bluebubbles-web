@@ -18375,3 +18375,181 @@ remaining interval, the sixty-seven run count, the five commit count, the three-
 split, the branch count and the one commit distance, all bare and naming nothing. Withheld per the
 practice READ SIXTH set: the state of the live endorsement vote, and any operational read on
 production sessions.
+
+## READ ONE HUNDRED AND THIRTY-FIRST: the 00:20 UTC run, a sixty-eighth consecutive block, and a security control that silently undid itself
+
+ANDREW, THIS IS THE ONE THING THIS LOOP NEEDS AND CANNOT DO ITSELF
+The Sentry connector needs reauthorizing. It lists as enabled for this session with an install
+state of unknown, so none of its tools load, and this session is non-interactive so the OAuth flow
+cannot be run from here. Reconnect it in your claude.ai connector settings and the loop resumes on
+the next tick. Placed at the top rather than only in email for the reason READ NINETY-FIFTH gives,
+and this run is more evidence for it: you pushed four commits into this repo between 23:33 and
+23:43 UTC, 36 minutes before this run closed, and the three reports in your inbox are still unread.
+
+Nothing has been monitored since 2026-08-12T15:08:27Z, which is 11 days 9 hours. That covers the
+public site, the CRM and the vote surface.
+
+The rest is the standing record. No triage was possible and no code changed here, so this makes NO
+claim about production health in either direction: an absent report is not an absent error, per
+READ TWENTY-SECOND.
+
+The blocker is unchanged at sixty-eight consecutive runs, tested rather than inherited per READ
+TWELFTH. An exact-count grep for `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the
+environment returns zero, so there is no token route around the connector either.
+
+`d424785`: A TRIGGER'S COLUMN SCOPE MADE A SECURITY CONTROL REVERSE ITSELF, AND THAT IS THE FINDING
+`update_executive_committee_flag()` derives `members.executive_committee` from the committee array,
+and it was declared `BEFORE INSERT OR UPDATE OF committee`. A column-scoped trigger fires only when
+that column appears in the SET list. `revoke-executive-session` wrote the boolean ALONE and never
+named `committee`, so the trigger stayed quiet: the flag went false, the array still said Executive
+Committee, and the next write touching `committee` for any reason recomputed the flag and handed
+CRM access back. He measured it live in a rolled-back transaction, start true, after revoke false,
+after any committee write TRUE again. `invite_executive_dialog` runs the same shape inverted, so
+promotions evaporated the same way.
+
+Two things to inherit rather than the incident. The general one: `UPDATE OF <col>` is a scope on
+the STATEMENT, not on the value, so a trigger written to keep a derived column honest is bypassed
+by any write that reaches the derived column directly. If a column is derived, do not scope its
+trigger, which is exactly what `_04` does; a direct write to the boolean then becomes an inert
+no-op, and his message is right that failing visibly beats appearing to work and reversing later.
+
+The other is that this is the FIFTH entry in the silent-failure family this file tracks, after READ
+NINETY-SIXTH's cron jobs that had never once authenticated while pg_cron reported success, READ ONE
+HUNDRED AND TWENTIETH's guard that fired while the write reported success, READ ONE HUNDRED AND
+TWENTY-FIRST's model swap on one side of a stored vector, and READ ONE HUNDRED AND TWENTY-NINTH's
+`or=` filter that 500ed on every call with nobody watching. This one is the worst shape of the five,
+because the reversal is not merely unreported: it is DELAYED and triggered by an unrelated write, so
+the control appears to work at the moment it is used and fails later for a reason nobody connects to
+it. When auditing a security control, check that it stays applied rather than that it applied.
+
+`2cea60a`: AN ARRAY THAT IS ACCESS CONTROL, WHOLESALE REPLACED BY AN IMPORT
+The other one worth recording. Both chapter imports wrote `committee: ['College Democrats']` inside
+the object they applied with `.update(...)`, which is a wholesale replace that DISCARDED every other
+committee on the row. `members.committee` is not decoration: `trigger_update_executive_committee`
+derives the access flag from it, so an import landing on an executive's row by a name-plus-phone
+match silently revoked their CRM access, and the Slack sync then pushed the removal onward.
+
+The fix is placed in the DATABASE rather than in each caller, as a merge function that locks the row
+and edits the array in one statement, and the Executive Committee guard sits inside it so no future
+caller can route around it in either direction. That is the same lesson READ ONE HUNDRED AND
+TWENTY-NINTH's `claim_meeting_host` reaches: when a rule protects access, put it where every caller
+must pass through it, not in the callers.
+
+Two residues from that commit are recorded so a future run does not raise them as new.
+`zapier-webhook` carries the identical wholesale replace in source but is absent from all 149
+deployed functions, so it is a source-only hazard rather than a live one. And 56 rows carrying
+exactly one chapter committee are consistent BOTH with a past overwrite and with a member who
+legitimately belongs to one chapter, with `audit_log` reaching back only to 2026-07-15 and holding
+no instance of the signature, so he declined to reconstruct them. Declining to guess at a destroyed
+list is the right call and is the same discipline READ ONE HUNDRED AND TWENTIETH records for his
+adjudications.
+
+His other two are his work and are not mine to re-diagnose: `3fdc57f` turns a recap paragraph into
+`meeting_commitments` rows with an owner, a status and a human-edit guard, and `b742e85` fixes a
+layout gap the first one introduced, its own message noting that `flutter analyze` is the only
+reason a bracket-depth error did not ship.
+
+None of this is mine to act on: he found all of it, deployed it and verified it live, which is the
+gate READ NINETY-FOURTH records him arriving at independently.
+
+THE AUTHORSHIP DISCRIMINATOR IS NOW FOUR AND ZERO, WHICH IS THE STRONGEST FORM YET
+All FOUR of his commits this window are authored `Andy Hartzler <andrew@hartzler.us>`, byte
+identical to the identity this loop commits under by standing rule. READ ONE HUNDRED AND TWENTIETH
+and READ ONE HUNDRED AND TWENTY-FIRST each record a two-and-two split and READ ONE HUNDRED AND
+TWENTY-NINTH a three-and-two; this window is four-and-zero, so an authorship test would have read
+every one of his commits as a sweep record. The field carries no information in either direction.
+Read the SUBJECT, per READ EIGHTY-THIRD.
+
+NOTHING WAS SENT, WHICH IS THE SUPPRESSION RULE RATHER THAN AN OMISSION
+All three reports were checked rather than assumed and ALL THREE are still UNREAD:
+`MOYD Sentry triage 2026-08-20`, sent 2026-08-20T22:22:28Z, at 3 days 1 hour 57 minutes;
+`MOYD Sentry triage 2026-08-19`, sent 2026-08-19T16:22:13Z, at 4 days 7 hours 58 minutes; and
+`MOYD Sentry triage 2026-08-18`, sent 2026-08-18T11:37:14Z, at 5 days 12 hours 43 minutes, each
+computed from a clock read this run against its own thread timestamp and FLOORED per READ TWELFTH.
+
+His four commits do NOT fire a send. READ NINETY-FIFTH retired "Andrew pushes anything" as a
+condition precisely because it had already fired at READ NINETY-FOURTH, been reported, and gone
+unread, and this is a continuation of that same fact rather than a new one. The decision was
+re-weighed rather than copied, per READ SEVENTY-FIRST, and reached the same answer: everything above
+is his own work, which he already has, so none of it is a fact the sent reports do not carry. The
+trigger to act on is unchanged: FOURTEEN DAYS blind, at 2026-08-26T15:08:27Z, which is 2 days 14
+hours away, or sooner if the connector returns or the vote is recorded closed. Neither happened.
+Name the ANCHOR when quoting a figure, per READ SEVENTY-SECOND, since report-age and blind-since
+differ by nearly a week.
+
+The crossing READ ONE HUNDRED AND THIRTIETH left ahead of itself HAS landed: the 08-20 report
+crossed THREE DAYS at 22:22:28 yesterday, 1 hour 57 minutes before this run closed. That section
+missed it by 2 minutes 11 seconds and said so; its instruction to carry the INSTANT forward and
+re-derive the slot is what made this run's check trivial. Blind-since crosses TWELVE DAYS at
+2026-08-24T15:08:27Z, about 14 hours 48 minutes after this close. Per READ NINETIETH and READ
+EIGHTY-NINTH, a round number on an anchor or a report whose trigger has already fired once is not
+itself a fresh send condition.
+
+Nothing else moved. The site tip is unchanged at `aa2d513` from 2026-08-12. The six `sentry-fix/`
+branch tips were enumerated rather than inherited and are unchanged from READ SIXTY-THIRD's
+inventory, so the three fixes it establishes are live gaps have now waited a further twelve days.
+Grepped both repos again rather than inherited: nothing says the endorsement vote has closed. The
+CRM hits are the doc comment in `auto_inferred_assignments_service.dart` and the branch comment in
+`vote_detail_screen.dart`, and the site hits are the render paths in `VoteStatusMessage.tsx` and the
+members dashboard voting page, every one describing what is shown WHEN a vote closes rather than
+stating that this one has. So the vote is treated as OPEN and nothing was merged.
+
+The branch ref trap bit in the classic form: local `master` stale at `9f108c2` against a real tip of
+`d424785`, with `HEAD` detached AT that tip. Checked in the form READ TWENTY-SECOND prescribes,
+local side the NAMED BRANCH and not `HEAD`, and repaired with `git checkout -B master HEAD` BEFORE
+committing, per READ SIXTY-FOURTH's addendum rather than READ NINTH's conditional repair. `HEAD`
+being AT the true tip is what makes that one-liner sufficient; READ ONE HUNDRED AND TWENTY-SIXTH
+records the other shape, where `HEAD` was itself behind and the one-liner moved `master` onto the
+stale commit and needed READ SECOND's `fetch` plus reset after it. Check WHERE `HEAD` is before
+choosing which repair to run. After the repair `git status` reports ahead of `origin/master` by 15,
+which is the stale remote-tracking cache talking, per READ TWENTY-SIXTH, and `git ls-remote` showed
+the remote already AT `d424785`. Do not act on it. The container also arrived with the wrong commit
+identity again, per READ SIXTIETH: set the one this project requires and do NOT rebase
+already-pushed commits to match, since that needs a force push and READ SECOND's prohibition is not
+negotiable for a cosmetic badge.
+
+VERIFICATION AND DISCLOSURE
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No adversarial
+audit was run, recorded as a departure rather than glossed, on the call READ SIXTY-FOURTH through
+READ ONE HUNDRED AND THIRTIETH each made for the identical case: this diff carries no diagnosis of a
+Sentry issue, no mechanism of its own and no code. Its factual claims are the five durations, which
+are arithmetic over timestamps printed above, and a characterization of four commits taken from
+their own messages in this public repo's log, both checkable without an auditor.
+
+This repo is public and the sibling is private. Named above: the commits `9f108c2`, `d424785`,
+`b742e85`, `3fdc57f`, `2cea60a` and `aa2d513`, the last being the private sibling's tip whose cover
+is prior publication in READ SIXTIETH; the branch prefix `sentry-fix/`; the table `members` and its
+`committee` and `executive_committee` columns, the table `meeting_commitments`, the trigger function
+`update_executive_committee_flag()` and the trigger `trigger_update_executive_committee`, the edge
+functions `revoke-executive-session`, `chapter-members-supabase`, `hs-chapters-supabase-` and
+`zapier-webhook`, the dialog `invite_executive_dialog`, the table `audit_log`, and the function
+`claim_meeting_host` cited from READ ONE HUNDRED AND TWENTY-NINTH, every one committed in THIS repo,
+the public one, by `d424785` and its predecessors; the files
+`auto_inferred_assignments_service.dart` and `vote_detail_screen.dart`, both committed here, and
+`VoteStatusMessage.tsx` with the members dashboard voting page named by role rather than by path,
+both in the private sibling and both published in READ SEVENTY-FIRST; the connector field name
+`enabledInChat` and install state `unknown`, published here since READ NINETIETH; `pg_cron`,
+published here since READ FIRST; the SQL form `BEFORE INSERT OR UPDATE OF`; the git commands and ref
+names, including `origin/master`, generic git plumbing naming nothing of ours; the verification
+commands `npx tsc --noEmit` and `flutter analyze`; the product names Sentry and Slack; and the env
+var name patterns `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN`. Apply READ
+SEVENTEENTH's test rather than the lazy version: "already committed" would be an argument for
+WITHHOLDING had any of these come from the private sibling, and none did. Everything else already
+appears in this file or is committed in this public repo's own tree.
+
+Deliberately WITHHELD from the account of his four commits, though all of it is already public in
+this repo's own commit log, because the finding survives without it and READ SIXTH's practice is to
+publish only what the finding needs: the meeting UUID and date, the deployed version numbers, the
+migration filenames beyond the `_04` and `_05` shorthand the finding uses, the new function names in
+the revocation and merge paths, the workflow id, the member and donor row counts, and above all the
+identity of the executive whose device label was corrected in the stored minutes. The three reports
+are named by subject line only, which is this loop's own published convention, and no transport,
+credential or container tooling is described, which READ EIGHTEENTH records as a BLOCKER class. No
+log content is quoted, because none was readable. Quantities are the clock values, the three report
+ages with the 08-20 three-day crossing instant and its 2 minute margin, the blind-since duration
+with its twelve-day crossing instant, the next trigger instant and its remaining interval, the
+sixty-eight run count, the four commit count, the four-and-zero authorship split, the branch count,
+the one commit distance, the 56 single-chapter rows and the 149 deployed functions, all bare and
+naming nothing. Withheld per the practice READ SIXTH set: the state of the live endorsement vote,
+and any operational read on production sessions.
