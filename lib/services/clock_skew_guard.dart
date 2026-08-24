@@ -92,7 +92,13 @@ class ClockSkewGuard {
       if (skew.abs().inSeconds <= _toleranceSeconds) {
         // Normal drift. Leave gotrue to do its job.
         if (_active) {
+          // Same ordering trap as in _refresh: restate the expiry against the
+          // new small offset BEFORE standing down, or the session keeps an
+          // expiry hours past the token's real death and every request 401s.
+          _correctExpiry(client);
           _active = false;
+          _authSub?.cancel();
+          _authSub = null;
           _timer?.cancel();
           client.auth.startAutoRefresh();
         }
@@ -251,21 +257,30 @@ class ClockSkewGuard {
   /// Round-trip the server_time RPC and take the midpoint of the local clock
   /// either side of it, so the measurement is not skewed by network latency in
   /// one direction. Same technique AuthRefreshGuard already uses to report skew.
+  /// Retried once, because a single failed probe at page load meant no guard at
+  /// all for that whole page load and the storm simply came back, with nothing
+  /// recorded to say why. One retry, not a loop: if the RPC is down the device
+  /// cannot refresh a token either, so there is nothing to protect.
   static Future<Duration?> _measureSkew(SupabaseClient client) async {
-    try {
-      final before = DateTime.now();
-      final raw = await client.rpc('server_time');
-      final after = DateTime.now();
-      final server = DateTime.parse(raw as String).toUtc();
-      final localMid = before
-          .toUtc()
-          .add(Duration(
-              milliseconds: after.difference(before).inMilliseconds ~/ 2));
-      return localMid.difference(server);
-    } catch (e) {
-      debugPrint('ClockSkewGuard: could not read server_time: $e');
-      return null;
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      try {
+        final before = DateTime.now();
+        final raw = await client.rpc('server_time');
+        final after = DateTime.now();
+        final server = DateTime.parse(raw as String).toUtc();
+        final localMid = before.toUtc().add(Duration(
+            milliseconds: after.difference(before).inMilliseconds ~/ 2));
+        return localMid.difference(server);
+      } catch (e) {
+        debugPrint(
+          'ClockSkewGuard: could not read server_time (attempt $attempt): $e',
+        );
+        if (attempt == 1) {
+          await Future<void>.delayed(const Duration(seconds: 2));
+        }
+      }
     }
+    return null;
   }
 
   static void _schedule(SupabaseClient client) {
@@ -280,15 +295,43 @@ class ClockSkewGuard {
       return;
     }
 
-    final expiry =
-        DateTime.fromMillisecondsSinceEpoch(expiresAt * 1000, isUtc: true);
-    // The comparison that matters: expiry is server time, so it must be compared
-    // against corrected time. Using DateTime.now() here is the original bug.
-    final untilRefresh =
-        expiry.difference(serverNow().toUtc()) - _refreshMargin;
+    _timer = Timer(
+      refreshDelayFor(
+        correctedExpiryEpochSeconds: expiresAt,
+        localNow: DateTime.now(),
+      ),
+      () => _refresh(client),
+    );
+  }
 
-    final wait = untilRefresh < _minInterval ? _minInterval : untilRefresh;
-    _timer = Timer(wait, () => _refresh(client));
+  /// How long to wait before refreshing, given the expiry [_correctExpiry] has
+  /// already written and the device's own clock.
+  ///
+  /// BOTH ARGUMENTS ARE IN THE DEVICE'S FRAME, and that is the whole point.
+  /// This compared against [serverNow] until 2026-08-24, which was right while
+  /// `expiresAt` still held the server's absolute `exp` and became wrong the
+  /// moment [_correctExpiry] started restating it. Comparing a device-frame
+  /// expiry against a server-frame now subtracts the offset a SECOND time, so
+  /// on the 7,279 second machine this returned about two hours past the point
+  /// the token had already died, and the proactive refresh never fired. On a
+  /// clock more than 49 minutes SLOW it goes negative and floors, which is a
+  /// refresh every minute forever.
+  ///
+  /// Taking the corrected expiry as an argument rather than a skew is
+  /// deliberate. The previous helper took the true expiry and a skew, so the
+  /// test could pass while production fed the function something else entirely,
+  /// which is exactly what happened. This takes what the caller actually has.
+  @visibleForTesting
+  static Duration refreshDelayFor({
+    required int correctedExpiryEpochSeconds,
+    required DateTime localNow,
+  }) {
+    final expiry = DateTime.fromMillisecondsSinceEpoch(
+      correctedExpiryEpochSeconds * 1000,
+      isUtc: true,
+    );
+    final until = expiry.difference(localNow.toUtc()) - _refreshMargin;
+    return until < _minInterval ? _minInterval : until;
   }
 
   static Future<void> _refresh(SupabaseClient client) async {
@@ -308,7 +351,19 @@ class ClockSkewGuard {
       _offset = skew;
       if (skew.abs().inSeconds <= _toleranceSeconds) {
         debugPrint('ClockSkewGuard: clock corrected, handing back to the SDK.');
+        // ORDER MATTERS. Restate the expiry against the NEW, small offset while
+        // still active, then stand down. Handing back without this leaves the
+        // session carrying an expiry two hours past the token's real death: the
+        // clock is now right, so the SDK reads that as plenty of time left, and
+        // every request 401s until the page is reloaded.
+        //
+        // This is the exact trap that would have been sprung by telling the
+        // member to turn automatic time back on, which is the one instruction
+        // this whole class hands them.
+        _correctExpiry(client);
         _active = false;
+        _authSub?.cancel();
+        _authSub = null;
         _timer?.cancel();
         try {
           client.auth.startAutoRefresh();
@@ -343,17 +398,6 @@ class ClockSkewGuard {
     return 'This device’s clock is about $amount $ahead the correct time. '
         'Signing in still works, but turning on automatic time in your system '
         'settings will stop the repeated sign-outs.';
-  }
-
-  @visibleForTesting
-  static Duration debugRefreshDelay({
-    required DateTime expiryUtc,
-    required DateTime localNow,
-    required Duration skew,
-  }) {
-    final corrected = localNow.toUtc().subtract(skew);
-    final until = expiryUtc.difference(corrected) - _refreshMargin;
-    return until < _minInterval ? _minInterval : until;
   }
 
   @visibleForTesting

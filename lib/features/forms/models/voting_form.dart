@@ -1,4 +1,6 @@
+import 'package:bluebubbles/services/clock_skew_guard.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+
 import 'form_field_config.dart';
 
 part 'voting_form.freezed.dart';
@@ -203,11 +205,19 @@ extension VotingFormExtension on VotingForm {
     return count;
   }
 
-  /// Check if voting is currently active
+  /// Check if voting is currently active.
+  ///
+  /// All three of these getters ask ClockSkewGuard for the time rather than the
+  /// device, because a vote window is the server's fact and the device only
+  /// thinks it knows what time it is. A real executive's Windows clock is 2h01m
+  /// fast, which closed every vote for him 2h01m early: the ballot dropped out
+  /// of Open Votes and showed "Voting has ended" while it was still open, and
+  /// he could not cast it. serverNow() equals DateTime.now() on a healthy
+  /// device, so nothing changes for anyone else.
   bool get isVotingActive {
     if (status != 'active') return false;
 
-    final now = DateTime.now();
+    final now = ClockSkewGuard.serverNow();
 
     // Check start date
     if (votingStartsAt != null && now.isBefore(votingStartsAt!)) {
@@ -225,12 +235,12 @@ extension VotingFormExtension on VotingForm {
   /// Check if voting has ended
   bool get hasEnded {
     if (votingEndsAt == null) return false;
-    return DateTime.now().isAfter(votingEndsAt!);
+    return ClockSkewGuard.serverNow().isAfter(votingEndsAt!);
   }
 
   /// Check if voting hasn't started yet
   bool get notStarted {
     if (votingStartsAt == null) return false;
-    return DateTime.now().isBefore(votingStartsAt!);
+    return ClockSkewGuard.serverNow().isBefore(votingStartsAt!);
   }
 }

@@ -10,73 +10,100 @@ import 'package:flutter_test/flutter_test.dart';
 /// Both halves of the guard need a live SupabaseClient to run, so what is
 /// exercised here is the two computations they call: the refresh delay, which
 /// covers the ticker, and the expiry correction, which covers the per-request
-/// path that stopping the ticker cannot reach. Those are the parts gotrue gets
-/// wrong on a skewed device and the parts a future edit is most likely to
-/// break.
+/// path that stopping the ticker cannot reach.
+///
+/// Both take EXACTLY what production passes them. That is not a style choice.
+/// The first version of the delay test took a true expiry and a skew, while
+/// production passed an already-corrected expiry, so the test stayed green
+/// through four hours of production computing a delay two hours past the point
+/// the token had died. A test whose inputs differ from the caller's is not a
+/// test of the caller.
 void main() {
   // Token issued at local 12:00 on a clock running 7,279 seconds fast, so the
   // server issued it at 09:58:41 and it truly expires at 10:58:41 server time.
   final skew = const Duration(seconds: 7279);
   final expiry = DateTime.utc(2026, 8, 24, 10, 58, 41);
 
-  group('ClockSkewGuard.debugRefreshDelay', () {
-    test('a token issued moments ago is NOT treated as expired', () {
-      // The device says 12:00:00. gotrue would compute expiry - now as minus
-      // 3,679 seconds here and refresh immediately, forever.
-      final delay = ClockSkewGuard.debugRefreshDelay(
-        expiryUtc: expiry,
-        localNow: DateTime.utc(2026, 8, 24, 12, 0, 0),
-        skew: skew,
-      );
+  // Everything below feeds refreshDelayFor the SAME shape production feeds it:
+  // the expiry ClockSkewGuard has ALREADY written into the session, which is in
+  // the DEVICE's frame, plus the device's own clock. The previous helper took
+  // the true expiry and a skew, so these tests passed green for four hours while
+  // production was computing something else entirely.
+  group('refreshDelayFor', () {
+    final trueExp = expiry.millisecondsSinceEpoch ~/ 1000;
+    // What _correctExpiry writes on the 7,279s-fast machine.
+    final correctedExp = trueExp + skew.inSeconds;
 
-      // Corrected now is 09:58:41, so 60 minutes remain, less the 10 minute
-      // margin.
-      expect(delay, const Duration(minutes: 50));
-      expect(delay > const Duration(minutes: 1), isTrue,
-          reason: 'anything at or near the floor means the storm is back');
+    test('a token issued moments ago is NOT treated as expired', () {
+      // Device says 12:00:00, which is 09:58:41 real time, so a full hour of
+      // token life remains and the refresh belongs 50 minutes out.
+      expect(
+        ClockSkewGuard.refreshDelayFor(
+          correctedExpiryEpochSeconds: correctedExp,
+          localNow: DateTime.utc(2026, 8, 24, 12, 0, 0),
+        ),
+        const Duration(minutes: 50),
+      );
+    });
+
+    test('THE REGRESSION: the skew is not counted twice', () {
+      // The bug shipped at 21:11 compared a device-frame expiry against
+      // server-frame now, which added the offset a second time and scheduled
+      // the refresh 2h01m AFTER the token had already died. Anything over an
+      // hour here means the proactive refresh never fires at all.
+      final delay = ClockSkewGuard.refreshDelayFor(
+        correctedExpiryEpochSeconds: correctedExp,
+        localNow: DateTime.utc(2026, 8, 24, 12, 0, 0),
+      );
+      expect(delay < const Duration(hours: 1), isTrue,
+          reason: 'a delay past the token lifetime is the double-count bug');
     });
 
     test('the refresh lands on the margin, not on expiry', () {
-      // Corrected now is 10:43:41, fifteen minutes from real expiry.
-      final delay = ClockSkewGuard.debugRefreshDelay(
-        expiryUtc: expiry,
-        localNow: DateTime.utc(2026, 8, 24, 12, 45, 0),
-        skew: skew,
+      // Device 12:45 is 10:43:41 real, fifteen minutes from real expiry.
+      expect(
+        ClockSkewGuard.refreshDelayFor(
+          correctedExpiryEpochSeconds: correctedExp,
+          localNow: DateTime.utc(2026, 8, 24, 12, 45, 0),
+        ),
+        const Duration(minutes: 5),
       );
-      expect(delay, const Duration(minutes: 5));
     });
 
     test('a genuinely expired token floors rather than spinning', () {
-      // Corrected now is 11:58:41, an hour past real expiry. The arithmetic is
-      // negative; the floor is what keeps a wrong correction from becoming a
-      // hot loop.
-      final delay = ClockSkewGuard.debugRefreshDelay(
-        expiryUtc: expiry,
-        localNow: DateTime.utc(2026, 8, 24, 14, 0, 0),
-        skew: skew,
+      expect(
+        ClockSkewGuard.refreshDelayFor(
+          correctedExpiryEpochSeconds: correctedExp,
+          localNow: DateTime.utc(2026, 8, 24, 14, 0, 0),
+        ),
+        const Duration(minutes: 1),
       );
-      expect(delay, const Duration(minutes: 1));
     });
 
-    test('a clock running SLOW is corrected in the other direction', () {
-      // Same size of error, opposite sign: the device says 09:58:41 when the
-      // server says 12:00:00, so the token expired an hour ago in fact and the
-      // guard must not sit on it for another 50 minutes.
-      final delay = ClockSkewGuard.debugRefreshDelay(
-        expiryUtc: expiry,
-        localNow: DateTime.utc(2026, 8, 24, 9, 58, 41),
-        skew: -skew,
+    test('a SLOW clock does not become a one-per-minute loop', () {
+      // The same double-count inverted: on a device 7,279s slow the old code
+      // went negative and floored forever. Device 09:58:41 is 12:00:00 real,
+      // so this token died an hour ago and ONE floored delay is correct, but
+      // a device that is merely slow and holding a fresh token must not floor.
+      final freshForSlowDevice =
+          DateTime.utc(2026, 8, 24, 9, 58, 41).millisecondsSinceEpoch ~/ 1000;
+      expect(
+        ClockSkewGuard.refreshDelayFor(
+          correctedExpiryEpochSeconds: freshForSlowDevice + 3600,
+          localNow: DateTime.utc(2026, 8, 24, 9, 58, 41),
+        ),
+        const Duration(minutes: 50),
       );
-      expect(delay, const Duration(minutes: 1));
     });
 
     test('an unskewed device gets the ordinary schedule', () {
-      final delay = ClockSkewGuard.debugRefreshDelay(
-        expiryUtc: expiry,
-        localNow: DateTime.utc(2026, 8, 24, 10, 0, 0),
-        skew: Duration.zero,
+      expect(
+        ClockSkewGuard.refreshDelayFor(
+          correctedExpiryEpochSeconds: trueExp,
+          localNow: DateTime.utc(2026, 8, 24, 10, 0, 0),
+        ),
+        const Duration(minutes: 48, seconds: 41),
       );
-      expect(delay, const Duration(minutes: 48, seconds: 41));
     });
   });
 
