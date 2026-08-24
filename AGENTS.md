@@ -19088,3 +19088,140 @@ seventy-three run count, the four commit count, the four-and-zero authorship spl
 count and the one commit distance, all bare and naming nothing. Withheld per the practice READ
 SIXTH set: the state of the live endorsement vote, and any operational read on production
 sessions.
+
+## READ ONE HUNDRED AND THIRTY-SEVENTH: the 12:21 UTC run, a seventy-fourth consecutive block, and a cwd trap that produced a false clean grep
+
+ANDREW, THIS IS THE ONE THING THIS LOOP NEEDS AND CANNOT DO ITSELF
+The Sentry connector needs reauthorizing. It is present for this session but not authorized, so
+none of its tools load, and this session is non-interactive so the OAuth flow cannot be run from
+here. Reconnect it in your claude.ai connector settings and the loop resumes on the next tick.
+Placed at the top rather than only in email for the reason READ NINETY-FIFTH gives: three reports
+sit unread in your inbox while you have been pushing into this repo, so this file is the channel
+that reaches you and the email thread is not.
+
+Nothing has been monitored since 2026-08-12T15:08:27Z, which is 11 days 21 hours. That covers the
+public site, the CRM and the vote surface.
+
+The rest is the standing record. No triage was possible and no code changed, so this makes NO
+claim about production health in either direction: an absent report is not an absent error, per
+READ TWENTY-SECOND.
+
+The blocker is unchanged at seventy-four consecutive runs, tested rather than inherited per READ
+TWELFTH. An exact-count grep for `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the
+environment returns zero, so there is no token route around the connector either.
+
+THE CWD TRAP BIT IN ITS HARMFUL DIRECTION, WHICH IS NEW FOR THIS STRETCH
+READ NINTH records the Bash tool's cwd persisting between calls, and READ ONE HUNDRED AND
+THIRTEENTH and READ ONE HUNDRED AND TWENTIETH each record it biting HARMLESSLY, where a bare
+command read the right tree by luck or answered `fatal: ambiguous argument` loudly. This run is
+the first in this stretch where it produced a FALSE CLEAN result instead.
+
+The vote-closure grep is run against both trees. An earlier call had left the shell in the CRM
+repo, so the call meant for the site ran `grep -ril ... src/` there. The CRM has no `src/`
+directory, so grep matched nothing, exited quietly, and the output read exactly like a site tree
+with no closure note in it. Re-run with an absolute path, the site returns eight hits.
+
+That is the shape worth inheriting rather than the incident: a relative path against a directory
+that does not exist in the wrong repo yields an EMPTY result, not an error, and an empty result is
+indistinguishable from a clean check. The two harmless instances on record both produced a
+non-empty answer or a visible failure, which is why this one is worth separating from them. Use
+`git -C <path>` and absolute paths for every command in a two repo container, per READ NINTH, and
+treat an unexpectedly empty grep as a cwd suspect before treating it as a finding.
+
+Nothing changed as a result. The eight site hits are the render paths in `VoteStatusMessage.tsx`,
+`VoteCard.tsx` and the three voting pages, plus three incidental matches in
+`site-main/captured/privacy.ts`, `site-action/lib/fallbackData.ts` and `site-action/lib/emailApi.ts`,
+the first of which is captured privacy-policy prose. The CRM hits are the doc comments and the
+dashboard card render path in `auto_inferred_assignments_service.dart`, the open/closed section
+render paths in `member_votes_view.dart` and `vote_detail_screen.dart`, the `VoterRollDisclosure`
+widget-name substring trap READ SEVENTY-NINTH names, and `Icons.close` in
+`donor_profile_screen.dart`. Every one describes what is shown WHEN a vote closes rather than
+stating that this one has. So the vote is treated as OPEN and nothing was merged.
+
+NOTHING WAS SENT, WHICH IS THE SUPPRESSION RULE RATHER THAN AN OMISSION
+All three reports were checked rather than assumed and ALL THREE are still UNREAD:
+`MOYD Sentry triage 2026-08-20`, sent 2026-08-20T22:22:28Z, at 3 days 13 hours 58 minutes;
+`MOYD Sentry triage 2026-08-19`, sent 2026-08-19T16:22:13Z, at 4 days 19 hours 59 minutes; and
+`MOYD Sentry triage 2026-08-18`, sent 2026-08-18T11:37:14Z, at 6 days 0 hours 44 minutes, each
+computed from a clock read this run against its own thread timestamp and FLOORED per READ TWELFTH.
+
+The trigger to act on is the one READ SEVENTY-NINTH registered, narrowed to two conditions by READ
+NINETY-FIFTH after the push condition fired and went unread: FOURTEEN DAYS blind, at
+2026-08-26T15:08:27Z, which is 2 days 2 hours away, or sooner if the connector returns or the vote
+is recorded closed. Neither happened. Name the ANCHOR when quoting a figure, per READ
+SEVENTY-SECOND, since report-age and blind-since differ by nearly a week.
+
+One crossing LANDED and three are ahead, all carried as INSTANTS rather than as sweep slots per
+READ ONE HUNDRED AND THIRTIETH. The 08-18 report crossed SIX DAYS at 2026-08-24T11:37:14Z, 44
+minutes BEFORE this run's clock read, which READ ONE HUNDRED AND THIRTY-SIXTH forewarned and
+explicitly flagged as close enough that a 12:20 run would be past it; it is, and that section's
+instruction to recompute against your own close rather than inherit the sentence is what made the
+check trivial. Ahead: blind-since crosses TWELVE DAYS at 2026-08-24T15:08:27Z, about 2 hours 47
+minutes after this close; the 08-19 report crosses FIVE DAYS at 2026-08-24T16:22:13Z, about 4
+hours after; and the 08-20 report crosses FOUR DAYS at 2026-08-24T22:22:28Z, about 10 hours after.
+Per READ NINETIETH and READ EIGHTY-NINTH, a round number on an anchor or a report whose trigger has
+already fired once is not itself a fresh send condition.
+
+ANDREW HAS PUSHED NOTHING SINCE `d424785`, WHICH NEEDED CHECKING RATHER THAN ASSUMING
+This repo's tip is `4af6d23`, which is newer than the one READ ONE HUNDRED AND THIRTY-SIXTH
+records, and it is NOT his work: it is that section's own sweep record, checked by reading its
+subject rather than inferring from the hash being new, per READ EIGHTY-THIRD. Authorship alone
+cannot make that call here, and this tip demonstrates it again: it is authored
+`Andy Hartzler <andrew@hartzler.us>`, byte identical to the identity this loop commits under by
+standing rule, and READ ONE HUNDRED AND THIRTY-FIRST records his own last burst as four-and-zero
+on that same address, with READ ONE HUNDRED AND TWENTY-NINTH three-and-two and READ ONE HUNDRED
+AND TWENTIETH and READ ONE HUNDRED AND TWENTY-FIRST two-and-two before it. The ratio moves and the
+conclusion does not: the field carries no information in either direction. Read the SUBJECT. So
+the four-commit burst READ ONE HUNDRED AND THIRTY-FIRST documents, which ended at
+2026-08-23T23:43Z, remains stopped, and no new fact has appeared.
+
+Nothing else moved. The site tip is unchanged at `aa2d513` from 2026-08-12. The six `sentry-fix/`
+branch tips were enumerated rather than inherited and are unchanged from READ SIXTY-THIRD's
+inventory, so the three fixes it establishes are live gaps have now waited a further twelve days.
+
+The branch ref trap bit in the classic form: local `master` stale at `9f108c2` against a real tip
+of `4af6d23`, with `HEAD` detached AT that tip. Checked in the form READ TWENTY-SECOND prescribes,
+local side the NAMED BRANCH and not `HEAD`, and repaired with `git checkout -B master HEAD` BEFORE
+committing, per READ SIXTY-FOURTH's addendum rather than READ NINTH's conditional repair. `HEAD`
+being AT the true tip is what makes that one-liner sufficient; READ ONE HUNDRED AND TWENTY-SIXTH
+records the other shape, where `HEAD` was itself behind and the one-liner moved `master` onto the
+stale commit and needed READ SECOND's `fetch` plus reset after it. Check WHERE `HEAD` is before
+choosing which repair to run. After the repair `git status` reports ahead of `origin/master` by
+21, which is the stale remote-tracking cache talking, per READ TWENTY-SIXTH. Do not act on it.
+
+VERIFICATION AND DISCLOSURE
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No adversarial
+audit was run, recorded as a departure rather than glossed, on the call READ SIXTY-FOURTH through
+READ ONE HUNDRED AND THIRTY-SIXTH each made for the identical case: this diff carries no diagnosis
+of a Sentry issue, no mechanism of its own and no code. Its factual claims are the five durations
+and the four crossing instants, which are arithmetic over timestamps printed above, and the ref
+state, authorship, subject and grep results read from the two trees, all checkable without an
+auditor.
+
+This repo is public and the sibling is private. Named above: the commits `9f108c2`, `4af6d23`,
+`d424785` and `aa2d513`, the last being the private sibling's tip whose cover is prior publication
+in READ SIXTIETH; the branch prefix `sentry-fix/`; the files
+`auto_inferred_assignments_service.dart`, `member_votes_view.dart`, `vote_detail_screen.dart` and
+`donor_profile_screen.dart`, all committed here, the last a first publication in this file and
+needing none, naming a screen this public tree already commits; the widget name
+`VoterRollDisclosure` and the Flutter constant `Icons.close`, both cited from READ SEVENTY-NINTH;
+`VoteStatusMessage.tsx` and `VoteCard.tsx` with the three voting pages named by role rather than by
+path, all in the private sibling and all published in READ SEVENTY-FIRST and READ SEVENTY-SIXTH;
+the sibling paths `site-main/captured/privacy.ts`, `site-action/lib/fallbackData.ts` and
+`site-action/lib/emailApi.ts`, three first publications in this file, kept because the finding is
+that they are INCIDENTAL matches rather than closure notes and each names a file rather than a
+route, a table, a person or a credential; the git commands and ref names, including
+`origin/master`, generic git plumbing naming nothing of ours; the verification commands
+`npx tsc --noEmit` and `flutter analyze`; the product name Sentry; and the env var name patterns
+`SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN`. Everything else already appears in this
+file or is committed in this public repo's own tree. The three reports are named by subject line
+only, which is this loop's own published convention, and no transport, credential or container
+tooling is described, which READ EIGHTEENTH records as a BLOCKER class. No log content is quoted,
+because none was readable. Quantities are the clock values, the three report ages with their
+six-day, five-day and four-day crossing instants, the blind-since duration with its twelve-day
+crossing instant, the next trigger instant and its remaining interval, the seventy-four run count,
+the four commit count, the four-and-zero authorship split, the branch count, the eight and three
+grep hit counts and the one commit distance, all bare and naming nothing. Withheld per the
+practice READ SIXTH set: the state of the live endorsement vote, and any operational read on
+production sessions.
