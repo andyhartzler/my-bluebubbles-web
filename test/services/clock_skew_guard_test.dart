@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:bluebubbles/services/clock_skew_guard.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -5,9 +7,12 @@ import 'package:flutter_test/flutter_test.dart';
 /// measurement that produced FLUTTER's auth_refresh_storm: a device clock
 /// 7,279 seconds fast, holding a token issued good for one hour.
 ///
-/// The scheduling code itself needs a live SupabaseClient, so what is exercised
-/// here is the delay computation it calls. That is the part that was wrong in
-/// gotrue and the part a future edit is most likely to break.
+/// Both halves of the guard need a live SupabaseClient to run, so what is
+/// exercised here is the two computations they call: the refresh delay, which
+/// covers the ticker, and the expiry correction, which covers the per-request
+/// path that stopping the ticker cannot reach. Those are the parts gotrue gets
+/// wrong on a skewed device and the parts a future edit is most likely to
+/// break.
 void main() {
   // Token issued at local 12:00 on a clock running 7,279 seconds fast, so the
   // server issued it at 09:58:41 and it truly expires at 10:58:41 server time.
@@ -72,6 +77,63 @@ void main() {
         skew: Duration.zero,
       );
       expect(delay, const Duration(minutes: 48, seconds: 41));
+    });
+  });
+
+  group('correctedExpiryFor', () {
+    // A token whose exp is 10:58:41 UTC, the real expiry the server issued.
+    String tokenExpiring(int exp) {
+      String seg(Map<String, dynamic> m) => base64Url
+          .encode(utf8.encode(json.encode(m)))
+          .replaceAll('=', ''); // real tokens are unpadded
+      return '${seg({'alg': 'HS256'})}.${seg({'exp': exp, 'sub': 'x'})}.sig';
+    }
+
+    final trueExp = expiry.millisecondsSinceEpoch ~/ 1000;
+
+    test('restates the expiry in the device frame', () {
+      // Device 7,279s fast, so it must believe the token lives 7,279s longer
+      // than it does. That is what makes isExpired come out right.
+      expect(
+        ClockSkewGuard.correctedExpiryFor(tokenExpiring(trueExp), skew),
+        trueExp + 7279,
+      );
+    });
+
+    test('a SLOW device is moved the other way', () {
+      expect(
+        ClockSkewGuard.correctedExpiryFor(tokenExpiring(trueExp), -skew),
+        trueExp - 7279,
+      );
+    });
+
+    test('applying it twice cannot stack the offset', () {
+      // The correction is re-applied on every auth state change, and a session
+      // can see more than one. It reads exp from the token each time rather
+      // than from the field it just wrote, so this has to be idempotent.
+      final token = tokenExpiring(trueExp);
+      final once = ClockSkewGuard.correctedExpiryFor(token, skew);
+      final twice = ClockSkewGuard.correctedExpiryFor(token, skew);
+      expect(twice, once);
+    });
+
+    test('an unreadable token leaves the session alone', () {
+      // Null means do not touch expiresAt. Writing a wrong expiry would be
+      // worse than the storm: the session could look valid past real expiry
+      // and every request would 401.
+      expect(ClockSkewGuard.correctedExpiryFor('not-a-jwt', skew), isNull);
+      expect(ClockSkewGuard.correctedExpiryFor('a.b', skew), isNull);
+      expect(ClockSkewGuard.correctedExpiryFor('a.!!!not-base64!!!.c', skew),
+          isNull);
+      expect(
+        ClockSkewGuard.correctedExpiryFor(
+          '${base64Url.encode(utf8.encode('{}')).replaceAll('=', '')}.'
+          '${base64Url.encode(utf8.encode('{"sub":"x"}')).replaceAll('=', '')}.s',
+          skew,
+        ),
+        isNull,
+        reason: 'a JWT with no exp claim carries no expiry to correct',
+      );
     });
   });
 

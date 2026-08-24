@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -27,12 +28,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// design. This class is the prevention half, so the storm does not start.
 ///
 /// THE APPROACH. Ask the server what time it actually is, once, at startup. If the
-/// device disagrees by more than [_toleranceSeconds], the SDK's own refresh timing
-/// cannot be trusted, so we stop its ticker and drive refreshes ourselves against
-/// corrected time.
+/// device disagrees by more than [_toleranceSeconds], two things follow, and the
+/// first version of this class shipped only the second:
 ///
-/// We cannot set the device clock and we cannot make gotrue read a different one.
-/// Taking over the schedule is the only lever that actually exists.
+///  1. Every session is permanently `isExpired`, so `SupabaseClient` refreshes
+///     before every single API call. [_correctExpiry] closes that by restating
+///     the session's expiry in the device's own frame. This is the dominant
+///     path and the one that actually storms.
+///  2. The SDK's refresh ticker reads the same wrong clock, so its schedule
+///     cannot be trusted either. We stop it and drive refreshes ourselves
+///     against corrected time.
+///
+/// We cannot set the device clock and we cannot make gotrue read a different one,
+/// so those two are the only levers that exist. Do not remove either believing the
+/// other covers it: stopping the ticker leaves an exec refreshing on every request,
+/// and correcting the expiry alone leaves the schedule in the SDK's hands with no
+/// guarantee about a version that computes it some other way.
 class ClockSkewGuard {
   ClockSkewGuard._();
 
@@ -54,6 +65,7 @@ class ClockSkewGuard {
   static bool _active = false;
   static bool _reported = false;
   static Timer? _timer;
+  static StreamSubscription<AuthState>? _authSub;
 
   /// Server time as best we know it. Equals the device clock when no correction
   /// is in force, so callers can use it unconditionally.
@@ -96,10 +108,95 @@ class ClockSkewGuard {
       // to stop before it starts the loop.
       client.auth.stopAutoRefresh();
       _active = true;
+
+      // Stopping the ticker is only half of it, and the smaller half. See
+      // _correctExpiry: SupabaseClient refreshes before EVERY request whenever
+      // the session looks expired, and that path is not the ticker.
+      _correctExpiry(client);
+      _watchForNewSessions(client);
+
       _schedule(client);
       unawaited(_report(client, skew));
     } catch (e) {
       debugPrint('ClockSkewGuard: install failed, leaving SDK alone: $e');
+    }
+  }
+
+  /// Restate the session's expiry in the DEVICE's terms, which is what closes
+  /// the path stopping the ticker cannot reach.
+  ///
+  /// Read from the installed packages rather than assumed, because the first
+  /// version of this class fixed the wrong half and said so. There are TWO
+  /// refresh paths, not one:
+  ///
+  ///   1. gotrue's auto-refresh ticker, which `stopAutoRefresh()` stops.
+  ///   2. `SupabaseClient._getAccessToken`, which runs before EVERY PostgREST,
+  ///      storage and functions call and refreshes whenever
+  ///      `currentSession.isExpired`. Nothing client-side stops that one.
+  ///
+  /// Both read `Session.expiresAt`, and `isExpired` compares it against
+  /// `DateTime.now()`. `expiresAt` is not stored: it is a late field derived
+  /// from the `exp` claim of the access token, which is absolute server time.
+  /// So on a device two hours fast, every session is permanently expired and
+  /// path 2 refreshes on every request forever. Stopping the ticker leaves the
+  /// dominant path untouched, which is exactly what shipped at 20:52 today.
+  ///
+  /// The lever is that `expiresAt` is a plain mutable field. Restating it as
+  /// `exp + offset` puts it in the same frame as the wrong clock that will be
+  /// compared against it, so BOTH paths compute correctly and neither needs to
+  /// know a correction happened.
+  ///
+  /// The true `exp` is re-read from the token every time rather than taken from
+  /// `expiresAt`, so this is idempotent: applying it twice to one session
+  /// cannot stack the offset.
+  static void _correctExpiry(SupabaseClient client) {
+    if (!_active) return;
+    final session = client.auth.currentSession;
+    if (session == null) return;
+    final corrected = correctedExpiryFor(session.accessToken, _offset);
+    if (corrected == null) return;
+    session.expiresAt = corrected;
+  }
+
+  /// The whole computation in one place so a test can exercise it without a
+  /// live client: read the true `exp` out of the token and restate it in the
+  /// device's frame. Null when the token is not a readable JWT, which means
+  /// leave the session exactly as gotrue built it.
+  @visibleForTesting
+  static int? correctedExpiryFor(String accessToken, Duration offset) {
+    final trueExp = _expFromJwt(accessToken);
+    if (trueExp == null) return null;
+    return trueExp + offset.inSeconds;
+  }
+
+  /// Every refresh mints a new Session object, and gotrue derives its expiry
+  /// from the token again, so the correction has to be re-applied to each one.
+  /// A refresh this class did not initiate, from a tab regaining focus or from
+  /// path 2 firing once before the correction landed, arrives here too.
+  static void _watchForNewSessions(SupabaseClient client) {
+    _authSub?.cancel();
+    _authSub = client.auth.onAuthStateChange.listen(
+      (_) => _correctExpiry(client),
+      onError: (Object e) =>
+          debugPrint('ClockSkewGuard: auth state stream error: $e'),
+    );
+  }
+
+  /// The `exp` claim, in seconds since the epoch, or null if the token is not
+  /// a readable JWT. Deliberately not a package dependency: this is three lines
+  /// and a failure here must degrade to leaving the session alone.
+  static int? _expFromJwt(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      final payload = json.decode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      ) as Map<String, dynamic>;
+      final exp = payload['exp'];
+      return exp is int ? exp : null;
+    } catch (e) {
+      debugPrint('ClockSkewGuard: could not read exp from token: $e');
+      return null;
     }
   }
 
@@ -144,6 +241,8 @@ class ClockSkewGuard {
   static void dispose() {
     _timer?.cancel();
     _timer = null;
+    _authSub?.cancel();
+    _authSub = null;
     _active = false;
     _reported = false;
     _offset = Duration.zero;
