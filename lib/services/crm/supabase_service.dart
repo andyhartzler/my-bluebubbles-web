@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/services/clock_skew_guard.dart';
 
 /// Singleton service for Supabase connection
 /// This is the ONLY place that interacts with Supabase
@@ -62,6 +65,21 @@ class CRMSupabaseService {
 
       _initialized = true;
       debugPrint('✅ CRM Supabase initialized successfully');
+
+      // A device clock that is far enough out turns gotrue's own refresh
+      // scheduling into a storm, because it compares a token's expiry against
+      // the LOCAL clock. Measured on a real executive's machine: 7,279 seconds
+      // fast, so every freshly issued one-hour token looked an hour expired on
+      // arrival and was replaced 3.2 seconds later, 51 times in under three
+      // minutes. ClockSkewGuard measures the offset once and, past its
+      // tolerance, takes the schedule off the SDK.
+      //
+      // Deliberately NOT awaited. It is one round trip and it never throws, but
+      // awaiting it would put a network call on the critical path of sign-in,
+      // and a hang there is a worse failure than the one this prevents. The
+      // cost of not awaiting is at most one extra SDK refresh before the guard
+      // installs, against the dozens the storm produces.
+      unawaited(ClockSkewGuard.install(_client!));
     } catch (e, stack) {
       debugPrint('❌ Failed to initialize CRM Supabase: $e');
       debugPrint('❌ Stack: ${stack.toString().split('\n').take(5).join('\n')}');
