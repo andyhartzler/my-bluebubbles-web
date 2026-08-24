@@ -52,6 +52,7 @@ class ClockSkewGuard {
 
   static Duration _offset = Duration.zero;
   static bool _active = false;
+  static bool _reported = false;
   static Timer? _timer;
 
   /// Server time as best we know it. Equals the device clock when no correction
@@ -96,8 +97,47 @@ class ClockSkewGuard {
       client.auth.stopAutoRefresh();
       _active = true;
       _schedule(client);
+      unawaited(_report(client, skew));
     } catch (e) {
       debugPrint('ClockSkewGuard: install failed, leaving SDK alone: $e');
+    }
+  }
+
+  /// Record the correction once per session, so a wrong device clock stays
+  /// VISIBLE after we stop it from causing damage.
+  ///
+  /// This exists because the fix would otherwise hide the fault. AuthRefreshGuard
+  /// reports skew, but only when a storm trips it, and the whole point of this
+  /// class is that the storm no longer happens. Without this row the machine
+  /// goes on running two hours out with nobody able to tell, and the member is
+  /// never told to turn automatic time back on.
+  ///
+  /// Same table and shape AuthRefreshGuard writes, so both halves of this
+  /// problem are readable from one place. Best effort: a failed insert must
+  /// never cost the correction it is describing.
+  static Future<void> _report(SupabaseClient client, Duration skew) async {
+    if (_reported) return;
+    final userId = client.auth.currentUser?.id;
+    // Nothing to attribute the row to yet, and the anon role has no business
+    // writing here. The next refresh tries again with a session in hand.
+    if (userId == null) return;
+    _reported = true;
+    try {
+      await client.from('client_diagnostics').insert({
+        'user_id': userId,
+        'kind': 'clock_skew_corrected',
+        'detail': {
+          'clock_skew_seconds': skew.inSeconds,
+          'tolerance_seconds': _toleranceSeconds,
+          'refresh_margin_minutes': _refreshMargin.inMinutes,
+          'device_now': DateTime.now().toUtc().toIso8601String(),
+          'server_now': serverNow().toUtc().toIso8601String(),
+        },
+      });
+    } catch (e) {
+      // Let a later refresh retry rather than swallowing the finding for good.
+      _reported = false;
+      debugPrint('ClockSkewGuard: diagnostic insert failed: $e');
     }
   }
 
@@ -105,6 +145,7 @@ class ClockSkewGuard {
     _timer?.cancel();
     _timer = null;
     _active = false;
+    _reported = false;
     _offset = Duration.zero;
   }
 
@@ -175,6 +216,9 @@ class ClockSkewGuard {
         } catch (_) {}
         return;
       }
+      // Still skewed. If install had no session to attribute the finding to,
+      // it does now.
+      unawaited(_report(client, skew));
     }
     _schedule(client);
   }
