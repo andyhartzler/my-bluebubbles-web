@@ -969,7 +969,7 @@ class MemberRepository {
     try {
       await _writeClient
           .from('members')
-          .update({'last_contacted': DateTime.now().toIso8601String()})
+          .update({'last_contacted': DateTime.now().toUtc().toIso8601String()})
           .eq('id', memberId);
     } catch (e) {
       debugPrint('❌ Error updating last contacted: $e');
@@ -983,7 +983,7 @@ class MemberRepository {
     try {
       await _writeClient
           .from('members')
-          .update({'intro_sent_at': DateTime.now().toIso8601String()})
+          .update({'intro_sent_at': DateTime.now().toUtc().toIso8601String()})
           .eq('id', memberId);
     } catch (e) {
       debugPrint('❌ Error marking intro sent: $e');
@@ -1001,7 +1001,8 @@ class MemberRepository {
     try {
       final data = {
         'opt_out': optOut,
-        optOut ? 'opt_out_date' : 'opt_in_date': DateTime.now().toIso8601String(),
+        optOut ? 'opt_out_date' : 'opt_in_date':
+            DateTime.now().toUtc().toIso8601String(),
       };
 
       if (reason != null) {

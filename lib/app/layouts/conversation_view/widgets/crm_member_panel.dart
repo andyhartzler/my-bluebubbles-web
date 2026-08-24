@@ -168,7 +168,15 @@ class _CRMMemberPanelState extends State<CRMMemberPanel> {
     );
   }
 
-  String _formatDate(DateTime date) {
+  /// A second copy of member_detail_screen's _formatDate, and the two have
+  /// already drifted apart. Left as two on purpose for now: this commit is a
+  /// correctness fix and collapsing them is a move, which would make the diff
+  /// harder to check. Worth collapsing next time either is touched.
+  String _formatDate(DateTime rawDate) {
+    // .toLocal() is load bearing. PostgREST returns a UTC-flagged DateTime and
+    // .month/.day/.year read UTC components, so a Central evening contact used
+    // to render as the next day. See member_repository's .toUtc() writes.
+    final date = rawDate.toLocal();
     final now = DateTime.now();
     final difference = now.difference(date);
 

@@ -3909,7 +3909,18 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     return Uri.tryParse('https://donors.moyoungdemocrats.org/donors/${donor.id}');
   }
 
-  String _formatDate(DateTime date) {
+  String _formatDate(DateTime rawDate) {
+    // PostgREST hands back a UTC-flagged DateTime, and Dart's .month/.day/.year
+    // read UTC components off it. Without this .toLocal() the calendar branch
+    // below renders the UTC date, which for a Central user is the PREVIOUS day
+    // for anything after 7pm.
+    //
+    // This has to land in the same commit as the .toUtc() on the write side in
+    // member_repository. Until today the two bugs cancelled: the write stored
+    // Central wall-clock as if it were UTC, and the read pulled UTC components
+    // back out, so the date came out right by accident. Fix either one alone
+    // and 164 of 307 last_contacted rows start rendering the wrong day.
+    final date = rawDate.toLocal();
     final now = DateTime.now();
     final difference = now.difference(date);
 
@@ -3924,7 +3935,10 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
   }
 
-  String _formatDateOnly(DateTime date) => '${date.month}/${date.day}/${date.year}';
+  String _formatDateOnly(DateTime date) {
+    final d = date.toLocal();
+    return '${d.month}/${d.day}/${d.year}';
+  }
 
   MeetingAttendance? get _latestMeeting {
     if (_meetingAttendance.isEmpty) return null;
