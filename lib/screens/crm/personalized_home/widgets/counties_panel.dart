@@ -34,6 +34,15 @@ import 'branded_panel.dart';
 /// to lose an exec's trust. No contact logging. No claiming or reassigning a
 /// county: ownership is what the room agreed, and the person with no county is
 /// fixed by a phone call, not a button.
+///
+/// DESIGN LANGUAGE. This is a field-ops call sheet, so the visual system is
+/// built around one question — "who's calling them?" — answered twice: once
+/// at the top as a stacked coverage bar over all eligible members, and once
+/// per county as a slim phone-coverage ratio bar ("X of Y have phones" is
+/// what turns a county into a callable job). Grassroots green = someone can
+/// call / covered. Action Red is never text or an icon-only signal (it is
+/// ~3:1 on navy); it appears only as a dot or bar fill, always beside a word.
+/// Sunrise gold carries warnings (unconfirmed assignments, data anomalies).
 class CountiesPanel extends StatefulWidget {
   const CountiesPanel({
     super.key,
@@ -57,6 +66,14 @@ class CountiesPanel extends StatefulWidget {
 /// it is called out. Sixty-two counties have members, so zero rows is not
 /// possible legitimate data.
 enum _CountiesState { loading, error, accessAnomaly, ready }
+
+/// Grassroots green: "someone can call this person". Semantic constant local
+/// to this panel so the meaning stays in one place.
+const Color _kCovered = Color(0xFF43A047);
+
+/// Action Red: "nobody is calling them". NEVER used as text or an icon-only
+/// signal — dot/bar fills only, always paired with a word.
+const Color _kUncovered = Color(0xFFE63946);
 
 class _CountiesPanelState extends State<CountiesPanel>
     with WidgetsBindingObserver {
@@ -147,6 +164,13 @@ class _CountiesPanelState extends State<CountiesPanel>
 
   int get _unownedMembers => _unowned.fold<int>(0, (a, c) => a + c.memberCount);
 
+  /// Members living in a county that SOMEBODY owns — the green half of the
+  /// hero bar. Pure subtraction over already-loaded data.
+  int get _coveredMembers => math.max(0, _membersWithCounty - _unownedMembers);
+
+  /// Counties with an owner, for the header summary chip.
+  int get _ownedCountyCount => _coverage.where((c) => c.hasOwner).length;
+
   List<Member> get _noRegionExecs {
     final owners = _coverage.expand((c) => c.ownerMemberIds).toSet();
     return _execRoster.where((m) => !owners.contains(m.id)).toList();
@@ -216,15 +240,13 @@ class _CountiesPanelState extends State<CountiesPanel>
     return BrandedPanel(
       title: 'Your Counties',
       icon: Icons.call,
+      headerAction: _state == _CountiesState.ready ? _headerChip() : null,
       // No bodyHeight on purpose: a fixed height has no headroom for large
       // Dynamic Type. Height is bounded by row count instead.
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
         child: switch (_state) {
-          _CountiesState.loading => const SizedBox(
-              height: 160,
-              child: Center(child: CircularProgressIndicator(color: Colors.white)),
-            ),
+          _CountiesState.loading => _loading(),
           _CountiesState.error => _error(),
           _CountiesState.accessAnomaly => _accessAnomaly(),
           _CountiesState.ready => _ready(),
@@ -233,42 +255,139 @@ class _CountiesPanelState extends State<CountiesPanel>
     );
   }
 
-  Widget _error() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Couldn't load your counties.",
-            style: TextStyle(color: Colors.white, fontSize: 15),
+  /// Header-strip summary chip: how much of the map is spoken for. Words
+  /// carry the meaning; the chip is informational, not tappable.
+  Widget _headerChip() {
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.14),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withOpacity(0.22)),
+        ),
+        child: Text(
+          '$_ownedCountyCount of ${_coverage.length} covered',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
           ),
-          const SizedBox(height: 4),
-          TextButton(
-            onPressed: _load,
-            style: TextButton.styleFrom(
-              foregroundColor: BrandColors.sunriseGold,
-              minimumSize: const Size(64, 48),
+        ),
+      ),
+    );
+  }
+
+  Widget _loading() => const SizedBox(
+        height: 160,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Checking the county map…',
+                style: TextStyle(color: Colors.white70, fontSize: 12.5),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _error() => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.wifi_off_rounded,
+                      color: Colors.white, size: 18),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    "Couldn't load your counties.",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            child: const Text('Retry'),
-          ),
-        ],
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh_rounded,
+                  size: 16, color: BrandColors.sunriseGold),
+              label: const Text('Retry'),
+              style: TextButton.styleFrom(
+                foregroundColor: BrandColors.sunriseGold,
+                minimumSize: const Size(64, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(
+                    color: BrandColors.sunriseGold.withOpacity(0.5),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+              ),
+            ),
+          ],
+        ),
       );
 
   /// Zero rows while the session says executive. Impossible as data, so it is
   /// reported as what it is rather than as an empty list.
-  Widget _accessAnomaly() => const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.warning_amber_rounded,
-              color: BrandColors.sunriseGold, size: 20),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              "County data came back empty, which can't be right: 62 counties "
-              'have members in them. This is an access problem, not an empty '
-              'list. Tell Andrew.',
-              style: TextStyle(color: Colors.white, fontSize: 14, height: 1.35),
-            ),
+  Widget _accessAnomaly() => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: BrandColors.sunriseGold.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: BrandColors.sunriseGold.withOpacity(0.45),
           ),
-        ],
+        ),
+        child: const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                color: BrandColors.sunriseGold, size: 20),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                "County data came back empty, which can't be right: 62 counties "
+                'have members in them. This is an access problem, not an empty '
+                'list. Tell Andrew.',
+                style: TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+              ),
+            ),
+          ],
+        ),
       );
 
   Widget _ready() {
@@ -289,15 +408,8 @@ class _CountiesPanelState extends State<CountiesPanel>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '$_totalEligible members. Who’s calling them?',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 14),
+        _hero(),
+        const SizedBox(height: 18),
 
         if (mine.isEmpty) ...[
           // The majority case: ten of fifteen execs. Not an error, and never
@@ -306,18 +418,25 @@ class _CountiesPanelState extends State<CountiesPanel>
           // colon into an empty list.
           const Text(
             "You weren't given a county at the August 12 meeting.",
-            style: TextStyle(color: Colors.white, fontSize: 14, height: 1.35),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             hasGaps
                 ? 'These counties have members and nobody calling them:'
                 : 'Every county with members already has someone calling it.',
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
+            style: const TextStyle(
+                color: Colors.white70, fontSize: 13, height: 1.35),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
         ] else ...[
-          _overline('YOURS'),
+          _sectionHeader('YOURS'),
+          const SizedBox(height: 8),
           ...shownOwned.map((c) => _countyRow(c, mine: true)),
           if (hiddenOwned > 0)
             _tappableLine(
@@ -331,8 +450,9 @@ class _CountiesPanelState extends State<CountiesPanel>
           // Only header the gaps section when there is a gap to head. An empty
           // "NOBODY'S" with a red dot and nothing under it reads as a bug.
           if (hasGaps) ...[
-            const SizedBox(height: 14),
-            _gapsOverline(),
+            const SizedBox(height: 16),
+            _sectionHeader("NOBODY'S CALLING", dotColor: _kUncovered),
+            const SizedBox(height: 8),
           ],
         ],
 
@@ -347,16 +467,25 @@ class _CountiesPanelState extends State<CountiesPanel>
             onTap: () => setState(() => _expandedGaps = true),
           ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         Divider(height: 1, color: Colors.white.withOpacity(0.10)),
         const SizedBox(height: 10),
 
         Semantics(
           label: '$_noCounty members have no county on file.',
           excludeSemantics: true,
-          child: Text(
-            '$_noCounty members have no county on file.',
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          child: Row(
+            children: [
+              Icon(Icons.location_off_outlined,
+                  size: 14, color: Colors.white.withOpacity(0.45)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '$_noCounty members have no county on file.',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ),
+            ],
           ),
         ),
         if (_noRegionExecs.isNotEmpty)
@@ -364,7 +493,7 @@ class _CountiesPanelState extends State<CountiesPanel>
             '${_noRegionExecs.length} execs have no county',
             semantics: '${_noRegionExecs.length} executives have no county '
                 'assignment. Double tap to see who.',
-            trailing: Icons.arrow_forward_ios,
+            trailing: Icons.chevron_right,
             onTap: _showNoRegionExecs,
             dense: true,
           ),
@@ -372,48 +501,177 @@ class _CountiesPanelState extends State<CountiesPanel>
     );
   }
 
-  Widget _overline(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.8,
+  // ---- hero ----
+
+  /// The point of the card: the whole eligible membership, split by whether
+  /// anyone is responsible for calling them. Words in the legend carry every
+  /// meaning the colours do.
+  Widget _hero() {
+    final covered = _coveredMembers;
+    final uncovered = _unownedMembers;
+    final unplaced = _noCounty;
+
+    final segments = <(int, Color)>[
+      if (covered > 0) (covered, _kCovered),
+      if (uncovered > 0) (uncovered, _kUncovered),
+      if (unplaced > 0) (unplaced, Colors.white.withOpacity(0.25)),
+    ];
+
+    return Semantics(
+      label: '$_totalEligible eligible members. '
+          '$covered have a caller, $uncovered have nobody calling them, '
+          '$unplaced have no county on file.',
+      excludeSemantics: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '$_totalEligible',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 36,
+                  fontWeight: FontWeight.w800,
+                  height: 1.0,
+                  letterSpacing: -0.5,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 4),
+                child: Text(
+                  'members eligible',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            "Who's calling them?",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (segments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _animatedSweep(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: SizedBox(
+                  height: 8,
+                  child: Row(
+                    children: [
+                      for (final (count, color) in segments)
+                        Expanded(
+                          flex: count,
+                          child: ColoredBox(color: color),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 14,
+              runSpacing: 4,
+              children: [
+                if (covered > 0)
+                  _legendEntry(_kCovered, '$covered have a caller'),
+                if (uncovered > 0)
+                  _legendEntry(_kUncovered, '$uncovered have nobody'),
+                if (unplaced > 0)
+                  _legendEntry(
+                      Colors.white.withOpacity(0.35), '$unplaced no county'),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _legendEntry(Color color, String label) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      );
+
+  /// Cheap left-to-right reveal for bars. Pure implicit animation — plays
+  /// once when the widget enters, does nothing on identical rebuilds, so a
+  /// silent background refresh never causes a distracting replay.
+  Widget _animatedSweep({required Widget child}) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 650),
+        curve: Curves.easeOutCubic,
+        child: child,
+        builder: (context, t, child) => ClipRect(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            widthFactor: t,
+            child: child,
           ),
         ),
       );
 
-  /// Action Red is 3.0:1 on navy, so it is never text. It is an 8px dot, and
-  /// the word carries the meaning, so colour is never the only signal.
-  Widget _gapsOverline() => Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Row(
-          children: [
+  // ---- sections & rows ----
+
+  /// Overline with an optional status dot and a hairline rule that carries the
+  /// eye across the card. The dot never stands alone: the word beside it is
+  /// the signal.
+  Widget _sectionHeader(String text, {Color? dotColor}) => Row(
+        children: [
+          if (dotColor != null) ...[
             Container(
               width: 8,
               height: 8,
-              decoration: const BoxDecoration(
-                color: Color(0xFFE63946),
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
             ),
             const SizedBox(width: 8),
-            _overline("NOBODY'S"),
           ],
-        ),
+          Text(
+            text,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.65),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Container(height: 1, color: Colors.white.withOpacity(0.10)),
+          ),
+        ],
       );
 
   Widget _countyRow(RegionCoverage c, {required bool mine}) {
     final zero = c.memberCount == 0;
-    // An owned county matching zero members is a mistyped county string in a
-    // commitment row. It is shown loudly rather than dropped.
-    final detail = zero
-        ? '0 members on file'
-        : mine
-            ? '${c.phoneCount} of ${c.memberCount} have phones'
-            : '${c.phoneCount} of ${c.memberCount}';
 
     final semantics = StringBuffer('${c.county} County')
       ..write(mine ? ', assigned to you' : ', no owner')
@@ -423,55 +681,149 @@ class _CountiesPanelState extends State<CountiesPanel>
           : '. ${c.memberCount} members, ${c.phoneCount} with phone numbers')
       ..write('. Double tap to open the member list.');
 
+    // An owned county matching zero members is a mistyped county string in a
+    // commitment row. It is shown loudly rather than dropped.
+    final Widget detail;
+    if (zero) {
+      detail = const Row(
+        children: [
+          Icon(Icons.error_outline_rounded,
+              size: 14, color: BrandColors.sunriseGold),
+          SizedBox(width: 6),
+          Text(
+            '0 members on file',
+            style: TextStyle(
+              color: BrandColors.sunriseGold,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      );
+    } else {
+      detail = Row(
+        children: [
+          Expanded(child: _coverageBar(c.phoneCount, c.memberCount)),
+          const SizedBox(width: 10),
+          Text(
+            mine
+                ? '${c.phoneCount} of ${c.memberCount} have phones'
+                : '${c.phoneCount} of ${c.memberCount} callable',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Accent bar: gold flags the data anomaly, red marks an uncovered county.
+    // Both are always accompanied by words (the gold line / section header).
+    final Color? accent = zero
+        ? BrandColors.sunriseGold
+        : (mine ? null : _kUncovered);
+
     return Semantics(
       label: semantics.toString(),
       button: true,
       excludeSemantics: true,
-      child: InkWell(
-        onTap: () => _openCounty(c.county),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 56),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            c.county,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        if (mine && c.anyUnconfirmed) ...[
-                          const SizedBox(width: 8),
-                          _unconfirmedPill(),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      detail,
-                      style: TextStyle(
-                        color: zero ? BrandColors.sunriseGold : Colors.white70,
-                        fontSize: 13,
-                        fontWeight: zero ? FontWeight.w700 : FontWeight.w400,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _openCounty(c.county),
+            borderRadius: BorderRadius.circular(12),
+            splashColor: Colors.white.withOpacity(0.10),
+            highlightColor: Colors.white.withOpacity(0.06),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 56),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.07),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  if (accent != null) ...[
+                    Container(
+                      width: 3,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: accent,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
+                    const SizedBox(width: 10),
                   ],
-                ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                c.county,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.1,
+                                ),
+                              ),
+                            ),
+                            if (mine && c.anyUnconfirmed) ...[
+                              const SizedBox(width: 8),
+                              _unconfirmedPill(),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 7),
+                        detail,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Icon(Icons.chevron_right,
+                      size: 18, color: Colors.white.withOpacity(0.55)),
+                ],
               ),
-              Icon(Icons.arrow_forward_ios,
-                  size: 14, color: Colors.white.withOpacity(0.6)),
-            ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Phone coverage as a slim ratio bar: fill = members with a phone number,
+  /// track = the rest. The "X of Y" text beside it always carries the number.
+  /// The fill eases in once on first build; identical rebuilds (e.g. a silent
+  /// background refresh) do not replay it.
+  Widget _coverageBar(int phones, int members) {
+    final fraction = members > 0 ? (phones / members).clamp(0.0, 1.0) : 0.0;
+    return Container(
+      height: 6,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: fraction),
+        duration: const Duration(milliseconds: 650),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, _) => FractionallySizedBox(
+          alignment: Alignment.centerLeft,
+          widthFactor: value,
+          child: Container(
+            decoration: BoxDecoration(
+              color: _kCovered,
+              borderRadius: BorderRadius.circular(3),
+            ),
           ),
         ),
       ),
@@ -482,19 +834,21 @@ class _CountiesPanelState extends State<CountiesPanel>
   /// were given to. Asserting an unconfirmed assignment as settled fact is the
   /// worse error, so the pill stays until somebody confirms it out of band.
   Widget _unconfirmedPill() => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
+          color: BrandColors.sunriseGold.withOpacity(0.12),
           border: Border.all(
-            color: BrandColors.sunriseGold.withOpacity(0.6),
+            color: BrandColors.sunriseGold.withOpacity(0.55),
           ),
           borderRadius: BorderRadius.circular(999),
         ),
         child: const Text(
-          'not confirmed',
+          'NOT CONFIRMED',
           style: TextStyle(
             color: BrandColors.sunriseGold,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
           ),
         ),
       );
@@ -510,23 +864,32 @@ class _CountiesPanelState extends State<CountiesPanel>
         label: semantics,
         button: true,
         excludeSemantics: true,
-        child: InkWell(
-          onTap: onTap,
-          child: Container(
-            constraints: BoxConstraints(minHeight: dense ? 44 : 48),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    text,
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: dense ? 12 : 13,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(10),
+            splashColor: Colors.white.withOpacity(0.10),
+            highlightColor: Colors.white.withOpacity(0.06),
+            child: Container(
+              constraints: BoxConstraints(minHeight: dense ? 44 : 48),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: dense ? 12 : 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-                Icon(trailing, size: 14, color: Colors.white.withOpacity(0.6)),
-              ],
+                  Icon(trailing,
+                      size: 18, color: Colors.white.withOpacity(0.55)),
+                ],
+              ),
             ),
           ),
         ),
