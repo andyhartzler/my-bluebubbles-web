@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
@@ -66,6 +68,7 @@ class _CountiesPanelState extends State<CountiesPanel>
   List<Member> _execRoster = const [];
   int _totalEligible = 0;
   bool _expandedGaps = false;
+  bool _expandedOwned = false;
 
   /// How many unowned counties to show before the expander. Bounds the panel
   /// height by row count rather than by a fixed pixel height, which is what
@@ -91,12 +94,16 @@ class _CountiesPanelState extends State<CountiesPanel>
     // The county map changes once per meeting, so there is no realtime channel
     // here on purpose. Neither meeting_commitments nor assignments is in the
     // supabase_realtime publication, which is why the sibling panel's .stream()
-    // never fires.
-    if (state == AppLifecycleState.resumed && widget.isExecutive) _load();
+    // never fires. A resume refresh is SILENT: it must not blank content that is
+    // already correct back to a spinner every time the exec tabs away and back.
+    if (state == AppLifecycleState.resumed && widget.isExecutive) {
+      _load(silent: true);
+    }
   }
 
-  Future<void> _load() async {
-    if (mounted) setState(() => _state = _CountiesState.loading);
+  Future<void> _load({bool silent = false}) async {
+    final hadData = _state == _CountiesState.ready;
+    if (!silent && mounted) setState(() => _state = _CountiesState.loading);
     try {
       final results = await Future.wait([
         _commitments.getRegionCoverage(),
@@ -115,7 +122,9 @@ class _CountiesPanelState extends State<CountiesPanel>
       });
     } catch (e) {
       debugPrint('CountiesPanel: load failed: $e');
-      if (mounted) setState(() => _state = _CountiesState.error);
+      // A background refresh that fails while good data is on screen keeps the
+      // data. Only a failed FIRST load becomes the error card.
+      if (mounted && !hadData) setState(() => _state = _CountiesState.error);
     }
   }
 
@@ -134,7 +143,7 @@ class _CountiesPanelState extends State<CountiesPanel>
   /// Subtraction, not a query: PostgREST cannot express "county IS NULL OR
   /// county = ''" in one filter, and this guarantees the numbers on screen add
   /// up to the headline.
-  int get _noCounty => _totalEligible - _membersWithCounty;
+  int get _noCounty => math.max(0, _totalEligible - _membersWithCounty);
 
   int get _unownedMembers => _unowned.fold<int>(0, (a, c) => a + c.memberCount);
 
@@ -265,7 +274,14 @@ class _CountiesPanelState extends State<CountiesPanel>
   Widget _ready() {
     final mine = _mine;
     final unowned = _unowned;
-    final shownGaps = _expandedGaps ? unowned : unowned.take(_visibleGaps);
+    final hasGaps = unowned.isNotEmpty;
+
+    final shownOwned =
+        _expandedOwned ? mine : mine.take(_visibleOwned).toList();
+    final hiddenOwned = mine.length - shownOwned.length;
+
+    final shownGaps =
+        (_expandedGaps ? unowned : unowned.take(_visibleGaps)).toList();
     final hiddenGaps = unowned.length - shownGaps.length;
     final hiddenGapMembers =
         _unownedMembers - shownGaps.fold<int>(0, (a, c) => a + c.memberCount);
@@ -285,24 +301,39 @@ class _CountiesPanelState extends State<CountiesPanel>
 
         if (mine.isEmpty) ...[
           // The majority case: ten of fifteen execs. Not an error, and never
-          // phrased as completion. It ends in a colon and a list of work.
+          // phrased as completion. It ends in a colon and a list of work, or,
+          // when there is no work left, says so plainly rather than trailing a
+          // colon into an empty list.
           const Text(
             "You weren't given a county at the August 12 meeting.",
             style: TextStyle(color: Colors.white, fontSize: 14, height: 1.35),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'These counties have members and nobody calling them:',
-            style: TextStyle(color: Colors.white70, fontSize: 13),
+          Text(
+            hasGaps
+                ? 'These counties have members and nobody calling them:'
+                : 'Every county with members already has someone calling it.',
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
           ),
           const SizedBox(height: 6),
         ] else ...[
           _overline('YOURS'),
-          ...mine.take(_visibleOwned).map((c) => _countyRow(c, mine: true)),
-          if (mine.length > _visibleOwned)
-            _plainLine('+ ${mine.length - _visibleOwned} more of yours'),
-          const SizedBox(height: 14),
-          _gapsOverline(),
+          ...shownOwned.map((c) => _countyRow(c, mine: true)),
+          if (hiddenOwned > 0)
+            _tappableLine(
+              '+ $hiddenOwned more of yours',
+              semantics: '$hiddenOwned more of your counties. '
+                  'Double tap for the full list.',
+              trailing: Icons.expand_more,
+              onTap: () => setState(() => _expandedOwned = true),
+              dense: true,
+            ),
+          // Only header the gaps section when there is a gap to head. An empty
+          // "NOBODY'S" with a red dot and nothing under it reads as a bug.
+          if (hasGaps) ...[
+            const SizedBox(height: 14),
+            _gapsOverline(),
+          ],
         ],
 
         ...shownGaps.map((c) => _countyRow(c, mine: false)),
@@ -465,14 +496,6 @@ class _CountiesPanelState extends State<CountiesPanel>
             fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
-        ),
-      );
-
-  Widget _plainLine(String text) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Text(
-          text,
-          style: const TextStyle(color: Colors.white70, fontSize: 12),
         ),
       );
 

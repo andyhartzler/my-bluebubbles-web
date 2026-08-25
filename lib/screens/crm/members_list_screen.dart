@@ -2614,19 +2614,18 @@ class _MembersListScreenState extends State<MembersListScreen> {
   Future<void> _dialMember(Member member) async {
     final number = _dialableNumber(member);
     if (number == null) return;
+    // Do NOT gate on canLaunchUrl: on mobile web it returns false for `tel:`
+    // even where the dialer opens fine, which would wrongly tell an exec the
+    // device can't call. Launch directly and only report failure if it throws.
     final uri = Uri.parse('tel:$number');
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-        return;
-      }
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {
-      // fall through to the message below
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This device cannot place calls.')),
+      );
     }
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('This device cannot place calls.')),
-    );
   }
 
   void _openMember(Member member) {
