@@ -1331,10 +1331,16 @@ class _MembersListScreenState extends State<MembersListScreen> {
               icon: const Icon(Icons.message),
               onPressed: _crmReady
                   ? () {
+                      // Carry the active filters through, exactly as the email
+                      // button does. From a county-scoped list — the way the
+                      // Your Counties tile opens it — this means "text the
+                      // members I'm looking at" texts that county. Without it,
+                      // an exec who filtered to Greene lost the scope on tap.
+                      final filter = _buildCurrentMessageFilter();
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const BulkMessageScreen(),
+                          builder: (_) => BulkMessageScreen(initialFilter: filter),
                         ),
                       );
                     }
