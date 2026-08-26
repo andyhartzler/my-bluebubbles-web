@@ -466,7 +466,7 @@ class _CandidatesGeneralListState extends State<CandidatesGeneralList> {
                     ),
                     if (isNominee) ...[
                       const SizedBox(width: 8),
-                      _nomineePill(),
+                      _nomineePill(c.party),
                     ],
                   ],
                 ),
@@ -547,17 +547,17 @@ class _CandidatesGeneralListState extends State<CandidatesGeneralList> {
     }
   }
 
-  Widget _nomineePill() {
+  Widget _nomineePill(String party) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: BrandColors.sunriseGold,
+        color: _partyColor(party),
         borderRadius: BorderRadius.circular(999),
       ),
       child: const Text(
-        'OUR NOMINEE',
+        'NOMINEE',
         style: TextStyle(
-          color: BrandColors.unityBlue,
+          color: Colors.white,
           fontSize: 9,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.4,
@@ -623,7 +623,7 @@ class _CandidatesGeneralListState extends State<CandidatesGeneralList> {
                       ),
                     ),
                   ),
-                  if (c.isDemocrat && c.advanced) _nomineePill(),
+                  if (c.isDemocrat && c.advanced) _nomineePill(c.party),
                 ],
               ),
               const SizedBox(height: 12),
