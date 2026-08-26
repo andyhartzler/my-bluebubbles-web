@@ -4,10 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:universal_html/html.dart' as html;
 
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/models/crm/outreach_activity.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
+import 'package:bluebubbles/services/crm/outreach_repository.dart';
 
+import 'outreach_log_sheet.dart';
 import 'outreach_region_section.dart';
 import 'volunteers_map_models.dart';
 
@@ -1590,6 +1593,9 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
         position: PopupMenuPosition.under,
         onSelected: (value) {
           switch (value) {
+            case 'activity':
+              _openAddToActivity(context);
+              break;
             case 'mark':
               _markContactedToday(context);
               break;
@@ -1605,6 +1611,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
           }
         },
         itemBuilder: (context) => [
+          _moreItem('activity', Icons.playlist_add_outlined, 'Add to activity'),
           _moreItem('mark', Icons.event_available_outlined,
               'Mark contacted today'),
           _moreItem('note', Icons.note_add_outlined, 'Record contact note'),
@@ -1636,6 +1643,56 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
         ],
       ),
     );
+  }
+
+  // ── add-to-activity (§5.3) ──────────────────────────────────────
+  // Adds the current selection to an existing planned/in-progress activity in
+  // this region, or seeds the create sheet pre-filled with the selection and
+  // the region's geography. The picker sheet returns the user's choice; this
+  // method is the only place that touches the map's region context, so the
+  // sheet stays region-agnostic.
+  Future<void> _openAddToActivity(BuildContext context) async {
+    final members = _selectedMembers;
+    if (members.isEmpty) return;
+
+    final choice = await showModalBottomSheet<_AddToActivityChoice>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AddToActivitySheet(
+        mode: _d.mode,
+        regionId: _d.id,
+        members: members,
+      ),
+    );
+    if (!mounted || choice == null) return;
+
+    switch (choice.kind) {
+      case _AddToActivityKind.added:
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(choice.addedCount > 0
+              ? 'Added ${choice.addedCount} to ${choice.title}'
+              : 'All selected members were already on ${choice.title}'),
+        ));
+        break;
+      case _AddToActivityKind.newActivity:
+        // Seed the create sheet with the selection and the region's single geo
+        // key; the other three geo lists stay empty. Candidates are Phase 4.
+        await OutreachLogSheet.show(
+          context,
+          participants: members,
+          counties: _d.mode == MapMode.county ? [_d.id] : const <String>[],
+          congressionalDistricts:
+              _d.mode == MapMode.congressional ? [_d.id] : const <String>[],
+          houseDistricts:
+              _d.mode == MapMode.house ? [_d.id] : const <String>[],
+          senateDistricts:
+              _d.mode == MapMode.senate ? [_d.id] : const <String>[],
+          titleSuggestion:
+              '${OutreachDisplay.kinds.values.first.label}: ${_d.mode.regionTitle(_d.id)}',
+        );
+        break;
+    }
   }
 
   String _textSkipReason(Member m) {
@@ -2053,4 +2110,324 @@ String _initials(String name) {
   final first = parts.first[0];
   final last = parts.length > 1 ? parts.last[0] : '';
   return (first + last).toUpperCase();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ADD-TO-ACTIVITY PICKER — the modal that lets the members action bar drop
+//  the current selection onto an existing region activity, or open the create
+//  sheet pre-seeded. Returns a [_AddToActivityChoice]; the panel does the
+//  region-aware follow-up (snackbar or create sheet). Null on dismiss.
+// ═══════════════════════════════════════════════════════════════
+
+enum _AddToActivityKind { added, newActivity }
+
+class _AddToActivityChoice {
+  const _AddToActivityChoice.added(this.addedCount, this.title)
+      : kind = _AddToActivityKind.added;
+  const _AddToActivityChoice.newActivity()
+      : kind = _AddToActivityKind.newActivity,
+        addedCount = 0,
+        title = '';
+
+  final _AddToActivityKind kind;
+
+  /// New participant rows the repository actually inserted (0 when every
+  /// selected member was already on the activity).
+  final int addedCount;
+  final String title;
+}
+
+class _AddToActivitySheet extends StatefulWidget {
+  const _AddToActivitySheet({
+    required this.mode,
+    required this.regionId,
+    required this.members,
+  });
+
+  final MapMode mode;
+  final String regionId;
+  final List<Member> members;
+
+  @override
+  State<_AddToActivitySheet> createState() => _AddToActivitySheetState();
+}
+
+class _AddToActivitySheetState extends State<_AddToActivitySheet> {
+  final OutreachRepository _repo = OutreachRepository();
+
+  List<OutreachActivity> _activities = const [];
+  bool _loading = true;
+  bool _adding = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final rows = await _repo.activitiesForRegion(widget.mode, widget.regionId);
+      if (!mounted) return;
+      // Only the actionable activities: planned or in progress. Filtered
+      // client-side so the repository stays a plain region query.
+      setState(() {
+        _activities = rows
+            .where((a) => a.status == 'planned' || a.status == 'in_progress')
+            .toList();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _activities = const [];
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _addTo(OutreachActivity activity) async {
+    if (_adding) return;
+    setState(() => _adding = true);
+    final inputs = widget.members
+        .map((m) => OutreachParticipantInput(memberId: m.id))
+        .toList();
+    int added;
+    try {
+      // PINNED: addParticipants dedupes on (activity_id, member_id) and returns
+      // the count of newly inserted rows.
+      added = await _repo.addParticipants(activity.id, inputs);
+    } catch (_) {
+      added = 0;
+    }
+    if (!mounted) return;
+    Navigator.of(context)
+        .pop(_AddToActivityChoice.added(added, activity.title));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _Palette.of(context);
+    final media = MediaQuery.of(context);
+    final maxHeight = media.size.height * 0.8;
+    final n = widget.members.length;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: Container(
+          decoration: BoxDecoration(
+            color: p.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _header(n),
+              Flexible(
+                child: _loading
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Center(
+                          child: SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: MoydMapTheme.unityBlue),
+                          ),
+                        ),
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+                        children: [
+                          _newActivityTile(p),
+                          const SizedBox(height: 12),
+                          if (_activities.isEmpty)
+                            _emptyNote(p)
+                          else
+                            ...[for (final a in _activities) _activityRow(p, a)],
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _header(int n) => Container(
+        color: MoydMapTheme.navy,
+        padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Icon(Icons.playlist_add, color: Colors.white, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Add $n member${n == 1 ? '' : 's'} to an activity',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 5),
+                  Container(
+                    width: 40,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: MoydMapTheme.gold,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            InkWell(
+              onTap: () => Navigator.of(context).pop(),
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 18),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _newActivityTile(_Palette p) => Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _adding
+              ? null
+              : () => Navigator.of(context)
+                  .pop(const _AddToActivityChoice.newActivity()),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: MoydMapTheme.unityBlue.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border:
+                  Border.all(color: MoydMapTheme.unityBlue.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.add_circle_outline, size: 20, color: p.action),
+                const SizedBox(width: 12),
+                Text('New activity',
+                    style: TextStyle(
+                        color: p.action,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  Widget _emptyNote(_Palette p) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: p.inset,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: p.divider),
+        ),
+        child: Text('No planned activities in this region yet.',
+            style: TextStyle(color: p.secondary, fontSize: 12.5)),
+      );
+
+  Widget _activityRow(_Palette p, OutreachActivity a) {
+    final kind = OutreachDisplay.kinds[a.kind];
+    final status = OutreachDisplay.statuses[a.status];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _adding ? null : () => _addTo(a),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: p.inset,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: p.divider),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: MoydMapTheme.unityBlue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(kind?.icon ?? a.kindIcon,
+                      size: 18, color: MoydMapTheme.unityBlue),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(a.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: p.text,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700)),
+                      if (a.scheduledOn != null) ...[
+                        const SizedBox(height: 2),
+                        Text(_fmtDate(a.scheduledOn!),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                TextStyle(color: p.secondary, fontSize: 12)),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: status?.color ?? a.statusColor,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(status?.label ?? a.statusLabel,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static const List<String> _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  String _fmtDate(DateTime d) => '${_months[d.month - 1]} ${d.day}, ${d.year}';
 }

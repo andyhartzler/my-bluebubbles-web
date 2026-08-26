@@ -5,7 +5,7 @@ import 'package:bluebubbles/features/forms/screens/endorsement_hub/endorsement_h
 import 'package:bluebubbles/features/forms/theme/moyd_brand.dart';
 import 'package:bluebubbles/screens/crm/candidates/candidates_mobile_page.dart';
 import 'package:bluebubbles/screens/crm/candidates/candidates_split_page.dart';
-import 'package:bluebubbles/screens/crm/volunteers/candidate_volunteers_map.dart';
+import 'package:bluebubbles/screens/crm/volunteers/candidate_volunteers_workspace.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATES INTELLIGENCE PAGE — ROUTER
@@ -51,7 +51,7 @@ class _CandidatesPageState extends State<CandidatesPage> {
         ),
         Expanded(
           child: switch (_area) {
-            CandidatesArea.volunteers => const CandidateVolunteersMap(),
+            CandidatesArea.volunteers => const CandidateVolunteersWorkspace(),
             CandidatesArea.endorsementHq => const EndorsementHubScreen(),
             CandidatesArea.field => _fieldBody(),
           },

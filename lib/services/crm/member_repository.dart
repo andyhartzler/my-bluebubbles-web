@@ -382,6 +382,25 @@ class MemberRepository {
     }
   }
 
+  /// Fetch full member records for a set of ids (order not guaranteed).
+  /// Used by roster-driven bulk actions that hold member ids but need Member
+  /// objects to hand to the bulk message/email screens.
+  Future<List<Member>> membersByIds(List<String> ids) async {
+    if (!_isReady || ids.isEmpty) return const <Member>[];
+
+    try {
+      final response =
+          await _readClient.from('members').select().inFilter('id', ids);
+      return (response as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .map(Member.fromJson)
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error fetching members by ids: $e');
+      return const <Member>[];
+    }
+  }
+
   /// Get member by phone number (E.164 format)
   /// This is the KEY lookup for linking to BlueBubbles Handles
   Future<Member?> getMemberByPhone(String phone) async {
