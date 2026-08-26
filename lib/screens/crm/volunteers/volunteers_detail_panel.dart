@@ -7,6 +7,15 @@ import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'outreach_region_section.dart';
 import 'volunteers_map_models.dart';
 
+/// Which slice of the detail panel to render.
+///
+/// [statewide] is the overview rail shown when nothing is selected. In the
+/// desktop three-pane region view [candidates] renders the left ballot pane and
+/// [members] the right selection pane; [combined] is the mobile draggable sheet
+/// which stacks candidates over members in one scroll. Only the [members] /
+/// [combined] panes own member-selection state.
+enum VolunteersPane { statewide, candidates, members, combined }
+
 // ═══════════════════════════════════════════════════════════════
 //  DETAIL PANEL — the right-hand rail (desktop) / draggable sheet body
 //  (mobile). Renders a Statewide Overview when nothing is selected, or a
@@ -89,6 +98,7 @@ class VolunteersDetailPanel extends StatelessWidget {
   const VolunteersDetailPanel({
     super.key,
     this.detail,
+    this.pane = VolunteersPane.combined,
     required this.statewideMembers,
     required this.statewideYoungDems,
     required this.hotRegions,
@@ -103,6 +113,10 @@ class VolunteersDetailPanel extends StatelessWidget {
 
   /// When null, the panel renders the Statewide Overview.
   final RegionDetail? detail;
+
+  /// Which slice of the region detail to render. Ignored when [detail] is null
+  /// (that always renders the statewide overview).
+  final VolunteersPane pane;
 
   final int statewideMembers;
   final int statewideYoungDems;
@@ -134,8 +148,10 @@ class VolunteersDetailPanel extends StatelessWidget {
       child: detail == null
           ? _statewide(context, p)
           : _RegionDetailView(
-              key: ValueKey('${detail!.mode}:${detail!.id}'),
+              key: ValueKey('${detail!.mode}:${detail!.id}:${pane.name}'),
               detail: detail!,
+              pane:
+                  pane == VolunteersPane.statewide ? VolunteersPane.combined : pane,
               onClose: onClose,
               onTextMembers: onTextMembers,
               onEmailMembers: onEmailMembers,
@@ -286,6 +302,7 @@ class _RegionDetailView extends StatefulWidget {
   const _RegionDetailView({
     super.key,
     required this.detail,
+    required this.pane,
     required this.onClose,
     required this.onTextMembers,
     required this.onEmailMembers,
@@ -295,6 +312,7 @@ class _RegionDetailView extends StatefulWidget {
   });
 
   final RegionDetail detail;
+  final VolunteersPane pane;
   final VoidCallback onClose;
   final void Function(List<Member> members) onTextMembers;
   final void Function(List<Member> members) onEmailMembers;
@@ -358,8 +376,22 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
 
   @override
   Widget build(BuildContext context) {
-    _seedIfNeeded();
     final p = _Palette.of(context);
+    switch (widget.pane) {
+      case VolunteersPane.candidates:
+        return _buildCandidatesPane(context, p);
+      case VolunteersPane.members:
+        return _buildMembersPane(context, p);
+      case VolunteersPane.statewide:
+      case VolunteersPane.combined:
+        return _buildCombined(context, p);
+    }
+  }
+
+  /// Mobile draggable sheet: candidates then members in one scroll, action bar
+  /// pinned below.
+  Widget _buildCombined(BuildContext context, _Palette p) {
+    _seedIfNeeded();
     final textCount = _selectedTextable.length;
     final emailCount = _selectedEmailable.length;
 
@@ -372,10 +404,56 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
             controller: widget.scrollController,
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
             children: [
-              _sectionHeader(p, 'CANDIDATES — NOVEMBER GENERAL'),
+              _sectionHeader(p, 'ON THE NOVEMBER BALLOT'),
               const SizedBox(height: 12),
               _candidateSection(context, p),
               const SizedBox(height: 24),
+              RegionOutreachSection(mode: _d.mode, regionId: _d.id),
+              const SizedBox(height: 24),
+              _membersSection(context, p),
+            ],
+          ),
+        ),
+        _actionBar(context, p, textCount: textCount, emailCount: emailCount),
+      ],
+    );
+  }
+
+  /// Desktop left pane: November nominee cards only. No member selection here.
+  Widget _buildCandidatesPane(BuildContext context, _Palette p) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _candidatesHeader(p),
+        Expanded(
+          child: ListView(
+            controller: widget.scrollController,
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            children: [
+              _candidateSection(context, p),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Desktop right pane: members list, outreach and the pinned action bar. This
+  /// pane owns the member-selection state.
+  Widget _buildMembersPane(BuildContext context, _Palette p) {
+    _seedIfNeeded();
+    final textCount = _selectedTextable.length;
+    final emailCount = _selectedEmailable.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _header(p),
+        Expanded(
+          child: ListView(
+            controller: widget.scrollController,
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            children: [
               RegionOutreachSection(mode: _d.mode, regionId: _d.id),
               const SizedBox(height: 24),
               _membersSection(context, p),
@@ -485,6 +563,43 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                 fontWeight: FontWeight.w700)),
       );
 
+  // ── candidates-pane header (desktop left) ───────────────────────
+  Widget _candidatesHeader(_Palette p) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 116),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      color: MoydMapTheme.navy,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('ON THE NOVEMBER BALLOT',
+              style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.4)),
+          const SizedBox(height: 3),
+          Text(_d.mode.regionTitle(_d.id),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  height: 1.1)),
+          const SizedBox(height: 8),
+          Container(
+            width: 44,
+            height: 3,
+            decoration: BoxDecoration(
+              color: MoydMapTheme.gold,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── candidate section ───────────────────────────────────────────
   Widget _candidateSection(BuildContext context, _Palette p) {
     if (_d.loadingCandidates) {
@@ -576,7 +691,6 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
     final office = row.candidate?.officeDisplay ?? row.result?.officeRaw ?? '';
     final party =
         row.candidate?.partyShort ?? row.result?.partyShort ?? '?';
-    final pct = (row.result?.pct ?? 0).clamp(0, 100).toDouble();
     final photo = row.candidate?.effectivePhotoUrl;
 
     void open() {
@@ -623,7 +737,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                         ),
                         if (row.isNominee) ...[
                           const SizedBox(width: 8),
-                          _nomineeBadge(),
+                          _nomineeBadge(party),
                         ],
                       ],
                     ),
@@ -642,16 +756,6 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                     color: p.secondary.withValues(alpha: 0.6), size: 18),
             ],
           ),
-          if (row.result != null) ...[
-            const SizedBox(height: 10),
-            _pctBar(p, pct),
-            const SizedBox(height: 5),
-            Text('${_thousands(row.result!.votes)}  ·  ${pct.toStringAsFixed(1)}%',
-                style: TextStyle(
-                    color: p.secondary,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600)),
-          ],
         ],
       ),
     );
@@ -703,42 +807,22 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                 color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800)),
       );
 
-  Widget _nomineeBadge() => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  /// Party-coded NOMINEE pill, mirroring the shipped candidates list: white
+  /// caps on the party chip colour. [partyShort] is the candidate's or result's
+  /// one-letter party ('D'/'R'/'L'/…), '?' when unknown.
+  Widget _nomineeBadge(String partyShort) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: MoydMapTheme.gold,
+          color: MapPalette.partyChipColor(partyShort),
           borderRadius: BorderRadius.circular(999),
         ),
-        // navy on gold clears 4.5:1; gold is a fill here, never text.
-        child: const Text('NOV NOMINEE ★',
+        child: const Text('NOMINEE',
             style: TextStyle(
-                color: MoydMapTheme.navy,
-                fontSize: 9.5,
+                color: Colors.white,
+                fontSize: 11,
                 fontWeight: FontWeight.w800,
-                letterSpacing: 0.3)),
+                letterSpacing: 0.4)),
       );
-
-  Widget _pctBar(_Palette p, double pct) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(3),
-      child: Container(
-        height: 6,
-        color: p.track,
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: (pct / 100).clamp(0.0, 1.0)),
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeOutCubic,
-          builder: (context, value, _) => Align(
-            alignment: Alignment.centerLeft,
-            child: FractionallySizedBox(
-              widthFactor: value,
-              child: Container(color: MoydMapTheme.unityBlue),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   // ── members section (real multi-select) ─────────────────────────
   Widget _membersSection(BuildContext context, _Palette p) {
@@ -1207,14 +1291,4 @@ String _initials(String name) {
   final first = parts.first[0];
   final last = parts.length > 1 ? parts.last[0] : '';
   return (first + last).toUpperCase();
-}
-
-String _thousands(int n) {
-  final s = n.toString();
-  final buf = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
-    buf.write(s[i]);
-  }
-  return buf.toString();
 }

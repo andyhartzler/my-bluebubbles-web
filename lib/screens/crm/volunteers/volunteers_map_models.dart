@@ -452,7 +452,7 @@ class RegionSearchHit {
 /// A [result]-backed row that also resolves to a [candidate] renders the
 /// candidate photo and taps through to their profile. A result with no matched
 /// candidate renders initials-only and is NOT tappable — never fabricate a
-/// profile. [isNominee] flags the gold "Nov nominee" badge (derivable from
+/// profile. [isNominee] flags the party-colored NOMINEE badge (derivable from
 /// `ElectionResult.advanced`).
 class CandidateDisplayRow {
   const CandidateDisplayRow({

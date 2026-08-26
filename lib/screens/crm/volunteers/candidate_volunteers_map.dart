@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart' show PointerHoverEvent;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show rootBundle, LogicalKeyboardKey;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -450,23 +450,42 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       _loadingMembers = true;
     });
     if (region != null) {
-      _flyTo(region.centroid, _selectionZoom(mode));
+      final fit = _fittedCamera(region);
+      _flyTo(fit.center, fit.zoom);
     }
     _loadMembers(mode, id, seq);
     if (!mode.isDistrict) _loadCountyGroups(id, seq);
   }
 
-  double _selectionZoom(MapMode mode) {
-    switch (mode) {
-      case MapMode.county:
-        return 8.0;
-      case MapMode.congressional:
-        return 7.2;
-      case MapMode.senate:
-        return 8.2;
-      case MapMode.house:
-        return 9.2;
+  /// Frame the selected region's polygon in the current viewport: build a
+  /// [LatLngBounds] over all of its ring points, fit it with 48px padding via
+  /// flutter_map's [CameraFit], and clamp the derived zoom to the map's
+  /// 6.0–12.0 range. The camera then flies to that center+zoom with the same
+  /// smooth tween used everywhere else.
+  ({LatLng center, double zoom}) _fittedCamera(RegionData region) {
+    var minLat = double.infinity, maxLat = -double.infinity;
+    var minLng = double.infinity, maxLng = -double.infinity;
+    for (final ring in region.rings) {
+      for (final p in ring) {
+        if (p.latitude < minLat) minLat = p.latitude;
+        if (p.latitude > maxLat) maxLat = p.latitude;
+        if (p.longitude < minLng) minLng = p.longitude;
+        if (p.longitude > maxLng) maxLng = p.longitude;
+      }
     }
+    if (minLat > maxLat) {
+      // No ring points (should not happen); fall back to the centroid.
+      return (center: region.centroid, zoom: _mapController.camera.zoom);
+    }
+    final bounds = LatLngBounds(
+      LatLng(minLat, minLng),
+      LatLng(maxLat, maxLng),
+    );
+    final fitted = CameraFit.bounds(
+      bounds: bounds,
+      padding: const EdgeInsets.all(48),
+    ).fit(_mapController.camera);
+    return (center: fitted.center, zoom: fitted.zoom.clamp(6.0, 12.0));
   }
 
   Future<void> _loadMembers(MapMode mode, String id, int seq) async {
@@ -744,12 +763,22 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   // ── Build ──────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final content = LayoutBuilder(
+    final layout = LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= _kDesktopBreakpoint;
         if (isDesktop) return _desktopLayout(context);
         return _mobileLayout(context);
       },
+    );
+
+    // Esc returns to the statewide view when a region is selected.
+    final content = CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          if (_selectedId != null) _clearSelection();
+        },
+      },
+      child: Focus(autofocus: true, child: layout),
     );
 
     if (widget.height != null && widget.height!.isFinite) {
@@ -759,29 +788,49 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   }
 
   Widget _desktopLayout(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: _mapStack(context)),
-        Container(
-          width: 1,
-          decoration: BoxDecoration(
-            color: _isDark ? const Color(0xFF2E3A57) : const Color(0xFFE5E9F0),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.10),
-                blurRadius: 16,
-                offset: const Offset(-4, 0),
-              ),
-            ],
+    // Statewide landing: full-width map + overview rail.
+    if (_selectedId == null) {
+      return Row(
+        children: [
+          Expanded(child: _mapStack(context)),
+          _paneDivider(),
+          SizedBox(
+            width: _kPanelWidth,
+            child: _buildPanel(context,
+                pane: VolunteersPane.statewide, showClose: false),
           ),
-        ),
-        SizedBox(
-          width: _kPanelWidth,
-          child: _buildPanel(context, showClose: _selectedId != null),
-        ),
-      ],
-    );
+        ],
+      );
+    }
+
+    // Region war room: Candidates | Map | Members.
+    return LayoutBuilder(builder: (context, constraints) {
+      const candidatesWidth = 320.0;
+      final membersWidth = (constraints.maxWidth * 0.24).clamp(360.0, 440.0);
+      return Row(
+        children: [
+          SizedBox(
+            width: candidatesWidth,
+            child: _buildPanel(context,
+                pane: VolunteersPane.candidates, showClose: false),
+          ),
+          _paneDivider(),
+          Expanded(child: _mapStack(context)),
+          _paneDivider(),
+          SizedBox(
+            width: membersWidth,
+            child: _buildPanel(context,
+                pane: VolunteersPane.members, showClose: false),
+          ),
+        ],
+      );
+    });
   }
+
+  Widget _paneDivider() => Container(
+        width: 1,
+        color: _isDark ? const Color(0xFF2E3A57) : const Color(0xFFE5E9F0),
+      );
 
   Widget _mobileLayout(BuildContext context) {
     return Stack(
@@ -798,6 +847,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
               return _MobileSheet(
                 child: _buildPanel(
                   context,
+                  pane: VolunteersPane.combined,
                   showClose: true,
                   scrollController: scrollController,
                 ),
@@ -810,7 +860,8 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 
   Widget _buildPanel(
     BuildContext context, {
-    required bool showClose,
+    required VolunteersPane pane,
+    bool showClose = false,
     ScrollController? scrollController,
   }) {
     final id = _selectedId;
@@ -830,6 +881,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     }
     return VolunteersDetailPanel(
       detail: detail,
+      pane: pane,
       statewideMembers: _statewideMembers,
       statewideYoungDems: _statewideYoungDems,
       hotRegions: _hotRegions(),
@@ -900,10 +952,18 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
             ),
           ),
 
-          // top-left: mode switch
+          // top-left: back-to-statewide pill (only while a region is selected)
+          if (_selectedId != null)
+            Positioned(
+              left: 16,
+              top: 16,
+              child: _backToStatewidePill(),
+            ),
+
+          // top-left: mode switch (shifts below the back pill when selecting)
           Positioned(
             left: 16,
-            top: 16,
+            top: _selectedId != null ? 64 : 16,
             child: _modeSwitcher(),
           ),
 
@@ -1094,6 +1154,47 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
             color: MoydMapTheme.navy, size: 16),
       );
 
+  // ── Back-to-statewide pill (navy fill, white text, both themes) ─
+  Widget _backToStatewidePill() {
+    return Semantics(
+      button: true,
+      label: 'Back to Missouri statewide',
+      excludeSemantics: true,
+      child: Material(
+        color: MoydMapTheme.navy,
+        elevation: 3,
+        shadowColor: Colors.black.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: _clearSelection,
+          borderRadius: BorderRadius.circular(999),
+          child: Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.18), width: 1),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.arrow_back_rounded, size: 16, color: Colors.white),
+                SizedBox(width: 6),
+                Text('Missouri',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Mode switcher (segmented pill, unityBlue active) ────────────
   Widget _modeSwitcher() {
     const modes = MapMode.values;
@@ -1235,7 +1336,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
         '${r.memberCount} member${r.memberCount == 1 ? '' : 's'}';
     return Positioned(
       left: 16,
-      top: 68,
+      top: _selectedId != null ? 116 : 68,
       child: IgnorePointer(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
