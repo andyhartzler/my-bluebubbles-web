@@ -5,19 +5,24 @@ import 'package:bluebubbles/features/forms/screens/endorsement_hub/endorsement_h
 import 'package:bluebubbles/features/forms/theme/moyd_brand.dart';
 import 'package:bluebubbles/screens/crm/candidates/candidates_mobile_page.dart';
 import 'package:bluebubbles/screens/crm/candidates/candidates_split_page.dart';
-import 'package:bluebubbles/screens/crm/county_outreach_screen.dart';
+import 'package:bluebubbles/screens/crm/volunteers/candidate_volunteers_map.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATES INTELLIGENCE PAGE — ROUTER
 //
-//  A thin area switch sits above two workspaces:
+//  A thin area switch sits above three workspaces, defaulting to the
+//  Candidate Volunteers map (the first thing Candidates opens to):
 //
+//   • Candidate Volunteers → the interactive Missouri "war room" map:
+//       county / congressional / MO House / MO Senate, tap a region to
+//       see its November candidates and the members who live there.
 //   • Field          → the width-based candidate map/list router
-//                       (≥1200px CandidatesSplitPage, else Mobile)
-//   • Endorsement HQ  → the 2026 candidate-survey intelligence hub
-//                       (EndorsementHubScreen)
+//                       (≥1200px CandidatesSplitPage, else Mobile),
+//                       with Primary and General sub-tabs.
+//   • Endorsement HQ  → the 2026 candidate-survey intelligence hub.
 //
-//  All field UI lives in lib/screens/crm/candidates/*.
+//  Field UI lives in lib/screens/crm/candidates/*, the volunteers map in
+//  lib/screens/crm/volunteers/*.
 // ═══════════════════════════════════════════════════════════════
 
 enum CandidatesArea { field, endorsementHq, volunteers }
@@ -32,7 +37,9 @@ class CandidatesPage extends StatefulWidget {
 }
 
 class _CandidatesPageState extends State<CandidatesPage> {
-  CandidatesArea _area = CandidatesArea.field;
+  // Candidate Volunteers (the map) is the landing area: clicking Candidates in
+  // the main nav opens straight into the Missouri map.
+  CandidatesArea _area = CandidatesArea.volunteers;
 
   @override
   Widget build(BuildContext context) {
@@ -44,8 +51,8 @@ class _CandidatesPageState extends State<CandidatesPage> {
         ),
         Expanded(
           child: switch (_area) {
+            CandidatesArea.volunteers => const CandidateVolunteersMap(),
             CandidatesArea.endorsementHq => const EndorsementHubScreen(),
-            CandidatesArea.volunteers => const CountyOutreachScreen(),
             CandidatesArea.field => _fieldBody(),
           },
         ),
@@ -100,19 +107,19 @@ class _AreaSwitcher extends StatelessWidget {
               SegmentedButton<CandidatesArea>(
                 segments: const [
                   ButtonSegment(
-                    value: CandidatesArea.field,
+                    value: CandidatesArea.volunteers,
                     icon: Icon(Icons.map_outlined),
+                    label: Text('Candidate Volunteers'),
+                  ),
+                  ButtonSegment(
+                    value: CandidatesArea.field,
+                    icon: Icon(Icons.insights_outlined),
                     label: Text('Field'),
                   ),
                   ButtonSegment(
                     value: CandidatesArea.endorsementHq,
                     icon: Icon(Icons.workspace_premium),
                     label: Text('Endorsement HQ'),
-                  ),
-                  ButtonSegment(
-                    value: CandidatesArea.volunteers,
-                    icon: Icon(Icons.campaign_outlined),
-                    label: Text('Candidate Volunteers'),
                   ),
                 ],
                 selected: {area},

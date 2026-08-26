@@ -11,6 +11,7 @@ import 'package:bluebubbles/widgets/crm/missouri_map_widget.dart';
 
 import 'candidate_district_sheet.dart';
 import 'candidate_view_mode.dart';
+import 'candidates_general_list.dart';
 import 'candidates_filter_shelf.dart';
 import 'candidates_grid_view.dart';
 import 'candidates_hero_stats.dart';
@@ -68,6 +69,7 @@ class _CandidatesMobilePageState extends State<CandidatesMobilePage>
 
   // View mode + selection
   CandidateViewMode _mode = CandidateViewMode.list;
+  bool _showGeneral = false;
   Candidate? _selected;
 
   @override
@@ -323,6 +325,13 @@ class _CandidatesMobilePageState extends State<CandidatesMobilePage>
       return CustomScrollView(
         controller: _scrollController,
         slivers: [
+          SliverToBoxAdapter(child: _buildFieldTabBar()),
+          if (_showGeneral)
+            const SliverFillRemaining(
+              hasScrollBody: true,
+              child: CandidatesGeneralList(),
+            )
+          else ...[
           // HERO MAP (collapsible on mobile, wider on tablet)
           SliverToBoxAdapter(
             child: _buildHeroMap(constraints.maxWidth, isTablet: isTablet),
@@ -409,9 +418,61 @@ class _CandidatesMobilePageState extends State<CandidatesMobilePage>
               child: _buildBody(filtered),
             ),
           ),
+          ],
         ],
       );
     });
+  }
+
+  /// Compact Primary/General segmented toggle at the top of the Field body.
+  /// Primary renders exactly today's mobile body; General renders the November
+  /// general-election field. Styled like the filter shelf's view-mode control.
+  Widget _buildFieldTabBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: Row(
+        children: [
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment<bool>(
+                value: false,
+                label: Text('Primary', style: TextStyle(fontSize: 12)),
+              ),
+              ButtonSegment<bool>(
+                value: true,
+                label: Text('General', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+            selected: {_showGeneral},
+            onSelectionChanged: (s) => setState(() => _showGeneral = s.first),
+            showSelectedIcon: false,
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: WidgetStateProperty.all(
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              ),
+              backgroundColor: WidgetStateProperty.resolveWith((states) {
+                return states.contains(WidgetState.selected)
+                    ? BrandColors.sunriseGold.withOpacity(0.18)
+                    : Colors.white.withOpacity(0.04);
+              }),
+              foregroundColor: WidgetStateProperty.resolveWith((states) {
+                return states.contains(WidgetState.selected)
+                    ? BrandColors.sunriseGold
+                    : Colors.white70;
+              }),
+              side: WidgetStateProperty.all(
+                BorderSide(color: Colors.white.withOpacity(0.10)),
+              ),
+              shape: WidgetStateProperty.all(
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // Map with tap-to-fullscreen. On mobile narrower / shorter; on tablet wider.

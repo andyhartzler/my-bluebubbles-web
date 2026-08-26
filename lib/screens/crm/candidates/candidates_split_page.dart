@@ -9,6 +9,7 @@ import 'package:bluebubbles/screens/crm/candidate_new_dialog.dart';
 import 'package:bluebubbles/widgets/crm/missouri_map_widget.dart';
 
 import 'candidate_view_mode.dart';
+import 'candidates_general_list.dart';
 import 'candidates_list_panel.dart';
 
 /// Desktop split-screen Candidates page. Left pane is the [CandidatesListPanel]
@@ -35,6 +36,7 @@ class _CandidatesSplitPageState extends State<CandidatesSplitPage> {
   List<PrimaryChallengePair> _pairs = const [];
 
   CandidateViewMode _mode = CandidateViewMode.list;
+  bool _showGeneral = false;
   String _search = '';
   String? _party;
   bool _ydOnly = false;
@@ -176,9 +178,16 @@ class _CandidatesSplitPageState extends State<CandidatesSplitPage> {
       );
     }
 
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _buildFieldTabBar(),
+        Expanded(
+          child: _showGeneral
+              ? const CandidatesGeneralList()
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
         // LEFT: list panel (60%)
         Expanded(
           flex: 6,
@@ -211,7 +220,61 @@ class _CandidatesSplitPageState extends State<CandidatesSplitPage> {
             child: _buildStickyMap(),
           ),
         ),
+                  ],
+                ),
+        ),
       ],
+    );
+  }
+
+  /// Compact Primary/General segmented toggle at the top of the Field body.
+  /// Primary renders exactly today's split view; General renders the November
+  /// general-election field. Styled like the list panel's view-mode control.
+  Widget _buildFieldTabBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Row(
+        children: [
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment<bool>(
+                value: false,
+                label: Text('Primary', style: TextStyle(fontSize: 12)),
+              ),
+              ButtonSegment<bool>(
+                value: true,
+                label: Text('General', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+            selected: {_showGeneral},
+            onSelectionChanged: (s) => setState(() => _showGeneral = s.first),
+            showSelectedIcon: false,
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: WidgetStateProperty.all(
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              ),
+              backgroundColor: WidgetStateProperty.resolveWith((states) {
+                return states.contains(WidgetState.selected)
+                    ? BrandColors.sunriseGold.withOpacity(0.18)
+                    : Colors.white.withOpacity(0.04);
+              }),
+              foregroundColor: WidgetStateProperty.resolveWith((states) {
+                return states.contains(WidgetState.selected)
+                    ? BrandColors.sunriseGold
+                    : Colors.white70;
+              }),
+              side: WidgetStateProperty.all(
+                BorderSide(color: Colors.white.withOpacity(0.10)),
+              ),
+              shape: WidgetStateProperty.all(
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
