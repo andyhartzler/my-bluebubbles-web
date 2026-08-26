@@ -1,8 +1,12 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:universal_html/html.dart' as html;
 
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/services/crm/member_repository.dart';
 
 import 'outreach_region_section.dart';
 import 'volunteers_map_models.dart';
@@ -15,6 +19,12 @@ import 'volunteers_map_models.dart';
 /// which stacks candidates over members in one scroll. Only the [members] /
 /// [combined] panes own member-selection state.
 enum VolunteersPane { statewide, candidates, members, combined }
+
+/// Members-pane "Last contacted" filter (§5). [any] is the default no-op.
+enum _LastContactedFilter { any, never, notIn30 }
+
+/// Members-pane sort order (§5). [nameAsc] is the default.
+enum _MemberSort { nameAsc, recentlyContacted, leastRecentlyContacted }
 
 // ═══════════════════════════════════════════════════════════════
 //  DETAIL PANEL — the right-hand rail (desktop) / draggable sheet body
@@ -80,7 +90,12 @@ class _Palette {
         secondary =
             isDark ? Colors.white.withValues(alpha: 0.72) : const Color(0xFF5A6478),
         divider = isDark ? const Color(0xFF2E3A57) : const Color(0xFFE5E9F0),
-        track = isDark ? const Color(0xFF313D5E) : const Color(0xFFDFE4EC);
+        track = isDark ? const Color(0xFF313D5E) : const Color(0xFFDFE4EC),
+        // Blue actions/links must clear 4.5:1 on the panel surface in both
+        // themes: raw unityBlue (#0B4DB8) is ~2:1 on the dark surface, so it
+        // lightens on dark. Used for text-link actions ("Show all", "Clear",
+        // skip "Details", "Log outreach").
+        action = isDark ? const Color(0xFF6AA0F0) : MoydMapTheme.unityBlue;
 
   final bool isDark;
   final Color surface;
@@ -89,6 +104,7 @@ class _Palette {
   final Color secondary;
   final Color divider;
   final Color track;
+  final Color action;
 
   factory _Palette.of(BuildContext c) =>
       _Palette(Theme.of(c).brightness == Brightness.dark);
@@ -327,16 +343,66 @@ class _RegionDetailView extends StatefulWidget {
 class _RegionDetailViewState extends State<_RegionDetailView> {
   static const _initialCap = 30;
 
+  final MemberRepository _repo = MemberRepository();
+
   final Set<String> _selectedIds = <String>{};
   bool _seeded = false;
   bool _expanded = false;
   bool _canTextFilter = false;
   bool _canEmailFilter = false;
 
+  // Committee multi-select — values loaded once from the repo and cached.
+  final Set<String> _committeeFilter = <String>{};
+  List<String> _committees = const [];
+  bool _loadingCommittees = false;
+
+  _LastContactedFilter _lastContacted = _LastContactedFilter.any;
+  _MemberSort _sort = _MemberSort.nameAsc;
+
+  // Session-only overrides applied by the action bar so the list and the
+  // last-contacted filter reflect a mark/note write without a full reload.
+  // The notes override also seeds the next append so repeated notes never
+  // clobber existing notes.
+  final Map<String, DateTime> _lastContactedOverride = <String, DateTime>{};
+  final Map<String, String> _notesOverride = <String, String>{};
+
   RegionDetail get _d => widget.detail;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCommittees();
+  }
+
+  Future<void> _loadCommittees() async {
+    if (_loadingCommittees) return;
+    setState(() => _loadingCommittees = true);
+    try {
+      final committees = await _repo.getUniqueCommittees();
+      if (!mounted) return;
+      setState(() {
+        _committees = committees;
+        _loadingCommittees = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingCommittees = false);
+    }
+  }
 
   bool _isSelectable(Member m) =>
       m.canContact || (m.preferredEmail ?? '').isNotEmpty;
+
+  DateTime? _effectiveLastContacted(Member m) =>
+      _lastContactedOverride[m.id] ?? m.lastContacted;
+
+  String? _effectiveNotes(Member m) => _notesOverride[m.id] ?? m.notes;
+
+  bool get _anyFilterActive =>
+      _canTextFilter ||
+      _canEmailFilter ||
+      _committeeFilter.isNotEmpty ||
+      _lastContacted != _LastContactedFilter.any;
 
   /// Seed the selection to ALL selectable members the first time they exist.
   /// Guarded so an async member load seeds once and later user changes stick.
@@ -350,14 +416,74 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
     _seeded = true;
   }
 
+  /// Members shown in the list: the textable/emailable toggles compose as an
+  /// OR group (unchanged from Phase 1), then AND with the committee and
+  /// last-contacted filters, then the chosen sort is applied.
   List<Member> get _displayed {
-    final all = _d.members;
-    if (!_canTextFilter && !_canEmailFilter) return all;
-    return all
-        .where((m) =>
-            (_canTextFilter && m.canContact) ||
-            (_canEmailFilter && (m.preferredEmail ?? '').isNotEmpty))
-        .toList();
+    Iterable<Member> out = _d.members;
+
+    if (_canTextFilter || _canEmailFilter) {
+      out = out.where((m) =>
+          (_canTextFilter && m.canContact) ||
+          (_canEmailFilter && (m.preferredEmail ?? '').isNotEmpty));
+    }
+
+    if (_committeeFilter.isNotEmpty) {
+      out = out.where((m) {
+        final committees = m.committee;
+        if (committees == null || committees.isEmpty) return false;
+        return committees.any(_committeeFilter.contains);
+      });
+    }
+
+    switch (_lastContacted) {
+      case _LastContactedFilter.any:
+        break;
+      case _LastContactedFilter.never:
+        out = out.where((m) => _effectiveLastContacted(m) == null);
+        break;
+      case _LastContactedFilter.notIn30:
+        final cutoff = DateTime.now().subtract(const Duration(days: 30));
+        out = out.where((m) {
+          final lc = _effectiveLastContacted(m);
+          return lc == null || lc.isBefore(cutoff);
+        });
+        break;
+    }
+
+    final list = out.toList();
+    _sortMembers(list);
+    return list;
+  }
+
+  void _sortMembers(List<Member> list) {
+    int byName(Member a, Member b) =>
+        a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    switch (_sort) {
+      case _MemberSort.nameAsc:
+        list.sort(byName);
+        break;
+      case _MemberSort.recentlyContacted:
+        list.sort((a, b) {
+          final la = _effectiveLastContacted(a);
+          final lb = _effectiveLastContacted(b);
+          if (la == null && lb == null) return byName(a, b);
+          if (la == null) return 1; // never-contacted sink to the bottom
+          if (lb == null) return -1;
+          return lb.compareTo(la); // most recent first
+        });
+        break;
+      case _MemberSort.leastRecentlyContacted:
+        list.sort((a, b) {
+          final la = _effectiveLastContacted(a);
+          final lb = _effectiveLastContacted(b);
+          if (la == null && lb == null) return byName(a, b);
+          if (la == null) return -1; // never-contacted are the most overdue
+          if (lb == null) return 1;
+          return la.compareTo(lb); // oldest first
+        });
+        break;
+    }
   }
 
   List<Member> get _selectedTextable => _d.members
@@ -856,6 +982,8 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
     }
 
     final displayed = _displayed;
+    final total = _d.members.length;
+    final filteredCount = displayed.length;
     final displayedSelectable = displayed.where(_isSelectable).toList();
     final selectedInDisplay = displayedSelectable
         .where((m) => _selectedIds.contains(m.id))
@@ -868,14 +996,31 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                 ? true
                 : null;
 
+    final filteredTextable = displayed.where((m) => m.canContact).length;
+    final filteredEmailable =
+        displayed.where((m) => (m.preferredEmail ?? '').isNotEmpty).length;
+
+    // Header count and summary reflect the currently filtered set, showing the
+    // total too when it differs (e.g. "MOYD MEMBERS (12 of 41)").
+    final headerCount = _anyFilterActive && filteredCount != total
+        ? '$filteredCount of $total'
+        : '$total';
+
+    final selectAllLabel = _anyFilterActive
+        ? 'Select all $filteredCount filtered'
+        : 'Select all';
+
     final visible = _expanded ? displayed : displayed.take(_initialCap).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader(p, 'MOYD MEMBERS (${_d.members.length})'),
+        _sectionHeader(p, 'MOYD MEMBERS ($headerCount)'),
+        const SizedBox(height: 6),
+        Text('$filteredTextable textable · $filteredEmailable emailable',
+            style: TextStyle(color: p.secondary, fontSize: 12)),
         const SizedBox(height: 10),
-        // tri-state All + filter chips
+        // Select-all-filtered + live selection count
         Row(
           children: [
             SizedBox(
@@ -891,39 +1036,203 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                     : (_) => _toggleAllDisplayed(displayedSelectable),
               ),
             ),
-            Text('All (${displayedSelectable.length})',
-                style: TextStyle(
-                    color: p.text,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700)),
+            Flexible(
+              child: Text(selectAllLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: p.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700)),
+            ),
             const Spacer(),
+            if (_selectedIds.isNotEmpty)
+              Text('${_selectedIds.length} selected',
+                  style: TextStyle(
+                      color: p.action,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700)),
           ],
         ),
         const SizedBox(height: 8),
+        // Filter + sort chips (§5)
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
-            _filterChip(p, 'Can text', _canTextFilter,
+            _filterChip(p, 'Textable', _canTextFilter,
                 () => setState(() => _canTextFilter = !_canTextFilter)),
-            _filterChip(p, 'Can email', _canEmailFilter,
+            _filterChip(p, 'Emailable', _canEmailFilter,
                 () => setState(() => _canEmailFilter = !_canEmailFilter)),
+            _menuChip(p, _committeeChipLabel(), _committeeFilter.isNotEmpty,
+                _openCommitteeFilter),
+            _menuChip(p, _lastContactedChipLabel(),
+                _lastContacted != _LastContactedFilter.any,
+                _openLastContactedFilter),
+            _menuChip(p, _sortChipLabel(), false, _openSortMenu),
           ],
         ),
         const SizedBox(height: 12),
-        ...visible.map((m) => _memberRow(context, p, m)),
+        if (visible.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text('No members match these filters.',
+                style: TextStyle(color: p.secondary, fontSize: 12.5)),
+          )
+        else
+          ...visible.map((m) => _memberRow(context, p, m)),
         if (displayed.length > _initialCap && !_expanded)
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: TextButton(
               onPressed: () => setState(() => _expanded = true),
               child: Text('Show all ${displayed.length}',
-                  style: const TextStyle(
-                      color: MoydMapTheme.unityBlue,
+                  style: TextStyle(
+                      color: p.action,
                       fontWeight: FontWeight.w700)),
             ),
           ),
       ],
+    );
+  }
+
+  String _committeeChipLabel() {
+    final n = _committeeFilter.length;
+    if (n == 0) return 'Committee';
+    return n == 1 ? '1 committee' : '$n committees';
+  }
+
+  String _lastContactedChipLabel() {
+    switch (_lastContacted) {
+      case _LastContactedFilter.any:
+        return 'Last contacted';
+      case _LastContactedFilter.never:
+        return 'Never contacted';
+      case _LastContactedFilter.notIn30:
+        return 'Not in 30 days';
+    }
+  }
+
+  String _sortChipLabel() {
+    switch (_sort) {
+      case _MemberSort.nameAsc:
+        return 'Sort: Name';
+      case _MemberSort.recentlyContacted:
+        return 'Sort: Recent';
+      case _MemberSort.leastRecentlyContacted:
+        return 'Sort: Least recent';
+    }
+  }
+
+  // ── filter/sort menus ───────────────────────────────────────────
+  Future<void> _openCommitteeFilter() async {
+    if (_committees.isEmpty && !_loadingCommittees) {
+      await _loadCommittees();
+    }
+    if (!mounted) return;
+    final temp = Set<String>.from(_committeeFilter);
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Filter by committee'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: _committees.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text('No committees on file.'))
+              : StatefulBuilder(
+                  builder: (context, setDialogState) => ListView(
+                    shrinkWrap: true,
+                    children: _committees
+                        .map((c) => CheckboxListTile(
+                              dense: true,
+                              value: temp.contains(c),
+                              title: Text(c),
+                              onChanged: (v) => setDialogState(() {
+                                if (v == true) {
+                                  temp.add(c);
+                                } else {
+                                  temp.remove(c);
+                                }
+                              }),
+                            ))
+                        .toList(),
+                  ),
+                ),
+        ),
+        actions: [
+          if (_committeeFilter.isNotEmpty || temp.isNotEmpty)
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext, <String>{}),
+                child: const Text('Clear')),
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, temp),
+              child: const Text('Apply')),
+        ],
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _committeeFilter
+          ..clear()
+          ..addAll(result);
+      });
+    }
+  }
+
+  Future<void> _openLastContactedFilter() async {
+    final result = await showDialog<_LastContactedFilter>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Last contacted'),
+        children: [
+          _radioOption(dialogContext, _LastContactedFilter.any, _lastContacted,
+              'Any'),
+          _radioOption(dialogContext, _LastContactedFilter.never,
+              _lastContacted, 'Never contacted'),
+          _radioOption(dialogContext, _LastContactedFilter.notIn30,
+              _lastContacted, 'Not contacted in 30 days'),
+        ],
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() => _lastContacted = result);
+    }
+  }
+
+  Future<void> _openSortMenu() async {
+    final result = await showDialog<_MemberSort>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Sort members'),
+        children: [
+          _radioOption(dialogContext, _MemberSort.nameAsc, _sort, 'Name (A–Z)'),
+          _radioOption(dialogContext, _MemberSort.recentlyContacted, _sort,
+              'Recently contacted'),
+          _radioOption(dialogContext, _MemberSort.leastRecentlyContacted, _sort,
+              'Least recently contacted'),
+        ],
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() => _sort = result);
+    }
+  }
+
+  Widget _radioOption<T>(
+      BuildContext ctx, T value, T groupValue, String label) {
+    final selected = value == groupValue;
+    return ListTile(
+      dense: true,
+      title: Text(label),
+      trailing: selected
+          ? const Icon(Icons.check, color: MoydMapTheme.unityBlue)
+          : null,
+      onTap: () => Navigator.pop(ctx, value),
     );
   }
 
@@ -962,6 +1271,40 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                   color: active ? Colors.white : p.text,
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700)),
+        ),
+      ),
+    );
+  }
+
+  /// Like [_filterChip] but carries a dropdown affordance, for chips that open
+  /// a menu (Committee / Last contacted / Sort) rather than toggling.
+  Widget _menuChip(_Palette p, String label, bool active, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 7, 8, 7),
+          decoration: BoxDecoration(
+            color: active ? MoydMapTheme.unityBlue : p.inset,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+                color: active ? MoydMapTheme.unityBlue : p.divider),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label,
+                  style: TextStyle(
+                      color: active ? Colors.white : p.text,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(width: 2),
+              Icon(Icons.arrow_drop_down,
+                  size: 18, color: active ? Colors.white : p.secondary),
+            ],
+          ),
         ),
       ),
     );
@@ -1110,6 +1453,13 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
   // ── pinned action bar ───────────────────────────────────────────
   Widget _actionBar(BuildContext context, _Palette p,
       {required int textCount, required int emailCount}) {
+    final selected = _selectedMembers;
+    final selCount = selected.length;
+    // Skip counts operate on the whole selection, independent of the filter.
+    final cantText = selected.where((m) => !m.canContact).length;
+    final cantEmail =
+        selected.where((m) => (m.preferredEmail ?? '').isEmpty).length;
+
     return Container(
       padding: EdgeInsets.fromLTRB(
           16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
@@ -1120,6 +1470,45 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (selCount > 0) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '$selCount selected · $textCount textable · $emailCount emailable',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: p.text,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => setState(() => _selectedIds.clear()),
+                  child: Text('Clear',
+                      style: TextStyle(
+                          color: p.action,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+          // Skip-reason surfacing (§5.3): the Text/Email buttons still send
+          // only to the eligible subset; these lines explain who is excluded.
+          if (selCount > 0 && cantText > 0)
+            _skipLine(
+                p,
+                "$cantText of $selCount can't be texted: no phone or opted out",
+                () => _showSkipDetails(context, isText: true)),
+          if (selCount > 0 && cantEmail > 0)
+            _skipLine(
+                p,
+                "$cantEmail of $selCount can't be emailed: no email on file",
+                () => _showSkipDetails(context, isText: false)),
           Row(
             children: [
               Expanded(
@@ -1139,6 +1528,10 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                   onTap: () => widget.onEmailMembers(_selectedEmailable),
                 ),
               ),
+              if (selCount > 0) ...[
+                const SizedBox(width: 10),
+                _moreMenu(context, p),
+              ],
             ],
           ),
           if (widget.onLogOutreach != null) ...[
@@ -1150,7 +1543,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                 icon: const Icon(Icons.edit_note_outlined, size: 18),
                 label: const Text('Log outreach'),
                 style: TextButton.styleFrom(
-                  foregroundColor: MoydMapTheme.unityBlue,
+                  foregroundColor: p.action,
                   textStyle: const TextStyle(
                       fontWeight: FontWeight.w700, fontSize: 13.5),
                   minimumSize: const Size(0, 40),
@@ -1161,6 +1554,375 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
         ],
       ),
     );
+  }
+
+  Widget _skipLine(_Palette p, String text, VoidCallback onDetails) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, size: 14, color: p.secondary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(text,
+                style: TextStyle(color: p.secondary, fontSize: 11.5)),
+          ),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: onDetails,
+            child: Text('Details',
+                style: TextStyle(
+                    color: p.action,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _moreMenu(BuildContext context, _Palette p) {
+    return Material(
+      color: p.inset,
+      borderRadius: BorderRadius.circular(12),
+      child: PopupMenuButton<String>(
+        tooltip: 'More actions',
+        position: PopupMenuPosition.under,
+        onSelected: (value) {
+          switch (value) {
+            case 'mark':
+              _markContactedToday(context);
+              break;
+            case 'note':
+              _recordContactNote(context);
+              break;
+            case 'copy':
+              _copyNames(context);
+              break;
+            case 'csv':
+              _exportCsv(context);
+              break;
+          }
+        },
+        itemBuilder: (context) => [
+          _moreItem('mark', Icons.event_available_outlined,
+              'Mark contacted today'),
+          _moreItem('note', Icons.note_add_outlined, 'Record contact note'),
+          _moreItem('copy', Icons.copy_all_outlined, 'Copy names'),
+          _moreItem('csv', Icons.download_outlined, 'Export CSV'),
+        ],
+        child: Container(
+          height: 46,
+          width: 46,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: p.divider),
+          ),
+          child: Icon(Icons.more_vert, size: 20, color: p.text),
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _moreItem(String value, IconData icon, String label) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 10),
+          Text(label),
+        ],
+      ),
+    );
+  }
+
+  String _textSkipReason(Member m) {
+    if (m.optOut) return 'opted out';
+    if ((m.phoneE164 ?? '').isEmpty) return 'no phone';
+    if (m.membershipEligible != true) return 'not eligible';
+    return 'cannot be texted';
+  }
+
+  Future<void> _showSkipDetails(BuildContext context,
+      {required bool isText}) async {
+    final skipped = isText
+        ? _selectedMembers.where((m) => !m.canContact).toList()
+        : _selectedMembers
+            .where((m) => (m.preferredEmail ?? '').isEmpty)
+            .toList();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isText ? "Can't be texted" : "Can't be emailed"),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: skipped.isEmpty
+              ? const Text('No skipped members.')
+              : ListView(
+                  shrinkWrap: true,
+                  children: skipped
+                      .map((m) => ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(m.name),
+                            subtitle: Text(
+                                isText ? _textSkipReason(m) : 'no email on file'),
+                          ))
+                      .toList(),
+                ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  String _todayStamp() {
+    final now = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${now.year}-${two(now.month)}-${two(now.day)}';
+  }
+
+  Future<void> _markContactedToday(BuildContext context) async {
+    final members = _selectedMembers;
+    if (members.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final now = DateTime.now();
+    var ok = 0;
+    var failed = 0;
+    for (final m in members) {
+      try {
+        await _repo.updateLastContacted(m.id);
+        _lastContactedOverride[m.id] = now;
+        ok++;
+      } catch (_) {
+        failed++;
+      }
+    }
+    if (!mounted) return;
+    setState(() {});
+    messenger.showSnackBar(SnackBar(
+      content: Text(failed == 0
+          ? 'Marked $ok as contacted today'
+          : 'Marked $ok as contacted, $failed failed'),
+    ));
+  }
+
+  Future<void> _recordContactNote(BuildContext context) async {
+    final members = _selectedMembers;
+    if (members.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final controller = TextEditingController();
+    var alsoContacted = true;
+
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+              'Record note · ${members.length} member${members.length == 1 ? '' : 's'}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: controller,
+                autofocus: true,
+                minLines: 3,
+                maxLines: 6,
+                decoration: const InputDecoration(
+                  hintText: 'Note (appended to each member\'s existing notes)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: alsoContacted,
+                title: const Text('Also mark as contacted today'),
+                onChanged: (v) =>
+                    setDialogState(() => alsoContacted = v ?? false),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+
+    final entry = controller.text.trim();
+    controller.dispose();
+    if (save != true || entry.isEmpty || !mounted) return;
+
+    final today = _todayStamp();
+    final now = DateTime.now();
+    var ok = 0;
+    var failed = 0;
+    for (final m in members) {
+      try {
+        // NEVER replace notes: append to the member's existing notes. Read the
+        // current notes (override wins so repeated appends chain), then append.
+        final base = (_effectiveNotes(m) ?? '').trim();
+        final appended = '$base\n[$today] $entry'.trim();
+        await _repo.updateNotes(m.id, appended);
+        _notesOverride[m.id] = appended;
+        if (alsoContacted) {
+          await _repo.updateLastContacted(m.id);
+          _lastContactedOverride[m.id] = now;
+        }
+        ok++;
+      } catch (_) {
+        failed++;
+      }
+    }
+    if (!mounted) return;
+    setState(() {});
+    messenger.showSnackBar(SnackBar(
+      content: Text(failed == 0
+          ? 'Saved note for $ok member${ok == 1 ? '' : 's'}'
+          : 'Saved note for $ok, $failed failed'),
+    ));
+  }
+
+  Future<void> _copyNames(BuildContext context) async {
+    final members = _selectedMembers;
+    if (members.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    await Clipboard.setData(
+        ClipboardData(text: members.map((m) => m.name).join('\n')));
+    if (!mounted) return;
+    messenger.showSnackBar(SnackBar(
+      content: Text(
+          'Copied ${members.length} name${members.length == 1 ? '' : 's'}'),
+    ));
+  }
+
+  Future<void> _exportCsv(BuildContext context) async {
+    final members = _selectedMembers;
+    if (members.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    var includePii = false;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Export CSV'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                  'Export ${members.length} selected member${members.length == 1 ? '' : 's'}.'),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: includePii,
+                title: const Text('Include phone and email'),
+                subtitle:
+                    const Text('Personal contact data will leave the system.'),
+                onChanged: (v) => setDialogState(() => includePii = v ?? false),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Export')),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final headers = <String>[
+      'name',
+      'county',
+      'congressional_district',
+      'house_district',
+      'senate_district',
+      'textable',
+      'emailable',
+    ];
+    if (includePii) {
+      headers
+        ..add('phone_e164')
+        ..add('preferred_email');
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln(headers.map(_csvEscape).join(','));
+    for (final m in members) {
+      final row = <String>[
+        m.name,
+        m.county ?? '',
+        m.congressionalDistrict ?? '',
+        m.houseDistrict ?? '',
+        m.senateDistrict ?? '',
+        m.canContact ? 'yes' : 'no',
+        (m.preferredEmail ?? '').isNotEmpty ? 'yes' : 'no',
+      ];
+      if (includePii) {
+        row
+          ..add(m.phoneE164 ?? '')
+          ..add(m.preferredEmail ?? '');
+      }
+      buffer.writeln(row.map(_csvEscape).join(','));
+    }
+
+    if (!kIsWeb) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('CSV export is only available on the web app.')));
+      return;
+    }
+
+    try {
+      final blob = html.Blob([buffer.toString()], 'text/csv;charset=utf-8');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', 'members-${_todayStamp()}.csv')
+        ..style.display = 'none';
+      html.document.body?.append(anchor);
+      anchor.click();
+      anchor.remove();
+      html.Url.revokeObjectUrl(url);
+      messenger.showSnackBar(SnackBar(
+        content: Text(
+            'Exported ${members.length} member${members.length == 1 ? '' : 's'}'),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(
+          SnackBar(content: Text('CSV export failed: $e')));
+    }
+  }
+
+  /// Minimal RFC-4180-ish CSV field escape: quote fields containing a comma,
+  /// quote, or newline and double embedded quotes.
+  String _csvEscape(String value) {
+    if (value.contains(',') ||
+        value.contains('"') ||
+        value.contains('\n') ||
+        value.contains('\r')) {
+      return '"${value.replaceAll('"', '""')}"';
+    }
+    return value;
   }
 
   Widget _actionButton({
