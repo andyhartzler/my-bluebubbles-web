@@ -19,6 +19,13 @@ import 'package:bluebubbles/screens/crm/volunteers/volunteers_map_models.dart';
 /// Quick date lens applied in-memory over the fetched list.
 enum _DateLens { all, upcoming, overdue }
 
+/// List vs. Board (Kanban) presentation of the same filtered activity set.
+enum _HubView { list, board }
+
+/// Below this width four side-by-side status columns don't fit, so the Board
+/// toggle is hidden and the hub is forced to the List view.
+const double _kBoardMinWidth = 840;
+
 class ActivitiesHubScreen extends StatefulWidget {
   const ActivitiesHubScreen({super.key});
 
@@ -37,6 +44,10 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
   final Set<String> _statuses = <String>{};
   String? _kind; // null = All kinds
   _DateLens _dateLens = _DateLens.all;
+
+  // List (default) vs. Board. Only reachable at desktop/tablet widths; a
+  // narrow LayoutBuilder forces List regardless of what this holds.
+  _HubView _view = _HubView.list;
 
   // Lazily-resolved per-row meta, cached so scroll rebuilds don't refetch.
   final Map<String, Future<_RowCounts>> _countsCache =
@@ -131,20 +142,28 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: _bg,
-      child: Column(
-        children: [
-          _header(),
-          _filterBar(),
-          Expanded(child: _body()),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Board is desktop/tablet only. Below the threshold we hide the toggle
+        // and force List, so a resize down never leaves four columns crammed.
+        final boardAllowed = constraints.maxWidth >= _kBoardMinWidth;
+        final showBoard = boardAllowed && _view == _HubView.board;
+        return Container(
+          color: _bg,
+          child: Column(
+            children: [
+              _header(boardAllowed),
+              _filterBar(),
+              Expanded(child: showBoard ? _board() : _body()),
+            ],
+          ),
+        );
+      },
     );
   }
 
   // ── Header ─────────────────────────────────────────────────────
-  Widget _header() {
+  Widget _header(bool boardAllowed) {
     return Container(
       color: _surface,
       padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
@@ -155,6 +174,10 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
                 style: TextStyle(
                     color: _text, fontSize: 19, fontWeight: FontWeight.w800)),
           ),
+          if (boardAllowed) ...[
+            _viewToggle(),
+            const SizedBox(width: 12),
+          ],
           Material(
             color: MoydMapTheme.unityBlue,
             borderRadius: BorderRadius.circular(10),
@@ -322,6 +345,327 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
         ],
       ),
     );
+  }
+
+  // ── List / Board toggle (desktop/tablet only) ──────────────────
+  Widget _viewToggle() {
+    Widget seg(_HubView view, IconData icon, String label) {
+      final selected = _view == view;
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _view = view),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            height: 34,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: selected ? MoydMapTheme.unityBlue : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon,
+                    size: 16, color: selected ? Colors.white : _secondary),
+                const SizedBox(width: 6),
+                Text(label,
+                    style: TextStyle(
+                        color: selected ? Colors.white : _secondary,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: _inset,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _divider),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          seg(_HubView.list, Icons.view_agenda_outlined, 'List'),
+          const SizedBox(width: 3),
+          seg(_HubView.board, Icons.view_column_outlined, 'Board'),
+        ],
+      ),
+    );
+  }
+
+  // ── Board (Kanban) ─────────────────────────────────────────────
+  //
+  // Four status columns over the SAME filtered set the list view uses
+  // (_visible). A card is a LongPressDraggable; each column a DragTarget.
+  // A legal drop into a different column optimistically moves the card, then
+  // persists via updateStatus; a failed write reverts. Filtered-out statuses
+  // simply yield an empty column.
+  Widget _board() {
+    final visible = _visible;
+    final keys = OutreachDisplay.statuses.keys.toList(); // planned→cancelled
+    final byStatus = <String, List<OutreachActivity>>{
+      for (final k in keys) k: <OutreachActivity>[],
+    };
+    for (final a in visible) {
+      (byStatus[a.status] ??= <OutreachActivity>[]).add(a);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < keys.length; i++) ...[
+            Expanded(child: _column(keys[i], byStatus[keys[i]]!)),
+            if (i < keys.length - 1) const SizedBox(width: 12),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _column(String key, List<OutreachActivity> items) {
+    final meta = OutreachDisplay.statuses[key]!;
+    return DragTarget<OutreachActivity>(
+      onWillAcceptWithDetails: (d) => d.data.status != key,
+      onAcceptWithDetails: (d) => _moveTo(d.data, key),
+      builder: (context, candidate, rejected) {
+        final hovering = candidate.isNotEmpty;
+        return Container(
+          decoration: BoxDecoration(
+            color: _surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: hovering ? meta.color : _divider,
+                width: hovering ? 1.6 : 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Thin top accent bar in the status color.
+              Container(
+                height: 4,
+                decoration: BoxDecoration(
+                  color: meta.color,
+                  borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(14)),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(meta.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: _text,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800)),
+                    ),
+                    const SizedBox(width: 8),
+                    _countBadge(items.length, meta.color),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: _divider),
+              Expanded(
+                child: items.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text('Nothing here',
+                              style: TextStyle(
+                                  color: _secondary,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(10),
+                        itemCount: items.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 8),
+                        itemBuilder: (_, i) => _boardCard(items[i]),
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _countBadge(int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text('$count',
+          style: const TextStyle(
+              color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w800)),
+    );
+  }
+
+  Widget _boardCard(OutreachActivity a) {
+    final card = _boardCardBody(a);
+    return LongPressDraggable<OutreachActivity>(
+      data: a,
+      dragAnchorStrategy: pointerDragAnchorStrategy,
+      feedback: Material(
+        color: Colors.transparent,
+        child: Opacity(
+          opacity: 0.95,
+          child: SizedBox(width: 240, child: _boardCardBody(a, dragging: true)),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.35, child: card),
+      child: card,
+    );
+  }
+
+  Widget _boardCardBody(OutreachActivity a, {bool dragging = false}) {
+    final geo = _geoLabels(a);
+    return Material(
+      color: dragging ? _surface : _inset,
+      borderRadius: BorderRadius.circular(12),
+      elevation: dragging ? 6 : 0,
+      shadowColor: Colors.black.withValues(alpha: 0.25),
+      child: InkWell(
+        onTap: dragging
+            ? null
+            : () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (_) => ActivityDetailScreen(activity: a)),
+                );
+                _load();
+              },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _divider),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(a.kindIcon, size: 16, color: MoydMapTheme.unityBlue),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(a.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: _text,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            height: 1.25)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                      a.scheduledOn == null
+                          ? 'No date'
+                          : _fmtDate(a.scheduledOn!),
+                      style: TextStyle(color: _secondary, fontSize: 11.5)),
+                  if (geo.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Flexible(child: _regionChip(geo.first)),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _regionChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: MoydMapTheme.unityBlue.withValues(alpha: _isDark ? 0.24 : 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+              color: _isDark ? Colors.white : MoydMapTheme.unityBlue,
+              fontSize: 11,
+              fontWeight: FontWeight.w700)),
+    );
+  }
+
+  // Enforced status transitions. Same-column drops are rejected upstream by the
+  // DragTarget (no-op). The rest reject with a snackbar rather than writing.
+  bool _canTransition(String from, String to) {
+    if (from == to) return false;
+    switch (from) {
+      case 'planned':
+        return to == 'in_progress' || to == 'completed' || to == 'cancelled';
+      case 'in_progress':
+        return to == 'completed' || to == 'cancelled';
+      case 'completed':
+        return to == 'in_progress'; // reopen only
+      case 'cancelled':
+        return to == 'planned' || to == 'in_progress'; // reopen only
+    }
+    return false;
+  }
+
+  Future<void> _moveTo(OutreachActivity a, String targetKey) async {
+    final label = OutreachDisplay.statuses[targetKey]?.label ?? targetKey;
+    if (!_canTransition(a.status, targetKey)) {
+      _snack('Cannot move "${a.title}" to $label');
+      return;
+    }
+    final index = _activities.indexWhere((e) => e.id == a.id);
+    if (index < 0) return;
+    final previous = _activities[index];
+
+    // Optimistic move: the card jumps columns and both count badges update.
+    setState(() => _activities[index] = previous.copyWith(status: targetKey));
+
+    try {
+      await _repo.updateStatus(a.id, targetKey);
+      if (!mounted) return;
+      _snack('Moved "${a.title}" to $label');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _activities[index] = previous);
+      _snack('Could not move "${a.title}". Please try again.');
+    }
+  }
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ));
   }
 
   // ── Body ───────────────────────────────────────────────────────

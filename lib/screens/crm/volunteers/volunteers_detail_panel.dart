@@ -885,6 +885,15 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                     color: p.secondary.withValues(alpha: 0.6), size: 18),
             ],
           ),
+          // Candidate-first entry point (§4.2): "Organize for {first name}".
+          // Only shown when the row resolves to a real candidate profile — an
+          // unmatched result row never fabricates an activity. Its onPressed
+          // lives on its own InkWell so the tap never bubbles up to the card's
+          // InkWell (which still one-taps to the candidate profile).
+          if (row.tappable) ...[
+            const SizedBox(height: 10),
+            _organizeButton(context, p, row),
+          ],
         ],
       ),
     );
@@ -901,6 +910,67 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
               ),
             )
           : card,
+    );
+  }
+
+  /// Compact "Organize for {first name}" action on a resolved nominee card.
+  /// Filled unityBlue (#0B4DB8) pill, white caps — clears 4.5:1 on both light
+  /// and dark surfaces because the fill is fixed rather than theme-derived. It
+  /// aligns left and ellipsizes so it never crowds the card or overflows the
+  /// narrow mobile [VolunteersPane.combined] width.
+  Widget _organizeButton(
+      BuildContext context, _Palette p, CandidateDisplayRow row) {
+    final candidate = row.candidate!;
+    final firstName =
+        candidate.firstName.isNotEmpty ? candidate.firstName : candidate.name;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Material(
+        color: MoydMapTheme.unityBlue,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: () => _openOrganize(context, row),
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.campaign_outlined,
+                    size: 15, color: Colors.white),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text('Organize for $firstName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Opens the create sheet pre-attached to this candidate and the current
+  /// region's single geo list. No members are pre-seeded — the create sheet's
+  /// Step 3 lets the exec add them; this is the candidate-first flow.
+  void _openOrganize(BuildContext context, CandidateDisplayRow row) {
+    final candidate = row.candidate!;
+    OutreachLogSheet.show(
+      context,
+      candidates: [candidate],
+      kind: 'canvass',
+      titleSuggestion: 'Canvass for ${candidate.name}',
+      counties: _d.mode == MapMode.county ? [_d.id] : const [],
+      congressionalDistricts:
+          _d.mode == MapMode.congressional ? [_d.id] : const [],
+      houseDistricts: _d.mode == MapMode.house ? [_d.id] : const [],
+      senateDistricts: _d.mode == MapMode.senate ? [_d.id] : const [],
     );
   }
 
