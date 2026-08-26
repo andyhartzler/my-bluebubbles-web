@@ -55,8 +55,6 @@ import {
   slackWorkspaceInvite, EMAIL_RE, DEFAULT_CHANNELS, WORKSPACE_TEAM_ID,
   groupTargets, addMemberToGroup,
   confirmSlackUserId, ensureSlackUserMapping, recordChannelInvite,
-  slackPostMessage, slackDmByEmail, chairsForVariant, buildInternalNotice,
-  NOTIFY_CHANNEL,
   type MemberRow, type Variant, type BuiltEmail,
 } from "../_shared/onboarding.ts";
 
@@ -370,18 +368,6 @@ Deno.serve(async (req) => {
         }
       } else {
         actions.push("LIVE: member not yet in Slack, channel adds + group adds deferred to followup");
-      }
-
-      // --- Tell the organisation. Nothing else does. ------------------------
-      const notice = buildInternalNotice({
-        name: m.name || realEmail, email: realEmail, variant,
-        committees: m.committee || [], channels: targets,
-      });
-      const posted = await slackPostMessage(NOTIFY_CHANNEL, notice, SLACK_BOT_TOKEN);
-      actions.push(`LIVE: chat.postMessage ${NOTIFY_CHANNEL}: ${posted.ok ? "ok" : posted.error}`);
-      for (const chair of chairsForVariant(variant)) {
-        const dm = await slackDmByEmail(chair, notice, SLACK_BOT_TOKEN);
-        actions.push(`LIVE: chair DM ${chair}: ${dm.ok ? "ok" : dm.error}`);
       }
     }
   } else {
