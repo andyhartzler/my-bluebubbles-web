@@ -1531,6 +1531,64 @@ class MemberRepository {
     return _mapMembers(_coerceList(data));
   }
 
+  /// Eligible members whose `house_district` is one of [districts]. Values are
+  /// coerced to bare digits ('CD-1' -> '1', '052' -> '52') to match how member
+  /// house/senate districts and the map GeoJSON both store them.
+  Future<List<Member>> getMembersInHouseDistricts(List<String> districts) =>
+      _membersInDistrictField('house_district', districts);
+
+  /// Eligible members whose `senate_district` is one of [districts].
+  Future<List<Member>> getMembersInSenateDistricts(List<String> districts) =>
+      _membersInDistrictField('senate_district', districts);
+
+  static String? _bareDigits(String raw) {
+    final d = raw.replaceAll(RegExp(r'\D'), '').replaceFirst(RegExp(r'^0+(?=\d)'), '');
+    return d.isEmpty ? null : d;
+  }
+
+  Future<List<Member>> _membersInDistrictField(
+      String column, List<String> districts) async {
+    if (!_isReady) return const [];
+    final clean = districts
+        .map((d) => _bareDigits(d))
+        .whereType<String>()
+        .toSet()
+        .toList();
+    if (clean.isEmpty) return const [];
+    final data = await _readClient
+        .from('members')
+        .select(_resolveColumnSelection(null))
+        .eq('membership_eligible', true)
+        .inFilter(column, clean)
+        .order('name');
+    return _mapMembers(_coerceList(data));
+  }
+
+  /// Count of eligible members per district/county, keyed to match the map
+  /// GeoJSON. [field] is one of 'county', 'congressional_district',
+  /// 'house_district', 'senate_district'. County keys are the normalized county
+  /// label; district keys are bare digits. Used to color the map by member
+  /// density.
+  Future<Map<String, int>> getMemberCountsByField(String field) async {
+    if (!_isReady) return const {};
+    final response = await _readClient
+        .from('members')
+        .select(field)
+        .eq('membership_eligible', true)
+        .not(field, 'is', null);
+    final counts = <String, int>{};
+    for (final row in _coerceList(response)) {
+      final raw = (row as Map)[field];
+      if (raw == null) continue;
+      final String? key = field == 'county'
+          ? Member.normalizeCountyLabel(raw)
+          : _bareDigits(raw.toString());
+      if (key == null || key.isEmpty) continue;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   /// Get member statistics
   Future<Map<String, dynamic>> getMemberStats() async {
     if (!_isReady) {
