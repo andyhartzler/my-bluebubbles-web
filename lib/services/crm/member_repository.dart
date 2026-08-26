@@ -39,6 +39,8 @@ class MemberRepository {
     'phone_e164',
     'county',
     'congressional_district',
+    'house_district',
+    'senate_district',
     'committee',
     'chapter_name',
     'chapter_position',
@@ -1503,6 +1505,28 @@ class MemberRepository {
         .from('members')
         .select('id, name')
         .eq('executive_committee', true)
+        .order('name');
+    return _mapMembers(_coerceList(data));
+  }
+
+  /// Every eligible member living in any of [counties], for the County Outreach
+  /// page. Full listing columns (name, phone, email, county, district, etc.) so
+  /// the page can show and select people and hand them to the text/email send
+  /// paths. Applies membership_eligible exactly like every other member query,
+  /// so the outreach set is the same population the rest of the CRM counts.
+  Future<List<Member>> getMembersInCounties(List<String> counties) async {
+    if (!_isReady) return const [];
+    final clean = counties
+        .map((c) => c.trim())
+        .where((c) => c.isNotEmpty)
+        .toList();
+    if (clean.isEmpty) return const [];
+    final data = await _readClient
+        .from('members')
+        .select(_resolveColumnSelection(null))
+        .eq('membership_eligible', true)
+        .inFilter('county', clean)
+        .order('county')
         .order('name');
     return _mapMembers(_coerceList(data));
   }

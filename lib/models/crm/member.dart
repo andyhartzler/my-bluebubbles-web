@@ -23,6 +23,8 @@ class Member {
   final String? state;
   final String? county;
   final String? congressionalDistrict;
+  final String? houseDistrict;
+  final String? senateDistrict;
   final String? race;
   final String? sexualOrientation;
   final String? desireToLead;
@@ -104,6 +106,8 @@ class Member {
     this.state,
     this.county,
     this.congressionalDistrict,
+    this.houseDistrict,
+    this.senateDistrict,
     this.race,
     this.sexualOrientation,
     this.desireToLead,
@@ -391,6 +395,8 @@ class Member {
       state: _normalizeText(json['state'] ?? json['address_state']),
       county: _normalizeText(json['county']),
       congressionalDistrict: normalizeDistrict(json['congressional_district']),
+      houseDistrict: _normalizeText(json['house_district']),
+      senateDistrict: _normalizeText(json['senate_district']),
       race: _normalizeText(json['race']),
       sexualOrientation: _normalizeText(json['sexual_orientation']),
       desireToLead: _normalizeText(json['desire_to_lead']),
@@ -487,6 +493,8 @@ class Member {
       'state': state,
       'county': county,
       'congressional_district': congressionalDistrict,
+      'house_district': houseDistrict,
+      'senate_district': senateDistrict,
       'race': race,
       'sexual_orientation': sexualOrientation,
       'desire_to_lead': desireToLead,
@@ -617,6 +625,8 @@ class Member {
     String? city,
     String? state,
     String? congressionalDistrict,
+    String? houseDistrict,
+    String? senateDistrict,
     String? race,
     String? sexualOrientation,
     String? desireToLead,
@@ -691,6 +701,8 @@ class Member {
       city: city ?? this.city,
       state: state ?? this.state,
       congressionalDistrict: congressionalDistrict ?? this.congressionalDistrict,
+      houseDistrict: houseDistrict ?? this.houseDistrict,
+      senateDistrict: senateDistrict ?? this.senateDistrict,
       race: race ?? this.race,
       sexualOrientation: sexualOrientation ?? this.sexualOrientation,
       desireToLead: desireToLead ?? this.desireToLead,

@@ -10,8 +10,9 @@ import 'package:bluebubbles/services/crm/user_home_preferences_service.dart';
 import 'widgets/activity_panel.dart';
 import 'widgets/assignments_panel.dart';
 import 'widgets/avatar_upload_dialog.dart';
+import 'package:bluebubbles/screens/crm/county_outreach_screen.dart';
+
 import 'widgets/branded_panel.dart';
-import 'widgets/counties_panel.dart';
 import 'widgets/home_customize_dialog.dart';
 import 'widgets/profile_header.dart';
 
@@ -162,20 +163,6 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // FIRST, above Assignments, and full width on every
-                    // breakpoint. Assignments has held zero rows since it was
-                    // built, so mounting the county tile beneath it would put
-                    // the one panel with real numbers several hundred pixels
-                    // down a phone scroll, behind an empty one. It renders
-                    // nothing at all for a non-executive, so it needs no
-                    // preference flag and no gate here.
-                    if (session.isExecutive) ...[
-                      CountiesPanel(
-                        memberId: member.id,
-                        isExecutive: true,
-                      ),
-                      const SizedBox(height: 16),
-                    ],
                     // Wide desktop: Assignments + Activity sit side-by-side
                     // in a 50/50 row above the full-width Calendar.
                     if (prefs.showAssignments &&
@@ -222,6 +209,13 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
                         const SizedBox(height: 16),
                       ],
                     ],
+                    // A single line under Assignments that opens County
+                    // Outreach (the Candidate Volunteers page). The rich
+                    // county view now lives on that page, not the home screen.
+                    if (session.isExecutive) ...[
+                      const _CountyOutreachLink(),
+                      const SizedBox(height: 16),
+                    ],
                     // Calendar — shared with the Committees first page,
                     // wrapped in a BrandedPanel so it matches the rest
                     // of the home surface visually.
@@ -239,6 +233,66 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One compact line under Assignments on the home screen. Opens County
+/// Outreach — the Candidate Volunteers page — where the real county work lives.
+class _CountyOutreachLink extends StatelessWidget {
+  const _CountyOutreachLink();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => Scaffold(
+              appBar: AppBar(title: const Text('Candidate Volunteers')),
+              body: const CountyOutreachScreen(),
+            ),
+          ),
+        ),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 56),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: BrandColors.tileGradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.campaign_outlined, color: Colors.white, size: 22),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('County Outreach',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700)),
+                    SizedBox(height: 2),
+                    Text('Text or email members by county',
+                        style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right,
+                  color: Colors.white.withOpacity(0.7), size: 20),
+            ],
+          ),
         ),
       ),
     );

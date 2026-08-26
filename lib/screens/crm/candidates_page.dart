@@ -5,6 +5,7 @@ import 'package:bluebubbles/features/forms/screens/endorsement_hub/endorsement_h
 import 'package:bluebubbles/features/forms/theme/moyd_brand.dart';
 import 'package:bluebubbles/screens/crm/candidates/candidates_mobile_page.dart';
 import 'package:bluebubbles/screens/crm/candidates/candidates_split_page.dart';
+import 'package:bluebubbles/screens/crm/county_outreach_screen.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATES INTELLIGENCE PAGE — ROUTER
@@ -19,7 +20,7 @@ import 'package:bluebubbles/screens/crm/candidates/candidates_split_page.dart';
 //  All field UI lives in lib/screens/crm/candidates/*.
 // ═══════════════════════════════════════════════════════════════
 
-enum CandidatesArea { field, endorsementHq }
+enum CandidatesArea { field, endorsementHq, volunteers }
 
 class CandidatesPage extends StatefulWidget {
   const CandidatesPage({super.key});
@@ -42,9 +43,11 @@ class _CandidatesPageState extends State<CandidatesPage> {
           onChanged: (a) => setState(() => _area = a),
         ),
         Expanded(
-          child: _area == CandidatesArea.endorsementHq
-              ? const EndorsementHubScreen()
-              : _fieldBody(),
+          child: switch (_area) {
+            CandidatesArea.endorsementHq => const EndorsementHubScreen(),
+            CandidatesArea.volunteers => const CountyOutreachScreen(),
+            CandidatesArea.field => _fieldBody(),
+          },
         ),
       ],
     );
@@ -105,6 +108,11 @@ class _AreaSwitcher extends StatelessWidget {
                     value: CandidatesArea.endorsementHq,
                     icon: Icon(Icons.workspace_premium),
                     label: Text('Endorsement HQ'),
+                  ),
+                  ButtonSegment(
+                    value: CandidatesArea.volunteers,
+                    icon: Icon(Icons.campaign_outlined),
+                    label: Text('Candidate Volunteers'),
                   ),
                 ],
                 selected: {area},
