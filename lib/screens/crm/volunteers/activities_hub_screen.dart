@@ -134,6 +134,11 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
   Color get _bg => _isDark ? const Color(0xFF151B2B) : const Color(0xFFF4F6FA);
   Color get _surface => _isDark ? const Color(0xFF1B2337) : Colors.white;
   Color get _inset => _isDark ? const Color(0xFF212B44) : const Color(0xFFEEF1F6);
+  // Blue text/icons on the dark neutral surfaces fall below 4.5:1; lift them to
+  // a lighter blue in dark mode. Solid blue FILLS (with white on them) stay
+  // unityBlue.
+  Color get _action =>
+      _isDark ? const Color(0xFF4D82E0) : MoydMapTheme.unityBlue;
   Color get _text => _isDark ? const Color(0xFFF4F6FA) : const Color(0xFF1E2637);
   Color get _secondary =>
       _isDark ? Colors.white.withValues(alpha: 0.72) : const Color(0xFF5A6478);
@@ -321,7 +326,7 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
               ),
               child: Text(label,
                   style: TextStyle(
-                      color: selected ? MoydMapTheme.unityBlue : _secondary,
+                      color: selected ? _action : _secondary,
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700)),
             ),
@@ -564,7 +569,7 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(a.kindIcon, size: 16, color: MoydMapTheme.unityBlue),
+                  Icon(a.kindIcon, size: 16, color: _action),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(a.title,
@@ -797,7 +802,7 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
         color: MoydMapTheme.unityBlue.withValues(alpha: _isDark ? 0.22 : 0.10),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Icon(icon, size: 20, color: MoydMapTheme.unityBlue),
+      child: Icon(icon, size: 20, color: _action),
     );
   }
 
@@ -859,8 +864,8 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
             TextButton(
               onPressed: action.$2,
               child: Text(action.$1,
-                  style: const TextStyle(
-                      color: MoydMapTheme.unityBlue,
+                  style: TextStyle(
+                      color: _action,
                       fontWeight: FontWeight.w800)),
             ),
           ],

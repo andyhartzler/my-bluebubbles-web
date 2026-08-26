@@ -250,6 +250,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   Color get _bg => _isDark ? const Color(0xFF151B2B) : const Color(0xFFF4F6FA);
   Color get _surface => _isDark ? const Color(0xFF1B2337) : Colors.white;
   Color get _inset => _isDark ? const Color(0xFF212B44) : const Color(0xFFEEF1F6);
+  // Blue text/icons on the dark neutral surfaces fall below 4.5:1; lift them to
+  // a lighter blue in dark mode. Solid blue FILLS (with white on them) stay
+  // unityBlue.
+  Color get _action =>
+      _isDark ? const Color(0xFF4D82E0) : MoydMapTheme.unityBlue;
   Color get _text => _isDark ? const Color(0xFFF4F6FA) : const Color(0xFF1E2637);
   Color get _secondary =>
       _isDark ? Colors.white.withValues(alpha: 0.72) : const Color(0xFF5A6478);
@@ -340,9 +345,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             const SizedBox(height: 14),
             TextButton(
               onPressed: _load,
-              child: const Text('Retry',
+              child: Text('Retry',
                   style: TextStyle(
-                      color: MoydMapTheme.unityBlue,
+                      color: _action,
                       fontWeight: FontWeight.w800)),
             ),
           ],
@@ -483,11 +488,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 17, color: MoydMapTheme.unityBlue),
+                Icon(icon, size: 17, color: _action),
                 const SizedBox(width: 8),
                 Text(label,
-                    style: const TextStyle(
-                        color: MoydMapTheme.unityBlue,
+                    style: TextStyle(
+                        color: _action,
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700)),
               ],
@@ -530,9 +535,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
                   onPressed: _busy ? null : _markAllAttended,
                   style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 8)),
-                  child: const Text('Mark all attended',
+                  child: Text('Mark all attended',
                       style: TextStyle(
-                          color: MoydMapTheme.unityBlue,
+                          color: _action,
                           fontWeight: FontWeight.w800,
                           fontSize: 12.5)),
                 ),
@@ -714,8 +719,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(label,
-            style: const TextStyle(
-                color: MoydMapTheme.unityBlue,
+            style: TextStyle(
+                color: _action,
                 fontSize: 11,
                 fontWeight: FontWeight.w800)),
       );
