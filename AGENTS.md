@@ -22366,3 +22366,209 @@ commit counts, the one-and-one authorship split, the branch count, the twenty un
 the 2026-06-27 bucket date, and the 607 rows cited from `abd9057`, all bare and naming nothing.
 Withheld per the practice READ SIXTH set: the state of the live endorsement vote, and any
 operational read on production sessions.
+
+## READ ONE HUNDRED AND FIFTY-EIGHTH: the 06:23 UTC run, a ninety-fifth consecutive block, and an Instagram finding this file recorded one notch too broadly
+
+ANDREW, THIS IS THE ONE THING THIS LOOP NEEDS AND CANNOT DO ITSELF
+The Sentry connector needs reauthorizing. It is present for this session but not authorized, so
+none of its tools load, and this session is non-interactive so the OAuth flow cannot be run from
+here. Reconnect it in your claude.ai connector settings and the loop resumes on the next tick.
+Placed at the top rather than only in email for the reason READ NINETY-FIFTH gives, and this run
+is more evidence for it: you pushed three commits into this repo between 23:56 and 00:49 UTC and
+the three reports in your inbox are still unread.
+
+Nothing has been monitored since 2026-08-12T15:08:27Z, which is 13 days 15 hours. That covers the
+public site, the CRM and the vote surface.
+
+AND THE BACKFILL ITEM READ ONE HUNDRED AND FORTY-THIRD RECORDED IS STILL OPEN, AND IT DECAYS
+`abd9057` left 607 rows carrying the naive timestamp, and none of the three commits this window
+touches them. The reason it decays is worth restating rather than assuming inherited: with the
+write fixed, a corrected client emits a byte-identical fingerprint to a broken one, so the old
+broken rows and the new correct ones become indistinguishable and an unbounded backfill would
+shift the new ones the wrong way. The ceilings and the rollback snapshot were captured before the
+deploy for exactly that reason. It is your own recorded next step rather than a fact this loop
+found, which is why it stays here rather than going out by email.
+
+The rest is the standing record. No triage was possible and no code changed here, so this makes
+NO claim about production health in either direction: an absent report is not an absent error, per
+READ TWENTY-SECOND.
+
+The blocker is unchanged at ninety-five consecutive runs, tested rather than inherited per READ
+TWELFTH. An exact-count grep for `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN` in the
+environment returns zero, so there is no token route around the connector either. A targeted
+`+sentry` tool search returns nothing, which is the check READ ONE HUNDRED AND THIRTY-EIGHTH adds
+to distinguish an absent connector from one whose tools sorted below a keyword search's cut.
+
+`eafa0eb` NARROWS A FINDING THIS FILE RECORDED TWO RUNS AGO, AND THE NARROWING IS THE POINT
+READ ONE HUNDRED AND FIFTY-SEVENTH recorded that Instagram's scraping endpoints are dead, probed
+live rather than assumed, leaving twenty Instagram-only members unfetchable. `eafa0eb` measures
+the same thing one notch more carefully and the conclusion changes: Instagram serves its public
+web API to RESIDENTIAL IPs and blocks datacenter ranges, so the identical request returns a full
+profile from a home connection and a block page from the edge function. The endpoints are not
+dead. They are closed to that CALLER.
+
+Those two readings point opposite ways, which is why the correction is worth more than the fact.
+Dead endpoint means stop trying and record the gap. Blocked caller means the work is possible from
+somewhere else, and he moved it there: a script on a residential connection, two members per thirty
+minutes to stay under the anonymous rate limit, MERGING into the photo column rather than replacing
+it. Take the general shape rather than the platform. When a request fails from your infrastructure,
+"the API is gone" and "the API refuses this network" are different findings, and only the second
+one has a workaround; distinguishing them costs one probe from a different network and is worth
+running before recording a capability as lost.
+
+Note also that this repo now carries a THIRD execution surface. READ FIRST's standing warning is
+that edge function source in this tree is not what production runs; this adds an out-of-tree script
+on a machine no run can reach, which the deployed function's own comments now point at. That is the
+right place for the pointer, and it is worth knowing before a future run reads that function's
+comments as describing something it could inspect.
+
+His other two are ordinary and are not mine to re-diagnose: `647b484` and `55686e8` rebuild the
+Candidate Volunteers map and add outreach tracking on top of it, both with migrations he applied
+himself and with analyzer results recorded in their own messages. Neither touches the endorsement
+voting surface.
+
+NOTHING WAS SENT, WHICH IS THE SUPPRESSION RULE RATHER THAN AN OMISSION
+All three reports were checked rather than assumed and ALL THREE are still UNREAD:
+`MOYD Sentry triage 2026-08-20`, sent 2026-08-20T22:22:28Z, at 5 days 8 hours 0 minutes;
+`MOYD Sentry triage 2026-08-19`, sent 2026-08-19T16:22:13Z, at 6 days 14 hours 0 minutes; and
+`MOYD Sentry triage 2026-08-18`, sent 2026-08-18T11:37:14Z, at 7 days 18 hours 45 minutes, each
+computed from a clock read this run against its own thread timestamp and FLOORED per READ TWELFTH.
+
+His three commits do NOT fire a send. READ NINETY-FIFTH retired "Andrew pushes anything" as a
+condition precisely because it had already fired at READ NINETY-FOURTH, been reported, and gone
+unread. The decision was re-weighed rather than copied, per READ SEVENTY-FIRST, and reached the
+same answer: all three are his own work, which he already has, so none is a fact the sent reports
+do not carry.
+
+THE FOURTEEN DAY TRIGGER IS NOW 8 HOURS 45 MINUTES OUT
+The trigger to act on is the one READ SEVENTY-NINTH registered, narrowed to two conditions by READ
+NINETY-FIFTH after the push condition fired and went unread: FOURTEEN DAYS blind, at
+2026-08-26T15:08:27Z, or sooner if the connector returns or the vote is recorded closed. Neither
+happened this run. On a two hour cadence roughly four more runs pass before it fires, in this
+afternoon's UTC window.
+
+READ ONE HUNDRED AND FIFTY-FIRST states what that trigger means and its reasoning is inherited
+unchanged: it is the point at which a fourth report against three unread ones stops being a
+duplicate alarm and starts being a materially different claim, since FOURTEEN DAYS blind is twice
+the span the 08-19 report described when it went out. A run past that instant should send, name
+the ANCHOR as blind-since per READ SEVENTY-SECOND, and re-register the next trigger rather than
+leaving it open, which is the practice READ SEVENTY-NINTH set. READ ONE HUNDRED AND FIFTY-FIFTH
+adds the half that is easy to get wrong: the fourteen-day instant appears BOTH in the crossing
+ledger and as the send trigger, and it is the registered TRIGGER that makes it fire rather than
+the round number, so a run applying the not-a-fresh-condition rule to the ledger entry would
+suppress the send this whole stretch has been waiting for.
+
+NO CROSSING LANDED THIS RUN, RECORDED EXPLICITLY PER READ ONE HUNDRED AND FORTY-FIRST
+Four are ahead and none is behind, all carried as INSTANTS rather than as sweep slots per READ ONE
+HUNDRED AND THIRTIETH: the 08-18 report crosses EIGHT DAYS at 2026-08-26T11:37:14Z, about 5 hours
+after this close; blind-since crosses FOURTEEN DAYS at 2026-08-26T15:08:27Z, which IS the trigger
+above rather than a separate item; the 08-19 report crosses SEVEN DAYS at 2026-08-26T16:22:13Z;
+and the 08-20 report crosses SIX DAYS at 2026-08-26T22:22:28Z, which is the thread READ ONE
+HUNDRED AND FORTY-SECOND names as landing a couple of minutes the wrong side of a 22:20 sweep slot
+forever. Per READ NINETIETH and READ EIGHTY-NINTH, a round number on an anchor or a report whose
+trigger has already fired once is not itself a fresh send condition, which covers the three that
+are not the trigger.
+
+ANDREW HAS PUSHED, WHICH NEEDED CHECKING RATHER THAN ASSUMING
+This repo's tip is `55686e8`, and it is NOT a sweep record: it and the two commits beneath it are
+his, authored between 2026-08-26T04:56:14Z and 05:49:08Z. Every commit between READ ONE HUNDRED
+AND FIFTY-SEVENTH's recorded tip and this one was enumerated rather than sampled, and the four are
+his three plus one sweep record, checked by reading their subjects rather than inferring from the
+hashes being new, per READ EIGHTY-THIRD.
+
+The authorship field could not have made that call. All three of his are
+`Andrew Hartzler <andrew@moyoungdemocrats.org>` and the sweep record is
+`Andy Hartzler <andrew@hartzler.us>`, so this window happens to split cleanly the other way. READ
+ONE HUNDRED AND FORTY-SECOND records a window splitting cleanly the same direction and READ ONE
+HUNDRED AND FORTY-FOURTH one splitting cleanly the OPPOSITE direction, with mixed windows either
+side. A window that happens to split cleanly is not a discriminator that works. Read the SUBJECT.
+
+The site tip is unchanged at `aa2d513` from 2026-08-12. The six `sentry-fix/` branch tips were
+enumerated rather than inherited and are unchanged from READ SIXTY-THIRD's inventory, so the three
+fixes it establishes are live gaps have now waited a further fourteen days.
+
+THE VOTE GREP, RUN WITH ABSOLUTE PATHS AND READ IN CONTEXT
+Nothing says the endorsement vote has closed. The CRM hits are the doc comments and the two
+dashboard card render paths in `auto_inferred_assignments_service.dart`, the doc comments in
+`voting_form.dart`, the results branch and the status banner in `vote_detail_screen.dart` and the
+status badge in `vote_results_chart.dart`, and the site hits are the rendered strings in
+`VoteStatusMessage.tsx` and the members dashboard voting page plus the per request status
+COMPUTATIONS in the members vote API routes. Every one describes what is shown WHEN a vote closes,
+or derives a status from a row's own dates, rather than stating that this one has. So the vote is
+treated as OPEN and nothing was merged.
+
+The derived-status hits are worth the same line READ ONE HUNDRED AND FIFTIETH gives them: the
+status is computed per request from the vote's own end date, so it is a rendering of data rather
+than a note in the repo, and the standing rule needs a commit or a note. Both greps used absolute
+paths, per READ ONE HUNDRED AND THIRTY-SEVENTH, which records the cwd trap producing a FALSE CLEAN
+result when a relative `src/` ran in the CRM tree and matched nothing. The pattern is a
+vote-closure one rather than any `clos` substring, and it differs from the one READ ONE HUNDRED AND
+FIFTY-SEVENTH used, so its hit count is not comparable against that section's: a count from this
+check is only comparable against the same pattern, per READ ONE HUNDRED AND FORTY-SIXTH.
+
+THE BRANCH REF TRAP, CRM ONLY
+Local `master` stale at `9f108c2` against a real tip of `55686e8`, with `HEAD` detached AT that
+tip. Checked in the form READ TWENTY-SECOND prescribes, local side the NAMED BRANCH and not `HEAD`,
+and repaired with `git -C <path> checkout -B master HEAD` BEFORE committing, per READ
+SIXTY-FOURTH's addendum rather than READ NINTH's conditional repair. `HEAD` being AT the true tip
+is what makes that one-liner sufficient; READ ONE HUNDRED AND TWENTY-SIXTH records the other shape,
+where `HEAD` was itself behind and the one-liner moved `master` onto the stale commit and needed
+READ SECOND's `fetch` plus reset after it. Check WHERE `HEAD` is BEFORE choosing which repair to
+run; if you did not, read the reflog rather than guessing which one applied, per READ ONE HUNDRED
+AND FIFTY-FIRST.
+
+Every git command this run carried `git -C <path>`, per READ NINTH, which READ ONE HUNDRED AND
+FORTY-SEVENTH records as the fix for a bare repair that landed in the right repo only by luck. The
+SITE side did NOT bite: its `main` is AT the true remote tip, which follows from that remote not
+having moved since 2026-08-12 rather than from anything changing, so it is a DEPARTURE and not a
+mechanism; keep running the check per READ SECOND. The cosmetic ahead count READ TWENTY-SIXTH names
+did NOT appear either: after the repair `git status -sb` reported a plain
+`## master...origin/master`, because this run had already fetched. The container also arrived with
+the wrong commit identity again, per READ SIXTIETH: set the one this project requires and do NOT
+rebase already-pushed commits to match, since that needs a force push and READ SECOND's
+prohibition is not negotiable for a cosmetic badge.
+
+VERIFICATION AND DISCLOSURE
+No code changed, so `npx tsc --noEmit` and `flutter analyze` have nothing to read: the only file
+touched is this one. Stated rather than skipped silently, per READ FORTY-EIGHTH. No adversarial
+audit was run, recorded as a departure rather than glossed, on the call READ SIXTY-FOURTH through
+READ ONE HUNDRED AND FIFTY-SEVENTH each made for the identical case: this diff carries no diagnosis
+of a Sentry issue, no mechanism of its own and no code. Its factual claims are the four durations
+and the four crossing instants, which are arithmetic over timestamps printed above, and a
+characterization of three commits taken from their own messages in this public repo's log, both
+checkable without an auditor.
+
+This repo is public and the sibling is private. Named above: the commits `9f108c2`, `55686e8`,
+`647b484`, `eafa0eb`, `abd9057` and `aa2d513`, the last being the private sibling's tip whose cover
+is prior publication in READ SIXTIETH; the branch prefix `sentry-fix/`; the column
+`profile_pictures`, published here by READ ONE HUNDRED AND FIFTY-SEVENTH; the files
+`auto_inferred_assignments_service.dart`, `voting_form.dart`, `vote_detail_screen.dart` and
+`vote_results_chart.dart`, all committed here, the last a first publication in this file and
+needing none, naming a results widget this public tree already commits; and `VoteStatusMessage.tsx`
+with the members dashboard voting page and the members vote API routes named by role rather than by
+path, all in the private sibling and all published in READ SEVENTY-FIRST and READ ONE HUNDRED AND
+FIFTIETH; the identifier `votingStatus`, published here by READ ONE HUNDRED AND FIFTIETH; the git
+commands and ref names, including `origin/master`, `git reflog` and the status output
+`## master...origin/master`, generic git plumbing naming nothing of ours; the verification commands
+`npx tsc --noEmit` and `flutter analyze`; the product names Sentry and Instagram; and the env var
+name patterns `SENTRY`, `SUPABASE`, `PROJECT_REF`, `POSTGRES` and `DSN`. Apply READ SEVENTEENTH's
+test rather than the lazy version: "already committed" would be an argument for WITHHOLDING had any
+of these come from the private sibling, and none did. Everything else already appears in this file
+or is committed in this public repo's own tree.
+
+Deliberately WITHHELD from the account of his three commits, though all of it is already public in
+this repo's own commit log, because the finding survives without it and READ SIXTH's practice is to
+publish only what the finding needs: the edge function name, the out-of-tree script's path and its
+scheduler job label, the map tile provider and geojson asset names, the new outreach and crosswalk
+table and column names, the migration filenames, and the per region coverage figures. The three
+reports are named by subject line only, which is this loop's own published convention, and no
+transport, credential or container tooling is described, which READ EIGHTEENTH records as a BLOCKER
+class. No log content is quoted, because none was readable; the vote-grep hits read in context are
+this project's own committed source and comment text, and none names a person, a vote or a ballot.
+Quantities are the clock values, the three report ages with their eight-day, seven-day and six-day
+crossing instants, the blind-since duration with its fourteen-day crossing instant, the next
+trigger instant with its remaining interval and its run estimate, the ninety-five run count, the
+three and four enumerated commit counts, the three-and-one authorship split, the branch count, the
+twenty Instagram-only members and the two-per-thirty-minutes rate cited from `eafa0eb`, and the 607
+rows cited from `abd9057`, all bare and naming nothing. Withheld per the practice READ SIXTH set:
+the state of the live endorsement vote, and any operational read on production sessions.
