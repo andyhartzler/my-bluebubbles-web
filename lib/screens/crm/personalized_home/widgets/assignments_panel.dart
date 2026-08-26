@@ -8,6 +8,7 @@ import 'package:bluebubbles/features/forms/screens/jobs/job_detail_screen.dart';
 import 'package:bluebubbles/models/crm/assignment.dart';
 import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/county_outreach_screen.dart';
 import 'package:bluebubbles/screens/crm/event_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/member_portal/member_portal_management_screen.dart';
@@ -35,11 +36,18 @@ class AssignmentsPanel extends StatefulWidget {
   final String memberId;
   final bool isStaff;
 
+  /// Exec-only. When true, a standing "County Outreach" row is included in
+  /// the unified list just like any other assignment, opening the Candidate
+  /// Volunteers page. It carries no deadline, so it sorts to the bottom and
+  /// always appears in All and Candidates.
+  final bool showCountyOutreach;
+
   const AssignmentsPanel({
     super.key,
     required this.authUserId,
     required this.memberId,
     required this.isStaff,
+    this.showCountyOutreach = false,
   });
 
   @override
@@ -160,6 +168,9 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
     for (final a in _auto) {
       out.add(_Item.fromAuto(a, this));
     }
+    if (widget.showCountyOutreach) {
+      out.add(_Item.countyOutreach(this));
+    }
     // Use a set on Assignment.id to avoid duplicates if a single row
     // appears in both _toMe and _byMe streams (assigner-of-self case).
     final seen = <String>{};
@@ -273,6 +284,15 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
       return;
     }
     await _navigateToEntity(kind: kind, id: id, committeeId: a.committeeId);
+  }
+
+  void _openCountyOutreach() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        appBar: AppBar(title: const Text('Candidate Volunteers')),
+        body: const CountyOutreachScreen(),
+      ),
+    ));
   }
 
   Future<void> _openExplicit(Assignment a, {required bool allowEdit}) async {
@@ -491,6 +511,20 @@ class _Item {
       // (the endorsement ballot) set 'urgent' inside 48 hours of close so
       // the chip reads with the same visual language as explicit items.
       priority: a.priority,
+    );
+  }
+
+  /// A standing exec item, not backed by any row: opens County Outreach
+  /// (the Candidate Volunteers page). Categorized as candidate work so it
+  /// shows in both All and Candidates. No `at`, so it sorts to the bottom.
+  factory _Item.countyOutreach(_AssignmentsPanelState state) {
+    return _Item(
+      id: 'county-outreach',
+      category: _HomeCategory.candidates,
+      title: 'County Outreach',
+      subtitle: 'Text or email members by county',
+      icon: Icons.campaign_outlined,
+      onTap: state._openCountyOutreach,
     );
   }
 
