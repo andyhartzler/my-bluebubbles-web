@@ -101,9 +101,10 @@ export const COMMITTEE_CHANNELS: { test: RegExp; channel: string; label: string 
   { test: /membership|outreach/i, channel: "C093RMQKXRA", label: "Membership & Outreach Committee" },
 ];
 
-// CC recipients. Hardcoded personal Gmails in the legacy zaps; config here.
-export const COLLEGE_CC = ["jaelynwoodley@gmail.com"]; // Elena Wierich removed from exec 2026-07-14
-export const HS_CC = ["korra.ravenclaw@gmail.com", "irvindwayne04@gmail.com"];
+// CC recipients. Per Andrew 2026-08-25: HS welcomes CC Gannon Seyer (exec,
+// chair of High School Democrats) only; college welcomes CC nobody right now.
+export const COLLEGE_CC: string[] = [];
+export const HS_CC = ["seyergannon@gmail.com"]; // Gannon Seyer
 
 export type Variant = "general" | "college" | "high_school";
 
