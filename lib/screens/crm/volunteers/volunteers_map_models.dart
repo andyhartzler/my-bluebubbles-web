@@ -403,16 +403,28 @@ MapOptions moMapOptions({
   required LatLng center,
   required double zoom,
   required Color backgroundColor,
+  void Function(TapPosition, LatLng)? onTap,
   InteractionOptions interaction =
       const InteractionOptions(flags: InteractiveFlag.all),
 }) =>
     MapOptions(
       initialCenter: center,
       initialZoom: zoom,
-      minZoom: 6.0,
+      // Fit Missouri to the viewport on open so the state FILLS the frame
+      // instead of floating tiny in a void. containCenter keeps it framed
+      // (center can't leave MO) without the constraint fighting the fit the
+      // way `contain` does on a wide screen.
+      initialCameraFit: CameraFit.bounds(
+        bounds: moBounds,
+        padding: const EdgeInsets.all(16),
+      ),
+      minZoom: 5.5,
       maxZoom: 12.0,
-      cameraConstraint: CameraConstraint.contain(bounds: moBounds),
+      cameraConstraint: CameraConstraint.containCenter(bounds: moBounds),
       interactionOptions: interaction,
+      // Native flutter_map tap: hands us the tapped LatLng directly, so region
+      // selection never depends on a fragile GestureDetector/pointToLatLng path.
+      onTap: onTap,
       backgroundColor: backgroundColor,
     );
 

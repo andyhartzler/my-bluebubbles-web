@@ -594,7 +594,13 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 
   void _recenter() {
     _clearSelection();
-    _flyTo(_moCenter, _initialZoom);
+    // Snap Missouri back to filling the frame, the same fit the map opens with.
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: moBounds,
+        padding: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   // ── Hit testing ────────────────────────────────────────────────
@@ -612,13 +618,29 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     return null;
   }
 
-  void _onTapUp(TapUpDetails d) {
-    final r = _regionAt(d.localPosition);
+  /// Region selection driven by flutter_map's native [MapOptions.onTap], which
+  /// hands us the exact tapped [LatLng]. This replaces the old GestureDetector +
+  /// pointToLatLng path, which competed with the map's own gesture arena and
+  /// left clicks dead.
+  void _onMapTapLatLng(LatLng ll) {
+    final r = _regionAtLatLng(ll);
     if (r == null) {
       _clearSelection();
       return;
     }
     _selectRegion(_mode, r.id);
+  }
+
+  /// Hit-test a tapped [LatLng] straight against the active regions, skipping
+  /// pixel coordinates entirely. Rejects taps that land inside a hole ring.
+  RegionData? _regionAtLatLng(LatLng ll) {
+    for (final r in _activeRegions) {
+      if (!pointInPolygon(ll, r.outerRing)) continue;
+      final holes = r.holes;
+      if (holes != null && holes.any((h) => pointInPolygon(ll, h))) continue;
+      return r;
+    }
+    return null;
   }
 
   void _onHover(PointerHoverEvent e) {
@@ -1047,10 +1069,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
               onExit: (_) {
                 if (_hoveredId != null) setState(() => _hoveredId = null);
               },
-              child: GestureDetector(
-                onTapUp: _onTapUp,
-                child: _buildFlutterMap(reduceMotion, dark),
-              ),
+              child: _buildFlutterMap(reduceMotion, dark),
             ),
           ),
 
@@ -1179,14 +1198,12 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
         center: _moCenter,
         zoom: _initialZoom,
         backgroundColor: maskColor,
+        onTap: (_, latLng) => _onMapTapLatLng(latLng),
       ),
       children: [
-        TileLayer(
-          urlTemplate: MoydMapTheme.tileTemplate(dark),
-          subdomains: const ['a', 'b', 'c', 'd'],
-          userAgentPackageName: 'org.moyoungdemocrats.crm',
-          maxZoom: 18,
-        ),
+        // No tile basemap: Missouri renders as a branded infographic on the
+        // solid brand canvas (backgroundColor), so no out-of-state tiles can
+        // ever bleed through around the state.
         PolygonLayer(polygons: polygons, polygonCulling: true),
         MarkerLayer(markers: _youngDemMarkers(reduceMotion)),
         // Activity presence: gold dots on regions with a planned/in_progress
