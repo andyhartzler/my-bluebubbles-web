@@ -1453,16 +1453,24 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      if (canText)
-                        Icon(Icons.sms_outlined,
+                      // Always show both glyphs so contactability reads at a
+                      // glance: solid when reachable, dimmed with a reason
+                      // tooltip when not.
+                      Tooltip(
+                        message: canText ? 'Textable' : 'No phone / opted out',
+                        child: Icon(Icons.sms_outlined,
                             size: 16,
-                            color: p.secondary.withValues(alpha: 0.85)),
-                      if (canEmail) ...[
-                        const SizedBox(width: 6),
-                        Icon(Icons.email_outlined,
+                            color: p.secondary
+                                .withValues(alpha: canText ? 0.85 : 0.38)),
+                      ),
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: canEmail ? 'Emailable' : 'No email on file',
+                        child: Icon(Icons.email_outlined,
                             size: 16,
-                            color: p.secondary.withValues(alpha: 0.85)),
-                      ],
+                            color: p.secondary
+                                .withValues(alpha: canEmail ? 0.85 : 0.38)),
+                      ),
                     ],
                   ),
                 ),

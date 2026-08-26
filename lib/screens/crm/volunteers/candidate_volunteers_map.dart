@@ -659,6 +659,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     ));
     if (!mounted) return;
     _offerLogIt(valid, kind: 'text_bank', channel: 'sms');
+    _refreshMembersAfterContact();
   }
 
   Future<void> _emailMembers(List<Member> people) async {
@@ -673,6 +674,16 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     ));
     if (!mounted) return;
     _offerLogIt(valid, kind: 'email_blast', channel: 'email');
+    _refreshMembersAfterContact();
+  }
+
+  /// The bulk text/email screens stamp `last_contacted`. Reload the selected
+  /// region's members so the "never/not contacted" filters, recently-contacted
+  /// sort, and header counts reflect it instead of going stale until reselect.
+  void _refreshMembersAfterContact() {
+    final id = _selectedId;
+    if (id == null) return;
+    _loadMembers(_mode, id, _selectionSeq);
   }
 
   void _snack(String msg) {
