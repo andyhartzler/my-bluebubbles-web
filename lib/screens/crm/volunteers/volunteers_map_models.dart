@@ -93,7 +93,10 @@ extension MapModeInfo on MapMode {
   String regionTitle(String id) {
     switch (this) {
       case MapMode.county:
-        return '$id County';
+        // An id that already carries "City" (e.g. St. Louis City, an
+        // independent city keyed off geoid 29510) is a full region name on
+        // its own — never suffix it into "St. Louis City County".
+        return id.endsWith('City') ? id : '$id County';
       case MapMode.congressional:
         return 'Congressional District $id';
       case MapMode.house:
@@ -106,9 +109,6 @@ extension MapModeInfo on MapMode {
   bool get isDistrict => this != MapMode.county;
 }
 
-/// The two choropleth lenses.
-enum MapLens { members, candidates }
-
 /// Candidate status for a district's November race. `none` covers counties
 /// (no ballot) and districts with no 2026 race at all.
 enum RegionStatus { youngDem, demContested, demUnopposed, noDem, notOnBallot }
@@ -120,32 +120,6 @@ class MapPalette {
   static const Color unityBlue = BrandColors.unityBlue; // #273351
   static const Color momentumBlue = BrandColors.momentumBlue; // #32A6DE
   static const Color sunriseGold = BrandColors.sunriseGold; // #FDB813
-
-  // Member-density sequential ramp (6 stops).
-  static const Color density0 = Color(0xFFEAEEF3);
-  static const Color density1 = Color(0xFFBFE0F4);
-  static const Color density2 = Color(0xFF7FC4EA);
-  static const Color density3 = Color(0xFF32A6DE);
-  static const Color density4 = Color(0xFF1F6FA8);
-  static const Color density5 = Color(0xFF273351);
-
-  static const List<Color> densityStops = [
-    density0,
-    density1,
-    density2,
-    density3,
-    density4,
-    density5,
-  ];
-
-  static const List<String> densityLabels = [
-    '0',
-    '1-2',
-    '3-5',
-    '6-10',
-    '11-25',
-    '26+',
-  ];
 
   // Candidate-status categorical (colourblind-aware, no green).
   static const Color statusYoungDem = sunriseGold;
@@ -161,13 +135,15 @@ class MapPalette {
   static const Color partyG = Color(0xFF2E7D32);
   static const Color partyOther = Color(0xFF546E7A);
 
-  // Deterministic avatar backgrounds (navy family).
+  // Deterministic avatar backgrounds (navy family). Every entry keeps white
+  // initials at >= 4.5:1 (the old #32A6DE / #4682B4 / #5A7FA3 fell short, so
+  // they are darkened to same-hue equivalents).
   static const List<Color> avatarColors = [
     Color(0xFF273351),
-    Color(0xFF32A6DE),
+    Color(0xFF16708F),
     Color(0xFF1F5FA0),
-    Color(0xFF4682B4),
-    Color(0xFF5A7FA3),
+    Color(0xFF38678F),
+    Color(0xFF46647F),
   ];
 
   static Color partyChipColor(String partyShort) {
@@ -185,41 +161,9 @@ class MapPalette {
     }
   }
 
-  /// Member-density fill for a raw member count. The empty bin sits at 55%
-  /// opacity; every populated bin renders at 72% over the Positron basemap.
-  static Color densityFill(int count) {
-    if (count <= 0) return density0.withValues(alpha: 0.55);
-    if (count <= 2) return density1.withValues(alpha: 0.72);
-    if (count <= 5) return density2.withValues(alpha: 0.72);
-    if (count <= 10) return density3.withValues(alpha: 0.72);
-    if (count <= 25) return density4.withValues(alpha: 0.72);
-    return density5.withValues(alpha: 0.72);
-  }
-
-  static int densityBin(int count) {
-    if (count <= 0) return 0;
-    if (count <= 2) return 1;
-    if (count <= 5) return 2;
-    if (count <= 10) return 3;
-    if (count <= 25) return 4;
-    return 5;
-  }
-
-  static Color statusFill(RegionStatus status) {
-    switch (status) {
-      case RegionStatus.youngDem:
-        return statusYoungDem.withValues(alpha: 0.72);
-      case RegionStatus.demContested:
-        return statusDemContested.withValues(alpha: 0.72);
-      case RegionStatus.demUnopposed:
-        return statusDemUnopposed.withValues(alpha: 0.72);
-      case RegionStatus.noDem:
-        return statusNoDem.withValues(alpha: 0.72);
-      case RegionStatus.notOnBallot:
-        return statusNa.withValues(alpha: 0.45);
-    }
-  }
-
+  /// NOTE: the detail panel intercepts [RegionStatus.youngDem] and paints it
+  /// with the theme highlight (scheme.tertiary) BEFORE consulting this, so the
+  /// gold constant below never renders in the volunteers area.
   static Color statusSwatch(RegionStatus status) {
     switch (status) {
       case RegionStatus.youngDem:
@@ -240,13 +184,13 @@ class MapPalette {
       case RegionStatus.youngDem:
         return 'Young Dem on ballot';
       case RegionStatus.demContested:
-        return 'Dem — contested';
+        return 'Dem on ballot, contested';
       case RegionStatus.demUnopposed:
-        return 'Dem — unopposed';
+        return 'Dem unopposed';
       case RegionStatus.noDem:
         return 'No Dem filed';
       case RegionStatus.notOnBallot:
-        return 'Not on ballot / NA';
+        return 'Not on the November ballot';
     }
   }
 
@@ -312,81 +256,6 @@ bool pointInPolygon(LatLng point, List<LatLng> polygon) {
     j = i;
   }
   return inside;
-}
-
-/// A single autocomplete entry in the "Jump to" search.
-class RegionSearchEntry {
-  const RegionSearchEntry({
-    required this.mode,
-    required this.id,
-    required this.label,
-  });
-
-  final MapMode mode;
-  final String id;
-  final String label;
-
-  String get group {
-    switch (mode) {
-      case MapMode.county:
-        return 'COUNTIES';
-      case MapMode.congressional:
-        return 'CONGRESSIONAL';
-      case MapMode.house:
-        return 'MO HOUSE';
-      case MapMode.senate:
-        return 'MO SENATE';
-    }
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  MOYD BRAND TOKENS for the map surface. Single source of truth so
-//  the two map widgets and the detail panel stay in lockstep. Every
-//  text/chip pairing built from these must clear 4.5:1 in BOTH themes.
-// ═══════════════════════════════════════════════════════════════
-class MoydMapTheme {
-  MoydMapTheme._();
-
-  static const Color navy = Color(0xFF273351);
-  static const Color unityBlue = Color(0xFF0B4DB8);
-
-  /// Gold is for strokes, rings and badge fills only — NEVER body text on a
-  /// light surface. For gold-flavored text on light surfaces use [goldText].
-  static const Color gold = Color(0xFFF0B429);
-  static const Color goldText = Color(0xFF8A6D1D);
-
-  /// Out-of-state mask fill, matched to the active theme's map surface.
-  static const Color maskLight = Color(0xFFEFF2F6);
-  static const Color maskDark = Color(0xFF1B2130);
-  static Color maskColor(bool dark) => dark ? maskDark : maskLight;
-
-  /// 5-step quantile member-density choropleth. Light: alpha 0x14→0xCC over a
-  /// unityBlue hue on the light basemap. Dark: alpha 0x22→0xE0 over dark tiles.
-  static const List<Color> choroplethRampLight = <Color>[
-    Color(0x140B4DB8),
-    Color(0x420B4DB8),
-    Color(0x700B4DB8),
-    Color(0x9E0B4DB8),
-    Color(0xCC0B4DB8),
-  ];
-  static const List<Color> choroplethRampDark = <Color>[
-    Color(0x220B4DB8),
-    Color(0x520B4DB8),
-    Color(0x810B4DB8),
-    Color(0xB10B4DB8),
-    Color(0xE00B4DB8),
-  ];
-
-  /// Choropleth fill for a 5-step quantile [bin] (0..4), clamped.
-  static Color choropleth(int bin, {required bool dark}) {
-    final ramp = dark ? choroplethRampDark : choroplethRampLight;
-    return ramp[bin.clamp(0, ramp.length - 1)];
-  }
-
-  /// CartoDB basemap URL template for the active theme (light_all / dark_all).
-  static String tileTemplate(bool dark) =>
-      'https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png';
 }
 
 /// Padded Missouri bounding box. Used both to constrain the camera

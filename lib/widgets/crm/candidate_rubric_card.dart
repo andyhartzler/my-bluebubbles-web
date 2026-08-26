@@ -95,7 +95,7 @@ const List<_RubricCategory> _categories = [
   _RubricCategory(
     'fundraising_velocity',
     'Fundraising Velocity',
-    'Donor breadth — number of contributions, banded.',
+    'Donor breadth: number of contributions, banded.',
     Icons.bolt_outlined,
   ),
   _RubricCategory(
@@ -125,6 +125,12 @@ class _CandidateRubricCardState extends State<CandidateRubricCard> {
   Map<String, Map<String, dynamic>> _byCategory = {};
   bool _loading = true;
   bool _isExec = false;
+
+  /// The 10 category rows + steppers collapse by default so the Profile tab
+  /// opens on the Edit CTA, member badge and Social Links without scrolling
+  /// past the rubric. Exec stepper state lives in [_byCategory] on this State,
+  /// so it survives collapse/expand regardless of the animation.
+  bool _expanded = false;
 
   @override
   void initState() {
@@ -251,10 +257,25 @@ class _CandidateRubricCardState extends State<CandidateRubricCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildTotalHeader(),
-        const SizedBox(height: 14),
-        _buildProgressBar(),
-        const SizedBox(height: 18),
-        ..._categories.map(_buildRow),
+        // Body (progress bar + 10 category rows) collapses to nothing.
+        // AnimatedCrossFade keeps both children mounted, so the exec steppers
+        // never lose state across a collapse/expand.
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity),
+          secondChild: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 14),
+              _buildProgressBar(),
+              const SizedBox(height: 18),
+              ..._categories.map(_buildRow),
+            ],
+          ),
+          crossFadeState:
+              _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 220),
+          sizeCurve: Curves.easeInOut,
+        ),
       ],
     );
   }
@@ -315,63 +336,80 @@ class _CandidateRubricCardState extends State<CandidateRubricCard> {
   Widget _buildTotalHeader() {
     final t = _total;
     final color = _totalColor;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(Icons.bar_chart, color: color, size: 20),
-        ),
-        const SizedBox(width: 12),
-        const Expanded(
-          child: Text(
-            'Candidate Rubric',
-            style: TextStyle(
-              color: _kNavy,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(999),
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => setState(() => _expanded = !_expanded),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
-            ],
-          ),
-          child: Text(
-            '$t',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              fontFeatures: [FontFeature.tabularFigures()],
-              height: 1.1,
+              child: Icon(Icons.bar_chart, color: color, size: 20),
             ),
-          ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Candidate Rubric',
+                style: TextStyle(
+                  color: _kNavy,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                '$t',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                  height: 1.1,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Text(
+              '/100',
+              style: TextStyle(
+                color: _kSlate600,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 4),
+            AnimatedRotation(
+              turns: _expanded ? 0.5 : 0.0,
+              duration: const Duration(milliseconds: 220),
+              child: const Icon(
+                Icons.expand_more,
+                color: _kSlate500,
+                size: 22,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 6),
-        const Text(
-          '/100',
-          style: TextStyle(
-            color: _kSlate600,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
+      ),
     );
   }
 

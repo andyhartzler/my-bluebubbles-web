@@ -4,12 +4,13 @@ import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/models/crm/outreach_activity.dart';
 import 'package:bluebubbles/services/crm/outreach_repository.dart';
 import 'package:bluebubbles/screens/crm/volunteers/volunteers_map_models.dart';
-import 'package:bluebubbles/screens/crm/volunteers/outreach_log_sheet.dart';
+import 'package:bluebubbles/screens/crm/volunteers/organizing_toolkit_sheet.dart';
 
-/// "Outreach" card for the candidate detail screen (Layer 2 of Candidate
+/// "Field organizing" card for the candidate detail screen (Layer 2 of Candidate
 /// Volunteers). Lists the field activities that supported this candidate and
-/// offers a "Log outreach" entry point that opens the shared [OutreachLogSheet]
-/// pre-seeded with the candidate and the district derived from their office.
+/// offers a "Plan activity" entry point that opens the shared
+/// [OrganizingToolkitSheet] pre-seeded with the candidate and the district
+/// derived from their office.
 class CandidateOutreachSection extends StatefulWidget {
   const CandidateOutreachSection({super.key, required this.candidate});
 
@@ -27,7 +28,7 @@ class _CandidateOutreachSectionState extends State<CandidateOutreachSection> {
   Object? _error;
   List<OutreachActivity> _activities = const <OutreachActivity>[];
 
-  /// How many recent rows to render before the "Log outreach" button.
+  /// How many recent rows to render before the "Plan activity" button.
   static const int _maxRows = 6;
 
   @override
@@ -88,7 +89,7 @@ class _CandidateOutreachSectionState extends State<CandidateOutreachSection> {
       }
     }
 
-    final saved = await OutreachLogSheet.show(
+    final saved = await OrganizingToolkitSheet.show(
       context,
       existing: existing,
       candidates: existing == null
@@ -98,7 +99,7 @@ class _CandidateOutreachSectionState extends State<CandidateOutreachSection> {
       senateDistricts: senate,
       houseDistricts: house,
       titleSuggestion:
-          existing == null ? 'Outreach for ${widget.candidate.name}' : null,
+          existing == null ? 'Organizing for ${widget.candidate.name}' : null,
     );
 
     if (saved == true) await _load();
@@ -152,7 +153,8 @@ class _CandidateOutreachSectionState extends State<CandidateOutreachSection> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: MoydMapTheme.navy.withValues(alpha: 0.10)),
+        side: BorderSide(
+            color: theme.colorScheme.outline.withValues(alpha: 0.2)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -172,7 +174,7 @@ class _CandidateOutreachSectionState extends State<CandidateOutreachSection> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
-                  'Could not load outreach. Pull to refresh or try again.',
+                  'Could not load activities. Pull to refresh or try again.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.error,
                   ),
@@ -182,7 +184,7 @@ class _CandidateOutreachSectionState extends State<CandidateOutreachSection> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
-                  'No outreach logged for this candidate yet.',
+                  'Nothing organized for this candidate yet.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -202,10 +204,10 @@ class _CandidateOutreachSectionState extends State<CandidateOutreachSection> {
               child: FilledButton.icon(
                 onPressed: () => _openSheet(),
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('Log outreach'),
+                label: const Text('Plan activity'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: MoydMapTheme.unityBlue,
-                  foregroundColor: Colors.white,
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
                 ),
               ),
             ),
@@ -216,9 +218,9 @@ class _CandidateOutreachSectionState extends State<CandidateOutreachSection> {
   }
 }
 
-/// Shared "Outreach" card header: a unityBlue badge, the title, and an optional
-/// count chip. Kept private to this file so the candidate and member sections
-/// stay independently owned.
+/// Shared "Field organizing" card header: a primary-filled badge, the title,
+/// and an optional count chip. Kept private to this file so the candidate and
+/// member sections stay independently owned.
 class _OutreachHeader extends StatelessWidget {
   const _OutreachHeader({this.count});
 
@@ -233,19 +235,19 @@ class _OutreachHeader extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: MoydMapTheme.unityBlue,
+            color: theme.colorScheme.primary,
             borderRadius: BorderRadius.circular(9),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.campaign_outlined,
-            color: Colors.white,
+            color: theme.colorScheme.onPrimary,
             size: 20,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            'Outreach',
+            'Field organizing',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
@@ -255,13 +257,13 @@ class _OutreachHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
             decoration: BoxDecoration(
-              color: MoydMapTheme.unityBlue.withValues(alpha: 0.12),
+              color: theme.colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
               '$count',
               style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurface,
+                color: theme.colorScheme.onPrimaryContainer,
                 fontWeight: FontWeight.w700,
               ),
             ),

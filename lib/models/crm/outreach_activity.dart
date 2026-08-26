@@ -26,11 +26,11 @@ class OutreachDisplay {
   };
 
   /// One entry per allowed `status`. Colors clear 4.5:1 as chip fills with
-  /// white text in both themes.
+  /// white text in both themes (no gold: in_progress is a deep amber).
   static const Map<String, ({String label, Color color})> statuses =
       <String, ({String label, Color color})>{
-    'planned': (label: 'Planned', color: Color(0xFF0B4DB8)), // unityBlue
-    'in_progress': (label: 'In progress', color: Color(0xFF8A6D1D)), // goldText
+    'planned': (label: 'Planned', color: Color(0xFF1565C0)),
+    'in_progress': (label: 'In progress', color: Color(0xFFB45309)),
     'completed': (label: 'Completed', color: Color(0xFF2E7D32)),
     'cancelled': (label: 'Cancelled', color: Color(0xFF6B7280)),
   };

@@ -22,6 +22,7 @@ import 'package:bluebubbles/screens/crm/intelligence_profile_section.dart';
 import 'package:bluebubbles/screens/crm/volunteers/candidate_outreach_section.dart';
 import 'package:bluebubbles/screens/crm/mec_committee_picker.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
+import 'package:bluebubbles/services/crm/election_results_repository.dart' as er;
 import 'package:bluebubbles/screens/crm/mec_donor_screen.dart';
 import 'package:bluebubbles/screens/crm/mec_payee_screen.dart';
 import 'package:bluebubbles/screens/crm/news_article_detail_screen.dart';
@@ -108,6 +109,12 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   bool _raceLoading = true;
   List<ElectionResult> _electionResults = [];
   List<Candidate> _districtCandidates = [];
+  // Official 2026 primary result rows for this exact race (all parties), used
+  // to render the November general field (advanced nominees, incl. R and L)
+  // ahead of a collapsed primary-results section. Empty → fall back to the
+  // flat filed-candidate list.
+  final er.ElectionResultsRepository _results2026 = er.ElectionResultsRepository();
+  List<er.ElectionResult> _raceResults = [];
   DistrictDemographics? _districtDemographics;
   Map<String, List<Candidate>> _adjacentDistricts = {};
   List<Map<String, dynamic>> _historicalCandidates = [];
@@ -385,6 +392,22 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         _districtCandidates = results[1] as List<Candidate>;
         _districtDemographics = results[2] as DistrictDemographics?;
         _adjacentDistricts = results[3] as Map<String, List<Candidate>>;
+
+        // Pull the official 2026 primary field for this race so the District
+        // tab can lead with the November ballot (advanced nominees of every
+        // party) and tuck the primary losers away. Only meaningful for the
+        // districted legislative seats the results table covers.
+        final officeType =
+            er.ElectionResultsRepository.officeTypeFor(c.office);
+        if (officeType != null) {
+          final bare = c.district!.replaceAll(RegExp(r'\D'), '');
+          _raceResults = await _results2026.forDistrict(
+            officeType: officeType,
+            district: bare.isEmpty ? c.district! : bare,
+          );
+        } else {
+          _raceResults = const [];
+        }
 
         // Load historical candidates for this (district, office) pair
         // (non-blocking). Office is required after migration 20260427_02 —
@@ -872,7 +895,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         ? ' (District ${c.district})'
         : '';
     final summary =
-        '${c.name} — ${c.officeDisplay}$district\nParty: ${c.party}'
+        '${c.name}, ${c.officeDisplay}$district\nParty: ${c.party}'
         '${c.isYoungDem ? "\n⭐ Young Democrat" : ""}'
         '${c.isEndorsed ? "\n✅ MOYD Endorsed" : ""}';
     _copyToClipboard(summary, 'Profile summary');
@@ -1756,6 +1779,111 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     return sections;
   }
 
+  /// First non-empty value across a set of candidate keys in [map]. Used to
+  /// read freshness metadata defensively — the FEC/MEC summary RPCs may or may
+  /// not surface these fields yet, so we render only what actually arrives.
+  String? _firstOf(Map<String, dynamic> map, List<String> keys) {
+    for (final k in keys) {
+      final v = map[k];
+      if (v != null && v.toString().trim().isNotEmpty) return v.toString();
+    }
+    return null;
+  }
+
+  /// A short "how current is this money data" strip. Shows the source
+  /// (FEC or MEC), the coverage-through date, the report period and the last
+  /// sync time — whichever the backend already provides. Turns amber when the
+  /// coverage date is older than 45 days. Returns null (renders nothing) until
+  /// at least one freshness field is populated, so there is no fabricated
+  /// "as of" claim before the backfill (B2/B3) lands.
+  Widget? _buildFinanceFreshnessBanner({required bool isFec}) {
+    final Map<String, dynamic> src = isFec ? _fecSummary : _financeSummary;
+    if (src.isEmpty) return null;
+
+    final coverage = _firstOf(src, const [
+      'coverage_end_date',
+      'coverage_through',
+      'coverage_end',
+      'report_through_date',
+      'latest_report_date',
+      'last_report_date',
+      'through_date',
+    ]);
+    final period = _firstOf(src, const [
+      'report_period',
+      'report_type',
+      'latest_report',
+      'report_year',
+    ]);
+    final synced = _firstOf(src, const [
+      'last_synced',
+      'synced_at',
+      'last_sync',
+      'refreshed_at',
+      'updated_at',
+    ]);
+
+    if (coverage == null && period == null && synced == null) return null;
+
+    // Stale if we can date the coverage and it is >45 days old.
+    var stale = false;
+    if (coverage != null) {
+      final d = DateTime.tryParse(coverage);
+      if (d != null) {
+        stale = DateTime.now().difference(d).inDays > 45;
+      }
+    }
+
+    final Color accent = stale ? BrandColors.warning : BrandColors.steelBlue;
+    final String sourceLabel = isFec
+        ? 'Federal Election Commission'
+        : 'Missouri Ethics Commission';
+
+    final bits = <String>[];
+    if (coverage != null) bits.add('Coverage through $coverage');
+    if (period != null) bits.add('Report: $period');
+    if (synced != null) bits.add('Synced $synced');
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: accent.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: accent.withOpacity(0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(stale ? Icons.warning_amber_rounded : Icons.verified_outlined,
+              color: accent, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  stale ? '$sourceLabel · may be out of date' : sourceLabel,
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700),
+                ),
+                if (bits.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    bits.join(' · '),
+                    style: TextStyle(
+                        color: Colors.white.withOpacity(0.75), fontSize: 11),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMoneyTab() {
     if (_financeLoading) {
       return _buildShimmerSkeleton(cardCount: 4);
@@ -1813,6 +1941,12 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
       children: [
         if (errorBanner != null) ...[
           errorBanner,
+          const SizedBox(height: 16),
+        ],
+
+        // ── Data freshness banner (source, coverage, last sync) ──
+        if (_buildFinanceFreshnessBanner(isFec: hasFecData) != null) ...[
+          _buildFinanceFreshnessBanner(isFec: hasFecData)!,
           const SizedBox(height: 16),
         ],
 
@@ -2192,9 +2326,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               ),
               const SizedBox(height: 12),
               Text(
-                'Connect ${c.name} to their Missouri Ethics Commission committee '
-                'to pull in contributions, expenditures, and donor history. Search by '
-                'committee name, candidate name, or MEC ID.',
+                'No MEC filings linked yet. The quarterly sync has not matched a '
+                'committee for ${c.name}. Connect their Missouri Ethics Commission '
+                'committee to pull in contributions, expenditures, and donor history. '
+                'Search by committee name, candidate name, or MEC ID.',
                 style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13, height: 1.4),
               ),
               const SizedBox(height: 16),
@@ -2215,7 +2350,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         const SizedBox(height: 12),
         Center(
           child: Text(
-            'No FEC federal record either — edit the candidate profile if this is a federal race.',
+            'No FEC federal record either. Edit the candidate profile if this is a federal race.',
             style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 11),
             textAlign: TextAlign.center,
           ),
@@ -2268,7 +2403,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         backgroundColor: BrandColors.unityBlue,
         title: const Text('Detach committee?', style: TextStyle(color: Colors.white)),
         content: Text(
-          'Remove MEC $mecId from ${_candidate.name}? This does NOT delete any MEC data — it just unlinks this committee from this candidate.',
+          'Remove MEC $mecId from ${_candidate.name}? This does NOT delete any MEC data. It just unlinks this committee from this candidate.',
           style: const TextStyle(color: Colors.white70),
         ),
         actions: [
@@ -3426,7 +3561,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
-                                'No MEC or FEC committee on file — not yet reporting',
+                                'No MEC or FEC committee on file, not yet reporting',
                                 style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11, fontStyle: FontStyle.italic),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -3482,7 +3617,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         message = 'District-level race data is not yet available for federal candidates.';
       } else if (level == 'statewide') {
         title = 'Statewide Race';
-        message = 'This is a statewide race — no district breakdown available.';
+        message = 'This is a statewide race, so there is no district breakdown available.';
       } else if (level == 'judicial') {
         title = 'Judicial Race';
         message = 'Circuit-level race data is not yet available.';
@@ -5118,7 +5253,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                c.notes?.isNotEmpty == true ? c.notes! : 'No notes yet — tap Edit to add internal notes.',
+                c.notes?.isNotEmpty == true ? c.notes! : 'No notes yet. Tap Edit to add internal notes.',
                 style: TextStyle(
                   color: c.notes?.isNotEmpty == true ? Colors.white70 : Colors.white30,
                   fontSize: 13,
@@ -5310,7 +5445,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Possible matches by name/email — link to confirm.',
+                      'Possible matches by name/email. Link to confirm.',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.85),
                         fontSize: 12,
@@ -5456,13 +5591,337 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   String _raceStatusLabel() {
     final hasDem = _districtCandidates.any((c) => c.isDemocrat);
     final hasRep = _districtCandidates.any((c) => c.isRepublican);
-    if (hasDem && hasRep) return 'Contested Race — Dem vs Rep';
-    if (hasDem) return 'Uncontested — Democrat Only';
-    if (hasRep) return 'Uncontested — Republican Only';
+    if (hasDem && hasRep) return 'Contested Race: Dem vs Rep';
+    if (hasDem) return 'Uncontested: Democrat Only';
+    if (hasRep) return 'Uncontested: Republican Only';
     return 'No Major Party Candidates';
   }
 
   Widget _buildRaceCandidates() {
+    // No official 2026 result rows for this race → keep the flat filed list.
+    if (_raceResults.isEmpty) {
+      return _buildRaceCandidatesFlat();
+    }
+
+    // November ballot = the advancing nominee of every party (D, R, L, ...),
+    // Democrats first, then by votes. Primary losers never appear here.
+    final advanced = _raceResults.where((r) => r.advanced).toList()
+      ..sort((a, b) {
+        final ad = a.isDemocrat ? 0 : 1;
+        final bd = b.isDemocrat ? 0 : 1;
+        if (ad != bd) return ad.compareTo(bd);
+        return b.votes.compareTo(a.votes);
+      });
+
+    // Did the profiled candidate win their primary? If not, their highlighted
+    // row belongs in the collapsed primary section, not the November card.
+    final currentAdvanced = advanced.any(_isCurrentResult);
+
+    return Column(
+      children: [
+        _buildNovemberBallotCard(advanced),
+        const SizedBox(height: 16),
+        _buildPrimaryResultsSection(showCurrentHint: !currentAdvanced),
+      ],
+    );
+  }
+
+  bool _isCurrentResult(er.ElectionResult r) =>
+      _normName(r.candidateName) == _normName(c.name);
+
+  String _normName(String raw) =>
+      raw.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+
+  Color _partyColorFor(String party) {
+    final p = party.toLowerCase();
+    if (p.contains('democr')) return BrandColors.democratBlue;
+    if (p.contains('republic')) return BrandColors.republicanRed;
+    if (p.contains('libert')) return Colors.amber;
+    return BrandColors.slateBlue;
+  }
+
+  /// Best-effort match of a result row to a full `Candidate` profile by
+  /// normalized name. Null → render initials + party chip, non-tappable
+  /// (never fabricate a profile for an unmatched nominee).
+  Candidate? _matchResultCandidate(er.ElectionResult r) {
+    final target = _normName(r.candidateName);
+    for (final dc in _districtCandidates) {
+      if (_normName(dc.name) == target) return dc;
+    }
+    return null;
+  }
+
+  Widget _buildNovemberBallotCard(List<er.ElectionResult> advanced) {
+    return _card(
+      'November Ballot (${advanced.length})',
+      Icons.how_to_vote,
+      BrandColors.momentumBlue,
+      child: Column(
+        children: [
+          const SizedBox(height: 4),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Nominees on the general-election ballot',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ),
+          ),
+          if (advanced.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No nominee has advanced to the November ballot yet.',
+                style: TextStyle(
+                    color: Colors.white.withOpacity(0.55), fontSize: 13),
+              ),
+            )
+          else
+            ...advanced.map(_buildBallotRow),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBallotRow(er.ElectionResult r) {
+    final isCurrent = _isCurrentResult(r);
+    final matched = _matchResultCandidate(r);
+    final partyColor = _partyColorFor(r.party);
+    final tappable = matched != null && !isCurrent;
+
+    final row = Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isCurrent
+              ? [
+                  BrandColors.sunriseGold.withOpacity(0.1),
+                  BrandColors.sunriseGold.withOpacity(0.03)
+                ]
+              : [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.02)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isCurrent
+              ? BrandColors.sunriseGold.withOpacity(0.3)
+              : partyColor.withOpacity(0.18),
+        ),
+      ),
+      child: Row(
+        children: [
+          Stack(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: partyColor.withOpacity(0.15),
+                backgroundImage: matched?.avatarUrl != null
+                    ? NetworkImage(matched!.avatarUrl!)
+                    : null,
+                child: matched?.avatarUrl == null
+                    ? Text(
+                        _initialsFor(r.candidateName),
+                        style: TextStyle(
+                            color: partyColor,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold),
+                      )
+                    : null,
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: partyColor,
+                    shape: BoxShape.circle,
+                    border:
+                        Border.all(color: const Color(0xFF0b1e37), width: 2),
+                  ),
+                  child: Center(
+                    child: Text(r.partyShort,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        r.candidateName,
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight:
+                                isCurrent ? FontWeight.bold : FontWeight.w500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isCurrent) ...[
+                      const SizedBox(width: 6),
+                      _badge('You', BrandColors.sunriseGold,
+                          textColor: Colors.black87),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${r.party} · ${_formatNumber(r.votes)} votes'
+                  '${r.pct != null ? ' · ${r.pct!.toStringAsFixed(1)}%' : ''}',
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.7), fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (tappable)
+            Icon(Icons.chevron_right,
+                color: Colors.white.withOpacity(0.2), size: 18),
+        ],
+      ),
+    );
+
+    if (!tappable) return row;
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => _openCandidate(matched),
+      child: row,
+    );
+  }
+
+  /// Collapsed-by-default section listing every result row for the race,
+  /// with votes, pct, a party chip and an "Advanced" tag on the winners.
+  /// Filed candidates who did not advance live only here.
+  Widget _buildPrimaryResultsSection({required bool showCurrentHint}) {
+    final rows = [..._raceResults]
+      ..sort((a, b) {
+        final ad = a.isDemocrat ? 0 : 1;
+        final bd = b.isDemocrat ? 0 : 1;
+        if (ad != bd) return ad.compareTo(bd);
+        return b.votes.compareTo(a.votes);
+      });
+
+    return _card(
+      'Primary Results (${rows.length})',
+      Icons.history_edu,
+      BrandColors.slateBlue,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: EdgeInsets.zero,
+          maintainState: true,
+          initiallyExpanded: false,
+          iconColor: Colors.white70,
+          collapsedIconColor: Colors.white70,
+          title: Text(
+            showCurrentHint
+                ? 'August primary field (you did not advance)'
+                : 'August primary field',
+            style: const TextStyle(
+                color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+          children: rows.map(_buildPrimaryResultRow).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrimaryResultRow(er.ElectionResult r) {
+    final isCurrent = _isCurrentResult(r);
+    final partyColor = _partyColorFor(r.party);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isCurrent
+            ? BrandColors.sunriseGold.withOpacity(0.08)
+            : Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isCurrent
+              ? BrandColors.sunriseGold.withOpacity(0.3)
+              : Colors.white12,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 26,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            decoration: BoxDecoration(
+              color: partyColor.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              r.partyShort,
+              style: TextStyle(
+                  color: partyColor, fontSize: 11, fontWeight: FontWeight.w800),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              r.candidateName,
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (isCurrent) ...[
+            const SizedBox(width: 6),
+            _badge('You', BrandColors.sunriseGold, textColor: Colors.black87),
+          ],
+          if (r.advanced) ...[
+            const SizedBox(width: 6),
+            _badge('Advanced', BrandColors.success),
+          ],
+          const SizedBox(width: 10),
+          Text(
+            '${_formatNumber(r.votes)}'
+            '${r.pct != null ? ' · ${r.pct!.toStringAsFixed(1)}%' : ''}',
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _initialsFor(String name) {
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
+        .toUpperCase();
+  }
+
+  Widget _buildRaceCandidatesFlat() {
     final opponents = _districtCandidates.where((cand) => cand.id != c.id).toList();
 
     return _card(
@@ -6283,7 +6742,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     // Aged-out members still live on the roster but are flagged — surface that
     // here so the candidate card doesn't mis-advertise them as "Active".
     final isAgedOut = c.estimatedAge != null && c.estimatedAge! > 36;
-    final title = isAgedOut ? 'MOYD Member — Aged Out' : 'Active MOYD Member';
+    final title = isAgedOut ? 'MOYD Member (Aged Out)' : 'Active MOYD Member';
     final subtitle = isAgedOut
         ? 'Registered Missouri Young Democrats member, no longer eligible. Tap to view full profile →'
         : 'Registered Missouri Young Democrats member. Tap to view full profile →';

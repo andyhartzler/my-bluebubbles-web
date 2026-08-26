@@ -3,12 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/outreach_activity.dart';
 import 'package:bluebubbles/services/crm/outreach_repository.dart';
-import 'package:bluebubbles/screens/crm/volunteers/volunteers_map_models.dart';
-import 'package:bluebubbles/screens/crm/volunteers/outreach_log_sheet.dart';
+import 'package:bluebubbles/screens/crm/volunteers/organizing_toolkit_sheet.dart';
 
-/// "Outreach" card for the member detail screen (Layer 2 of Candidate
+/// "Organizing" card for the member detail screen (Layer 2 of Candidate
 /// Volunteers). Lists the field activities this member took part in and offers
-/// a "Log outreach" entry point that opens the shared [OutreachLogSheet]
+/// a "Plan activity" entry point that opens the shared [OrganizingToolkitSheet]
 /// pre-seeded with this member as a participant and their county.
 class MemberOutreachSection extends StatefulWidget {
   const MemberOutreachSection({super.key, required this.member});
@@ -26,7 +25,7 @@ class _MemberOutreachSectionState extends State<MemberOutreachSection> {
   Object? _error;
   List<OutreachActivity> _activities = const <OutreachActivity>[];
 
-  /// How many recent rows to render before the "Log outreach" button.
+  /// How many recent rows to render before the "Plan activity" button.
   static const int _maxRows = 6;
 
   @override
@@ -68,14 +67,14 @@ class _MemberOutreachSectionState extends State<MemberOutreachSection> {
       if (county != null && county.trim().isNotEmpty) counties.add(county.trim());
     }
 
-    final saved = await OutreachLogSheet.show(
+    final saved = await OrganizingToolkitSheet.show(
       context,
       existing: existing,
       participants:
           existing == null ? <Member>[widget.member] : const <Member>[],
       counties: counties,
       titleSuggestion:
-          existing == null ? 'Outreach with ${widget.member.name}' : null,
+          existing == null ? 'Organizing with ${widget.member.name}' : null,
     );
 
     if (saved == true) await _load();
@@ -88,7 +87,8 @@ class _MemberOutreachSectionState extends State<MemberOutreachSection> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: MoydMapTheme.navy.withValues(alpha: 0.10)),
+        side: BorderSide(
+            color: theme.colorScheme.outline.withValues(alpha: 0.2)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -106,7 +106,7 @@ class _MemberOutreachSectionState extends State<MemberOutreachSection> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
-                  'Could not load outreach. Try again.',
+                  'Could not load activities. Try again.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.error,
                   ),
@@ -116,7 +116,7 @@ class _MemberOutreachSectionState extends State<MemberOutreachSection> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
-                  'No outreach logged with this member yet.',
+                  'Nothing organized with this member yet.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -136,10 +136,10 @@ class _MemberOutreachSectionState extends State<MemberOutreachSection> {
               child: FilledButton.icon(
                 onPressed: () => _openSheet(),
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('Log outreach'),
+                label: const Text('Plan activity'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: MoydMapTheme.unityBlue,
-                  foregroundColor: Colors.white,
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
                 ),
               ),
             ),
@@ -150,8 +150,9 @@ class _MemberOutreachSectionState extends State<MemberOutreachSection> {
   }
 }
 
-/// "Outreach" card header: a unityBlue badge, the title, and an optional count
-/// chip. Private to this file so the member section stays independently owned.
+/// "Organizing" card header: a primary-filled badge, the title, and an optional
+/// count chip. Private to this file so the member section stays independently
+/// owned.
 class _MemberOutreachHeader extends StatelessWidget {
   const _MemberOutreachHeader({this.count});
 
@@ -166,19 +167,19 @@ class _MemberOutreachHeader extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: MoydMapTheme.unityBlue,
+            color: theme.colorScheme.primary,
             borderRadius: BorderRadius.circular(9),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.campaign_outlined,
-            color: Colors.white,
+            color: theme.colorScheme.onPrimary,
             size: 20,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            'Outreach',
+            'Organizing',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
@@ -188,13 +189,13 @@ class _MemberOutreachHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
             decoration: BoxDecoration(
-              color: MoydMapTheme.unityBlue.withValues(alpha: 0.12),
+              color: theme.colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
               '$count',
               style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurface,
+                color: theme.colorScheme.onPrimaryContainer,
                 fontWeight: FontWeight.w700,
               ),
             ),

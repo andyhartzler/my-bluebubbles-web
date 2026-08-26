@@ -6,20 +6,24 @@ import 'package:bluebubbles/models/crm/outreach_activity.dart';
 import 'package:bluebubbles/services/crm/outreach_repository.dart';
 
 import 'volunteers_map_models.dart';
+import 'volunteers_theme.dart';
 
 // ═══════════════════════════════════════════════════════════════
-//  OUTREACH LOG SHEET (Layer 2 of Candidate Volunteers)
-//  A modal bottom sheet that plans or records a field-outreach activity:
-//  kind, title, schedule, status, channel, description, editable geography,
-//  a searchable candidate picker and a per-row participant roster. Saving a
-//  new activity calls OutreachRepository.createActivity; editing an existing
-//  one flips its status via updateStatus.
+//  ORGANIZING TOOLKIT SHEET (Layer 2 of Candidate Volunteers)
+//  A modal bottom sheet that plans or updates an organizing activity. The
+//  create flow reads as a toolkit: pick a play (grouped by intent), then plan
+//  it: name, schedule, status, channel, the plan, editable geography, a
+//  searchable nominee picker and a per-row participant roster. Saving a new
+//  activity calls OutreachRepository.createActivity; editing an existing one
+//  flips its status via updateStatus. The stored kind/status/channel keys are
+//  unchanged, so old rows round-trip untouched.
 //
-//  Public entry: OutreachLogSheet.show(...). Returns true if a save landed.
+//  Public entry: OrganizingToolkitSheet.show(...). Returns true if a save
+//  landed. Every color resolves from [VolunteersTheme] (the Slack palette).
 // ═══════════════════════════════════════════════════════════════
 
-class OutreachLogSheet {
-  const OutreachLogSheet._();
+class OrganizingToolkitSheet {
+  const OrganizingToolkitSheet._();
 
   /// Modal bottom sheet / dialog. Returns true if an activity was saved.
   static Future<bool?> show(
@@ -40,7 +44,7 @@ class OutreachLogSheet {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _OutreachLogSheetBody(
+      builder: (ctx) => _OrganizingToolkitSheetBody(
         existing: existing,
         counties: counties,
         congressionalDistricts: congressionalDistricts,
@@ -69,6 +73,36 @@ const Map<String, String> _kChannelLabels = <String, String>{
 
 const List<String> _kRoles = <String>['volunteer', 'captain', 'organizer'];
 
+/// The kind picker, grouped by organizing intent. Each entry is a stored `kind`
+/// key plus a one-line description. The eight keys here match OutreachDisplay
+/// exactly, so every stored activity has a home and old rows still edit.
+const List<({String title, List<({String key, String desc})> items})>
+    _kKindGroups = <({String title, List<({String key, String desc})> items})>[
+  (
+    title: 'RALLY THE VOTE',
+    items: <({String key, String desc})>[
+      (key: 'canvass', desc: 'Knock doors with members'),
+      (key: 'phone_bank', desc: 'Call voters together'),
+      (key: 'text_bank', desc: 'Text voters from anywhere'),
+      (key: 'day_of_action', desc: 'One big day, one district'),
+    ],
+  ),
+  (
+    title: 'BUILD COMMUNITY',
+    items: <({String key, String desc})>[
+      (key: 'volunteer_day', desc: 'Get members together to serve'),
+      (key: 'other', desc: 'Socials, watch parties, anything else'),
+    ],
+  ),
+  (
+    title: 'GET THE WORD OUT',
+    items: <({String key, String desc})>[
+      (key: 'email_blast', desc: 'Email members a call to action'),
+      (key: 'social_blitz', desc: 'Coordinated posts for a nominee'),
+    ],
+  ),
+];
+
 /// One editable participant line: a member plus their per-activity role.
 class _Participant {
   _Participant(this.member);
@@ -76,8 +110,8 @@ class _Participant {
   String role = 'volunteer';
 }
 
-class _OutreachLogSheetBody extends StatefulWidget {
-  const _OutreachLogSheetBody({
+class _OrganizingToolkitSheetBody extends StatefulWidget {
+  const _OrganizingToolkitSheetBody({
     required this.existing,
     required this.counties,
     required this.congressionalDistricts,
@@ -104,10 +138,12 @@ class _OutreachLogSheetBody extends StatefulWidget {
   final String? titleSuggestion;
 
   @override
-  State<_OutreachLogSheetBody> createState() => _OutreachLogSheetBodyState();
+  State<_OrganizingToolkitSheetBody> createState() =>
+      _OrganizingToolkitSheetBodyState();
 }
 
-class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
+class _OrganizingToolkitSheetBodyState
+    extends State<_OrganizingToolkitSheetBody> {
   final OutreachRepository _repo = OutreachRepository();
 
   late final TextEditingController _titleCtrl;
@@ -151,7 +187,7 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
     _sds = [...(ex?.senateDistricts ?? widget.senateDistricts)];
     _hds = [...(ex?.houseDistricts ?? widget.houseDistricts)];
 
-    // Seed every prefilled candidate as selected; the picker lets HQ narrow it.
+    // Seed every prefilled nominee as selected; the picker lets HQ narrow it.
     _selectedCandidateIds =
         widget.candidates.map((c) => c.id).where((id) => id.isNotEmpty).toSet();
     _participants =
@@ -166,14 +202,17 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
     super.dispose();
   }
 
-  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
-  Color get _surface => _isDark ? const Color(0xFF1B2337) : Colors.white;
-  Color get _inset => _isDark ? const Color(0xFF212B44) : const Color(0xFFF4F6FA);
-  Color get _text => _isDark ? const Color(0xFFF4F6FA) : const Color(0xFF1E2637);
-  Color get _secondary =>
-      _isDark ? Colors.white.withValues(alpha: 0.72) : const Color(0xFF5A6478);
-  Color get _divider =>
-      _isDark ? const Color(0xFF2E3A57) : const Color(0xFFE5E9F0);
+  // ── Palette (the ONE VolunteersTheme, resolved per build) ──────
+  VolunteersTheme get _vt => VolunteersTheme.of(context);
+  Color get _surface => _vt.surface;
+  Color get _inset => _vt.inset;
+  Color get _text => _vt.text;
+  Color get _secondary => _vt.secondary;
+  Color get _divider => _vt.divider;
+  Color get _accent => _vt.accent;
+  Color get _onAccent => _vt.onAccent;
+  Color get _accentSoft => _vt.accentSoft;
+  Color get _onAccentSoft => _vt.onAccentSoft;
 
   bool get _canSave => !_saving && _titleCtrl.text.trim().isNotEmpty;
 
@@ -219,7 +258,7 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
     } else {
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not save this outreach. Try again.')),
+        const SnackBar(content: Text('Could not save this activity. Try again.')),
       );
     }
   }
@@ -272,20 +311,23 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
 
   Widget _header() {
     return Container(
-      color: MoydMapTheme.navy,
       padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+      decoration: BoxDecoration(
+        color: _surface,
+        border: Border(bottom: BorderSide(color: _divider)),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Icon(Icons.campaign_outlined, color: Colors.white, size: 22),
+          Icon(Icons.campaign_outlined, color: _accent, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_isEdit ? 'Update outreach' : 'Log outreach',
-                    style: const TextStyle(
-                        color: Colors.white,
+                Text(_isEdit ? 'Update activity' : 'Plan an activity',
+                    style: TextStyle(
+                        color: _text,
                         fontSize: 18,
                         fontWeight: FontWeight.w800)),
                 const SizedBox(height: 5),
@@ -293,7 +335,7 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
                   width: 40,
                   height: 3,
                   decoration: BoxDecoration(
-                    color: MoydMapTheme.gold,
+                    color: _accent,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -308,10 +350,10 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
               height: 36,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.16),
+                color: _inset,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.close, color: Colors.white, size: 18),
+              child: Icon(Icons.close, color: _secondary, size: 18),
             ),
           ),
         ],
@@ -345,7 +387,7 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
         children: [
           Row(
             children: [
-              Icon(ex.kindIcon, size: 18, color: MoydMapTheme.unityBlue),
+              Icon(ex.kindIcon, size: 18, color: _accent),
               const SizedBox(width: 8),
               Text(ex.kindLabel,
                   style: TextStyle(
@@ -378,12 +420,17 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
 
   // ── CREATE MODE ────────────────────────────────────────────────
   List<Widget> _createFields() {
+    final ideas = _ideaTitles();
     return [
-      _label('KIND'),
-      const SizedBox(height: 10),
-      _kindChips(),
-      const SizedBox(height: 20),
-      _label('TITLE'),
+      _label('PICK A PLAY'),
+      const SizedBox(height: 12),
+      _kindGroups(),
+      const SizedBox(height: 22),
+      if (ideas.isNotEmpty) ...[
+        _ideaStrip(ideas),
+        const SizedBox(height: 18),
+      ],
+      _label('NAME THE ACTIVITY'),
       const SizedBox(height: 8),
       _textField(_titleCtrl, 'e.g. Saturday canvass in HD 42',
           onChanged: (_) => setState(() {})),
@@ -401,75 +448,184 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
       const SizedBox(height: 10),
       _statusChips(),
       const SizedBox(height: 20),
-      _label('NOTES'),
+      _label('THE PLAN'),
       const SizedBox(height: 8),
-      _textField(_descCtrl, 'What is the plan, who is running it…',
+      _textField(_descCtrl,
+          'What is the plan, who runs it, and what does success look like',
           maxLines: 3),
       const SizedBox(height: 22),
-      _label('GEOGRAPHY'),
+      _label('WHERE'),
       const SizedBox(height: 10),
       _geoEditor('Counties', _counties, 'Add county'),
       _geoEditor('Congressional', _cds, 'Add CD #'),
       _geoEditor('Senate', _sds, 'Add SD #'),
       _geoEditor('House', _hds, 'Add HD #'),
       const SizedBox(height: 12),
-      _label('CANDIDATES'),
+      _label('FOR WHICH NOMINEES'),
       const SizedBox(height: 10),
       _candidatePicker(),
       const SizedBox(height: 22),
-      _label('PARTICIPANTS (${_participants.length})'),
+      _label("WHO'S IN (${_participants.length})"),
       const SizedBox(height: 10),
       _participantRoster(),
     ];
   }
 
-  // ── Kind icon-chip row ─────────────────────────────────────────
-  Widget _kindChips() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+  // ── Kind groups ("pick a play") ────────────────────────────────
+  Widget _kindGroups() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final entry in OutreachDisplay.kinds.entries)
-          _kindChip(entry.key, entry.value.label, entry.value.icon),
+        for (var g = 0; g < _kKindGroups.length; g++) ...[
+          if (g > 0) const SizedBox(height: 16),
+          _groupTitle(_kKindGroups[g].title),
+          const SizedBox(height: 8),
+          for (final item in _kKindGroups[g].items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _kindCard(item.key, item.desc),
+            ),
+        ],
       ],
     );
   }
 
-  Widget _kindChip(String key, String label, IconData icon) {
+  Widget _groupTitle(String label) => Text(label,
+      style: TextStyle(
+          color: _secondary,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.9));
+
+  Widget _kindCard(String key, String desc) {
+    final meta = OutreachDisplay.kinds[key]!;
     final selected = _kind == key;
-    final fg = selected
-        ? (_isDark ? MoydMapTheme.gold : MoydMapTheme.goldText)
-        : _secondary;
+    final fg = selected ? _onAccentSoft : _text;
+    final sub = selected ? _onAccentSoft.withValues(alpha: 0.85) : _secondary;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => setState(() => _kind = key),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            color: selected ? _accentSoft : _inset,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: selected ? _accent : _divider),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? _onAccentSoft.withValues(alpha: 0.14)
+                      : _surface,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(meta.icon,
+                    size: 18, color: selected ? _onAccentSoft : _accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(meta.label,
+                        style: TextStyle(
+                            color: fg,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(desc,
+                        style:
+                            TextStyle(color: sub, fontSize: 12, height: 1.2)),
+                  ],
+                ),
+              ),
+              Icon(
+                selected ? Icons.check_circle : Icons.circle_outlined,
+                size: 20,
+                color: selected ? _onAccentSoft : _secondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Idea strip (client-side title templates) ───────────────────
+  //
+  // Shown only when the sheet is seeded from a region and/or nominee. Tapping
+  // a chip drops the template into the title field so HQ names it in one tap.
+  List<String> _ideaTitles() {
+    final region = _seedRegionLabel();
+    final nominee =
+        widget.candidates.isNotEmpty ? widget.candidates.first.name : null;
+    final out = <String>[];
+    if (region != null) out.add('Saturday canvass in $region');
+    if (nominee != null) out.add('Text bank for $nominee');
+    if (region != null) out.add('New member meet-up in $region');
+    return out.take(3).toList();
+  }
+
+  String? _seedRegionLabel() {
+    if (_counties.isNotEmpty) return '${_counties.first} County';
+    if (_cds.isNotEmpty) return 'CD ${_cds.first}';
+    if (_sds.isNotEmpty) return 'SD ${_sds.first}';
+    if (_hds.isNotEmpty) return 'HD ${_hds.first}';
+    return null;
+  }
+
+  Widget _ideaStrip(List<String> ideas) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.lightbulb_outline, size: 15, color: _secondary),
+            const SizedBox(width: 6),
+            Text('Tap to name it fast',
+                style: TextStyle(
+                    color: _secondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [for (final t in ideas) _ideaChip(t)],
+        ),
+      ],
+    );
+  }
+
+  Widget _ideaChip(String title) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() {
+          _titleCtrl.text = title;
+        }),
         borderRadius: BorderRadius.circular(999),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: selected
-                ? MoydMapTheme.gold.withValues(alpha: _isDark ? 0.20 : 0.16)
-                : _inset,
+            color: _accentSoft,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: selected
-                  ? MoydMapTheme.gold.withValues(alpha: 0.7)
-                  : _divider,
-            ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 15, color: fg),
-              const SizedBox(width: 6),
-              Text(label,
-                  style: TextStyle(
-                      color: selected ? fg : _text,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700)),
-            ],
-          ),
+          child: Text(title,
+              style: TextStyle(
+                  color: _onAccentSoft,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700)),
         ),
       ),
     );
@@ -661,8 +817,7 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(999),
-                      borderSide:
-                          const BorderSide(color: MoydMapTheme.unityBlue),
+                      borderSide: BorderSide(color: _accent),
                     ),
                   ),
                 ),
@@ -678,22 +833,21 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
     return Container(
       padding: const EdgeInsets.fromLTRB(11, 6, 6, 6),
       decoration: BoxDecoration(
-        color: MoydMapTheme.unityBlue.withValues(alpha: 0.12),
+        color: _accentSoft,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(label,
-              style: const TextStyle(
-                  color: MoydMapTheme.unityBlue,
+              style: TextStyle(
+                  color: _onAccentSoft,
                   fontSize: 11.5,
                   fontWeight: FontWeight.w800)),
           const SizedBox(width: 3),
           GestureDetector(
             onTap: onRemove,
-            child: const Icon(Icons.close,
-                size: 13, color: MoydMapTheme.unityBlue),
+            child: Icon(Icons.close, size: 13, color: _onAccentSoft),
           ),
         ],
       ),
@@ -703,20 +857,20 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
   Widget _readChip(String label) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: MoydMapTheme.unityBlue.withValues(alpha: 0.12),
+          color: _accentSoft,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(label,
-            style: const TextStyle(
-                color: MoydMapTheme.unityBlue,
+            style: TextStyle(
+                color: _onAccentSoft,
                 fontSize: 11,
                 fontWeight: FontWeight.w800)),
       );
 
-  // ── Candidate picker ───────────────────────────────────────────
+  // ── Nominee picker ─────────────────────────────────────────────
   Widget _candidatePicker() {
     if (widget.candidates.isEmpty) {
-      return _emptyNote('No candidates tied to this region.');
+      return _emptyNote('No nominees tied to this region yet.');
     }
     final q = _candSearchCtrl.text.trim().toLowerCase();
     final visible = q.isEmpty
@@ -730,14 +884,14 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _textField(_candSearchCtrl, 'Search candidates…',
+        _textField(_candSearchCtrl, 'Search nominees…',
             prefix: Icons.search, onChanged: (_) => setState(() {})),
         const SizedBox(height: 10),
         for (final c in visible) _candidateTile(c),
         if (visible.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text('No candidates match “$q”.',
+            child: Text('No nominees match “$q”.',
                 style: TextStyle(color: _secondary, fontSize: 12.5)),
           ),
       ],
@@ -763,11 +917,10 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
               color: selected
-                  ? MoydMapTheme.unityBlue.withValues(alpha: 0.08)
+                  ? _accent.withValues(alpha: 0.08)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: selected ? MoydMapTheme.unityBlue : _divider),
+              border: Border.all(color: selected ? _accent : _divider),
             ),
             child: Row(
               children: [
@@ -799,7 +952,7 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
                 Icon(
                   selected ? Icons.check_circle : Icons.circle_outlined,
                   size: 20,
-                  color: selected ? MoydMapTheme.unityBlue : _secondary,
+                  color: selected ? _accent : _secondary,
                 ),
               ],
             ),
@@ -812,7 +965,8 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
   // ── Participant roster ─────────────────────────────────────────
   Widget _participantRoster() {
     if (_participants.isEmpty) {
-      return _emptyNote('No participants selected on the map.');
+      return _emptyNote(
+          'Nobody is on the roster yet. Select members on the map to add them.');
     }
     return Column(
       children: [for (final p in _participants) _participantRow(p)],
@@ -886,7 +1040,7 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
       child: Opacity(
         opacity: _canSave ? 1 : 0.5,
         child: Material(
-          color: MoydMapTheme.unityBlue,
+          color: _accent,
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
             onTap: _canSave ? _save : null,
@@ -895,15 +1049,15 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
               height: 48,
               alignment: Alignment.center,
               child: _saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2.4, color: Colors.white),
+                          strokeWidth: 2.4, color: _onAccent),
                     )
-                  : Text(_isEdit ? 'Save status' : 'Log outreach',
-                      style: const TextStyle(
-                          color: Colors.white,
+                  : Text(_isEdit ? 'Save status' : 'Save plan',
+                      style: TextStyle(
+                          color: _onAccent,
                           fontSize: 15,
                           fontWeight: FontWeight.w800)),
             ),
@@ -954,7 +1108,7 @@ class _OutreachLogSheetBodyState extends State<_OutreachLogSheetBody> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: MoydMapTheme.unityBlue),
+          borderSide: BorderSide(color: _accent),
         ),
       ),
     );

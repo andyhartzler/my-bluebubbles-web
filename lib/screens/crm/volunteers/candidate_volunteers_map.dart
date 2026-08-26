@@ -20,9 +20,10 @@ import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
 
-import 'outreach_log_sheet.dart';
+import 'organizing_toolkit_sheet.dart';
 import 'volunteers_map_models.dart';
 import 'volunteers_detail_panel.dart';
+import 'volunteers_theme.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATE VOLUNTEERS — "The Field Map"
@@ -37,21 +38,17 @@ import 'volunteers_detail_panel.dart';
 const double _kDesktopBreakpoint = 1200;
 const double _kPanelWidth = 400; // 360–440 rail per spec
 
-/// Rectangle comfortably larger than [moBounds], used as the outer ring of the
-/// out-of-state donut mask. Order: NW, NE, SE, SW.
-final List<LatLng> _kOuterRect = <LatLng>[
-  const LatLng(45, -102),
-  const LatLng(45, -84),
-  const LatLng(30, -84),
-  const LatLng(30, -102),
-];
-
 class CandidateVolunteersMap extends StatefulWidget {
-  const CandidateVolunteersMap({super.key, this.height});
+  const CandidateVolunteersMap({super.key, this.height, this.onOpenActivities});
 
   /// Optional fixed height. When null (the default) the widget fills the
   /// available vertical space via an Expanded/SizedBox.expand parent.
   final double? height;
+
+  /// Fired by the statewide rail's "All activities" link and "This week"
+  /// footer. The workspace shell flips its IndexedStack to the Activities tab.
+  /// Null when mounted outside the shell — the link is then hidden.
+  final VoidCallback? onOpenActivities;
 
   @override
   State<CandidateVolunteersMap> createState() => _CandidateVolunteersMapState();
@@ -79,7 +76,6 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   final Map<MapMode, Map<String, int>> _memberCounts = {};
   final Map<MapMode, List<int>> _choroplethCuts = {}; // 4 quantile cut points
   final Map<MapMode, List<int>> _memberRange = {}; // [min, max]
-  List<List<LatLng>> _moOutlineRings = const [];
   Map<String, List<ElectionResult>> _electionByDistrict = const {};
   Map<String, GeNominee> _geLookup = const {};
   final Set<String> _youngDemNames = {};
@@ -162,7 +158,6 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
         _nominees.getLookup(),
         _candidates.fetchAllCandidates(),
         _members.countEligibleMembers(),
-        _parseOutline(),
       ]);
 
       _regions[MapMode.county] = results[0] as List<RegionData>;
@@ -177,11 +172,12 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       _geLookup = results[9] as Map<String, GeNominee>;
       final candidates = results[10] as List<Candidate>;
       _statewideMembers = results[11] as int;
-      _moOutlineRings = results[12] as List<List<LatLng>>;
 
       for (final c in candidates) {
         if (c.name.isEmpty) continue;
-        final ot = _candidateOfficeType(c.office);
+        // Shared classifier on the repository (also used by the candidate
+        // profile's District tab), so the two never drift.
+        final ot = ElectionResultsRepository.officeTypeFor(c.office);
         final d = c.district == null ? null : bareDigits(c.district!);
         if (ot != null && d != null && d.isNotEmpty) {
           (_candidatesByDistrict['$ot:$d'] ??= <Candidate>[]).add(c);
@@ -217,7 +213,8 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       if (mounted) setState(() => _loadingBase = false);
 
       // Activity presence rides on top of the finished base map, so the
-      // choropleth shows immediately and gold dots resolve a moment later.
+      // choropleth shows immediately and the activity dots resolve a moment
+      // later.
       await _loadActivityCoverage();
     } catch (e) {
       debugPrint('CandidateVolunteersMap bootstrap failed: $e');
@@ -233,10 +230,19 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     for (final feature in features) {
       final props = feature['properties'] as Map<String, dynamic>;
       final rawId = props[mode.idProperty]?.toString() ?? '';
-      final id = mode == MapMode.county
+      String id = mode == MapMode.county
           ? (Member.normalizeCountyLabel(rawId) ?? rawId.trim())
           : bareDigits(rawId);
       if (id.isEmpty) continue;
+      // St. Louis is TWO features sharing the county name "St. Louis": the
+      // county (geoid 29189) and the independent city (geoid 29510). Keying
+      // both on "St. Louis" collided them into one region with a doubled
+      // member count. Give the city its own id so the two rank and select
+      // independently. regionTitle keeps "St. Louis City" intact.
+      if (mode == MapMode.county &&
+          props['geoid']?.toString() == '29510') {
+        id = 'St. Louis City';
+      }
 
       final geometry = feature['geometry'] as Map<String, dynamic>;
       final geoType = geometry['type'] as String;
@@ -268,34 +274,6 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     return out;
   }
 
-  /// Parse the dissolved Missouri outline into the outer boundary ring(s) used
-  /// as the hole in the out-of-state mask. Same ring-parsing as [_parseGeoJson].
-  Future<List<List<LatLng>>> _parseOutline() async {
-    try {
-      final raw =
-          await rootBundle.loadString('assets/geojson/mo_state_outline.geojson');
-      final geo = json.decode(raw) as Map<String, dynamic>;
-      final features = geo['features'] as List<dynamic>;
-      final rings = <List<LatLng>>[];
-      for (final feature in features) {
-        final geometry = feature['geometry'] as Map<String, dynamic>;
-        final type = geometry['type'] as String;
-        final coords = geometry['coordinates'];
-        if (type == 'Polygon') {
-          rings.add(_parseRing((coords as List).first as List));
-        } else if (type == 'MultiPolygon') {
-          for (final poly in coords as List) {
-            rings.add(_parseRing((poly as List).first as List));
-          }
-        }
-      }
-      return rings;
-    } catch (e) {
-      debugPrint('CandidateVolunteersMap outline parse failed: $e');
-      return const [];
-    }
-  }
-
   List<LatLng> _parseRing(List ring) => ring
       .map<LatLng>((c) => LatLng(
             (c[1] as num).toDouble(),
@@ -321,27 +299,6 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   }
 
   List<RegionData> get _activeRegions => _regions[_mode] ?? const [];
-
-  // ── Candidate office classification ────────────────────────────
-  String? _candidateOfficeType(String office) {
-    final o = office.toLowerCase();
-    if (o.contains('congress') ||
-        o.contains('u.s. rep') ||
-        o.contains('us rep') ||
-        o.contains('u.s. house')) {
-      return 'congressional';
-    }
-    if (o.contains('state senate') || o.contains('state senator')) {
-      return 'senate';
-    }
-    if (o.contains('state rep') ||
-        o.contains('representative') ||
-        o.contains('house') ||
-        o.contains('assembly')) {
-      return 'house';
-    }
-    return null;
-  }
 
   String _officeTypeLabel(String ot) {
     switch (ot) {
@@ -726,7 +683,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     String? titleSuggestion,
   }) async {
     final geo = _selectedGeo();
-    final saved = await OutreachLogSheet.show(
+    final saved = await OrganizingToolkitSheet.show(
       context,
       counties: geo.counties,
       congressionalDistricts: geo.cds,
@@ -744,13 +701,13 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   }
 
   /// Post-send prompt: offer to record the just-completed bulk send as a
-  /// completed outreach activity, prefilled with its channel and recipients.
+  /// completed activity, prefilled with its channel and recipients.
   void _offerLogIt(List<Member> participants,
       {required String kind, required String channel}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: const Text('Log this as outreach?'),
+      content: const Text('Save this as a completed activity?'),
       action: SnackBarAction(
-        label: 'Log it',
+        label: 'Save it',
         onPressed: () => _openOutreachSheet(
           participants,
           kind: kind,
@@ -844,7 +801,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     });
   }
 
-  /// Gold centroid dots for regions in the CURRENT mode that carry at least one
+  /// Highlight centroid dots for regions in the CURRENT mode that carry at least one
   /// planned/in_progress activity. Non-interactive: wrapped in [IgnorePointer]
   /// so a tap on a dot still falls through to region selection. Recomputed on
   /// build, so a mode change re-derives the visible set from `_mode`.
@@ -963,10 +920,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     });
   }
 
-  Widget _paneDivider() => Container(
-        width: 1,
-        color: _isDark ? const Color(0xFF2E3A57) : const Color(0xFFE5E9F0),
-      );
+  Widget _paneDivider() => Container(width: 1, color: _vt.divider);
 
   Widget _mobileLayout(BuildContext context) {
     return Stack(
@@ -1020,7 +974,12 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       pane: pane,
       statewideMembers: _statewideMembers,
       statewideYoungDems: _statewideYoungDems,
+      statewideNominees: _geLookup.length,
       hotRegions: _hotRegions(),
+      upcomingActivities: _upcomingActivities(),
+      organizingPlays: _organizingPlays(),
+      onOpenActivities: widget.onOpenActivities,
+      onHighlightYoungDems: _highlightYoungDems,
       onClose: _clearSelection,
       onSelectHot: _selectRegion,
       onTextMembers: _textMembers,
@@ -1032,6 +991,175 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     );
   }
 
+  /// The next up-to-3 planned activities across every geography, soonest first.
+  /// Drawn from the already-loaded `_activities` (planned + in_progress); we
+  /// keep only `planned` with a real date so the rail shows what is coming up.
+  List<OutreachActivity> _upcomingActivities() {
+    final planned = _activities
+        .where((a) => a.status == 'planned' && a.scheduledOn != null)
+        .toList()
+      ..sort((a, b) => a.scheduledOn!.compareTo(b.scheduledOn!));
+    return planned.take(3).toList();
+  }
+
+  /// Switch to the district geography that carries the most young-dem regions
+  /// and let the pulse rings draw attention to their pins. Called by the rail's
+  /// "young dems on the November ballot" tile.
+  void _highlightYoungDems() {
+    MapMode? best;
+    var bestCount = 0;
+    for (final mode in [
+      MapMode.congressional,
+      MapMode.senate,
+      MapMode.house,
+    ]) {
+      final n = (_regions[mode] ?? const <RegionData>[])
+          .where((r) => r.status == RegionStatus.youngDem)
+          .length;
+      if (n > bestCount) {
+        bestCount = n;
+        best = mode;
+      }
+    }
+    if (best != null) _changeMode(best);
+  }
+
+  /// Real Candidate profiles tied to a district (for seeding a play's sheet).
+  List<Candidate> _nomineeCandidates(String officeType, String id) =>
+      _rowsForDistrict(officeType, id)
+          .map((r) => r.candidate)
+          .whereType<Candidate>()
+          .toList();
+
+  /// Open the toolkit sheet pre-seeded for a single region + nominee, from an
+  /// Organizing Play card. Reloads activity coverage on save so the new dots
+  /// and "this week" rows appear.
+  Future<void> _startPlay({
+    required MapMode mode,
+    required String id,
+    required String kind,
+    required String title,
+    List<Candidate> candidates = const [],
+  }) async {
+    final saved = await OrganizingToolkitSheet.show(
+      context,
+      counties: mode == MapMode.county ? [id] : const [],
+      congressionalDistricts: mode == MapMode.congressional ? [id] : const [],
+      senateDistricts: mode == MapMode.senate ? [id] : const [],
+      houseDistricts: mode == MapMode.house ? [id] : const [],
+      candidates: candidates,
+      participants: const [],
+      kind: kind,
+      titleSuggestion: title,
+    );
+    if (saved == true) await _loadActivityCoverage();
+  }
+
+  /// Three deterministic organizing ideas computed from data already in memory.
+  /// Each is a concrete next action seeded into the toolkit sheet, so the front
+  /// door always offers something to plan even with zero activities logged.
+  List<OrganizingPlay> _organizingPlays() {
+    final plays = <OrganizingPlay>[];
+
+    // 1) Rally for a young dem — top young-dem district by member count.
+    RegionData? topYoungDem;
+    MapMode? topYoungDemMode;
+    for (final mode in [
+      MapMode.congressional,
+      MapMode.senate,
+      MapMode.house,
+    ]) {
+      for (final r in _regions[mode] ?? const <RegionData>[]) {
+        if (r.status != RegionStatus.youngDem) continue;
+        if (topYoungDem == null || r.memberCount > topYoungDem.memberCount) {
+          topYoungDem = r;
+          topYoungDemMode = mode;
+        }
+      }
+    }
+    if (topYoungDem != null && topYoungDemMode != null) {
+      final region = topYoungDemMode.regionTitle(topYoungDem.id);
+      final ot = topYoungDemMode.officeType!;
+      plays.add(OrganizingPlay(
+        icon: OutreachDisplay.kindIcon('day_of_action'),
+        title: 'Rally for a young dem',
+        rationale:
+            'A young Democrat is on the ballot in $region, home to ${topYoungDem.memberCount} members.',
+        onStart: () => _startPlay(
+          mode: topYoungDemMode!,
+          id: topYoungDem!.id,
+          kind: 'day_of_action',
+          title: 'Day of action in $region',
+          candidates: _nomineeCandidates(ot, topYoungDem.id),
+        ),
+      ));
+    }
+
+    // 2) Wake a quiet region — highest-member county with nothing planned.
+    final withActivity = _regionsWithActivity[MapMode.county] ?? const <String>{};
+    RegionData? quiet;
+    for (final r in _regions[MapMode.county] ?? const <RegionData>[]) {
+      if (withActivity.contains(r.id)) continue;
+      if (quiet == null || r.memberCount > quiet.memberCount) quiet = r;
+    }
+    if (quiet != null && quiet.memberCount > 0) {
+      final region = MapMode.county.regionTitle(quiet.id);
+      plays.add(OrganizingPlay(
+        icon: OutreachDisplay.kindIcon('volunteer_day'),
+        title: 'Wake a quiet region',
+        rationale:
+            '${quiet.memberCount} members live in $region and nothing is planned yet.',
+        onStart: () => _startPlay(
+          mode: MapMode.county,
+          id: quiet!.id,
+          kind: 'volunteer_day',
+          title: 'Meet-up in $region',
+        ),
+      ));
+    }
+
+    // 3) Text bank for the ticket — a contested Dem race with 5+ members.
+    RegionData? contested;
+    MapMode? contestedMode;
+    for (final mode in [
+      MapMode.congressional,
+      MapMode.senate,
+      MapMode.house,
+    ]) {
+      for (final r in _regions[mode] ?? const <RegionData>[]) {
+        final ok = (r.status == RegionStatus.demContested ||
+                r.status == RegionStatus.youngDem) &&
+            r.memberCount >= 5;
+        if (!ok) continue;
+        if (contested == null || r.memberCount > contested.memberCount) {
+          contested = r;
+          contestedMode = mode;
+        }
+      }
+    }
+    if (contested != null && contestedMode != null) {
+      final region = contestedMode.regionTitle(contested.id);
+      final ot = contestedMode.officeType!;
+      final nominees = _nomineeCandidates(ot, contested.id);
+      final who = nominees.isNotEmpty ? nominees.first.name : region;
+      plays.add(OrganizingPlay(
+        icon: OutreachDisplay.kindIcon('text_bank'),
+        title: 'Text bank for the ticket',
+        rationale:
+            '$region has a contested Democratic race and ${contested.memberCount} members ready to help.',
+        onStart: () => _startPlay(
+          mode: contestedMode!,
+          id: contested!.id,
+          kind: 'text_bank',
+          title: 'Text bank for $who',
+          candidates: nominees,
+        ),
+      ));
+    }
+
+    return plays;
+  }
+
   List<HotRegion> _hotRegions() {
     final regions = [..._activeRegions];
     regions.sort((a, b) {
@@ -1040,30 +1168,35 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       if (ay != by) return by - ay;
       return b.memberCount.compareTo(a.memberCount);
     });
-    return regions
-        .take(5)
-        .map((r) => HotRegion(
-            mode: _mode, id: r.id, memberCount: r.memberCount, status: r.status))
-        .toList();
+    // Defensive de-dup: even with the St. Louis City geoid split, never let two
+    // rows share an id (a re-parse or a future collision would otherwise show a
+    // region twice with the same count).
+    final seen = <String>{};
+    final out = <HotRegion>[];
+    for (final r in regions) {
+      if (!seen.add(r.id)) continue;
+      out.add(HotRegion(
+          mode: _mode, id: r.id, memberCount: r.memberCount, status: r.status));
+      if (out.length == 5) break;
+    }
+    return out;
   }
 
   // ── Map + floating chrome ──────────────────────────────────────
   Widget _mapStack(BuildContext context) {
     final dark = _isDark;
+    final vt = _vt;
     if (_loadingBase && _activeRegions.isEmpty) {
       return Container(
-        color: MoydMapTheme.maskColor(dark),
+        color: vt.mask,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const CircularProgressIndicator(
-                  color: MoydMapTheme.unityBlue, strokeWidth: 2.5),
+              CircularProgressIndicator(color: vt.accent, strokeWidth: 2.5),
               const SizedBox(height: 14),
               Text('Loading the field map…',
-                  style: TextStyle(
-                      color: dark ? Colors.white70 : const Color(0xFF5A6478),
-                      fontSize: 13)),
+                  style: TextStyle(color: vt.secondary, fontSize: 13)),
             ],
           ),
         ),
@@ -1108,7 +1241,6 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
             child: _RegionSearchField(
               hits: _allSearchHits(),
               onPick: _onSearchPick,
-              dark: dark,
             ),
           ),
 
@@ -1128,7 +1260,6 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
             child: _glass(
               radius: 12,
               child: ChoroplethLegend(
-                dark: dark,
                 minCount: (_memberRange[_mode] ?? const [0, 0])[0],
                 maxCount: (_memberRange[_mode] ?? const [0, 0])[1],
               ),
@@ -1146,60 +1277,45 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   }
 
   Widget _buildFlutterMap(bool reduceMotion, bool dark) {
-    final maskColor = MoydMapTheme.maskColor(dark);
+    final vt = _vt;
+    final maskColor = vt.mask;
     final polygons = <Polygon>[];
 
-    // 1) Out-of-state mask (donut) + Missouri outline, drawn first (under).
-    if (_moOutlineRings.isNotEmpty) {
-      polygons.add(Polygon(
-        points: _kOuterRect,
-        holePointsList: _moOutlineRings,
-        color: maskColor,
-        borderStrokeWidth: 0,
-      ));
-      final outlineColor =
-          dark ? MoydMapTheme.gold.withValues(alpha: 0.6) : MoydMapTheme.navy;
-      for (final ring in _moOutlineRings) {
-        polygons.add(Polygon(
-          points: ring,
-          color: Colors.transparent,
-          borderColor: outlineColor,
-          borderStrokeWidth: 2,
-        ));
-      }
-    }
+    // The state silhouette is formed by the region polygons themselves — there
+    // is no separate outline or out-of-state mask polygon. The old coarse
+    // 60-point outline asset cut gold chords across the fills and the donut
+    // mask painted maskColor over maskColor, so both are gone. A slightly
+    // firmer region border gives the state edge its definition instead.
 
-    // 2) Region choropleth fills.
+    // 1) Region choropleth fills.
     final selecting = _selectedId != null;
-    final borderBase =
-        (dark ? Colors.white : Colors.white).withValues(alpha: dark ? 0.10 : 0.55);
+    final borderBase = vt.divider;
     for (final r in _activeRegions) {
       final hovered = _hoveredId == r.id && _selectedId != r.id;
       polygons.add(Polygon(
         points: r.outerRing,
         holePointsList: r.holes,
-        color: _fillFor(r, dark, selecting),
-        borderColor: hovered ? MoydMapTheme.unityBlue : borderBase,
-        borderStrokeWidth: hovered ? 1.5 : 0.6,
+        color: _fillFor(r, vt, selecting),
+        borderColor: hovered ? vt.accent : borderBase,
+        borderStrokeWidth: hovered ? 1.5 : 0.8,
       ));
     }
 
-    // 3) Selection: navy halo (dark: white 40%) under a gold 3px ring.
+    // 2) Selection: onSurface halo under a 3px accent ring.
     final sel = _selectedId == null ? null : _index[_mode]?[_selectedId];
     if (sel != null) {
       polygons.add(Polygon(
         points: sel.outerRing,
         holePointsList: sel.holes,
         color: Colors.transparent,
-        borderColor:
-            dark ? Colors.white.withValues(alpha: 0.4) : MoydMapTheme.navy,
+        borderColor: vt.text.withValues(alpha: 0.4),
         borderStrokeWidth: 5,
       ));
       polygons.add(Polygon(
         points: sel.outerRing,
         holePointsList: sel.holes,
         color: Colors.transparent,
-        borderColor: MoydMapTheme.gold,
+        borderColor: vt.accent,
         borderStrokeWidth: 3,
       ));
     }
@@ -1214,20 +1330,20 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       ),
       children: [
         // No tile basemap: Missouri renders as a branded infographic on the
-        // solid brand canvas (backgroundColor), so no out-of-state tiles can
-        // ever bleed through around the state.
+        // solid canvas (backgroundColor), so no out-of-state tiles can ever
+        // bleed through around the state.
         PolygonLayer(polygons: polygons, polygonCulling: true),
         MarkerLayer(markers: _youngDemMarkers(reduceMotion)),
-        // Activity presence: gold dots on regions with a planned/in_progress
-        // activity in the current mode, statewide and in region-selected views.
+        // Activity presence: highlight dots on regions with a planned/
+        // in_progress activity in the current mode, statewide and in-region.
         MarkerLayer(markers: _activityMarkers()),
       ],
     );
   }
 
-  Color _fillFor(RegionData r, bool dark, bool selecting) {
+  Color _fillFor(RegionData r, VolunteersTheme vt, bool selecting) {
     final bin = _choroplethBin(_mode, r.memberCount);
-    Color base = MoydMapTheme.choropleth(bin, dark: dark);
+    Color base = vt.choropleth(bin);
     if (selecting && _selectedId != r.id) {
       base = base.withValues(alpha: base.a * 0.6);
     }
@@ -1263,7 +1379,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                             height: 34,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: MoydMapTheme.gold
+                              color: _vt.highlight
                                   .withValues(alpha: 0.45 * (1 - t)),
                             ),
                           ),
@@ -1278,33 +1394,36 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     }).toList();
   }
 
-  Widget _staticPin(String id) => Container(
-        width: 30,
-        height: 30,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: MoydMapTheme.gold,
-          border: Border.all(color: Colors.white, width: 2),
-          boxShadow: [
-            BoxShadow(
-                color: MoydMapTheme.gold.withValues(alpha: 0.5),
-                blurRadius: 8,
-                spreadRadius: 1),
-          ],
-        ),
-        child: const Icon(Icons.star_rounded,
-            color: MoydMapTheme.navy, size: 16),
-      );
+  Widget _staticPin(String id) {
+    final vt = _vt;
+    return Container(
+      width: 30,
+      height: 30,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: vt.highlightSoft,
+        border: Border.all(color: vt.surface, width: 2),
+        boxShadow: [
+          BoxShadow(
+              color: vt.highlight.withValues(alpha: 0.5),
+              blurRadius: 8,
+              spreadRadius: 1),
+        ],
+      ),
+      child: Icon(Icons.star_rounded, color: vt.onHighlightSoft, size: 16),
+    );
+  }
 
-  // ── Back-to-statewide pill (navy fill, white text, both themes) ─
+  // ── Back-to-statewide pill (accent fill, onAccent content, both themes) ─
   Widget _backToStatewidePill() {
+    final vt = _vt;
     return Semantics(
       button: true,
       label: 'Back to Missouri statewide',
       excludeSemantics: true,
       child: Material(
-        color: MoydMapTheme.navy,
+        color: vt.accent,
         elevation: 3,
         shadowColor: Colors.black.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(999),
@@ -1318,16 +1437,16 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.18), width: 1),
+                  color: vt.onAccent.withValues(alpha: 0.18), width: 1),
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.arrow_back_rounded, size: 16, color: Colors.white),
-                SizedBox(width: 6),
+                Icon(Icons.arrow_back_rounded, size: 16, color: vt.onAccent),
+                const SizedBox(width: 6),
                 Text('Missouri',
                     style: TextStyle(
-                        color: Colors.white,
+                        color: vt.onAccent,
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700)),
               ],
@@ -1361,11 +1480,11 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                 child: Container(
                   margin: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: MoydMapTheme.unityBlue,
+                    color: _vt.accent,
                     borderRadius: BorderRadius.circular(999),
                     boxShadow: [
                       BoxShadow(
-                          color: MoydMapTheme.unityBlue.withValues(alpha: 0.30),
+                          color: _vt.accent.withValues(alpha: 0.30),
                           blurRadius: 6,
                           offset: const Offset(0, 2)),
                     ],
@@ -1390,6 +1509,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   }
 
   Widget _modeSegment(MapMode mode, bool selected) {
+    final vt = _vt;
     final count = _regions[mode]?.length;
     return Semantics(
       button: true,
@@ -1408,11 +1528,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                   style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
-                    color: selected
-                        ? Colors.white
-                        : (_isDark
-                            ? const Color(0xFFC9D2E4)
-                            : MoydMapTheme.navy),
+                    color: selected ? vt.onAccent : vt.secondary,
                   )),
               if (count != null) ...[
                 const SizedBox(width: 3),
@@ -1423,8 +1539,8 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
                         color: selected
-                            ? Colors.white.withValues(alpha: 0.85)
-                            : MoydMapTheme.unityBlue,
+                            ? vt.onAccent.withValues(alpha: 0.85)
+                            : vt.accent,
                       )),
                 ),
               ],
@@ -1462,9 +1578,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
           child: SizedBox(
             width: 44,
             height: 44,
-            child: Icon(icon,
-                size: 20,
-                color: _isDark ? Colors.white : MoydMapTheme.navy),
+            child: Icon(icon, size: 20, color: _vt.text),
           ),
         ),
       ),
@@ -1473,10 +1587,12 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 
   // ── Hover tooltip ──────────────────────────────────────────────
   Widget _hoverTooltip() {
+    final vt = _vt;
     final r = _index[_mode]?[_hoveredId];
     if (r == null) return const SizedBox.shrink();
     final line =
         '${r.memberCount} member${r.memberCount == 1 ? '' : 's'}';
+    final youngDem = r.status == RegionStatus.youngDem;
     return Positioned(
       left: 16,
       top: _selectedId != null ? 116 : 68,
@@ -1484,10 +1600,8 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: MoydMapTheme.navy.withValues(alpha: 0.94),
+            color: vt.inverseSurface.withValues(alpha: 0.96),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-                color: MoydMapTheme.gold.withValues(alpha: 0.5), width: 1),
             boxShadow: [
               BoxShadow(
                   color: Colors.black.withValues(alpha: 0.3),
@@ -1500,18 +1614,25 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(_mode.regionTitle(r.id),
-                  style: const TextStyle(
-                      color: Colors.white,
+                  style: TextStyle(
+                      color: vt.onInverseSurface,
                       fontSize: 12,
                       fontWeight: FontWeight.w800)),
               const SizedBox(height: 2),
-              Text(line,
-                  style: TextStyle(
-                      color: r.status == RegionStatus.youngDem
-                          ? MoydMapTheme.gold
-                          : Colors.white.withValues(alpha: 0.78),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (youngDem) ...[
+                    Icon(Icons.star_rounded, size: 12, color: vt.highlight),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(line,
+                      style: TextStyle(
+                          color: vt.onInverseSurface.withValues(alpha: 0.82),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
             ],
           ),
         ),
@@ -1521,11 +1642,12 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 
   // ── Region title lockup (top-center, selected) ─────────────────
   /// Translucent lockup over the map: overline + region title, plus a
-  /// gold-accented "n activities here" chip when n > 0. Wrapped in
+  /// highlight-tinted "n activities here" chip when n > 0. Wrapped in
   /// [IgnorePointer] so it never swallows a map tap. Both themes clear 4.5:1
-  /// (navy title / navy chip text on light; white title / gold chip text on
-  /// the dark glass surface).
+  /// (onSurface title on the glass surface; onTertiaryContainer chip text on
+  /// the tertiaryContainer chip).
   Widget _regionTitleLockup(bool dark) {
+    final vt = _vt;
     final id = _selectedId;
     if (id == null) return const SizedBox.shrink();
     final n = _activityCountForSelected();
@@ -1542,18 +1664,18 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                     fontSize: 10.5,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.1,
-                    color: dark ? Colors.white70 : const Color(0xFF5A6478),
+                    color: vt.secondary,
                   )),
               const SizedBox(height: 2),
               Text(_mode.regionTitle(id),
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: dark ? Colors.white : MoydMapTheme.navy,
+                    color: vt.text,
                   )),
               if (n > 0) ...[
                 const SizedBox(height: 6),
-                _activityChip(n, dark),
+                _activityChip(n, vt),
               ],
             ],
           ),
@@ -1562,15 +1684,12 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     );
   }
 
-  Widget _activityChip(int n, bool dark) {
+  Widget _activityChip(int n, VolunteersTheme vt) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: MoydMapTheme.gold.withValues(alpha: dark ? 0.22 : 0.18),
+        color: vt.highlightSoft,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-            color: MoydMapTheme.gold.withValues(alpha: dark ? 0.7 : 0.55),
-            width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1578,17 +1697,15 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
           Container(
             width: 7,
             height: 7,
-            decoration: const BoxDecoration(
-                shape: BoxShape.circle, color: MoydMapTheme.gold),
+            decoration: BoxDecoration(
+                shape: BoxShape.circle, color: vt.onHighlightSoft),
           ),
           const SizedBox(width: 6),
           Text('$n ${n == 1 ? 'activity' : 'activities'} here',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                // Gold is a badge/stroke colour, never body text on light;
-                // navy on light, gold on the dark glass surface.
-                color: dark ? MoydMapTheme.gold : MoydMapTheme.navy,
+                color: vt.onHighlightSoft,
               )),
         ],
       ),
@@ -1597,14 +1714,12 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 
   // ── Glass chrome helper ────────────────────────────────────────
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  VolunteersTheme get _vt => VolunteersTheme.of(context);
 
   Widget _glass({required double radius, required Widget child}) {
-    final bg = _isDark
-        ? const Color(0xFF1B2337).withValues(alpha: 0.90)
-        : Colors.white.withValues(alpha: 0.90);
-    final border = _isDark
-        ? Colors.white.withValues(alpha: 0.10)
-        : Colors.black.withValues(alpha: 0.06);
+    final vt = _vt;
+    final bg = vt.surface.withValues(alpha: 0.90);
+    final border = vt.divider;
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: BackdropFilter(
@@ -1636,19 +1751,18 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 class ChoroplethLegend extends StatelessWidget {
   const ChoroplethLegend({
     super.key,
-    required this.dark,
     required this.minCount,
     required this.maxCount,
   });
 
-  final bool dark;
   final int minCount;
   final int maxCount;
 
   @override
   Widget build(BuildContext context) {
-    final title = dark ? Colors.white70 : const Color(0xFF5A6478);
-    final micro = dark ? Colors.white54 : const Color(0xFF8A93A6);
+    final vt = VolunteersTheme.of(context);
+    final title = vt.secondary;
+    final micro = vt.secondary.withValues(alpha: 0.75);
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(
@@ -1672,8 +1786,7 @@ class ChoroplethLegend extends StatelessWidget {
                 children: [
                   for (var bin = 0; bin < 5; bin++)
                     Expanded(
-                      child: Container(
-                          color: MoydMapTheme.choropleth(bin, dark: dark)),
+                      child: Container(color: vt.choropleth(bin)),
                     ),
                 ],
               ),
@@ -1708,19 +1821,17 @@ class _RegionSearchField extends StatelessWidget {
   const _RegionSearchField({
     required this.hits,
     required this.onPick,
-    required this.dark,
   });
 
   final List<RegionSearchHit> hits;
   final void Function(RegionSearchHit) onPick;
-  final bool dark;
 
   @override
   Widget build(BuildContext context) {
-    final fieldText = dark ? Colors.white : const Color(0xFF1E2637);
-    final hintColor =
-        (dark ? Colors.white : Colors.black).withValues(alpha: 0.4);
-    final panelBg = dark ? const Color(0xFF1B2337) : Colors.white;
+    final vt = VolunteersTheme.of(context);
+    final fieldText = vt.text;
+    final hintColor = vt.secondary;
+    final panelBg = vt.surface;
 
     return Autocomplete<RegionSearchHit>(
       displayStringForOption: (h) => h.label,
@@ -1749,21 +1860,14 @@ class _RegionSearchField extends StatelessWidget {
             child: Container(
               height: 44,
               decoration: BoxDecoration(
-                color: (dark ? const Color(0xFF1B2337) : Colors.white)
-                    .withValues(alpha: 0.90),
+                color: vt.surface.withValues(alpha: 0.90),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                    color: dark
-                        ? Colors.white.withValues(alpha: 0.10)
-                        : Colors.black.withValues(alpha: 0.06),
-                    width: 1),
+                border: Border.all(color: vt.divider, width: 1),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: [
-                  Icon(Icons.search,
-                      size: 18,
-                      color: dark ? Colors.white70 : const Color(0xFF5A6478)),
+                  Icon(Icons.search, size: 18, color: vt.secondary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
@@ -1785,9 +1889,7 @@ class _RegionSearchField extends StatelessWidget {
                       onTap: () => controller.clear(),
                       child: Icon(Icons.close,
                           size: 16,
-                          color: dark
-                              ? Colors.white54
-                              : const Color(0xFF8A93A6)),
+                          color: vt.secondary.withValues(alpha: 0.75)),
                     ),
                 ],
               ),
@@ -1807,11 +1909,7 @@ class _RegionSearchField extends StatelessWidget {
               decoration: BoxDecoration(
                 color: panelBg,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                    color: dark
-                        ? Colors.white.withValues(alpha: 0.10)
-                        : Colors.black.withValues(alpha: 0.06),
-                    width: 1),
+                border: Border.all(color: vt.divider, width: 1),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.18),
@@ -1839,9 +1937,7 @@ class _RegionSearchField extends StatelessWidget {
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 1.2,
-                                color: dark
-                                    ? Colors.white54
-                                    : const Color(0xFF8A93A6),
+                                color: vt.secondary.withValues(alpha: 0.85),
                               )),
                         ),
                       InkWell(
@@ -1877,10 +1973,10 @@ class _MobileSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final vt = VolunteersTheme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1B2337) : Colors.white,
+        color: vt.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
@@ -1897,7 +1993,7 @@ class _MobileSheet extends StatelessWidget {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: const Color(0xFFC3CAD6),
+              color: vt.divider,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -1909,21 +2005,23 @@ class _MobileSheet extends StatelessWidget {
   }
 }
 
-/// Gold activity-presence dot dropped on a region centroid. Filled gold with a
-/// thin white ring and a soft shadow so it reads over any choropleth fill in
-/// both themes. Purely decorative — the map's tap handling sits above it.
+/// Activity-presence dot dropped on a region centroid. Filled with the
+/// highlight role, a thin surface ring and a soft shadow so it reads over any
+/// choropleth fill in both themes. Purely decorative — the map's tap handling
+/// sits above it.
 class _ActivityDot extends StatelessWidget {
   const _ActivityDot();
 
   @override
   Widget build(BuildContext context) {
+    final vt = VolunteersTheme.of(context);
     return Container(
       width: 12,
       height: 12,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: MoydMapTheme.gold,
-        border: Border.all(color: Colors.white, width: 2),
+        color: vt.highlight,
+        border: Border.all(color: vt.surface, width: 2),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.35),

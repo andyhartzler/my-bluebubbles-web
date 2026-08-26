@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:universal_html/html.dart' as html;
 
 import 'package:bluebubbles/models/crm/member.dart';
@@ -10,9 +11,11 @@ import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/outreach_repository.dart';
 
-import 'outreach_log_sheet.dart';
+import 'activity_detail_screen.dart';
+import 'organizing_toolkit_sheet.dart';
 import 'outreach_region_section.dart';
 import 'volunteers_map_models.dart';
+import 'volunteers_theme.dart';
 
 /// Which slice of the detail panel to render.
 ///
@@ -42,7 +45,24 @@ enum _MemberSort { nameAsc, recentlyContacted, leastRecentlyContacted }
 //  so it stays visible at every snap.
 // ═══════════════════════════════════════════════════════════════
 
-/// One row in the Statewide Overview "hot districts" list.
+/// One "Organizing play" idea card on the front door of the rail. Computed by
+/// the map from data already in memory; [onStart] opens the toolkit sheet
+/// pre-seeded with the play's kind, geography and nominee.
+class OrganizingPlay {
+  const OrganizingPlay({
+    required this.icon,
+    required this.title,
+    required this.rationale,
+    required this.onStart,
+  });
+
+  final IconData icon;
+  final String title;
+  final String rationale;
+  final VoidCallback onStart;
+}
+
+/// One row in the Statewide Overview "priority districts" list.
 class HotRegion {
   const HotRegion({
     required this.mode,
@@ -84,33 +104,40 @@ class RegionDetail {
   final bool loadingMembers;
 }
 
-// ── theme palette resolved per build from the active brightness ───────────
+// ── theme palette, resolved per build from the active ColorScheme ─────────
+//
+// A thin wrapper over [VolunteersTheme] so this file's many `p.xxx` call sites
+// keep reading cleanly while every color now flows from scheme roles (exactly
+// like the Slack pages). `action` is scheme.primary — already light enough to
+// clear 4.5:1 on the dark surface, so the old hand-lightened blue is gone.
 class _Palette {
-  _Palette(this.isDark)
-      : surface = isDark ? const Color(0xFF1B2337) : Colors.white,
-        inset = isDark ? const Color(0xFF212B44) : const Color(0xFFF4F6FA),
-        text = isDark ? const Color(0xFFF4F6FA) : const Color(0xFF1E2637),
-        secondary =
-            isDark ? Colors.white.withValues(alpha: 0.72) : const Color(0xFF5A6478),
-        divider = isDark ? const Color(0xFF2E3A57) : const Color(0xFFE5E9F0),
-        track = isDark ? const Color(0xFF313D5E) : const Color(0xFFDFE4EC),
-        // Blue actions/links must clear 4.5:1 on the panel surface in both
-        // themes: raw unityBlue (#0B4DB8) is ~2:1 on the dark surface, so it
-        // lightens on dark. Used for text-link actions ("Show all", "Clear",
-        // skip "Details", "Log outreach").
-        action = isDark ? const Color(0xFF6AA0F0) : MoydMapTheme.unityBlue;
+  _Palette(this.vt);
 
-  final bool isDark;
-  final Color surface;
-  final Color inset;
-  final Color text;
-  final Color secondary;
-  final Color divider;
-  final Color track;
-  final Color action;
+  final VolunteersTheme vt;
 
-  factory _Palette.of(BuildContext c) =>
-      _Palette(Theme.of(c).brightness == Brightness.dark);
+  bool get isDark => vt.isDark;
+  Color get surface => vt.surface;
+  Color get inset => vt.inset;
+  Color get text => vt.text;
+  Color get secondary => vt.secondary;
+  Color get divider => vt.divider;
+  Color get action => vt.accent;
+
+  Color get accent => vt.accent;
+  Color get onAccent => vt.onAccent;
+  Color get accentSoft => vt.accentSoft;
+  Color get onAccentSoft => vt.onAccentSoft;
+  Color get highlight => vt.highlight;
+  Color get highlightSoft => vt.highlightSoft;
+  Color get onHighlightSoft => vt.onHighlightSoft;
+
+  /// Priority-swatch colour for a region status, kept off gold: young-dem uses
+  /// the highlight role, the others keep their data-vis swatch.
+  Color statusSwatch(RegionStatus status) => status == RegionStatus.youngDem
+      ? vt.highlight
+      : MapPalette.statusSwatch(status);
+
+  factory _Palette.of(BuildContext c) => _Palette(VolunteersTheme.of(c));
 }
 
 class VolunteersDetailPanel extends StatelessWidget {
@@ -120,7 +147,12 @@ class VolunteersDetailPanel extends StatelessWidget {
     this.pane = VolunteersPane.combined,
     required this.statewideMembers,
     required this.statewideYoungDems,
+    this.statewideNominees = 0,
     required this.hotRegions,
+    this.upcomingActivities = const [],
+    this.organizingPlays = const [],
+    this.onOpenActivities,
+    this.onHighlightYoungDems,
     required this.onClose,
     required this.onSelectHot,
     required this.onTextMembers,
@@ -139,7 +171,20 @@ class VolunteersDetailPanel extends StatelessWidget {
 
   final int statewideMembers;
   final int statewideYoungDems;
+  final int statewideNominees;
   final List<HotRegion> hotRegions;
+
+  /// Next few planned activities, soonest first (already filtered by the map).
+  final List<OutreachActivity> upcomingActivities;
+
+  /// Deterministic organizing ideas for the "Organizing plays" section.
+  final List<OrganizingPlay> organizingPlays;
+
+  /// Flip the workspace shell to the Activities tab. Null when unavailable.
+  final VoidCallback? onOpenActivities;
+
+  /// Jump the map to the district geography with the most young-dem pins.
+  final VoidCallback? onHighlightYoungDems;
 
   final VoidCallback onClose;
   final void Function(MapMode mode, String id) onSelectHot;
@@ -181,7 +226,7 @@ class VolunteersDetailPanel extends StatelessWidget {
     );
   }
 
-  // ── STATEWIDE OVERVIEW ─────────────────────────────────────────
+  // ── ORGANIZING HQ (statewide rail) ─────────────────────────────
   Widget _statewide(BuildContext context, _Palette p) {
     return ListView(
       controller: scrollController,
@@ -194,7 +239,7 @@ class VolunteersDetailPanel extends StatelessWidget {
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.4)),
         const SizedBox(height: 4),
-        Text('Statewide overview',
+        Text('Organizing HQ',
             style: TextStyle(
                 color: p.text,
                 fontSize: 22,
@@ -202,56 +247,101 @@ class VolunteersDetailPanel extends StatelessWidget {
                 height: 1.1,
                 letterSpacing: -0.3)),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _overviewChip(p, '👥', '$statewideMembers members', accent: false),
-            _overviewChip(p, '★', '$statewideYoungDems young dems running',
-                accent: true),
-          ],
-        ),
+        _statTiles(p),
         const SizedBox(height: 24),
-        _sectionHeader(p, 'HOT DISTRICTS'),
+        _sectionHeader(p, 'PRIORITY DISTRICTS'),
         const SizedBox(height: 10),
         if (hotRegions.isEmpty)
           Text('Loading district signal…',
               style: TextStyle(color: p.secondary, fontSize: 13))
         else
           ...hotRegions.map((h) => _hotRow(context, p, h)),
+        const SizedBox(height: 24),
+        _thisWeek(context, p),
+        if (organizingPlays.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _sectionHeader(p, 'ORGANIZING PLAYS'),
+          const SizedBox(height: 10),
+          ...organizingPlays.map((play) => _playCard(p, play)),
+        ],
       ],
     );
   }
 
-  Widget _overviewChip(_Palette p, String glyph, String label,
-      {required bool accent}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+  // ── stat tiles ─────────────────────────────────────────────────
+  Widget _statTiles(_Palette p) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: _statTile(p,
+              value: '$statewideMembers', label: 'members'),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _statTile(p,
+              value: '$statewideYoungDems',
+              label: 'young dems on the\nNovember ballot',
+              highlight: true,
+              onTap: onHighlightYoungDems),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _statTile(p,
+              value: '$statewideNominees', label: 'Democratic\nnominees'),
+        ),
+      ],
+    );
+  }
+
+  Widget _statTile(_Palette p,
+      {required String value,
+      required String label,
+      bool highlight = false,
+      VoidCallback? onTap}) {
+    final content = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: accent ? MoydMapTheme.gold.withValues(alpha: 0.16) : p.inset,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-            color: accent ? MoydMapTheme.gold.withValues(alpha: 0.5) : p.divider),
+        color: highlight ? p.highlightSoft : p.inset,
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(glyph, style: const TextStyle(fontSize: 13)),
-          const SizedBox(width: 6),
+          Text(value,
+              style: TextStyle(
+                  color: highlight ? p.onHighlightSoft : p.text,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  height: 1.0)),
+          const SizedBox(height: 4),
           Text(label,
               style: TextStyle(
-                  // gold-flavored text on a light surface must use goldText
-                  // (4.5:1), never raw gold.
-                  color: accent ? MoydMapTheme.goldText : p.text,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700)),
+                  color: highlight
+                      ? p.onHighlightSoft.withValues(alpha: 0.9)
+                      : p.secondary,
+                  fontSize: 11.5,
+                  height: 1.15,
+                  fontWeight: FontWeight.w600)),
         ],
+      ),
+    );
+    if (onTap == null) return content;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: content,
       ),
     );
   }
 
+  // ── priority district row ──────────────────────────────────────
   Widget _hotRow(BuildContext context, _Palette p, HotRegion h) {
-    final gold = h.status == RegionStatus.youngDem;
+    final youngDem = h.status == RegionStatus.youngDem;
+    final swatch = p.statusSwatch(h.status);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -265,8 +355,8 @@ class VolunteersDetailPanel extends StatelessWidget {
               color: p.inset,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                  color: gold
-                      ? MoydMapTheme.gold.withValues(alpha: 0.55)
+                  color: youngDem
+                      ? p.highlight.withValues(alpha: 0.55)
                       : p.divider),
             ),
             child: Row(
@@ -276,13 +366,15 @@ class VolunteersDetailPanel extends StatelessWidget {
                   height: 34,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color:
-                        MapPalette.statusSwatch(h.status).withValues(alpha: 0.22),
+                    color: youngDem
+                        ? p.highlightSoft
+                        : swatch.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(9),
                   ),
-                  child: Icon(gold ? Icons.star_rounded : Icons.place_outlined,
+                  child: Icon(
+                      youngDem ? Icons.star_rounded : Icons.place_outlined,
                       size: 18,
-                      color: gold ? MoydMapTheme.goldText : p.secondary),
+                      color: youngDem ? p.onHighlightSoft : p.secondary),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -297,7 +389,7 @@ class VolunteersDetailPanel extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                           '${h.memberCount} member${h.memberCount == 1 ? '' : 's'}'
-                          '${gold ? ' · young dem running' : ''}',
+                          '${youngDem ? ' · young dem running' : ''}',
                           style: TextStyle(color: p.secondary, fontSize: 12)),
                     ],
                   ),
@@ -307,6 +399,212 @@ class VolunteersDetailPanel extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // ── this week ──────────────────────────────────────────────────
+  Widget _thisWeek(BuildContext context, _Palette p) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionHeader(p, 'THIS WEEK'),
+        const SizedBox(height: 10),
+        if (upcomingActivities.isEmpty)
+          Text('Nothing is scheduled yet. Start with an organizing play below.',
+              style: TextStyle(color: p.secondary, fontSize: 12.5, height: 1.3))
+        else
+          ...upcomingActivities.map((a) => _activityRow(context, p, a)),
+        if (onOpenActivities != null) ...[
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: onOpenActivities,
+              style: TextButton.styleFrom(
+                foregroundColor: p.accent,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                minimumSize: const Size(0, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('All activities',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _activityRow(BuildContext context, _Palette p, OutreachActivity a) {
+    final geoChips = _activityGeoLabels(a).take(3).toList();
+    final date =
+        a.scheduledOn == null ? null : DateFormat('EEE, MMM d').format(a.scheduledOn!);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => ActivityDetailScreen(activity: a),
+          )),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: p.inset,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: p.divider),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: p.accentSoft,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(a.kindIcon, size: 18, color: p.onAccentSoft),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(a.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: p.text,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(
+                          [if (date != null) date, a.kindLabel].join(' · '),
+                          style:
+                              TextStyle(color: p.secondary, fontSize: 12)),
+                      if (geoChips.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children:
+                              geoChips.map((c) => _geoChip(p, c)).toList(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _geoChip(_Palette p, String label) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: p.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: p.divider),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                color: p.secondary,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700)),
+      );
+
+  List<String> _activityGeoLabels(OutreachActivity a) => [
+        ...a.counties,
+        ...a.congressionalDistricts.map((d) => 'CD $d'),
+        ...a.senateDistricts.map((d) => 'SD $d'),
+        ...a.houseDistricts.map((d) => 'HD $d'),
+      ];
+
+  // ── organizing play card ───────────────────────────────────────
+  Widget _playCard(_Palette p, OrganizingPlay play) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: p.inset,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: p.divider),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: p.accentSoft,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(play.icon, size: 18, color: p.onAccentSoft),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(play.title,
+                          style: TextStyle(
+                              color: p.text,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 3),
+                      Text(play.rationale,
+                          style: TextStyle(
+                              color: p.secondary,
+                              fontSize: 12,
+                              height: 1.3)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Material(
+                color: p.accent,
+                borderRadius: BorderRadius.circular(999),
+                child: InkWell(
+                  onTap: play.onStart,
+                  borderRadius: BorderRadius.circular(999),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add, size: 16, color: p.onAccent),
+                        const SizedBox(width: 6),
+                        Text('Start planning',
+                            style: TextStyle(
+                                color: p.onAccent,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -603,7 +901,10 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
     return Container(
       constraints: const BoxConstraints(minHeight: 116),
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-      color: MoydMapTheme.navy,
+      decoration: BoxDecoration(
+        color: p.surface,
+        border: Border(bottom: BorderSide(color: p.divider)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -615,25 +916,25 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(_d.mode.overline,
-                        style: const TextStyle(
-                            color: Colors.white70,
+                        style: TextStyle(
+                            color: p.secondary,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.4)),
                     const SizedBox(height: 3),
                     Text(_d.mode.regionTitle(_d.id),
-                        style: const TextStyle(
-                            color: Colors.white,
+                        style: TextStyle(
+                            color: p.text,
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
                             height: 1.1)),
                     const SizedBox(height: 8),
-                    // gold underline
+                    // accent underline bar
                     Container(
                       width: 44,
                       height: 3,
                       decoration: BoxDecoration(
-                        color: MoydMapTheme.gold,
+                        color: p.accent,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -652,11 +953,10 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                       height: 36,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.16),
+                        color: p.inset,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close,
-                          color: Colors.white, size: 18),
+                      child: Icon(Icons.close, color: p.secondary, size: 18),
                     ),
                   ),
                 ),
@@ -667,10 +967,10 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _headerStat('👥', '${_d.memberCount} member'
+              _headerStat(p, '👥', '${_d.memberCount} member'
                   '${_d.memberCount == 1 ? '' : 's'}'),
-              _headerStat('💬', '$texting can text'),
-              _headerStat('✉', '$emailing can email'),
+              _headerStat(p, '💬', '$texting can text'),
+              _headerStat(p, '✉', '$emailing can email'),
             ],
           ),
         ],
@@ -678,16 +978,16 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
     );
   }
 
-  Widget _headerStat(String glyph, String label) => Container(
+  Widget _headerStat(_Palette p, String glyph, String label) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.16),
+          color: p.inset,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+          border: Border.all(color: p.divider),
         ),
         child: Text('$glyph  $label',
-            style: const TextStyle(
-                color: Colors.white,
+            style: TextStyle(
+                color: p.text,
                 fontSize: 12,
                 fontWeight: FontWeight.w700)),
       );
@@ -697,21 +997,24 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
     return Container(
       constraints: const BoxConstraints(minHeight: 116),
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-      color: MoydMapTheme.navy,
+      decoration: BoxDecoration(
+        color: p.surface,
+        border: Border(bottom: BorderSide(color: p.divider)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('ON THE NOVEMBER BALLOT',
+          Text('ON THE NOVEMBER BALLOT',
               style: TextStyle(
-                  color: Colors.white70,
+                  color: p.secondary,
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.4)),
           const SizedBox(height: 3),
           Text(_d.mode.regionTitle(_d.id),
-              style: const TextStyle(
-                  color: Colors.white,
+              style: TextStyle(
+                  color: p.text,
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   height: 1.1)),
@@ -720,7 +1023,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
             width: 44,
             height: 3,
             decoration: BoxDecoration(
-              color: MoydMapTheme.gold,
+              color: p.accent,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -740,10 +1043,10 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
       final noDem = _d.status == RegionStatus.noDem;
       return _emptyBox(
         p,
-        circle: (noDem ? MapPalette.statusNoDem : MoydMapTheme.unityBlue)
+        circle: (noDem ? MapPalette.statusNoDem : p.accent)
             .withValues(alpha: 0.14),
         icon: noDem ? Icons.person_off_outlined : Icons.how_to_vote_outlined,
-        iconColor: MoydMapTheme.unityBlue,
+        iconColor: p.accent,
         title: noDem
             ? 'No Democrat filed here'
             : _d.status == RegionStatus.notOnBallot
@@ -803,12 +1106,12 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
   Widget _districtChip(_Palette p, String label) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: MoydMapTheme.unityBlue.withValues(alpha: 0.12),
+          color: p.accentSoft,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(label,
-            style: const TextStyle(
-                color: MoydMapTheme.unityBlue,
+            style: TextStyle(
+                color: p.onAccentSoft,
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800)),
       );
@@ -834,7 +1137,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
         color: p.inset,
         borderRadius: BorderRadius.circular(14),
         border: row.isNominee
-            ? Border.all(color: MoydMapTheme.gold, width: 1.4)
+            ? Border.all(color: p.highlight, width: 1.4)
             : Border.all(color: p.divider),
       ),
       padding: const EdgeInsets.all(12),
@@ -917,10 +1220,10 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
   }
 
   /// Compact "Organize for {first name}" action on a resolved nominee card.
-  /// Filled unityBlue (#0B4DB8) pill, white caps — clears 4.5:1 on both light
-  /// and dark surfaces because the fill is fixed rather than theme-derived. It
-  /// aligns left and ellipsizes so it never crowds the card or overflows the
-  /// narrow mobile [VolunteersPane.combined] width.
+  /// Filled accent pill, onAccent caps — clears 4.5:1 in both themes because
+  /// the pairing comes straight from the scheme roles. It aligns left and
+  /// ellipsizes so it never crowds the card or overflows the narrow mobile
+  /// [VolunteersPane.combined] width.
   Widget _organizeButton(
       BuildContext context, _Palette p, CandidateDisplayRow row) {
     final candidate = row.candidate!;
@@ -929,7 +1232,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
     return Align(
       alignment: Alignment.centerLeft,
       child: Material(
-        color: MoydMapTheme.unityBlue,
+        color: p.accent,
         borderRadius: BorderRadius.circular(999),
         child: InkWell(
           onTap: () => _openOrganize(context, row),
@@ -939,15 +1242,14 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.campaign_outlined,
-                    size: 15, color: Colors.white),
+                Icon(Icons.campaign_outlined, size: 15, color: p.onAccent),
                 const SizedBox(width: 6),
                 Flexible(
                   child: Text('Organize for $firstName',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: Colors.white,
+                      style: TextStyle(
+                          color: p.onAccent,
                           fontSize: 12.5,
                           fontWeight: FontWeight.w700)),
                 ),
@@ -964,7 +1266,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
   /// Step 3 lets the exec add them; this is the candidate-first flow.
   void _openOrganize(BuildContext context, CandidateDisplayRow row) {
     final candidate = row.candidate!;
-    OutreachLogSheet.show(
+    OrganizingToolkitSheet.show(
       context,
       candidates: [candidate],
       kind: 'canvass',
@@ -1047,9 +1349,9 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
           const SizedBox(height: 12),
           _emptyBox(
             p,
-            circle: MoydMapTheme.unityBlue.withValues(alpha: 0.12),
+            circle: p.accent.withValues(alpha: 0.12),
             icon: Icons.group_add_outlined,
-            iconColor: MoydMapTheme.unityBlue,
+            iconColor: p.accent,
             title: 'No members here yet',
             body: 'No MOYD members live in this area on record.',
           ),
@@ -1104,7 +1406,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
               child: Checkbox(
                 value: headerTri,
                 tristate: true,
-                activeColor: MoydMapTheme.unityBlue,
+                activeColor: p.accent,
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 onChanged: displayedSelectable.isEmpty
@@ -1306,7 +1608,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
       dense: true,
       title: Text(label),
       trailing: selected
-          ? const Icon(Icons.check, color: MoydMapTheme.unityBlue)
+          ? Icon(Icons.check, color: VolunteersTheme.of(ctx).accent)
           : null,
       onTap: () => Navigator.pop(ctx, value),
     );
@@ -1337,14 +1639,13 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
-            color: active ? MoydMapTheme.unityBlue : p.inset,
+            color: active ? p.accent : p.inset,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-                color: active ? MoydMapTheme.unityBlue : p.divider),
+            border: Border.all(color: active ? p.accent : p.divider),
           ),
           child: Text(label,
               style: TextStyle(
-                  color: active ? Colors.white : p.text,
+                  color: active ? p.onAccent : p.text,
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700)),
         ),
@@ -1363,22 +1664,21 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
         child: Container(
           padding: const EdgeInsets.fromLTRB(12, 7, 8, 7),
           decoration: BoxDecoration(
-            color: active ? MoydMapTheme.unityBlue : p.inset,
+            color: active ? p.accent : p.inset,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-                color: active ? MoydMapTheme.unityBlue : p.divider),
+            border: Border.all(color: active ? p.accent : p.divider),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(label,
                   style: TextStyle(
-                      color: active ? Colors.white : p.text,
+                      color: active ? p.onAccent : p.text,
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700)),
               const SizedBox(width: 2),
               Icon(Icons.arrow_drop_down,
-                  size: 18, color: active ? Colors.white : p.secondary),
+                  size: 18, color: active ? p.onAccent : p.secondary),
             ],
           ),
         ),
@@ -1401,7 +1701,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
             width: 34,
             child: Checkbox(
               value: selected,
-              activeColor: MoydMapTheme.unityBlue,
+              activeColor: p.accent,
               visualDensity: VisualDensity.compact,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               onChanged: selectable
@@ -1627,7 +1927,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
               child: TextButton.icon(
                 onPressed: () => widget.onLogOutreach!(_selectedMembers),
                 icon: const Icon(Icons.edit_note_outlined, size: 18),
-                label: const Text('Log outreach'),
+                label: const Text('Plan activity'),
                 style: TextButton.styleFrom(
                   foregroundColor: p.action,
                   textStyle: const TextStyle(
@@ -1783,7 +2083,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
       case _AddToActivityKind.newActivity:
         // Seed the create sheet with the selection and the region's single geo
         // key; the other three geo lists stay empty. Candidates are Phase 4.
-        await OutreachLogSheet.show(
+        await OrganizingToolkitSheet.show(
           context,
           participants: members,
           counties: _d.mode == MapMode.county ? [_d.id] : const <String>[],
@@ -2093,10 +2393,11 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
     required bool enabled,
     required VoidCallback onTap,
   }) {
+    final p = _Palette.of(context);
     return Opacity(
       opacity: enabled ? 1 : 0.45,
       child: Material(
-        color: MoydMapTheme.unityBlue,
+        color: p.accent,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: enabled ? onTap : null,
@@ -2107,11 +2408,11 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 17, color: Colors.white),
+                Icon(icon, size: 17, color: p.onAccent),
                 const SizedBox(width: 7),
                 Text(label,
-                    style: const TextStyle(
-                        color: Colors.white,
+                    style: TextStyle(
+                        color: p.onAccent,
                         fontSize: 14,
                         fontWeight: FontWeight.w800)),
               ],
@@ -2130,7 +2431,7 @@ Widget _sectionHeader(_Palette p, String label) => Row(
           width: 20,
           height: 3,
           decoration: BoxDecoration(
-            color: MoydMapTheme.gold,
+            color: p.highlight,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -2152,11 +2453,11 @@ Widget _panelSpinner(_Palette p, String label) => Padding(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(
+            SizedBox(
               width: 26,
               height: 26,
               child: CircularProgressIndicator(
-                  strokeWidth: 2.5, color: MoydMapTheme.unityBlue),
+                  strokeWidth: 2.5, color: p.accent),
             ),
             const SizedBox(height: 12),
             Text(label, style: TextStyle(color: p.secondary, fontSize: 12.5)),
@@ -2333,15 +2634,14 @@ class _AddToActivitySheetState extends State<_AddToActivitySheet> {
               _header(n),
               Flexible(
                 child: _loading
-                    ? const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 40),
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 40),
                         child: Center(
                           child: SizedBox(
                             width: 26,
                             height: 26,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: MoydMapTheme.unityBlue),
+                                strokeWidth: 2.5, color: p.accent),
                           ),
                         ),
                       )
@@ -2364,52 +2664,58 @@ class _AddToActivitySheetState extends State<_AddToActivitySheet> {
     );
   }
 
-  Widget _header(int n) => Container(
-        color: MoydMapTheme.navy,
-        padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const Icon(Icons.playlist_add, color: Colors.white, size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Add $n member${n == 1 ? '' : 's'} to an activity',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 5),
-                  Container(
-                    width: 40,
-                    height: 3,
-                    decoration: BoxDecoration(
-                      color: MoydMapTheme.gold,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+  Widget _header(int n) {
+    final p = _Palette.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: p.surface,
+        border: Border(bottom: BorderSide(color: p.divider)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(Icons.playlist_add, color: p.accent, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Add $n member${n == 1 ? '' : 's'} to an activity',
+                    style: TextStyle(
+                        color: p.text,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800)),
+                const SizedBox(height: 5),
+                Container(
+                  width: 40,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: p.accent,
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                ],
-              ),
-            ),
-            InkWell(
-              onTap: () => Navigator.of(context).pop(),
-              borderRadius: BorderRadius.circular(18),
-              child: Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.16),
-                  shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.close, color: Colors.white, size: 18),
-              ),
+              ],
             ),
-          ],
-        ),
-      );
+          ),
+          InkWell(
+            onTap: () => Navigator.of(context).pop(),
+            borderRadius: BorderRadius.circular(18),
+            child: Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: p.inset,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.close, color: p.secondary, size: 18),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _newActivityTile(_Palette p) => Material(
         color: Colors.transparent,
@@ -2422,10 +2728,9 @@ class _AddToActivitySheetState extends State<_AddToActivitySheet> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
-              color: MoydMapTheme.unityBlue.withValues(alpha: 0.08),
+              color: p.accent.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
-              border:
-                  Border.all(color: MoydMapTheme.unityBlue.withValues(alpha: 0.5)),
+              border: Border.all(color: p.accent.withValues(alpha: 0.5)),
             ),
             child: Row(
               children: [
@@ -2477,11 +2782,11 @@ class _AddToActivitySheetState extends State<_AddToActivitySheet> {
                   height: 34,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: MoydMapTheme.unityBlue.withValues(alpha: 0.12),
+                    color: p.accentSoft,
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(kind?.icon ?? a.kindIcon,
-                      size: 18, color: MoydMapTheme.unityBlue),
+                      size: 18, color: p.onAccentSoft),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

@@ -3,17 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:bluebubbles/models/crm/outreach_activity.dart';
 import 'package:bluebubbles/services/crm/outreach_repository.dart';
 import 'package:bluebubbles/screens/crm/volunteers/activity_detail_screen.dart';
-import 'package:bluebubbles/screens/crm/volunteers/outreach_log_sheet.dart';
-import 'package:bluebubbles/screens/crm/volunteers/volunteers_map_models.dart';
+import 'package:bluebubbles/screens/crm/volunteers/organizing_toolkit_sheet.dart';
+import 'package:bluebubbles/screens/crm/volunteers/volunteers_theme.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  ACTIVITIES HUB (Tab 2 of the War Room workspace)
 //
-//  Org-wide list of volunteer activities over OutreachRepository, with a
-//  status/kind/date filter bar and a "+ New Activity" that reuses the
-//  shipped OutreachLogSheet create flow. Row tap pushes ActivityDetailScreen.
-//  Per-row roster/nominee/attended counts are loaded lazily and cached so the
-//  list never fires hundreds of queries up front.
+//  Org-wide list of organizing activities over OutreachRepository, with a
+//  status/kind/date filter bar and a "Plan activity" button that reuses the
+//  shipped OrganizingToolkitSheet create flow. Row tap pushes
+//  ActivityDetailScreen. Per-row roster/nominee/attended counts are loaded
+//  lazily and cached so the list never fires hundreds of queries up front.
 // ═══════════════════════════════════════════════════════════════
 
 /// Quick date lens applied in-memory over the fetched list.
@@ -125,25 +125,29 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
   }
 
   Future<void> _newActivity() async {
-    final saved = await OutreachLogSheet.show(context);
+    final saved = await OrganizingToolkitSheet.show(context);
     if (saved == true) _load();
   }
 
-  // ── Theme tokens ───────────────────────────────────────────────
-  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
-  Color get _bg => _isDark ? const Color(0xFF151B2B) : const Color(0xFFF4F6FA);
-  Color get _surface => _isDark ? const Color(0xFF1B2337) : Colors.white;
-  Color get _inset => _isDark ? const Color(0xFF212B44) : const Color(0xFFEEF1F6);
-  // Blue text/icons on the dark neutral surfaces fall below 4.5:1; lift them to
-  // a lighter blue in dark mode. Solid blue FILLS (with white on them) stay
-  // unityBlue.
-  Color get _action =>
-      _isDark ? const Color(0xFF4D82E0) : MoydMapTheme.unityBlue;
-  Color get _text => _isDark ? const Color(0xFFF4F6FA) : const Color(0xFF1E2637);
-  Color get _secondary =>
-      _isDark ? Colors.white.withValues(alpha: 0.72) : const Color(0xFF5A6478);
-  Color get _divider =>
-      _isDark ? const Color(0xFF2E3A57) : const Color(0xFFE5E9F0);
+  // ── Theme tokens (the ONE VolunteersTheme) ─────────────────────
+  // Page and cards both sit on `surface` and separate with hairline `divider`
+  // borders, exactly like the Slack tabs; chip fills and roundels use `inset`.
+  // `primary` is already light in dark schemes, so the old blue-lift hack is
+  // gone. Accent is the single accent in both themes.
+  VolunteersTheme get _vt => VolunteersTheme.of(context);
+  bool get _isDark => _vt.isDark;
+  Color get _bg => _vt.surface;
+  Color get _surface => _vt.surface;
+  Color get _inset => _vt.inset;
+  Color get _action => _vt.accent;
+  Color get _text => _vt.text;
+  Color get _secondary => _vt.secondary;
+  Color get _divider => _vt.divider;
+  Color get _accent => _vt.accent;
+  Color get _onAccent => _vt.onAccent;
+  Color get _accentSoft => _vt.accentSoft;
+  Color get _onAccentSoft => _vt.onAccentSoft;
+  Color get _danger => _vt.danger;
 
   @override
   Widget build(BuildContext context) {
@@ -175,7 +179,7 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
       child: Row(
         children: [
           Expanded(
-            child: Text('Volunteer activities',
+            child: Text('Organizing activities',
                 style: TextStyle(
                     color: _text, fontSize: 19, fontWeight: FontWeight.w800)),
           ),
@@ -184,21 +188,21 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
             const SizedBox(width: 12),
           ],
           Material(
-            color: MoydMapTheme.unityBlue,
+            color: _accent,
             borderRadius: BorderRadius.circular(10),
             child: InkWell(
               onTap: _newActivity,
               borderRadius: BorderRadius.circular(10),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.add, color: Colors.white, size: 18),
-                    SizedBox(width: 6),
-                    Text('New Activity',
+                    Icon(Icons.add, color: _onAccent, size: 18),
+                    const SizedBox(width: 6),
+                    Text('Plan activity',
                         style: TextStyle(
-                            color: Colors.white,
+                            color: _onAccent,
                             fontSize: 13.5,
                             fontWeight: FontWeight.w700)),
                   ],
@@ -320,7 +324,7 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: selected
-                    ? MoydMapTheme.unityBlue.withValues(alpha: _isDark ? 0.28 : 0.12)
+                    ? _accent.withValues(alpha: _isDark ? 0.28 : 0.12)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -366,18 +370,18 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: selected ? MoydMapTheme.unityBlue : Colors.transparent,
+              color: selected ? _accent : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(icon,
-                    size: 16, color: selected ? Colors.white : _secondary),
+                    size: 16, color: selected ? _onAccent : _secondary),
                 const SizedBox(width: 6),
                 Text(label,
                     style: TextStyle(
-                        color: selected ? Colors.white : _secondary,
+                        color: selected ? _onAccent : _secondary,
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700)),
               ],
@@ -595,9 +599,7 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
                     const SizedBox(width: 8),
                     Text('$d ${d == 1 ? 'day' : 'days'} overdue',
                         style: TextStyle(
-                            color: _isDark
-                                ? const Color(0xFFF0B429)
-                                : const Color(0xFF8A6D1D),
+                            color: _danger,
                             fontSize: 11.5,
                             fontWeight: FontWeight.w700)),
                   ],
@@ -618,14 +620,14 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: MoydMapTheme.unityBlue.withValues(alpha: _isDark ? 0.24 : 0.10),
+        color: _accentSoft,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-              color: _isDark ? Colors.white : MoydMapTheme.unityBlue,
+              color: _onAccentSoft,
               fontSize: 11,
               fontWeight: FontWeight.w700)),
     );
@@ -686,12 +688,12 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
   // ── Body ───────────────────────────────────────────────────────
   Widget _body() {
     if (_loading) {
-      return const Center(
+      return Center(
         child: SizedBox(
           width: 26,
           height: 26,
           child: CircularProgressIndicator(
-              strokeWidth: 2.6, color: MoydMapTheme.unityBlue),
+              strokeWidth: 2.6, color: _accent),
         ),
       );
     }
@@ -718,7 +720,7 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
 
     return RefreshIndicator(
       onRefresh: _load,
-      color: MoydMapTheme.unityBlue,
+      color: _accent,
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
         itemCount: visible.length,
@@ -789,9 +791,7 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
                 Text(
                   overdue == 1 ? '1 day overdue' : '$overdue days overdue',
                   style: TextStyle(
-                      color: _isDark
-                          ? MoydMapTheme.gold
-                          : MoydMapTheme.goldText,
+                      color: _danger,
                       fontSize: 12,
                       fontWeight: FontWeight.w800),
                 ),
@@ -809,10 +809,10 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
       height: 40,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: MoydMapTheme.unityBlue.withValues(alpha: _isDark ? 0.22 : 0.10),
+        color: _accentSoft,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Icon(icon, size: 20, color: _action),
+      child: Icon(icon, size: 20, color: _onAccentSoft),
     );
   }
 

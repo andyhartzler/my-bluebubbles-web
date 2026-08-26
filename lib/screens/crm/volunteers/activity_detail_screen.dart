@@ -7,6 +7,7 @@ import 'package:bluebubbles/services/crm/outreach_repository.dart';
 import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
 import 'package:bluebubbles/screens/crm/volunteers/volunteers_map_models.dart';
+import 'package:bluebubbles/screens/crm/volunteers/volunteers_theme.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  ACTIVITY DETAIL (full-screen route)
@@ -245,32 +246,31 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     );
   }
 
-  // ── Theme tokens ───────────────────────────────────────────────
-  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
-  Color get _bg => _isDark ? const Color(0xFF151B2B) : const Color(0xFFF4F6FA);
-  Color get _surface => _isDark ? const Color(0xFF1B2337) : Colors.white;
-  Color get _inset => _isDark ? const Color(0xFF212B44) : const Color(0xFFEEF1F6);
-  // Blue text/icons on the dark neutral surfaces fall below 4.5:1; lift them to
-  // a lighter blue in dark mode. Solid blue FILLS (with white on them) stay
-  // unityBlue.
-  Color get _action =>
-      _isDark ? const Color(0xFF4D82E0) : MoydMapTheme.unityBlue;
-  Color get _text => _isDark ? const Color(0xFFF4F6FA) : const Color(0xFF1E2637);
-  Color get _secondary =>
-      _isDark ? Colors.white.withValues(alpha: 0.72) : const Color(0xFF5A6478);
-  Color get _divider =>
-      _isDark ? const Color(0xFF2E3A57) : const Color(0xFFE5E9F0);
+  // ── Theme tokens (the ONE VolunteersTheme) ─────────────────────
+  // Page and cards both sit on `surface` and separate with hairline `divider`
+  // borders, exactly like the hub. `primary` is already light in dark schemes,
+  // so the old hand-lifted blue is gone.
+  VolunteersTheme get _vt => VolunteersTheme.of(context);
+  Color get _bg => _vt.surface;
+  Color get _surface => _vt.surface;
+  Color get _inset => _vt.inset;
+  Color get _action => _vt.accent;
+  Color get _text => _vt.text;
+  Color get _secondary => _vt.secondary;
+  Color get _divider => _vt.divider;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: MoydMapTheme.navy,
-        foregroundColor: Colors.white,
+        backgroundColor: _surface,
+        foregroundColor: _text,
+        elevation: 0,
+        shape: Border(bottom: BorderSide(color: _divider)),
         title: Row(
           children: [
-            Icon(_activity.kindIcon, size: 20, color: Colors.white),
+            Icon(_activity.kindIcon, size: 20, color: _action),
             const SizedBox(width: 10),
             Expanded(
               child: Text(_activity.title,
@@ -283,12 +283,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         ),
       ),
       body: _loading
-          ? const Center(
+          ? Center(
               child: SizedBox(
                 width: 26,
                 height: 26,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2.6, color: MoydMapTheme.unityBlue),
+                    strokeWidth: 2.6, color: _action),
               ),
             )
           : _errored
@@ -622,6 +622,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   }
 
   Widget _attendanceControl(ActivityRosterEntry entry) {
+    // Active segment = solid status fill with white text (the same language as
+    // the status chips), which clears 4.5:1 in both themes. Tinted-fill +
+    // colored-text could not reach that on the dark inset.
     Widget seg({
       required String label,
       required bool active,
@@ -637,14 +640,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               height: 32,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: active
-                    ? activeColor.withValues(alpha: _isDark ? 0.30 : 0.14)
-                    : Colors.transparent,
+                color: active ? activeColor : Colors.transparent,
                 borderRadius: BorderRadius.circular(7),
               ),
               child: Text(label,
                   style: TextStyle(
-                      color: active ? activeColor : _secondary,
+                      color: active ? Colors.white : _secondary,
                       fontSize: 12,
                       fontWeight: FontWeight.w700)),
             ),
@@ -667,7 +668,9 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           seg(
             label: 'Unrecorded',
             active: entry.attended == null,
-            activeColor: _secondary,
+            // The cancelled-status grey: white text on it clears 4.5:1 in both
+            // themes, where `_secondary` (light in dark mode) would not.
+            activeColor: const Color(0xFF6B7280),
             onTap: null,
           ),
           seg(
@@ -715,12 +718,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   Widget _readChip(String label) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: MoydMapTheme.unityBlue.withValues(alpha: 0.12),
+          color: _vt.accentSoft,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(label,
             style: TextStyle(
-                color: _action,
+                color: _vt.onAccentSoft,
                 fontSize: 11,
                 fontWeight: FontWeight.w800)),
       );

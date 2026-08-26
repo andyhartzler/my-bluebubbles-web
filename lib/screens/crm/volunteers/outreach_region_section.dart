@@ -3,15 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:bluebubbles/models/crm/outreach_activity.dart';
 import 'package:bluebubbles/services/crm/outreach_repository.dart';
 
-import 'outreach_log_sheet.dart';
+import 'organizing_toolkit_sheet.dart';
 import 'volunteers_map_models.dart';
+import 'volunteers_theme.dart';
 
 // ═══════════════════════════════════════════════════════════════
-//  REGION OUTREACH SECTION (Layer 2 of Candidate Volunteers)
-//  The recent-outreach list mounted in the region detail panel between the
+//  REGION ORGANIZING SECTION (Layer 2 of Candidate Volunteers)
+//  The recent-activity list mounted in the region detail panel between the
 //  candidates and members sections. Loads the activities that covered the
 //  current region and renders them as compact rows; tapping a row opens the
-//  OutreachLogSheet in edit/read mode.
+//  OrganizingToolkitSheet in edit/read mode.
 // ═══════════════════════════════════════════════════════════════
 
 class RegionOutreachSection extends StatefulWidget {
@@ -69,24 +70,22 @@ class _RegionOutreachSectionState extends State<RegionOutreachSection> {
   }
 
   Future<void> _open(OutreachActivity activity) async {
-    final saved = await OutreachLogSheet.show(context, existing: activity);
+    final saved = await OrganizingToolkitSheet.show(context, existing: activity);
     if (saved == true) _load();
   }
 
-  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
-  Color get _inset => _isDark ? const Color(0xFF212B44) : const Color(0xFFF4F6FA);
-  Color get _text => _isDark ? const Color(0xFFF4F6FA) : const Color(0xFF1E2637);
-  Color get _secondary =>
-      _isDark ? Colors.white.withValues(alpha: 0.72) : const Color(0xFF5A6478);
-  Color get _divider =>
-      _isDark ? const Color(0xFF2E3A57) : const Color(0xFFE5E9F0);
+  VolunteersTheme get _vt => VolunteersTheme.of(context);
+  Color get _inset => _vt.inset;
+  Color get _text => _vt.text;
+  Color get _secondary => _vt.secondary;
+  Color get _divider => _vt.divider;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader('OUTREACH'),
+        _sectionHeader('ORGANIZING'),
         const SizedBox(height: 12),
         if (_loading)
           _spinner()
@@ -104,7 +103,7 @@ class _RegionOutreachSectionState extends State<RegionOutreachSection> {
             width: 20,
             height: 3,
             decoration: BoxDecoration(
-              color: MoydMapTheme.gold,
+              color: _vt.accent,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -120,14 +119,14 @@ class _RegionOutreachSectionState extends State<RegionOutreachSection> {
         ],
       );
 
-  Widget _spinner() => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
+  Widget _spinner() => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
         child: Center(
           child: SizedBox(
             width: 22,
             height: 22,
             child: CircularProgressIndicator(
-                strokeWidth: 2.4, color: MoydMapTheme.unityBlue),
+                strokeWidth: 2.4, color: _vt.accent),
           ),
         ),
       );
@@ -139,7 +138,7 @@ class _RegionOutreachSectionState extends State<RegionOutreachSection> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: _divider),
         ),
-        child: Text('No outreach logged here yet.',
+        child: Text('Nothing organized here yet.',
             style: TextStyle(color: _secondary, fontSize: 12.5)),
       );
 
@@ -165,11 +164,11 @@ class _RegionOutreachSectionState extends State<RegionOutreachSection> {
                   height: 34,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: MoydMapTheme.unityBlue.withValues(alpha: 0.12),
+                    color: _vt.accentSoft,
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(a.kindIcon,
-                      size: 18, color: MoydMapTheme.unityBlue),
+                      size: 18, color: _vt.onAccentSoft),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

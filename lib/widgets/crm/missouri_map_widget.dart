@@ -9,7 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/screens/crm/volunteers/volunteers_map_models.dart'
-    show MoydMapTheme, moMapOptions;
+    show moMapOptions;
 
 // ═══════════════════════════════════════════════════════════════
 //  MISSOURI MAP WIDGET — flutter_map + real GeoJSON districts
@@ -18,6 +18,27 @@ import 'package:bluebubbles/screens/crm/volunteers/volunteers_map_models.dart'
 //  Census TIGER/Line, color-coded by candidate status.
 //  Supports toggle between district types, tap, zoom, pan.
 // ═══════════════════════════════════════════════════════════════
+
+/// Map-surface tokens for THIS tile-based widget only. Moved here from
+/// volunteers_map_models.dart when the Candidate Volunteers area switched to
+/// the scheme-driven VolunteersTheme; this widget is the sole consumer now.
+class MoydMapTheme {
+  MoydMapTheme._();
+
+  static const Color navy = Color(0xFF273351);
+
+  /// State-outline stroke in dark mode (strokes/rings only, never body text).
+  static const Color gold = Color(0xFFF0B429);
+
+  /// Out-of-state mask fill, matched to the active theme's map surface.
+  static const Color maskLight = Color(0xFFEFF2F6);
+  static const Color maskDark = Color(0xFF1B2130);
+  static Color maskColor(bool dark) => dark ? maskDark : maskLight;
+
+  /// CartoDB basemap URL template for the active theme (light_all / dark_all).
+  static String tileTemplate(bool dark) =>
+      'https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png';
+}
 
 /// Which set of district boundaries to display.
 enum DistrictType { house, senate, congressional }

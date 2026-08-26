@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/screens/crm/volunteers/activities_hub_screen.dart';
 import 'package:bluebubbles/screens/crm/volunteers/candidate_volunteers_map.dart';
-import 'package:bluebubbles/screens/crm/volunteers/volunteers_map_models.dart';
+import 'package:bluebubbles/screens/crm/volunteers/volunteers_theme.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATE VOLUNTEERS WORKSPACE (the "War Room" shell)
@@ -42,9 +42,14 @@ class _CandidateVolunteersWorkspaceState
           // toggles which is painted, so the map keeps its region + zoom.
           child: IndexedStack(
             index: _tab.index,
-            children: const [
-              CandidateVolunteersMap(),
-              ActivitiesHubScreen(),
+            children: [
+              CandidateVolunteersMap(
+                // The statewide rail's "All activities" link and "This week"
+                // footer flip us to the Activities tab.
+                onOpenActivities: () =>
+                    setState(() => _tab = _WorkspaceTab.activities),
+              ),
+              const ActivitiesHubScreen(),
             ],
           ),
         ),
@@ -54,8 +59,8 @@ class _CandidateVolunteersWorkspaceState
 }
 
 /// Compact sub-tab strip sitting under the Candidates area switcher. Uses a 2px
-/// unityBlue underline for the active tab so it reads as a nested tab rather
-/// than a second heavyweight segmented control. Legible in both themes.
+/// accent underline for the active tab so it reads as a nested tab rather than a
+/// second heavyweight segmented control. Legible in both themes.
 class _TabBar extends StatelessWidget {
   const _TabBar({required this.active, required this.onChanged});
 
@@ -64,21 +69,19 @@ class _TabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF1B2337) : Colors.white;
-    final divider = isDark ? const Color(0xFF2E3A57) : const Color(0xFFE5E9F0);
+    final vt = VolunteersTheme.of(context);
 
     return Container(
       height: 48,
       decoration: BoxDecoration(
-        color: surface,
-        border: Border(bottom: BorderSide(color: divider)),
+        color: vt.surface,
+        border: Border(bottom: BorderSide(color: vt.divider)),
       ),
       child: Row(
         children: [
-          _tab(context, _WorkspaceTab.map, 'MAP', Icons.map_outlined, isDark),
+          _tab(context, _WorkspaceTab.map, 'MAP', Icons.map_outlined, vt),
           _tab(context, _WorkspaceTab.activities, 'ACTIVITIES',
-              Icons.event_note_outlined, isDark),
+              Icons.event_note_outlined, vt),
         ],
       ),
     );
@@ -89,12 +92,11 @@ class _TabBar extends StatelessWidget {
     _WorkspaceTab tab,
     String label,
     IconData icon,
-    bool isDark,
+    VolunteersTheme vt,
   ) {
     final selected = active == tab;
-    const activeColor = MoydMapTheme.unityBlue;
-    final idle = isDark ? Colors.white.withValues(alpha: 0.62) : const Color(0xFF5A6478);
-    final fg = selected ? activeColor : idle;
+    final activeColor = vt.accent;
+    final fg = selected ? activeColor : vt.secondary;
 
     return Material(
       color: Colors.transparent,

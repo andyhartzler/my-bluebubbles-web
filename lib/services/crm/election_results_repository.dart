@@ -75,6 +75,31 @@ class ElectionResultsRepository {
   static const _columns =
       'office_raw, office_type, district, candidate_name, party, votes, pct, advanced';
 
+  /// Classify a free-text office label (e.g. 'State Representative',
+  /// 'U.S. Representative', 'State Senator') into the [ElectionResult.officeType]
+  /// value used to key a race: 'congressional' | 'senate' | 'house'. Returns
+  /// null when the office is not a districted legislative seat (statewide,
+  /// judicial, county, ...), which have no per-district primary field here.
+  static String? officeTypeFor(String office) {
+    final o = office.toLowerCase();
+    if (o.contains('congress') ||
+        o.contains('u.s. rep') ||
+        o.contains('us rep') ||
+        o.contains('u.s. house')) {
+      return 'congressional';
+    }
+    if (o.contains('state senate') || o.contains('state senator')) {
+      return 'senate';
+    }
+    if (o.contains('state rep') ||
+        o.contains('representative') ||
+        o.contains('house') ||
+        o.contains('assembly')) {
+      return 'house';
+    }
+    return null;
+  }
+
   /// All result rows, loaded once and cached.
   Future<List<ElectionResult>> getAll() async {
     if (_cache != null) return _cache!;
