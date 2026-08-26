@@ -4,6 +4,7 @@ import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 
+import 'outreach_region_section.dart';
 import 'volunteers_map_models.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -115,9 +116,10 @@ class VolunteersDetailPanel extends StatelessWidget {
   final void Function(List<Member> members) onTextMembers;
   final void Function(List<Member> members) onEmailMembers;
 
-  /// Layer 2 outreach logging. Null-safe: the "Log outreach" button is hidden
-  /// entirely while this is null.
-  final VoidCallback? onLogOutreach;
+  /// Layer 2 outreach logging. Receives the currently selected members so the
+  /// map can seed the outreach sheet's participant roster. Null-safe: the "Log
+  /// outreach" button is hidden entirely while this is null.
+  final void Function(List<Member> members)? onLogOutreach;
 
   /// Supplied on the mobile draggable sheet so the single scroll view drives
   /// drag-to-expand. Null on desktop (the rail owns its own controller).
@@ -296,7 +298,7 @@ class _RegionDetailView extends StatefulWidget {
   final VoidCallback onClose;
   final void Function(List<Member> members) onTextMembers;
   final void Function(List<Member> members) onEmailMembers;
-  final VoidCallback? onLogOutreach;
+  final void Function(List<Member> members)? onLogOutreach;
   final ScrollController? scrollController;
   final bool showCloseButton;
 
@@ -349,6 +351,11 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
           _selectedIds.contains(m.id) && (m.preferredEmail ?? '').isNotEmpty)
       .toList();
 
+  /// Every selected member, regardless of contact capability — seeds the
+  /// outreach sheet's participant roster.
+  List<Member> get _selectedMembers =>
+      _d.members.where((m) => _selectedIds.contains(m.id)).toList();
+
   @override
   Widget build(BuildContext context) {
     _seedIfNeeded();
@@ -368,6 +375,8 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
               _sectionHeader(p, 'CANDIDATES — NOVEMBER GENERAL'),
               const SizedBox(height: 12),
               _candidateSection(context, p),
+              const SizedBox(height: 24),
+              RegionOutreachSection(mode: _d.mode, regionId: _d.id),
               const SizedBox(height: 24),
               _membersSection(context, p),
             ],
@@ -1053,7 +1062,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
             SizedBox(
               width: double.infinity,
               child: TextButton.icon(
-                onPressed: widget.onLogOutreach,
+                onPressed: () => widget.onLogOutreach!(_selectedMembers),
                 icon: const Icon(Icons.edit_note_outlined, size: 18),
                 label: const Text('Log outreach'),
                 style: TextButton.styleFrom(

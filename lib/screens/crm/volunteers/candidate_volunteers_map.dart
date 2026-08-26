@@ -18,6 +18,7 @@ import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
 
+import 'outreach_log_sheet.dart';
 import 'volunteers_map_models.dart';
 import 'volunteers_detail_panel.dart';
 
@@ -594,31 +595,104 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   }
 
   // ── Member actions ─────────────────────────────────────────────
-  void _textMembers(List<Member> people) {
+  Future<void> _textMembers(List<Member> people) async {
     final valid = people.where((m) => m.canContact).toList();
     if (valid.isEmpty) {
       _snack('None of those members can be texted.');
       return;
     }
-    Navigator.of(context).push(MaterialPageRoute(
+    await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => BulkMessageScreen(initialManualMembers: valid),
     ));
+    if (!mounted) return;
+    _offerLogIt(valid, kind: 'text_bank', channel: 'sms');
   }
 
-  void _emailMembers(List<Member> people) {
+  Future<void> _emailMembers(List<Member> people) async {
     final valid =
         people.where((m) => (m.preferredEmail ?? '').isNotEmpty).toList();
     if (valid.isEmpty) {
       _snack('None of those members have an email on file.');
       return;
     }
-    Navigator.of(context).push(MaterialPageRoute(
+    await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => BulkEmailScreen(initialManualMembers: valid),
     ));
+    if (!mounted) return;
+    _offerLogIt(valid, kind: 'email_blast', channel: 'email');
   }
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  // ── Outreach logging ───────────────────────────────────────────
+  /// The four district lists for the current selection, one populated by the
+  /// selected region's id (county mode → counties, etc.), the rest empty.
+  ({List<String> counties, List<String> cds, List<String> sds, List<String> hds})
+      _selectedGeo() {
+    final id = _selectedId;
+    if (id == null) {
+      return (counties: const [], cds: const [], sds: const [], hds: const []);
+    }
+    switch (_mode) {
+      case MapMode.county:
+        return (counties: [id], cds: const [], sds: const [], hds: const []);
+      case MapMode.congressional:
+        return (counties: const [], cds: [id], sds: const [], hds: const []);
+      case MapMode.senate:
+        return (counties: const [], cds: const [], sds: [id], hds: const []);
+      case MapMode.house:
+        return (counties: const [], cds: const [], sds: const [], hds: [id]);
+    }
+  }
+
+  /// Every real candidate profile tied to the currently selected region.
+  List<Candidate> _selectedCandidates() => _selectedGroups
+      .expand((g) => g.rows)
+      .map((r) => r.candidate)
+      .whereType<Candidate>()
+      .toList();
+
+  void _openOutreachSheet(
+    List<Member> participants, {
+    String? kind,
+    String? channel,
+    String? status,
+    String? titleSuggestion,
+  }) {
+    final geo = _selectedGeo();
+    OutreachLogSheet.show(
+      context,
+      counties: geo.counties,
+      congressionalDistricts: geo.cds,
+      senateDistricts: geo.sds,
+      houseDistricts: geo.hds,
+      candidates: _selectedCandidates(),
+      participants: participants,
+      kind: kind,
+      channel: channel,
+      status: status,
+      titleSuggestion: titleSuggestion,
+    );
+  }
+
+  /// Post-send prompt: offer to record the just-completed bulk send as a
+  /// completed outreach activity, prefilled with its channel and recipients.
+  void _offerLogIt(List<Member> participants,
+      {required String kind, required String channel}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: const Text('Log this as outreach?'),
+      action: SnackBarAction(
+        label: 'Log it',
+        onPressed: () => _openOutreachSheet(
+          participants,
+          kind: kind,
+          channel: channel,
+          status: 'completed',
+        ),
+      ),
+    ));
   }
 
   // ── Search hits ────────────────────────────────────────────────
@@ -763,7 +837,8 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       onSelectHot: _selectRegion,
       onTextMembers: _textMembers,
       onEmailMembers: _emailMembers,
-      onLogOutreach: null,
+      onLogOutreach:
+          _selectedId == null ? null : (members) => _openOutreachSheet(members),
       scrollController: scrollController,
       showCloseButton: showClose,
     );

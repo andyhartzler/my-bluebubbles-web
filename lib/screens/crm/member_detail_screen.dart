@@ -18,6 +18,7 @@ import 'package:bluebubbles/screens/crm/member_detail/email_history_tab.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/screens/crm/editors/member_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/member_detail/slack_activity_tab.dart';
+import 'package:bluebubbles/screens/crm/volunteers/member_outreach_section.dart';
 import 'package:bluebubbles/services/crm/crm_email_service.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
@@ -2776,6 +2777,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               sectionLayout,
               const SizedBox(height: 24),
             ],
+            MemberOutreachSection(member: _member),
+            const SizedBox(height: 24),
             ElevatedButton.icon(
               icon: Icon(_member.optOut ? Icons.check_circle : Icons.block),
               label: Text(_member.optOut ? 'Opt In' : 'Opt Out'),

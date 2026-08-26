@@ -19,6 +19,7 @@ import 'package:bluebubbles/screens/crm/widgets/socials/candidate_socials_panel.
 import 'package:bluebubbles/screens/crm/candidate_edit_dialog.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/intelligence_profile_section.dart';
+import 'package:bluebubbles/screens/crm/volunteers/candidate_outreach_section.dart';
 import 'package:bluebubbles/screens/crm/mec_committee_picker.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:bluebubbles/screens/crm/mec_donor_screen.dart';
@@ -1533,6 +1534,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
         // ── Filing Information ──
         _buildFilingInfo(),
+        const SizedBox(height: 16),
+
+        // ── Field Outreach (Layer 2) ──
+        CandidateOutreachSection(candidate: c),
         const SizedBox(height: 16),
 
         // ── Quick Action Buttons ──
