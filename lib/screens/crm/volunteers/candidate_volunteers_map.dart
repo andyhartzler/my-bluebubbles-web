@@ -10,7 +10,9 @@ import 'package:latlong2/latlong.dart';
 
 import 'package:bluebubbles/models/crm/candidate.dart' show Candidate;
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/models/crm/outreach_activity.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
+import 'package:bluebubbles/services/crm/outreach_repository.dart';
 import 'package:bluebubbles/services/crm/crosswalk_repository.dart';
 import 'package:bluebubbles/services/crm/election_results_repository.dart';
 import 'package:bluebubbles/services/crm/ge_nominee_repository.dart';
@@ -97,6 +99,14 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 
   // ── Interaction ──
   String? _hoveredId;
+
+  // ── Outreach activity presence (planned/in_progress) ──
+  // One live query, cached in state, then bucketed client-side per MapMode.
+  final _outreach = OutreachRepository();
+  List<OutreachActivity> _activities = const [];
+  final Map<MapMode, Set<String>> _regionsWithActivity = {
+    for (final m in MapMode.values) m: <String>{},
+  };
 
   final _members = MemberRepository();
   final _elections = ElectionResultsRepository();
@@ -205,6 +215,10 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       }
 
       if (mounted) setState(() => _loadingBase = false);
+
+      // Activity presence rides on top of the finished base map, so the
+      // choropleth shows immediately and gold dots resolve a moment later.
+      await _loadActivityCoverage();
     } catch (e) {
       debugPrint('CandidateVolunteersMap bootstrap failed: $e');
       if (mounted) setState(() => _loadingBase = false);
@@ -673,15 +687,15 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       .whereType<Candidate>()
       .toList();
 
-  void _openOutreachSheet(
+  Future<void> _openOutreachSheet(
     List<Member> participants, {
     String? kind,
     String? channel,
     String? status,
     String? titleSuggestion,
-  }) {
+  }) async {
     final geo = _selectedGeo();
-    OutreachLogSheet.show(
+    final saved = await OutreachLogSheet.show(
       context,
       counties: geo.counties,
       congressionalDistricts: geo.cds,
@@ -694,6 +708,8 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       status: status,
       titleSuggestion: titleSuggestion,
     );
+    // A save landed → new dots and counts must appear. Re-run the one query.
+    if (saved == true) await _loadActivityCoverage();
   }
 
   /// Post-send prompt: offer to record the just-completed bulk send as a
@@ -758,6 +774,92 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       if (count > c) bin++;
     }
     return bin.clamp(0, 4);
+  }
+
+  // ── Activity presence ──────────────────────────────────────────
+  /// ONE query for planned/in_progress activities, bucketed client-side into a
+  /// per-mode set of region ids: each activity's geo array is added to the set
+  /// for that mode (county→counties, congressional→congressional_districts,
+  /// house→house_districts, senate→senate_districts). The raw list is cached so
+  /// the selected-region count is computed without re-querying. Handles the
+  /// repo not being ready / an empty result as empty sets, never a crash.
+  Future<void> _loadActivityCoverage() async {
+    List<OutreachActivity> activities;
+    try {
+      activities = await _outreach.listActivities(
+        statuses: const ['planned', 'in_progress'],
+      );
+    } catch (e) {
+      debugPrint('CandidateVolunteersMap activity coverage load failed: $e');
+      activities = const [];
+    }
+
+    final buckets = <MapMode, Set<String>>{
+      for (final m in MapMode.values) m: <String>{},
+    };
+    for (final a in activities) {
+      buckets[MapMode.county]!.addAll(a.counties);
+      buckets[MapMode.congressional]!.addAll(a.congressionalDistricts);
+      buckets[MapMode.house]!.addAll(a.houseDistricts);
+      buckets[MapMode.senate]!.addAll(a.senateDistricts);
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _activities = activities;
+      for (final m in MapMode.values) {
+        _regionsWithActivity[m] = buckets[m]!;
+      }
+    });
+  }
+
+  /// Gold centroid dots for regions in the CURRENT mode that carry at least one
+  /// planned/in_progress activity. Non-interactive: wrapped in [IgnorePointer]
+  /// so a tap on a dot still falls through to region selection. Recomputed on
+  /// build, so a mode change re-derives the visible set from `_mode`.
+  List<Marker> _activityMarkers() {
+    final ids = _regionsWithActivity[_mode] ?? const <String>{};
+    if (ids.isEmpty) return const [];
+    final index = _index[_mode] ?? const <String, RegionData>{};
+    final markers = <Marker>[];
+    for (final id in ids) {
+      final region = index[id];
+      if (region == null) continue;
+      markers.add(Marker(
+        point: region.centroid,
+        width: 16,
+        height: 16,
+        child: const IgnorePointer(child: _ActivityDot()),
+      ));
+    }
+    return markers;
+  }
+
+  /// Count of loaded planned/in_progress activities whose geo array for the
+  /// current mode contains [_selectedId]. Read from the cached list, no query.
+  int _activityCountForSelected() {
+    final id = _selectedId;
+    if (id == null) return 0;
+    var n = 0;
+    for (final a in _activities) {
+      final List<String> geo;
+      switch (_mode) {
+        case MapMode.county:
+          geo = a.counties;
+          break;
+        case MapMode.congressional:
+          geo = a.congressionalDistricts;
+          break;
+        case MapMode.house:
+          geo = a.houseDistricts;
+          break;
+        case MapMode.senate:
+          geo = a.senateDistricts;
+          break;
+      }
+      if (geo.contains(id)) n++;
+    }
+    return n;
   }
 
   // ── Build ──────────────────────────────────────────────────────
@@ -979,6 +1081,15 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
             ),
           ),
 
+          // top-center: region title lockup + "n activities here" chip
+          if (_selectedId != null)
+            Positioned(
+              top: 16,
+              left: 0,
+              right: 0,
+              child: Center(child: _regionTitleLockup(dark)),
+            ),
+
           // bottom-left: member-density legend
           Positioned(
             left: 16,
@@ -1078,6 +1189,9 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
         ),
         PolygonLayer(polygons: polygons, polygonCulling: true),
         MarkerLayer(markers: _youngDemMarkers(reduceMotion)),
+        // Activity presence: gold dots on regions with a planned/in_progress
+        // activity in the current mode, statewide and in region-selected views.
+        MarkerLayer(markers: _activityMarkers()),
       ],
     );
   }
@@ -1372,6 +1486,82 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ── Region title lockup (top-center, selected) ─────────────────
+  /// Translucent lockup over the map: overline + region title, plus a
+  /// gold-accented "n activities here" chip when n > 0. Wrapped in
+  /// [IgnorePointer] so it never swallows a map tap. Both themes clear 4.5:1
+  /// (navy title / navy chip text on light; white title / gold chip text on
+  /// the dark glass surface).
+  Widget _regionTitleLockup(bool dark) {
+    final id = _selectedId;
+    if (id == null) return const SizedBox.shrink();
+    final n = _activityCountForSelected();
+    return IgnorePointer(
+      child: _glass(
+        radius: 12,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_mode.overline,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                    color: dark ? Colors.white70 : const Color(0xFF5A6478),
+                  )),
+              const SizedBox(height: 2),
+              Text(_mode.regionTitle(id),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: dark ? Colors.white : MoydMapTheme.navy,
+                  )),
+              if (n > 0) ...[
+                const SizedBox(height: 6),
+                _activityChip(n, dark),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _activityChip(int n, bool dark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: MoydMapTheme.gold.withValues(alpha: dark ? 0.22 : 0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+            color: MoydMapTheme.gold.withValues(alpha: dark ? 0.7 : 0.55),
+            width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: const BoxDecoration(
+                shape: BoxShape.circle, color: MoydMapTheme.gold),
+          ),
+          const SizedBox(width: 6),
+          Text('$n ${n == 1 ? 'activity' : 'activities'} here',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                // Gold is a badge/stroke colour, never body text on light;
+                // navy on light, gold on the dark glass surface.
+                color: dark ? MoydMapTheme.gold : MoydMapTheme.navy,
+              )),
+        ],
       ),
     );
   }
@@ -1684,6 +1874,32 @@ class _MobileSheet extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
+/// Gold activity-presence dot dropped on a region centroid. Filled gold with a
+/// thin white ring and a soft shadow so it reads over any choropleth fill in
+/// both themes. Purely decorative — the map's tap handling sits above it.
+class _ActivityDot extends StatelessWidget {
+  const _ActivityDot();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: MoydMapTheme.gold,
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 3,
+          ),
         ],
       ),
     );
