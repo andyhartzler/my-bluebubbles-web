@@ -29,8 +29,8 @@ serve(async (req) => {
       // FIXED: Changed to descending order (newest first)
       const { data: allMembers, error: fetchError } = await supabaseClient
         .from('members')
-        .select('id, name, instagram, x, profile_pictures, created_at')
-        .or('instagram.not.is.null,x.not.is.null')
+        .select('id, name, instagram, x, tiktok, profile_pictures, created_at')
+        .or('instagram.not.is.null,x.not.is.null,tiktok.not.is.null')
         .order('created_at', { ascending: false }) // CHANGED: newest first
         .limit(limit * 3)
 
@@ -67,7 +67,7 @@ serve(async (req) => {
         console.log(`\n[${i + 1}/${members.length}] ${member.name} (${member.id})`)
 
         try {
-          const result = await processSingleMember(supabaseClient, member.id, member.instagram, member.x)
+          const result = await processSingleMember(supabaseClient, member.id, member.instagram, member.x, member.tiktok)
           results.push({ 
             memberId: member.id, 
             name: member.name, 
@@ -120,11 +120,11 @@ serve(async (req) => {
 
     const { data: member } = await supabaseClient
       .from('members')
-      .select('instagram, x')
+      .select('instagram, x, tiktok')
       .eq('id', memberId)
       .single()
 
-    const result = await processSingleMember(supabaseClient, memberId, member?.instagram, member?.x)
+    const result = await processSingleMember(supabaseClient, memberId, member?.instagram, member?.x, member?.tiktok)
 
     return new Response(
       JSON.stringify(result),
@@ -143,7 +143,7 @@ serve(async (req) => {
   }
 })
 
-async function processSingleMember(supabaseClient: any, memberId: string, instagram: string | null, x: string | null) {
+async function processSingleMember(supabaseClient: any, memberId: string, instagram: string | null, x: string | null, tiktok: string | null) {
   const profileUrls: { [key: string]: string } = {}
   
   // Try Instagram
@@ -167,6 +167,19 @@ async function processSingleMember(supabaseClient: any, memberId: string, instag
       console.log('  ✓ Twitter found')
     } else {
       console.log('  ✗ Twitter failed')
+    }
+  }
+
+  // Try TikTok (via unavatar.io — free tier serves TikTok avatars; Instagram
+  // is pro-only there, and IG's own endpoints have been dead since ~June 2026)
+  if (tiktok) {
+    console.log('  Fetching TikTok...')
+    const tiktokUrl = await fetchTikTokProfilePicture(tiktok)
+    if (tiktokUrl) {
+      profileUrls.tiktok = tiktokUrl
+      console.log('  ✓ TikTok found')
+    } else {
+      console.log('  ✗ TikTok failed')
     }
   }
 
@@ -411,10 +424,46 @@ async function fetchTwitterProfilePicture(rawHandle: string): Promise<string | n
       return profileUrl ? profileUrl.replace('_normal', '_400x400') : null
     }
     
-    console.log(`    Twitter API status: ${response.status}`)
+    console.log(`    Twitter API status: ${response.status}; trying unavatar`)
+    return await fetchUnavatar('x', username)
+  } catch (error) {
+    console.log(`    Twitter error: ${error?.message || error}; trying unavatar`)
+    return await fetchUnavatar('x', username)
+  }
+}
+
+// unavatar.io proxies public avatars. `fallback=false` makes a miss a 404
+// instead of a generic placeholder image, so a miss stays a miss.
+async function fetchUnavatar(provider: string, username: string): Promise<string | null> {
+  try {
+    const url = `https://unavatar.io/${provider}/${encodeURIComponent(username)}?fallback=false`
+    const res = await fetch(url, { redirect: 'follow' })
+    const type = res.headers.get('content-type') || ''
+    if (res.ok && type.startsWith('image/')) return url
+    console.log(`    unavatar ${provider}/${username}: ${res.status} ${type}`)
     return null
   } catch (error) {
-    console.log(`    Twitter error: ${error?.message || error}`)
+    console.log(`    unavatar error: ${error?.message || error}`)
     return null
   }
+}
+
+function cleanTikTokHandle(input: string): string | null {
+  if (!input) return null
+  let cleaned = input.trim()
+  if (cleaned.includes('tiktok.com/')) {
+    const match = cleaned.match(/tiktok\.com\/@?([^/?#]+)/)
+    if (match && match[1]) cleaned = match[1]
+  }
+  cleaned = cleaned.replace(/^@/, '').replace(/\/$/, '').replace(/\s/g, '')
+  if (!/^[a-zA-Z0-9_.]+$/.test(cleaned) || cleaned.length === 0 || cleaned.length > 24) {
+    return null
+  }
+  return cleaned
+}
+
+async function fetchTikTokProfilePicture(rawHandle: string): Promise<string | null> {
+  const username = cleanTikTokHandle(rawHandle)
+  if (!username) return null
+  return await fetchUnavatar('tiktok', username)
 }
