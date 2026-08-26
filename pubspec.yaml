@@ -502,6 +502,7 @@ flutter:
     - assets/geojson/mo_senate_districts.geojson
     - assets/geojson/mo_congressional_districts.geojson
     - assets/geojson/mo_counties.geojson
+    - assets/geojson/mo_state_outline.geojson
     - assets/icon/facebook-icon.png
     - assets/icon/instagram-icon.png
     - assets/icon/threads-icon.png

@@ -11,10 +11,10 @@ import 'package:latlong2/latlong.dart';
 import 'package:bluebubbles/models/crm/candidate.dart' show Candidate;
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
+import 'package:bluebubbles/services/crm/crosswalk_repository.dart';
 import 'package:bluebubbles/services/crm/election_results_repository.dart';
 import 'package:bluebubbles/services/crm/ge_nominee_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
-import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
 
@@ -22,16 +22,26 @@ import 'volunteers_map_models.dart';
 import 'volunteers_detail_panel.dart';
 
 // ═══════════════════════════════════════════════════════════════
-//  CANDIDATE VOLUNTEERS — "The War Room Map"
-//  A full-bleed interactive Missouri map: four geographies, two
-//  choropleth lenses, tap-a-region → candidates + resident members,
-//  desktop split panel / mobile draggable sheet.
+//  CANDIDATE VOLUNTEERS — "The Field Map"
+//  A Missouri-only interactive map: four geographies, a member-density
+//  choropleth, tap-a-region → candidates + resident members, desktop
+//  right rail / mobile draggable sheet. Missouri is masked so the camera
+//  never wanders into Kansas or Illinois and out-of-state tiles are hidden.
 //
 //  Public entry: CandidateVolunteersMap
 // ═══════════════════════════════════════════════════════════════
 
 const double _kDesktopBreakpoint = 1200;
-const double _kPanelWidth = 400;
+const double _kPanelWidth = 400; // 360–440 rail per spec
+
+/// Rectangle comfortably larger than [moBounds], used as the outer ring of the
+/// out-of-state donut mask. Order: NW, NE, SE, SW.
+final List<LatLng> _kOuterRect = <LatLng>[
+  const LatLng(45, -102),
+  const LatLng(45, -84),
+  const LatLng(30, -84),
+  const LatLng(30, -102),
+];
 
 class CandidateVolunteersMap extends StatefulWidget {
   const CandidateVolunteersMap({super.key, this.height});
@@ -57,18 +67,21 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   static const LatLng _moCenter = LatLng(38.35, -92.45);
   static const double _initialZoom = 6.4;
 
-  // ── Mode + lens ──
+  // ── Mode ──
   MapMode _mode = MapMode.county;
-  MapLens _lens = MapLens.members;
 
   // ── Loaded geometry + reference data ──
   final Map<MapMode, List<RegionData>> _regions = {};
   final Map<MapMode, Map<String, RegionData>> _index = {};
   final Map<MapMode, Map<String, int>> _memberCounts = {};
+  final Map<MapMode, List<int>> _choroplethCuts = {}; // 4 quantile cut points
+  final Map<MapMode, List<int>> _memberRange = {}; // [min, max]
+  List<List<LatLng>> _moOutlineRings = const [];
   Map<String, List<ElectionResult>> _electionByDistrict = const {};
   Map<String, GeNominee> _geLookup = const {};
   final Set<String> _youngDemNames = {};
-  final Map<String, Candidate> _candidateByName = {};
+  // 'officeType:bareDigits(district)' -> candidates classified into that race.
+  final Map<String, List<Candidate>> _candidatesByDistrict = {};
   int _statewideMembers = 0;
   int _statewideYoungDems = 0;
   bool _loadingBase = true;
@@ -76,21 +89,19 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   // ── Selection ──
   String? _selectedId;
   List<Member> _selectedMembers = const [];
-  List<ElectionResult> _selectedCandidates = const [];
+  List<CandidateDisplayGroup> _selectedGroups = const [];
   bool _loadingMembers = false;
-  int _selectionSeq = 0; // guards out-of-order async member loads
+  bool _loadingCandidates = false;
+  int _selectionSeq = 0; // guards out-of-order async loads
 
   // ── Interaction ──
   String? _hoveredId;
-  RegionStatus? _statusFilter; // Lens B legend filter
-  final TextEditingController _searchCtrl = TextEditingController();
-  final FocusNode _searchFocus = FocusNode();
-  bool _searchOpen = false;
 
   final _members = MemberRepository();
   final _elections = ElectionResultsRepository();
   final _nominees = GeNomineeRepository();
   final _candidates = CandidateRepository();
+  final _crosswalk = CrosswalkRepository();
 
   @override
   void initState() {
@@ -113,10 +124,6 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
           if (mounted) setState(() => _cameraMoving = false);
         }
       });
-    _searchCtrl.addListener(() => setState(() {}));
-    _searchFocus.addListener(() {
-      setState(() => _searchOpen = _searchFocus.hasFocus);
-    });
     _bootstrap();
   }
 
@@ -125,8 +132,6 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     _pulseController.dispose();
     _cameraController.dispose();
     _mapController.dispose();
-    _searchCtrl.dispose();
-    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -146,6 +151,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
         _nominees.getLookup(),
         _candidates.fetchAllCandidates(),
         _members.countEligibleMembers(),
+        _parseOutline(),
       ]);
 
       _regions[MapMode.county] = results[0] as List<RegionData>;
@@ -160,10 +166,15 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       _geLookup = results[9] as Map<String, GeNominee>;
       final candidates = results[10] as List<Candidate>;
       _statewideMembers = results[11] as int;
+      _moOutlineRings = results[12] as List<List<LatLng>>;
 
       for (final c in candidates) {
         if (c.name.isEmpty) continue;
-        _candidateByName[normalizeName(c.name)] = c;
+        final ot = _candidateOfficeType(c.office);
+        final d = c.district == null ? null : bareDigits(c.district!);
+        if (ot != null && d != null && d.isNotEmpty) {
+          (_candidatesByDistrict['$ot:$d'] ??= <Candidate>[]).add(c);
+        }
         if (c.isYoungDem && c.isDemocrat) {
           _youngDemNames.add(normalizeName(c.name));
         }
@@ -175,7 +186,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 
       for (final mode in MapMode.values) {
         final counts = _memberCounts[mode] ?? const {};
-        final regions = _regions[mode] ?? const [];
+        final regions = _regions[mode] ?? const <RegionData>[];
         final index = <String, RegionData>{};
         for (final r in regions) {
           r.memberCount = counts[r.id] ?? 0;
@@ -183,6 +194,13 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
           index[r.id] = r;
         }
         _index[mode] = index;
+        final vals = regions.map((r) => r.memberCount).toList();
+        _choroplethCuts[mode] = _computeQuantileCuts(vals);
+        if (vals.isEmpty) {
+          _memberRange[mode] = const [0, 0];
+        } else {
+          _memberRange[mode] = [vals.reduce(math.min), vals.reduce(math.max)];
+        }
       }
 
       if (mounted) setState(() => _loadingBase = false);
@@ -235,6 +253,34 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     return out;
   }
 
+  /// Parse the dissolved Missouri outline into the outer boundary ring(s) used
+  /// as the hole in the out-of-state mask. Same ring-parsing as [_parseGeoJson].
+  Future<List<List<LatLng>>> _parseOutline() async {
+    try {
+      final raw =
+          await rootBundle.loadString('assets/geojson/mo_state_outline.geojson');
+      final geo = json.decode(raw) as Map<String, dynamic>;
+      final features = geo['features'] as List<dynamic>;
+      final rings = <List<LatLng>>[];
+      for (final feature in features) {
+        final geometry = feature['geometry'] as Map<String, dynamic>;
+        final type = geometry['type'] as String;
+        final coords = geometry['coordinates'];
+        if (type == 'Polygon') {
+          rings.add(_parseRing((coords as List).first as List));
+        } else if (type == 'MultiPolygon') {
+          for (final poly in coords as List) {
+            rings.add(_parseRing((poly as List).first as List));
+          }
+        }
+      }
+      return rings;
+    } catch (e) {
+      debugPrint('CandidateVolunteersMap outline parse failed: $e');
+      return const [];
+    }
+  }
+
   List<LatLng> _parseRing(List ring) => ring
       .map<LatLng>((c) => LatLng(
             (c[1] as num).toDouble(),
@@ -261,6 +307,134 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 
   List<RegionData> get _activeRegions => _regions[_mode] ?? const [];
 
+  // ── Candidate office classification ────────────────────────────
+  String? _candidateOfficeType(String office) {
+    final o = office.toLowerCase();
+    if (o.contains('congress') ||
+        o.contains('u.s. rep') ||
+        o.contains('us rep') ||
+        o.contains('u.s. house')) {
+      return 'congressional';
+    }
+    if (o.contains('state senate') || o.contains('state senator')) {
+      return 'senate';
+    }
+    if (o.contains('state rep') ||
+        o.contains('representative') ||
+        o.contains('house') ||
+        o.contains('assembly')) {
+      return 'house';
+    }
+    return null;
+  }
+
+  String _officeTypeLabel(String ot) {
+    switch (ot) {
+      case 'congressional':
+        return 'Congressional';
+      case 'senate':
+        return 'Senate';
+      case 'house':
+        return 'House';
+      default:
+        return ot;
+    }
+  }
+
+  String _districtChipLabel(String ot, String d) {
+    switch (ot) {
+      case 'congressional':
+        return 'CD $d';
+      case 'senate':
+        return 'SD $d';
+      case 'house':
+        return 'HD $d';
+      default:
+        return d;
+    }
+  }
+
+  /// Best-effort name match: casefold + strip punctuation via [normalizeName].
+  Candidate? _matchResultToCandidate(
+      String officeType, String district, ElectionResult r) {
+    final list = _candidatesByDistrict['$officeType:$district'];
+    if (list == null) return null;
+    final target = normalizeName(r.candidateName);
+    for (final c in list) {
+      if (normalizeName(c.name) == target) return c;
+    }
+    return null;
+  }
+
+  List<CandidateDisplayRow> _rowsForDistrict(String officeType, String district) {
+    final rows = <CandidateDisplayRow>[];
+    final used = <String>{};
+    final results = _electionByDistrict['$officeType:$district'] ?? const [];
+    for (final r in results) {
+      final cand = _matchResultToCandidate(officeType, district, r);
+      if (cand != null) used.add(cand.id);
+      rows.add(CandidateDisplayRow(
+        result: r,
+        candidate: cand,
+        isNominee: r.advanced,
+      ));
+    }
+    // Candidates in this district with no result row, appended after.
+    final extra = _candidatesByDistrict['$officeType:$district'] ?? const [];
+    for (final c in extra) {
+      if (used.contains(c.id)) continue;
+      rows.add(CandidateDisplayRow(candidate: c, isNominee: false));
+    }
+    return rows;
+  }
+
+  /// District modes yield a single office-typed group for the selected seat.
+  List<CandidateDisplayGroup> _districtGroups(MapMode mode, String id) {
+    final ot = mode.officeType;
+    if (ot == null) return const [];
+    final rows = _rowsForDistrict(ot, id);
+    if (rows.isEmpty) return const [];
+    return [
+      CandidateDisplayGroup(
+        officeTypeLabel: _officeTypeLabel(ot),
+        districtChips: [_districtChipLabel(ot, id)],
+        rows: rows,
+      ),
+    ];
+  }
+
+  /// County mode: borrow the candidate rows of the districts that overlap the
+  /// county, grouped by office type (Congressional, Senate, House).
+  Future<List<CandidateDisplayGroup>> _countyGroups(String countyId) async {
+    final norm = Member.normalizeCountyLabel(countyId) ?? countyId;
+    final cw = (await _crosswalk.getCountyCrosswalk())[norm];
+    if (cw == null) return const [];
+    const order = <List<String>>[
+      ['congressional', 'Congressional'],
+      ['senate', 'Senate'],
+      ['house', 'House'],
+    ];
+    final groups = <CandidateDisplayGroup>[];
+    for (final entry in order) {
+      final ot = entry[0];
+      final label = entry[1];
+      final districts = cw[ot] ?? const [];
+      if (districts.isEmpty) continue;
+      final chips = <String>[];
+      final rows = <CandidateDisplayRow>[];
+      for (final d in districts) {
+        chips.add(_districtChipLabel(ot, d));
+        rows.addAll(_rowsForDistrict(ot, d));
+      }
+      groups.add(CandidateDisplayGroup(
+        officeTypeLabel: label,
+        districtChips: chips,
+        rows: rows,
+      ));
+    }
+    return groups;
+  }
+
   // ── Selection ──────────────────────────────────────────────────
   void _selectRegion(MapMode mode, String id) {
     final seq = ++_selectionSeq;
@@ -269,18 +443,16 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       _mode = mode;
       _selectedId = id;
       _hoveredId = null;
-      _selectedCandidates = mode.isDistrict
-          ? (_electionByDistrict['${mode.officeType}:$id'] ?? const [])
-          : const [];
+      _selectedGroups = mode.isDistrict ? _districtGroups(mode, id) : const [];
+      _loadingCandidates = !mode.isDistrict; // county resolves async
       _selectedMembers = const [];
       _loadingMembers = true;
-      _searchOpen = false;
     });
-    _searchFocus.unfocus();
     if (region != null) {
       _flyTo(region.centroid, _selectionZoom(mode));
     }
     _loadMembers(mode, id, seq);
+    if (!mode.isDistrict) _loadCountyGroups(id, seq);
   }
 
   double _selectionZoom(MapMode mode) {
@@ -327,12 +499,28 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     }
   }
 
+  Future<void> _loadCountyGroups(String id, int seq) async {
+    try {
+      final groups = await _countyGroups(id);
+      if (!mounted || seq != _selectionSeq) return;
+      setState(() {
+        _selectedGroups = groups;
+        _loadingCandidates = false;
+      });
+    } catch (e) {
+      debugPrint('CandidateVolunteersMap county candidates load failed: $e');
+      if (!mounted || seq != _selectionSeq) return;
+      setState(() => _loadingCandidates = false);
+    }
+  }
+
   void _clearSelection() {
     setState(() {
       _selectedId = null;
       _selectedMembers = const [];
-      _selectedCandidates = const [];
+      _selectedGroups = const [];
       _loadingMembers = false;
+      _loadingCandidates = false;
     });
   }
 
@@ -343,19 +531,11 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       _selectedId = null;
       _hoveredId = null;
       _selectedMembers = const [];
-      _selectedCandidates = const [];
+      _selectedGroups = const [];
       _loadingMembers = false;
-      _statusFilter = null;
+      _loadingCandidates = false;
     });
     _flyTo(_moCenter, _initialZoom);
-  }
-
-  void _changeLens(MapLens lens) {
-    if (lens == _lens) return;
-    setState(() {
-      _lens = lens;
-      if (lens == MapLens.members) _statusFilter = null;
-    });
   }
 
   // ── Camera ─────────────────────────────────────────────────────
@@ -374,7 +554,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 
   void _zoomBy(double delta) {
     final camera = _mapController.camera;
-    final z = (camera.zoom + delta).clamp(5.5, 12.0);
+    final z = (camera.zoom + delta).clamp(6.0, 12.0);
     _mapController.move(camera.center, z);
   }
 
@@ -389,7 +569,11 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     final ll = _mapController.camera.pointToLatLng(
         math.Point(localPosition.dx, localPosition.dy));
     for (final r in _activeRegions) {
-      if (pointInPolygon(ll, r.outerRing)) return r;
+      if (!pointInPolygon(ll, r.outerRing)) continue;
+      // Reject taps that fall inside a hole ring.
+      final holes = r.holes;
+      if (holes != null && holes.any((h) => pointInPolygon(ll, h))) continue;
+      return r;
     }
     return null;
   }
@@ -433,42 +617,54 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     ));
   }
 
-  void _openCandidate(Candidate c) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => CandidateDetailScreen(candidate: c),
-    ));
-  }
-
-  Candidate? _resolveCandidate(String name) =>
-      _candidateByName[normalizeName(name)];
-
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  // ── Search index ───────────────────────────────────────────────
-  List<RegionSearchEntry> _searchResults(String query) {
-    final q = query.trim().toLowerCase();
-    if (q.isEmpty) return const [];
-    final out = <RegionSearchEntry>[];
-    for (final mode in MapMode.values) {
-      for (final r in _regions[mode] ?? const <RegionData>[]) {
-        final label = mode.regionTitle(r.id);
-        if (r.id.toLowerCase().contains(q) ||
-            label.toLowerCase().contains(q)) {
-          out.add(RegionSearchEntry(mode: mode, id: r.id, label: label));
-          if (out.length >= 40) break;
-        }
-      }
+  // ── Search hits ────────────────────────────────────────────────
+  List<RegionSearchHit> _allSearchHits() {
+    final out = <RegionSearchHit>[];
+    for (final r in _regions[MapMode.county] ?? const <RegionData>[]) {
+      out.add(RegionSearchHit(
+          mode: MapMode.county, id: r.id, label: '${r.id} County'));
     }
-    // Prefer exact-id-prefix and same-mode matches first, then cap to 7.
-    out.sort((a, b) {
-      final ap = a.id.toLowerCase().startsWith(q) ? 0 : 1;
-      final bp = b.id.toLowerCase().startsWith(q) ? 0 : 1;
-      if (ap != bp) return ap - bp;
-      return a.mode.index.compareTo(b.mode.index);
-    });
-    return out.take(7).toList();
+    for (final r in _regions[MapMode.congressional] ?? const <RegionData>[]) {
+      out.add(RegionSearchHit(
+          mode: MapMode.congressional, id: r.id, label: 'CD ${r.id}'));
+    }
+    for (final r in _regions[MapMode.senate] ?? const <RegionData>[]) {
+      out.add(
+          RegionSearchHit(mode: MapMode.senate, id: r.id, label: 'SD ${r.id}'));
+    }
+    for (final r in _regions[MapMode.house] ?? const <RegionData>[]) {
+      out.add(
+          RegionSearchHit(mode: MapMode.house, id: r.id, label: 'HD ${r.id}'));
+    }
+    return out;
+  }
+
+  void _onSearchPick(RegionSearchHit hit) {
+    _selectRegion(hit.mode, hit.id);
+  }
+
+  // ── Choropleth binning ─────────────────────────────────────────
+  List<int> _computeQuantileCuts(List<int> counts) {
+    final sorted = [...counts]..sort();
+    if (sorted.isEmpty) return const [1, 2, 3, 4];
+    int q(double p) {
+      final idx = ((sorted.length - 1) * p).round().clamp(0, sorted.length - 1);
+      return sorted[idx];
+    }
+    return [q(0.2), q(0.4), q(0.6), q(0.8)];
+  }
+
+  int _choroplethBin(MapMode mode, int count) {
+    final cuts = _choroplethCuts[mode] ?? const [1, 2, 3, 4];
+    var bin = 0;
+    for (final c in cuts) {
+      if (count > c) bin++;
+    }
+    return bin.clamp(0, 4);
   }
 
   // ── Build ──────────────────────────────────────────────────────
@@ -495,9 +691,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
         Container(
           width: 1,
           decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? const Color(0xFF2E3A57)
-                : const Color(0xFFE5E9F0),
+            color: _isDark ? const Color(0xFF2E3A57) : const Color(0xFFE5E9F0),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.10),
@@ -521,11 +715,11 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
         Positioned.fill(child: _mapStack(context)),
         if (_selectedId != null)
           DraggableScrollableSheet(
-            initialChildSize: 0.45,
-            minChildSize: 0.12,
-            maxChildSize: 0.92,
+            initialChildSize: 0.35,
+            minChildSize: 0.2,
+            maxChildSize: 0.95,
             snap: true,
-            snapSizes: const [0.12, 0.45, 0.92],
+            snapSizes: const [0.35, 0.7, 0.95],
             builder: (context, scrollController) {
               return _MobileSheet(
                 child: _buildPanel(
@@ -554,11 +748,10 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
         id: id,
         status: region?.status ?? RegionStatus.notOnBallot,
         memberCount: region?.memberCount ?? 0,
-        candidates: _selectedCandidates,
         members: _selectedMembers,
-        loadingCandidates: false,
+        candidateGroups: _selectedGroups,
+        loadingCandidates: _loadingCandidates,
         loadingMembers: _loadingMembers,
-        youngDemNames: _youngDemNames,
       );
     }
     return VolunteersDetailPanel(
@@ -568,10 +761,9 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       hotRegions: _hotRegions(),
       onClose: _clearSelection,
       onSelectHot: _selectRegion,
-      onOpenCandidate: _openCandidate,
       onTextMembers: _textMembers,
       onEmailMembers: _emailMembers,
-      resolveCandidate: _resolveCandidate,
+      onLogOutreach: null,
       scrollController: scrollController,
       showCloseButton: showClose,
     );
@@ -594,18 +786,21 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 
   // ── Map + floating chrome ──────────────────────────────────────
   Widget _mapStack(BuildContext context) {
+    final dark = _isDark;
     if (_loadingBase && _activeRegions.isEmpty) {
       return Container(
-        color: const Color(0xFFEFF2F6),
-        child: const Center(
+        color: MoydMapTheme.maskColor(dark),
+        child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(
-                  color: MapPalette.momentumBlue, strokeWidth: 2.5),
-              SizedBox(height: 14),
-              Text('Loading the war room…',
-                  style: TextStyle(color: Color(0xFF5A6478), fontSize: 13)),
+              const CircularProgressIndicator(
+                  color: MoydMapTheme.unityBlue, strokeWidth: 2.5),
+              const SizedBox(height: 14),
+              Text('Loading the field map…',
+                  style: TextStyle(
+                      color: dark ? Colors.white70 : const Color(0xFF5A6478),
+                      fontSize: 13)),
             ],
           ),
         ),
@@ -625,24 +820,16 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
               },
               child: GestureDetector(
                 onTapUp: _onTapUp,
-                child: _buildFlutterMap(reduceMotion),
+                child: _buildFlutterMap(reduceMotion, dark),
               ),
             ),
           ),
 
-          // top-left: mode + lens
+          // top-left: mode switch
           Positioned(
             left: 16,
             top: 16,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _modeSwitcher(),
-                const SizedBox(height: 8),
-                _lensToggle(),
-              ],
-            ),
+            child: _modeSwitcher(),
           ),
 
           // top-right: search
@@ -650,11 +837,26 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
             right: 16,
             top: 16,
             width: 300,
-            child: _searchPill(),
+            child: _RegionSearchField(
+              hits: _allSearchHits(),
+              onPick: _onSearchPick,
+              dark: dark,
+            ),
           ),
 
-          // bottom-left: legend
-          Positioned(left: 16, bottom: 16, child: _legend()),
+          // bottom-left: member-density legend
+          Positioned(
+            left: 16,
+            bottom: 16,
+            child: _glass(
+              radius: 12,
+              child: ChoroplethLegend(
+                dark: dark,
+                minCount: (_memberRange[_mode] ?? const [0, 0])[0],
+                maxCount: (_memberRange[_mode] ?? const [0, 0])[1],
+              ),
+            ),
+          ),
 
           // bottom-right: zoom
           Positioned(right: 16, bottom: 16, child: _zoomCluster()),
@@ -666,49 +868,75 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     );
   }
 
-  Widget _buildFlutterMap(bool reduceMotion) {
+  Widget _buildFlutterMap(bool reduceMotion, bool dark) {
+    final maskColor = MoydMapTheme.maskColor(dark);
     final polygons = <Polygon>[];
+
+    // 1) Out-of-state mask (donut) + Missouri outline, drawn first (under).
+    if (_moOutlineRings.isNotEmpty) {
+      polygons.add(Polygon(
+        points: _kOuterRect,
+        holePointsList: _moOutlineRings,
+        color: maskColor,
+        borderStrokeWidth: 0,
+      ));
+      final outlineColor =
+          dark ? MoydMapTheme.gold.withValues(alpha: 0.6) : MoydMapTheme.navy;
+      for (final ring in _moOutlineRings) {
+        polygons.add(Polygon(
+          points: ring,
+          color: Colors.transparent,
+          borderColor: outlineColor,
+          borderStrokeWidth: 2,
+        ));
+      }
+    }
+
+    // 2) Region choropleth fills.
+    final selecting = _selectedId != null;
+    final borderBase =
+        (dark ? Colors.white : Colors.white).withValues(alpha: dark ? 0.10 : 0.55);
     for (final r in _activeRegions) {
+      final hovered = _hoveredId == r.id && _selectedId != r.id;
       polygons.add(Polygon(
         points: r.outerRing,
         holePointsList: r.holes,
-        color: _fillFor(r),
-        borderColor: Colors.white,
-        borderStrokeWidth: 1.2,
+        color: _fillFor(r, dark, selecting),
+        borderColor: hovered ? MoydMapTheme.unityBlue : borderBase,
+        borderStrokeWidth: hovered ? 1.5 : 0.6,
       ));
     }
-    // Selected gold ring (white casing under gold), drawn last.
+
+    // 3) Selection: navy halo (dark: white 40%) under a gold 3px ring.
     final sel = _selectedId == null ? null : _index[_mode]?[_selectedId];
     if (sel != null) {
       polygons.add(Polygon(
         points: sel.outerRing,
         holePointsList: sel.holes,
-        borderColor: Colors.white,
-        borderStrokeWidth: 5.5,
+        color: Colors.transparent,
+        borderColor:
+            dark ? Colors.white.withValues(alpha: 0.4) : MoydMapTheme.navy,
+        borderStrokeWidth: 5,
       ));
       polygons.add(Polygon(
         points: sel.outerRing,
         holePointsList: sel.holes,
-        borderColor: MapPalette.sunriseGold,
+        color: Colors.transparent,
+        borderColor: MoydMapTheme.gold,
         borderStrokeWidth: 3,
       ));
     }
 
     return FlutterMap(
       mapController: _mapController,
-      options: const MapOptions(
-        initialCenter: _moCenter,
-        initialZoom: _initialZoom,
-        minZoom: 5.5,
-        maxZoom: 12.0,
-        interactionOptions:
-            const InteractionOptions(flags: InteractiveFlag.all),
-        backgroundColor: const Color(0xFFEFF2F6),
+      options: moMapOptions(
+        center: _moCenter,
+        zoom: _initialZoom,
+        backgroundColor: maskColor,
       ),
       children: [
         TileLayer(
-          urlTemplate:
-              'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+          urlTemplate: MoydMapTheme.tileTemplate(dark),
           subdomains: const ['a', 'b', 'c', 'd'],
           userAgentPackageName: 'org.moyoungdemocrats.crm',
           maxZoom: 18,
@@ -719,33 +947,13 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     );
   }
 
-  Color _fillFor(RegionData r) {
-    // base solid + base opacity
-    final Color solid;
-    final double baseOpacity;
-    if (_lens == MapLens.members) {
-      solid = MapPalette.densityStops[MapPalette.densityBin(r.memberCount)];
-      baseOpacity = r.memberCount <= 0 ? 0.55 : 0.72;
-    } else {
-      solid = MapPalette.statusSwatch(r.status);
-      baseOpacity = r.status == RegionStatus.notOnBallot ? 0.45 : 0.72;
+  Color _fillFor(RegionData r, bool dark, bool selecting) {
+    final bin = _choroplethBin(_mode, r.memberCount);
+    Color base = MoydMapTheme.choropleth(bin, dark: dark);
+    if (selecting && _selectedId != r.id) {
+      base = base.withValues(alpha: base.a * 0.6);
     }
-
-    double op;
-    if (_selectedId == r.id) {
-      op = 0.92;
-    } else if (_selectedId != null) {
-      op = 0.55;
-    } else if (_lens == MapLens.candidates &&
-        _statusFilter != null &&
-        r.status != _statusFilter) {
-      op = 0.30;
-    } else if (_hoveredId == r.id) {
-      op = 0.88;
-    } else {
-      op = baseOpacity;
-    }
-    return solid.withValues(alpha: op);
+    return base;
   }
 
   List<Marker> _youngDemMarkers(bool reduceMotion) {
@@ -777,7 +985,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                             height: 34,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: MapPalette.sunriseGold
+                              color: MoydMapTheme.gold
                                   .withValues(alpha: 0.45 * (1 - t)),
                             ),
                           ),
@@ -798,20 +1006,20 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: MapPalette.sunriseGold,
+          color: MoydMapTheme.gold,
           border: Border.all(color: Colors.white, width: 2),
           boxShadow: [
             BoxShadow(
-                color: MapPalette.sunriseGold.withValues(alpha: 0.5),
+                color: MoydMapTheme.gold.withValues(alpha: 0.5),
                 blurRadius: 8,
                 spreadRadius: 1),
           ],
         ),
         child: const Icon(Icons.star_rounded,
-            color: MapPalette.unityBlue, size: 16),
+            color: MoydMapTheme.navy, size: 16),
       );
 
-  // ── Mode switcher ──────────────────────────────────────────────
+  // ── Mode switcher (segmented pill, unityBlue active) ────────────
   Widget _modeSwitcher() {
     const modes = MapMode.values;
     return _glass(
@@ -834,13 +1042,11 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                 child: Container(
                   margin: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [MapPalette.unityBlue, MapPalette.momentumBlue],
-                    ),
+                    color: MoydMapTheme.unityBlue,
                     borderRadius: BorderRadius.circular(999),
                     boxShadow: [
                       BoxShadow(
-                          color: MapPalette.sunriseGold.withValues(alpha: 0.35),
+                          color: MoydMapTheme.unityBlue.withValues(alpha: 0.30),
                           blurRadius: 6,
                           offset: const Offset(0, 2)),
                     ],
@@ -885,8 +1091,9 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                     fontWeight: FontWeight.w600,
                     color: selected
                         ? Colors.white
-                        : (_isDark ? const Color(0xFFC9D2E4)
-                            : const Color(0xFF3C4763)),
+                        : (_isDark
+                            ? const Color(0xFFC9D2E4)
+                            : MoydMapTheme.navy),
                   )),
               if (count != null) ...[
                 const SizedBox(width: 3),
@@ -898,7 +1105,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                         fontWeight: FontWeight.w700,
                         color: selected
                             ? Colors.white.withValues(alpha: 0.85)
-                            : MapPalette.momentumBlue,
+                            : MoydMapTheme.unityBlue,
                       )),
                 ),
               ],
@@ -908,297 +1115,6 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       ),
     );
   }
-
-  // ── Lens toggle ────────────────────────────────────────────────
-  Widget _lensToggle() {
-    return _glass(
-      radius: 999,
-      child: SizedBox(
-        height: 34,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _lensSegment(MapLens.members, 'Members', MapPalette.momentumBlue),
-            _lensSegment(MapLens.candidates, 'Candidates',
-                MapPalette.sunriseGold),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _lensSegment(MapLens lens, String label, Color dot) {
-    final selected = _lens == lens;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: '$label lens',
-      excludeSemantics: true,
-      child: InkWell(
-        onTap: () => _changeLens(lens),
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          margin: const EdgeInsets.all(3),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected ? MapPalette.unityBlue : Colors.transparent,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-              const SizedBox(width: 6),
-              Text(label,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: selected
-                        ? Colors.white
-                        : (_isDark
-                            ? const Color(0xFFC9D2E4)
-                            : const Color(0xFF3C4763)),
-                  )),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Search ─────────────────────────────────────────────────────
-  Widget _searchPill() {
-    final List<RegionSearchEntry> results =
-        _searchOpen ? _searchResults(_searchCtrl.text) : const <RegionSearchEntry>[];
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _glass(
-          radius: 999,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                Icon(Icons.search,
-                    size: 18,
-                    color: _isDark ? Colors.white70 : const Color(0xFF5A6478)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _searchCtrl,
-                    focusNode: _searchFocus,
-                    style: TextStyle(
-                        fontSize: 13.5,
-                        color: _isDark ? Colors.white : const Color(0xFF1E2637)),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      border: InputBorder.none,
-                      hintText: 'Jump to a district, county, or town…',
-                      hintStyle: TextStyle(
-                          fontSize: 13,
-                          color: (_isDark ? Colors.white : Colors.black)
-                              .withValues(alpha: 0.4)),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 11),
-                    ),
-                  ),
-                ),
-                if (_searchCtrl.text.isNotEmpty)
-                  GestureDetector(
-                    onTap: () {
-                      _searchCtrl.clear();
-                    },
-                    child: Icon(Icons.close,
-                        size: 16,
-                        color:
-                            _isDark ? Colors.white54 : const Color(0xFF8A93A6)),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        if (results.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          _glass(
-            radius: 14,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 320),
-              child: ListView(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                children: _groupedResults(results),
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  List<Widget> _groupedResults(List<RegionSearchEntry> results) {
-    final widgets = <Widget>[];
-    String? lastGroup;
-    for (final e in results) {
-      if (e.group != lastGroup) {
-        lastGroup = e.group;
-        widgets.add(Padding(
-          padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-          child: Text(e.group,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-                color: _isDark ? Colors.white54 : const Color(0xFF8A93A6),
-              )),
-        ));
-      }
-      widgets.add(InkWell(
-        onTap: () {
-          _searchCtrl.clear();
-          _searchFocus.unfocus();
-          _selectRegion(e.mode, e.id);
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          child: Text(e.label,
-              style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  color: _isDark ? Colors.white : const Color(0xFF1E2637))),
-        ),
-      ));
-    }
-    return widgets;
-  }
-
-  // ── Legend ─────────────────────────────────────────────────────
-  Widget _legend() {
-    return _glass(
-      radius: 12,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        child: _lens == MapLens.members ? _legendMembers() : _legendCandidates(),
-      ),
-    );
-  }
-
-  Widget _legendMembers() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _legendTitle('MEMBER DENSITY'),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: 160,
-          height: 10,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: Row(
-              children: [
-                for (final c in MapPalette.densityStops)
-                  Expanded(child: Container(color: c)),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          width: 160,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _legendMicro('0'),
-              _legendMicro('26+'),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _legendCandidates() {
-    const order = [
-      RegionStatus.youngDem,
-      RegionStatus.demContested,
-      RegionStatus.demUnopposed,
-      RegionStatus.noDem,
-      RegionStatus.notOnBallot,
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _legendTitle('CANDIDATE STATUS'),
-        const SizedBox(height: 8),
-        for (final s in order) _legendStatusRow(s),
-      ],
-    );
-  }
-
-  Widget _legendStatusRow(RegionStatus s) {
-    final active = _statusFilter == s;
-    final dimmed = _statusFilter != null && !active;
-    return Semantics(
-      button: true,
-      selected: active,
-      excludeSemantics: true,
-      child: InkWell(
-        onTap: () =>
-            setState(() => _statusFilter = active ? null : s),
-        borderRadius: BorderRadius.circular(6),
-        child: Opacity(
-          opacity: dimmed ? 0.45 : 1,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: MapPalette.statusSwatch(s),
-                    borderRadius: BorderRadius.circular(3),
-                    border: active
-                        ? Border.all(color: MapPalette.unityBlue, width: 1.5)
-                        : null,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(MapPalette.statusLabel(s),
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                      color:
-                          _isDark ? Colors.white : const Color(0xFF3C4763),
-                    )),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _legendTitle(String label) => Text(label,
-      style: TextStyle(
-        fontSize: 10.5,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 1.2,
-        color: _isDark ? Colors.white70 : const Color(0xFF5A6478),
-      ));
-
-  Widget _legendMicro(String label) => Text(label,
-      style: TextStyle(
-        fontSize: 10,
-        fontWeight: FontWeight.w600,
-        color: _isDark ? Colors.white54 : const Color(0xFF8A93A6),
-      ));
 
   // ── Zoom cluster ───────────────────────────────────────────────
   Widget _zoomCluster() {
@@ -1229,7 +1145,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
             height: 44,
             child: Icon(icon,
                 size: 20,
-                color: _isDark ? Colors.white : const Color(0xFF273351)),
+                color: _isDark ? Colors.white : MoydMapTheme.navy),
           ),
         ),
       ),
@@ -1240,22 +1156,19 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   Widget _hoverTooltip() {
     final r = _index[_mode]?[_hoveredId];
     if (r == null) return const SizedBox.shrink();
-    final line = _lens == MapLens.members
-        ? '${r.memberCount} member${r.memberCount == 1 ? '' : 's'}'
-        : (_mode.isDistrict
-            ? MapPalette.statusLabel(r.status)
-            : '${r.memberCount} member${r.memberCount == 1 ? '' : 's'}');
+    final line =
+        '${r.memberCount} member${r.memberCount == 1 ? '' : 's'}';
     return Positioned(
       left: 16,
-      top: 116,
+      top: 68,
       child: IgnorePointer(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: MapPalette.unityBlue.withValues(alpha: 0.94),
+            color: MoydMapTheme.navy.withValues(alpha: 0.94),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-                color: MapPalette.sunriseGold.withValues(alpha: 0.5), width: 1),
+                color: MoydMapTheme.gold.withValues(alpha: 0.5), width: 1),
             boxShadow: [
               BoxShadow(
                   color: Colors.black.withValues(alpha: 0.3),
@@ -1276,8 +1189,8 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
               Text(line,
                   style: TextStyle(
                       color: r.status == RegionStatus.youngDem
-                          ? MapPalette.sunriseGold
-                          : Colors.white.withValues(alpha: 0.75),
+                          ? MoydMapTheme.gold
+                          : Colors.white.withValues(alpha: 0.78),
                       fontSize: 11,
                       fontWeight: FontWeight.w600)),
             ],
@@ -1317,6 +1230,245 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
           child: Material(color: Colors.transparent, child: child),
         ),
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CHOROPLETH LEGEND — bottom-left member-density scale.
+//  Five swatches from the active theme ramp + "Members" label + min/max.
+// ═══════════════════════════════════════════════════════════════
+class ChoroplethLegend extends StatelessWidget {
+  const ChoroplethLegend({
+    super.key,
+    required this.dark,
+    required this.minCount,
+    required this.maxCount,
+  });
+
+  final bool dark;
+  final int minCount;
+  final int maxCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = dark ? Colors.white70 : const Color(0xFF5A6478);
+    final micro = dark ? Colors.white54 : const Color(0xFF8A93A6);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('MEMBERS',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                color: title,
+              )),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: 160,
+            height: 10,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: Row(
+                children: [
+                  for (var bin = 0; bin < 5; bin++)
+                    Expanded(
+                      child: Container(
+                          color: MoydMapTheme.choropleth(bin, dark: dark)),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: 160,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('$minCount',
+                    style: TextStyle(
+                        fontSize: 10, fontWeight: FontWeight.w600, color: micro)),
+                Text('$maxCount',
+                    style: TextStyle(
+                        fontSize: 10, fontWeight: FontWeight.w600, color: micro)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  REGION SEARCH — Autocomplete over the loaded regions, all four modes.
+//  County names + synthetic "CD 3"/"HD 42"/"SD 15" labels. No network.
+// ═══════════════════════════════════════════════════════════════
+class _RegionSearchField extends StatelessWidget {
+  const _RegionSearchField({
+    required this.hits,
+    required this.onPick,
+    required this.dark,
+  });
+
+  final List<RegionSearchHit> hits;
+  final void Function(RegionSearchHit) onPick;
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final fieldText = dark ? Colors.white : const Color(0xFF1E2637);
+    final hintColor =
+        (dark ? Colors.white : Colors.black).withValues(alpha: 0.4);
+    final panelBg = dark ? const Color(0xFF1B2337) : Colors.white;
+
+    return Autocomplete<RegionSearchHit>(
+      displayStringForOption: (h) => h.label,
+      optionsBuilder: (TextEditingValue value) {
+        final q = value.text.trim().toLowerCase();
+        if (q.isEmpty) return const Iterable<RegionSearchHit>.empty();
+        final matches =
+            hits.where((h) => h.label.toLowerCase().contains(q)).toList();
+        matches.sort((a, b) {
+          final ap = a.label.toLowerCase().startsWith(q) ? 0 : 1;
+          final bp = b.label.toLowerCase().startsWith(q) ? 0 : 1;
+          if (ap != bp) return ap - bp;
+          if (a.mode.index != b.mode.index) {
+            return a.mode.index.compareTo(b.mode.index);
+          }
+          return a.label.compareTo(b.label);
+        });
+        return matches.take(8);
+      },
+      onSelected: onPick,
+      fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: (dark ? const Color(0xFF1B2337) : Colors.white)
+                    .withValues(alpha: 0.90),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                    color: dark
+                        ? Colors.white.withValues(alpha: 0.10)
+                        : Colors.black.withValues(alpha: 0.06),
+                    width: 1),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.search,
+                      size: 18,
+                      color: dark ? Colors.white70 : const Color(0xFF5A6478)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      onSubmitted: (_) => onSubmit(),
+                      style: TextStyle(fontSize: 13.5, color: fieldText),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        hintText: 'Jump to a district or county…',
+                        hintStyle:
+                            TextStyle(fontSize: 13, color: hintColor),
+                      ),
+                    ),
+                  ),
+                  if (controller.text.isNotEmpty)
+                    GestureDetector(
+                      onTap: () => controller.clear(),
+                      child: Icon(Icons.close,
+                          size: 16,
+                          color: dark
+                              ? Colors.white54
+                              : const Color(0xFF8A93A6)),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        final list = options.toList();
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: 300,
+              margin: const EdgeInsets.only(top: 6),
+              decoration: BoxDecoration(
+                color: panelBg,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: dark
+                        ? Colors.white.withValues(alpha: 0.10)
+                        : Colors.black.withValues(alpha: 0.06),
+                    width: 1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              constraints: const BoxConstraints(maxHeight: 320),
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                itemCount: list.length,
+                itemBuilder: (context, i) {
+                  final o = list[i];
+                  final showGroup = i == 0 || list[i - 1].group != o.group;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (showGroup)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+                          child: Text(o.group,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
+                                color: dark
+                                    ? Colors.white54
+                                    : const Color(0xFF8A93A6),
+                              )),
+                        ),
+                      InkWell(
+                        onTap: () => onSelected(o),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 9),
+                          child: Text(o.label,
+                              style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: fieldText)),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

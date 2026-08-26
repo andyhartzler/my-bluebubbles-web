@@ -8,6 +8,8 @@ import 'package:latlong2/latlong.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
+import 'package:bluebubbles/screens/crm/volunteers/volunteers_map_models.dart'
+    show MoydMapTheme, moMapOptions;
 
 // ═══════════════════════════════════════════════════════════════
 //  MISSOURI MAP WIDGET — flutter_map + real GeoJSON districts
@@ -115,6 +117,16 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   static final _moCenter = LatLng(38.35, -92.45);
   static const _initialZoom = 6.5;
 
+  // Out-of-state mask: dissolved Missouri outline ring(s) used as the hole,
+  // plus a rectangle comfortably larger than the padded MO bounds.
+  List<List<LatLng>> _maskRings = const [];
+  static final List<LatLng> _outerRect = <LatLng>[
+    const LatLng(45, -102),
+    const LatLng(45, -84),
+    const LatLng(30, -84),
+    const LatLng(30, -102),
+  ];
+
   // ── Asset paths ──────────────────────────────────────────
   static final _geoJsonPaths = {
     DistrictType.house: 'assets/geojson/mo_house_districts.geojson',
@@ -168,6 +180,35 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
     });
 
     _loadGeoJson(_activeType);
+    _loadMask();
+  }
+
+  /// Parse the dissolved Missouri outline into the ring(s) that form the hole
+  /// in the out-of-state mask. Same ring parsing as [_loadGeoJson].
+  Future<void> _loadMask() async {
+    try {
+      final raw = await rootBundle
+          .loadString('assets/geojson/mo_state_outline.geojson');
+      final geo = json.decode(raw) as Map<String, dynamic>;
+      final features = geo['features'] as List<dynamic>;
+      final rings = <List<LatLng>>[];
+      for (final feature in features) {
+        final geometry = feature['geometry'] as Map<String, dynamic>;
+        final type = geometry['type'] as String;
+        final coords = geometry['coordinates'];
+        if (type == 'Polygon') {
+          rings.add(_parseRing((coords as List).first as List));
+        } else if (type == 'MultiPolygon') {
+          for (final poly in coords as List) {
+            rings.add(_parseRing((poly as List).first as List));
+          }
+        }
+      }
+      if (!mounted) return;
+      setState(() => _maskRings = rings);
+    } catch (e) {
+      debugPrint('MissouriMapWidget mask load failed: $e');
+    }
   }
 
   @override
@@ -624,6 +665,7 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
   // ── Map ───────────────────────────────────────────────────
 
   Widget _buildMap() {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     // Show spinner when the active district type hasn't loaded yet
     final isLoading = !_loadedTypes.contains(_activeType);
 
@@ -658,8 +700,29 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
     final polygons = _activePolygons;
     final districtMap = _activeDistrictMap;
 
-    // Build flutter_map polygon list
+    // Build flutter_map polygon list. The out-of-state mask is prepended so
+    // it draws under the district polygons and hides Kansas/Illinois tiles.
     final mapPolygons = <Polygon>[];
+    if (_maskRings.isNotEmpty) {
+      mapPolygons.add(Polygon(
+        points: _outerRect,
+        holePointsList: _maskRings,
+        color: MoydMapTheme.maskColor(dark),
+        borderStrokeWidth: 0,
+        isFilled: true,
+      ));
+      final outlineColor =
+          dark ? MoydMapTheme.gold.withOpacity(0.6) : MoydMapTheme.navy;
+      for (final ring in _maskRings) {
+        mapPolygons.add(Polygon(
+          points: ring,
+          color: Colors.transparent,
+          borderColor: outlineColor,
+          borderStrokeWidth: 2,
+          isFilled: false,
+        ));
+      }
+    }
     for (final dp in polygons) {
       final isSelected = dp.district == selectedDist;
       final outerRing = dp.rings.first;
@@ -837,23 +900,20 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
               onTapUp: (details) => _handleMapTapGesture(details),
               child: FlutterMap(
                 mapController: _mapController,
-                options: MapOptions(
-                  initialCenter: _moCenter,
-                  initialZoom: _initialZoom,
-                  minZoom: 5.5,
-                  maxZoom: 12.0,
-                  interactionOptions: InteractionOptions(
+                options: moMapOptions(
+                  center: _moCenter,
+                  zoom: _initialZoom,
+                  backgroundColor: MoydMapTheme.maskColor(dark),
+                  interaction: InteractionOptions(
                     flags: widget.interactive
                         ? InteractiveFlag.all
                         : InteractiveFlag.none,
                   ),
-                  backgroundColor: const Color(0xFFf0f0f0),
                 ),
                 children: [
-                  // Light tile layer (CartoDB Positron)
+                  // Theme-matched CartoDB basemap (light_all / dark_all).
                   TileLayer(
-                    urlTemplate:
-                        'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+                    urlTemplate: MoydMapTheme.tileTemplate(dark),
                     subdomains: const ['a', 'b', 'c', 'd'],
                     userAgentPackageName: 'org.moyoungdemocrats.crm',
                     maxZoom: 18,
@@ -1113,21 +1173,16 @@ class _DistrictPolygon {
   final String district;
   final List<List<LatLng>> rings;
   final LatLng centroid;
-  Color fillColor;
-  Color borderColor;
-  _DistrictStatus status;
-  int candidateCount;
-  int ydCount;
+  Color fillColor = Colors.transparent;
+  Color borderColor = Colors.transparent;
+  _DistrictStatus status = _DistrictStatus.noData;
+  int candidateCount = 0;
+  int ydCount = 0;
 
   _DistrictPolygon({
     required this.district,
     required this.rings,
     required this.centroid,
-    this.fillColor = Colors.transparent,
-    this.borderColor = Colors.transparent,
-    this.status = _DistrictStatus.noData,
-    this.candidateCount = 0,
-    this.ydCount = 0,
   });
 }
 

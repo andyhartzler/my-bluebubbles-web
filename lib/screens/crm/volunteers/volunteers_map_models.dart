@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/models/crm/candidate.dart' show Candidate;
+import 'package:bluebubbles/services/crm/election_results_repository.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  MODELS + COLOR LOGIC for the Candidate Volunteers "War Room" map.
@@ -335,4 +338,148 @@ class RegionSearchEntry {
         return 'MO SENATE';
     }
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MOYD BRAND TOKENS for the map surface. Single source of truth so
+//  the two map widgets and the detail panel stay in lockstep. Every
+//  text/chip pairing built from these must clear 4.5:1 in BOTH themes.
+// ═══════════════════════════════════════════════════════════════
+class MoydMapTheme {
+  MoydMapTheme._();
+
+  static const Color navy = Color(0xFF273351);
+  static const Color unityBlue = Color(0xFF0B4DB8);
+
+  /// Gold is for strokes, rings and badge fills only — NEVER body text on a
+  /// light surface. For gold-flavored text on light surfaces use [goldText].
+  static const Color gold = Color(0xFFF0B429);
+  static const Color goldText = Color(0xFF8A6D1D);
+
+  /// Out-of-state mask fill, matched to the active theme's map surface.
+  static const Color maskLight = Color(0xFFEFF2F6);
+  static const Color maskDark = Color(0xFF1B2130);
+  static Color maskColor(bool dark) => dark ? maskDark : maskLight;
+
+  /// 5-step quantile member-density choropleth. Light: alpha 0x14→0xCC over a
+  /// unityBlue hue on the light basemap. Dark: alpha 0x22→0xE0 over dark tiles.
+  static const List<Color> choroplethRampLight = <Color>[
+    Color(0x140B4DB8),
+    Color(0x420B4DB8),
+    Color(0x700B4DB8),
+    Color(0x9E0B4DB8),
+    Color(0xCC0B4DB8),
+  ];
+  static const List<Color> choroplethRampDark = <Color>[
+    Color(0x220B4DB8),
+    Color(0x520B4DB8),
+    Color(0x810B4DB8),
+    Color(0xB10B4DB8),
+    Color(0xE00B4DB8),
+  ];
+
+  /// Choropleth fill for a 5-step quantile [bin] (0..4), clamped.
+  static Color choropleth(int bin, {required bool dark}) {
+    final ramp = dark ? choroplethRampDark : choroplethRampLight;
+    return ramp[bin.clamp(0, ramp.length - 1)];
+  }
+
+  /// CartoDB basemap URL template for the active theme (light_all / dark_all).
+  static String tileTemplate(bool dark) =>
+      'https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png';
+}
+
+/// Padded Missouri bounding box. Used both to constrain the camera
+/// ([moMapOptions]) and to size the out-of-state donut mask.
+final LatLngBounds moBounds = LatLngBounds(
+  const LatLng(35.85, -95.95), // padded SW (MO true SW ≈ 35.9957, -95.7747)
+  const LatLng(40.75, -88.95), // padded NE (MO true NE ≈ 40.6136, -89.0988)
+);
+
+/// Shared camera helper. Both map widgets pass their own center/zoom and the
+/// theme-matched background color; the constraint and min/max zoom are fixed so
+/// the map can never wander into Kansas or Illinois.
+MapOptions moMapOptions({
+  required LatLng center,
+  required double zoom,
+  required Color backgroundColor,
+  InteractionOptions interaction =
+      const InteractionOptions(flags: InteractiveFlag.all),
+}) =>
+    MapOptions(
+      initialCenter: center,
+      initialZoom: zoom,
+      minZoom: 6.0,
+      maxZoom: 12.0,
+      cameraConstraint: CameraConstraint.contain(bounds: moBounds),
+      interactionOptions: interaction,
+      backgroundColor: backgroundColor,
+    );
+
+/// A single "Jump to" autocomplete hit: a county name or a synthetic district
+/// label ("CD 3", "HD 42", "SD 15"). Data comes from the loaded regions, never
+/// the network.
+class RegionSearchHit {
+  const RegionSearchHit({
+    required this.mode,
+    required this.id,
+    required this.label,
+  });
+
+  final MapMode mode;
+  final String id;
+  final String label;
+
+  String get group {
+    switch (mode) {
+      case MapMode.county:
+        return 'COUNTIES';
+      case MapMode.congressional:
+        return 'CONGRESSIONAL';
+      case MapMode.house:
+        return 'MO HOUSE';
+      case MapMode.senate:
+        return 'MO SENATE';
+    }
+  }
+
+  @override
+  String toString() => label;
+}
+
+/// One candidate line in a region's detail panel.
+///
+/// A [result]-backed row that also resolves to a [candidate] renders the
+/// candidate photo and taps through to their profile. A result with no matched
+/// candidate renders initials-only and is NOT tappable — never fabricate a
+/// profile. [isNominee] flags the gold "Nov nominee" badge (derivable from
+/// `ElectionResult.advanced`).
+class CandidateDisplayRow {
+  const CandidateDisplayRow({
+    this.result,
+    this.candidate,
+    this.isNominee = false,
+  });
+
+  final ElectionResult? result;
+  final Candidate? candidate;
+  final bool isNominee;
+
+  /// True when this row resolves to a full candidate profile and can navigate.
+  bool get tappable => candidate != null;
+}
+
+/// A group of candidate rows sharing an office type, e.g. all Congressional
+/// candidates for the districts that overlap a county. [districtChips] carries
+/// the "CD 3", "HD 42" labels shown in the group header.
+class CandidateDisplayGroup {
+  const CandidateDisplayGroup({
+    required this.officeTypeLabel,
+    this.districtChips = const <String>[],
+    this.rows = const <CandidateDisplayRow>[],
+  });
+
+  final String officeTypeLabel;
+  final List<String> districtChips;
+  final List<CandidateDisplayRow> rows;
 }
