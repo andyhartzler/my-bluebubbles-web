@@ -591,6 +591,16 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
                           ? 'No date'
                           : _fmtDate(a.scheduledOn!),
                       style: TextStyle(color: _secondary, fontSize: 11.5)),
+                  if (_overdueDays(a) case final d?) ...[
+                    const SizedBox(width: 8),
+                    Text('$d ${d == 1 ? 'day' : 'days'} overdue',
+                        style: TextStyle(
+                            color: _isDark
+                                ? const Color(0xFFF0B429)
+                                : const Color(0xFF8A6D1D),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700)),
+                  ],
                   if (geo.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     Flexible(child: _regionChip(geo.first)),
