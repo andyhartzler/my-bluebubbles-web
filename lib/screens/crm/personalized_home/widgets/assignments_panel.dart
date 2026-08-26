@@ -8,7 +8,7 @@ import 'package:bluebubbles/features/forms/screens/jobs/job_detail_screen.dart';
 import 'package:bluebubbles/models/crm/assignment.dart';
 import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
-import 'package:bluebubbles/screens/crm/county_outreach_screen.dart';
+import 'package:bluebubbles/screens/crm/volunteers/candidate_volunteers_workspace.dart';
 import 'package:bluebubbles/screens/crm/event_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/member_portal/member_portal_management_screen.dart';
@@ -287,10 +287,14 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
   }
 
   void _openCountyOutreach() {
+    // Land on the real Candidate Volunteers war room (MAP + ACTIVITIES), not
+    // the old county-outreach page. The workspace is a bare Column with its own
+    // tab strip and no Scaffold, so wrap one here for a way back, the same way
+    // the endorsement-hub deep link above does.
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => Scaffold(
         appBar: AppBar(title: const Text('Candidate Volunteers')),
-        body: const CountyOutreachScreen(),
+        body: const CandidateVolunteersWorkspace(),
       ),
     ));
   }

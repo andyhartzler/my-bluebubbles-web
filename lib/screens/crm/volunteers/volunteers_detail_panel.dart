@@ -857,7 +857,10 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(name,
-                              maxLines: 1,
+                              // Full name must show. Wrap to a second line
+                              // before ellipsizing so a long name is never cut
+                              // off, on desktop especially.
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                   color: p.text,

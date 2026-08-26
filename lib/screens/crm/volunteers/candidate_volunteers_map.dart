@@ -383,22 +383,20 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 
   List<CandidateDisplayRow> _rowsForDistrict(String officeType, String district) {
     final rows = <CandidateDisplayRow>[];
-    final used = <String>{};
     final results = _electionByDistrict['$officeType:$district'] ?? const [];
     for (final r in results) {
+      // Candidate Volunteers shows ONLY the November general-election ballot,
+      // Democrats only. `advanced` marks the nominee who reached the November
+      // ballot; primary losers and every non-Democrat party are excluded here,
+      // at the single funnel both the county and district grouping paths run
+      // through, so nothing non-Dem or non-November can leak into any pane.
+      if (!(r.advanced && r.isDemocrat)) continue;
       final cand = _matchResultToCandidate(officeType, district, r);
-      if (cand != null) used.add(cand.id);
       rows.add(CandidateDisplayRow(
         result: r,
         candidate: cand,
         isNominee: r.advanced,
       ));
-    }
-    // Candidates in this district with no result row, appended after.
-    final extra = _candidatesByDistrict['$officeType:$district'] ?? const [];
-    for (final c in extra) {
-      if (used.contains(c.id)) continue;
-      rows.add(CandidateDisplayRow(candidate: c, isNominee: false));
     }
     return rows;
   }
@@ -929,7 +927,10 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 
     // Region war room: Candidates | Map | Members.
     return LayoutBuilder(builder: (context, constraints) {
-      const candidatesWidth = 320.0;
+      // Candidates pane was pinned to 320px, which clipped every real full
+      // name even on wide desktops. Make it responsive like the members pane
+      // (a touch narrower so the map keeps room) with a 360px floor.
+      final candidatesWidth = (constraints.maxWidth * 0.22).clamp(360.0, 420.0);
       final membersWidth = (constraints.maxWidth * 0.24).clamp(360.0, 440.0);
       return Row(
         children: [
