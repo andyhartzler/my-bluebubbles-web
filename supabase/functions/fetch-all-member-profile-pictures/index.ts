@@ -1,6 +1,24 @@
-// VERSION WITH MULTIPLE INSTAGRAM METHODS
-// Tries 3 different approaches if one fails
-// FIXED: Starts with newest members first & consistent error handling
+// Fetches member profile photos into the `member-photos` bucket and records
+// them in members.profile_pictures. Fired per member by the
+// auto_fetch_member_profile_pictures trigger.
+//
+// INSTAGRAM DOES NOT WORK FROM HERE AND THAT IS NOT A BUG TO FIX IN THIS FILE.
+// Instagram serves its public web API to residential IPs and blocks datacenter
+// ranges, which is every Supabase edge runtime. Measured 2026-08-26: the exact
+// request below returns a full profile from a home connection and a block page
+// from this function, and instagram.com's profile HTML is now a JS shell with
+// no og:image, so the three scraping methods here are all dead. The three are
+// kept because they cost nothing when a handle is absent and would resume
+// working if Instagram ever reopens the endpoint.
+//
+// Instagram is instead fetched from a residential connection by
+// ~/moyd-ops/ig-photos/fetch_ig_photos.py (launchd: com.moyd.ig-photos), which
+// MERGES its result into the same profile_pictures column. Anything here that
+// writes that column must merge rather than replace, or it will drop the
+// instagram entry that script wrote.
+//
+// TikTok and X do work from here, via unavatar.io (free tier covers both;
+// Instagram is behind their paid plan).
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
