@@ -1614,6 +1614,8 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
               ),
               if (selCount > 0) ...[
                 const SizedBox(width: 10),
+                _addToActivityButton(context, p),
+                const SizedBox(width: 10),
                 _moreMenu(context, p),
               ],
             ],
@@ -1665,6 +1667,32 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
     );
   }
 
+  /// First-class "Add to activity" action, promoted out of the ⋮ menu so the
+  /// action bar is more than just Text/Email. Opens the same activity picker.
+  Widget _addToActivityButton(BuildContext context, _Palette p) {
+    return Material(
+      color: p.inset,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () => _openAddToActivity(context),
+        borderRadius: BorderRadius.circular(12),
+        child: Tooltip(
+          message: 'Add selection to an activity',
+          child: Container(
+            height: 46,
+            width: 46,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: p.divider),
+            ),
+            child: Icon(Icons.playlist_add_outlined, size: 20, color: p.action),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _moreMenu(BuildContext context, _Palette p) {
     return Material(
       color: p.inset,
@@ -1674,9 +1702,6 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
         position: PopupMenuPosition.under,
         onSelected: (value) {
           switch (value) {
-            case 'activity':
-              _openAddToActivity(context);
-              break;
             case 'mark':
               _markContactedToday(context);
               break;
@@ -1692,7 +1717,6 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
           }
         },
         itemBuilder: (context) => [
-          _moreItem('activity', Icons.playlist_add_outlined, 'Add to activity'),
           _moreItem('mark', Icons.event_available_outlined,
               'Mark contacted today'),
           _moreItem('note', Icons.note_add_outlined, 'Record contact note'),
