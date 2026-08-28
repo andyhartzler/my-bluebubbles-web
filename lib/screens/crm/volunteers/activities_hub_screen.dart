@@ -60,6 +60,7 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _errored = false;
@@ -96,8 +97,14 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
 
   Future<_RowCounts> _countsFor(String activityId) {
     return _countsCache.putIfAbsent(activityId, () async {
-      final roster = await _repo.getRoster(activityId);
-      final nominees = await _repo.activityCandidateCount(activityId);
+      // Fetch roster and nominee count concurrently instead of sequentially
+      // (this runs per visible row).
+      final results = await Future.wait([
+        _repo.getRoster(activityId),
+        _repo.activityCandidateCount(activityId),
+      ]);
+      final roster = results[0] as List<ActivityRosterEntry>;
+      final nominees = results[1] as int;
       final attended = roster.where((e) => e.attended == true).length;
       return _RowCounts(
         rostered: roster.length,

@@ -1623,7 +1623,12 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (youngDem) ...[
-                    Icon(Icons.star_rounded, size: 12, color: vt.highlight),
+                    // Paint on the inverseSurface tooltip: use the guaranteed
+                    // contrasting onInverseSurface role, not scheme.tertiary
+                    // (vt.highlight), which washes out on a light dark-mode
+                    // inverseSurface.
+                    Icon(Icons.star_rounded,
+                        size: 12, color: vt.onInverseSurface),
                     const SizedBox(width: 4),
                   ],
                   Text(line,

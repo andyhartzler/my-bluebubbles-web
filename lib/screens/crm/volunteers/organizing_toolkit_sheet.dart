@@ -150,6 +150,11 @@ class _OrganizingToolkitSheetBodyState
   late final TextEditingController _descCtrl;
   final TextEditingController _candSearchCtrl = TextEditingController();
 
+  /// One persistent add-field controller per geography editor, keyed by label.
+  /// Hoisted out of build() so typed input is not wiped on every rebuild and
+  /// the controllers are actually disposed.
+  final Map<String, TextEditingController> _geoCtrls = {};
+
   late String _kind;
   late String _status;
   String? _channel;
@@ -199,6 +204,9 @@ class _OrganizingToolkitSheetBodyState
     _titleCtrl.dispose();
     _descCtrl.dispose();
     _candSearchCtrl.dispose();
+    for (final c in _geoCtrls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -222,34 +230,38 @@ class _OrganizingToolkitSheetBodyState
     setState(() => _saving = true);
 
     bool ok;
-    if (_isEdit) {
-      await _repo.updateStatus(widget.existing!.id, _status);
-      ok = true;
-    } else {
-      final activity = OutreachActivity(
-        id: '',
-        kind: _kind,
-        title: _titleCtrl.text.trim(),
-        description:
-            _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-        status: _status,
-        channel: _channel,
-        scheduledOn: _scheduledOn,
-        completedAt: _status == 'completed' ? DateTime.now() : null,
-        counties: _counties,
-        congressionalDistricts: _cds,
-        senateDistricts: _sds,
-        houseDistricts: _hds,
-      );
-      final id = await _repo.createActivity(
-        activity,
-        candidateIds: _selectedCandidateIds.toList(),
-        participants: [
-          for (final p in _participants)
-            OutreachParticipantInput(memberId: p.member.id, role: p.role),
-        ],
-      );
-      ok = id != null;
+    try {
+      if (_isEdit) {
+        await _repo.updateStatus(widget.existing!.id, _status);
+        ok = true;
+      } else {
+        final activity = OutreachActivity(
+          id: '',
+          kind: _kind,
+          title: _titleCtrl.text.trim(),
+          description:
+              _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+          status: _status,
+          channel: _channel,
+          scheduledOn: _scheduledOn,
+          completedAt: _status == 'completed' ? DateTime.now() : null,
+          counties: _counties,
+          congressionalDistricts: _cds,
+          senateDistricts: _sds,
+          houseDistricts: _hds,
+        );
+        final id = await _repo.createActivity(
+          activity,
+          candidateIds: _selectedCandidateIds.toList(),
+          participants: [
+            for (final p in _participants)
+              OutreachParticipantInput(memberId: p.member.id, role: p.role),
+          ],
+        );
+        ok = id != null;
+      }
+    } catch (_) {
+      ok = false;
     }
 
     if (!mounted) return;
@@ -457,9 +469,9 @@ class _OrganizingToolkitSheetBodyState
       _label('WHERE'),
       const SizedBox(height: 10),
       _geoEditor('Counties', _counties, 'Add county'),
-      _geoEditor('Congressional', _cds, 'Add CD #'),
-      _geoEditor('Senate', _sds, 'Add SD #'),
-      _geoEditor('House', _hds, 'Add HD #'),
+      _geoEditor('Congressional', _cds, 'Add CD #', digitsOnly: true),
+      _geoEditor('Senate', _sds, 'Add SD #', digitsOnly: true),
+      _geoEditor('House', _hds, 'Add HD #', digitsOnly: true),
       const SizedBox(height: 12),
       _label('FOR WHICH NOMINEES'),
       const SizedBox(height: 10),
@@ -756,10 +768,17 @@ class _OrganizingToolkitSheetBodyState
   }
 
   // ── Geography editor ───────────────────────────────────────────
-  Widget _geoEditor(String label, List<String> list, String hint) {
-    final ctrl = TextEditingController();
+  Widget _geoEditor(String label, List<String> list, String hint,
+      {bool digitsOnly = false}) {
+    final ctrl = _geoCtrls.putIfAbsent(label, () => TextEditingController());
     void add() {
-      final v = ctrl.text.trim();
+      var v = ctrl.text.trim();
+      // District lists must store bare digits ("59"), matching the map's
+      // region queries; a hand-typed "HD 59" or "District 59" would never match.
+      if (digitsOnly) {
+        final m = RegExp(r'\d+').firstMatch(v);
+        v = m == null ? '' : int.parse(m.group(0)!).toString();
+      }
       if (v.isEmpty || list.contains(v)) return;
       setState(() => list.add(v));
       ctrl.clear();

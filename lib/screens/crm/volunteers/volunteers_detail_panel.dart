@@ -2080,6 +2080,11 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
               : 'All selected members were already on ${choice.title}'),
         ));
         break;
+      case _AddToActivityKind.failed:
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Could not add to ${choice.title}. Please try again.'),
+        ));
+        break;
       case _AddToActivityKind.newActivity:
         // Seed the create sheet with the selection and the region's single geo
         // key; the other three geo lists stay empty. Candidates are Phase 4.
@@ -2158,11 +2163,11 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
     var ok = 0;
     var failed = 0;
     for (final m in members) {
-      try {
-        await _repo.updateLastContacted(m.id);
+      final wrote = await _repo.updateLastContacted(m.id);
+      if (wrote) {
         _lastContactedOverride[m.id] = now;
         ok++;
-      } catch (_) {
+      } else {
         failed++;
       }
     }
@@ -2234,21 +2239,21 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
     var ok = 0;
     var failed = 0;
     for (final m in members) {
-      try {
-        // NEVER replace notes: append to the member's existing notes. Read the
-        // current notes (override wins so repeated appends chain), then append.
-        final base = (_effectiveNotes(m) ?? '').trim();
-        final appended = '$base\n[$today] $entry'.trim();
-        await _repo.updateNotes(m.id, appended);
-        _notesOverride[m.id] = appended;
-        if (alsoContacted) {
-          await _repo.updateLastContacted(m.id);
-          _lastContactedOverride[m.id] = now;
-        }
-        ok++;
-      } catch (_) {
+      // NEVER replace notes: append to the member's existing notes. Read the
+      // current notes (override wins so repeated appends chain), then append.
+      final base = (_effectiveNotes(m) ?? '').trim();
+      final appended = '$base\n[$today] $entry'.trim();
+      final noteWrote = await _repo.updateNotes(m.id, appended);
+      if (!noteWrote) {
         failed++;
+        continue;
       }
+      _notesOverride[m.id] = appended;
+      if (alsoContacted) {
+        final contactWrote = await _repo.updateLastContacted(m.id);
+        if (contactWrote) _lastContactedOverride[m.id] = now;
+      }
+      ok++;
     }
     if (!mounted) return;
     setState(() {});
@@ -2525,7 +2530,7 @@ String _initials(String name) {
 //  region-aware follow-up (snackbar or create sheet). Null on dismiss.
 // ═══════════════════════════════════════════════════════════════
 
-enum _AddToActivityKind { added, newActivity }
+enum _AddToActivityKind { added, newActivity, failed }
 
 class _AddToActivityChoice {
   const _AddToActivityChoice.added(this.addedCount, this.title)
@@ -2534,6 +2539,9 @@ class _AddToActivityChoice {
       : kind = _AddToActivityKind.newActivity,
         addedCount = 0,
         title = '';
+  const _AddToActivityChoice.failed(this.title)
+      : kind = _AddToActivityKind.failed,
+        addedCount = 0;
 
   final _AddToActivityKind kind;
 
@@ -2598,17 +2606,18 @@ class _AddToActivitySheetState extends State<_AddToActivitySheet> {
     final inputs = widget.members
         .map((m) => OutreachParticipantInput(memberId: m.id))
         .toList();
-    int added;
+    // PINNED: addParticipants dedupes on (activity_id, member_id) and returns
+    // the count of newly inserted rows; it rethrows on a rejected write so a
+    // failure is not mistaken for "everyone was already on the activity".
+    _AddToActivityChoice result;
     try {
-      // PINNED: addParticipants dedupes on (activity_id, member_id) and returns
-      // the count of newly inserted rows.
-      added = await _repo.addParticipants(activity.id, inputs);
+      final added = await _repo.addParticipants(activity.id, inputs);
+      result = _AddToActivityChoice.added(added, activity.title);
     } catch (_) {
-      added = 0;
+      result = _AddToActivityChoice.failed(activity.title);
     }
     if (!mounted) return;
-    Navigator.of(context)
-        .pop(_AddToActivityChoice.added(added, activity.title));
+    Navigator.of(context).pop(result);
   }
 
   @override

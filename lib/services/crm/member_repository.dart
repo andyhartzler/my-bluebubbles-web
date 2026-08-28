@@ -177,6 +177,23 @@ class MemberRepository {
         return MemberFetchResult(members: members, totalCount: totalCount);
       }
 
+      if (fetchAll) {
+        // "Fetch everything" must page past the PostgREST 1000-row cap, or it
+        // silently returns only the first 1000 eligible members.
+        final all = <dynamic>[];
+        const pageSize = 1000;
+        var pageOffset = 0;
+        while (true) {
+          final pageData =
+              await query.range(pageOffset, pageOffset + pageSize - 1);
+          final pageList = _coerceList(pageData);
+          all.addAll(pageList);
+          if (pageList.length < pageSize) break;
+          pageOffset += pageSize;
+        }
+        return MemberFetchResult(members: _mapMembers(all));
+      }
+
       final data = await query;
       final list = _coerceList(data);
       var members = _mapMembers(list);
@@ -984,16 +1001,21 @@ class MemberRepository {
   }
 
   /// Update member's last contacted timestamp
-  Future<void> updateLastContacted(String memberId) async {
-    if (!_isReady) return;
+  /// Returns true if the write succeeded. Callers that batch this over many
+  /// members rely on the bool to count failures instead of reporting every
+  /// row as saved.
+  Future<bool> updateLastContacted(String memberId) async {
+    if (!_isReady) return false;
 
     try {
       await _writeClient
           .from('members')
           .update({'last_contacted': DateTime.now().toUtc().toIso8601String()})
           .eq('id', memberId);
+      return true;
     } catch (e) {
       debugPrint('❌ Error updating last contacted: $e');
+      return false;
     }
   }
 
@@ -1040,16 +1062,20 @@ class MemberRepository {
   }
 
   /// Update member notes
-  Future<void> updateNotes(String memberId, String notes) async {
-    if (!_isReady) return;
+  /// Returns true if the write succeeded, so batched callers can count
+  /// failures rather than reporting an RLS-rejected write as saved.
+  Future<bool> updateNotes(String memberId, String notes) async {
+    if (!_isReady) return false;
 
     try {
       await _writeClient
           .from('members')
           .update({'notes': notes})
           .eq('id', memberId);
+      return true;
     } catch (e) {
       debugPrint('❌ Error updating notes: $e');
+      return false;
     }
   }
 
@@ -1574,13 +1600,25 @@ class MemberRepository {
         .toSet()
         .toList();
     if (clean.isEmpty) return const [];
-    final data = await _readClient
-        .from('members')
-        .select(_resolveColumnSelection(null))
-        .eq('membership_eligible', true)
-        .inFilter(column, clean)
-        .order('name');
-    return _mapMembers(_coerceList(data));
+    // Page past the 1000-row cap so a dense multi-district selection returns
+    // every eligible member, not just the first page.
+    final all = <dynamic>[];
+    const pageSize = 1000;
+    var offset = 0;
+    while (true) {
+      final data = await _readClient
+          .from('members')
+          .select(_resolveColumnSelection(null))
+          .eq('membership_eligible', true)
+          .inFilter(column, clean)
+          .order('name')
+          .range(offset, offset + pageSize - 1);
+      final page = _coerceList(data);
+      all.addAll(page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
+    return _mapMembers(all);
   }
 
   /// Count of eligible members per district/county, keyed to match the map
@@ -1590,20 +1628,31 @@ class MemberRepository {
   /// density.
   Future<Map<String, int>> getMemberCountsByField(String field) async {
     if (!_isReady) return const {};
-    final response = await _readClient
-        .from('members')
-        .select(field)
-        .eq('membership_eligible', true)
-        .not(field, 'is', null);
     final counts = <String, int>{};
-    for (final row in _coerceList(response)) {
-      final raw = (row as Map)[field];
-      if (raw == null) continue;
-      final String? key = field == 'county'
-          ? Member.normalizeCountyLabel(raw)
-          : _bareDigits(raw.toString());
-      if (key == null || key.isEmpty) continue;
-      counts[key] = (counts[key] ?? 0) + 1;
+    const pageSize = 1000;
+    var offset = 0;
+    // Page past the 1000-row cap so the map density choropleth, member range,
+    // and priority-district ranking stay accurate once eligible membership
+    // grows beyond a single page.
+    while (true) {
+      final response = await _readClient
+          .from('members')
+          .select(field)
+          .eq('membership_eligible', true)
+          .not(field, 'is', null)
+          .range(offset, offset + pageSize - 1);
+      final rows = _coerceList(response);
+      for (final row in rows) {
+        final raw = (row as Map)[field];
+        if (raw == null) continue;
+        final String? key = field == 'county'
+            ? Member.normalizeCountyLabel(raw)
+            : _bareDigits(raw.toString());
+        if (key == null || key.isEmpty) continue;
+        counts[key] = (counts[key] ?? 0) + 1;
+      }
+      if (rows.length < pageSize) break;
+      offset += pageSize;
     }
     return counts;
   }

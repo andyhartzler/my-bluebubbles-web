@@ -373,17 +373,25 @@ class CandidateRepository {
     if (!isReady) return [];
 
     try {
-      final response = await _client
-          
-          .from('candidates')
-          .select()
-          .eq('is_young_dem', true)
-          .order('estimated_age', ascending: true);
-
-      final results = (response as List<dynamic>)
-          .whereType<Map<String, dynamic>>()
-          .map(Candidate.fromJson)
-          .toList();
+      // Paginate past the 1000-row cap so no young-Dem row is silently dropped.
+      final results = <Candidate>[];
+      const pageSize = 1000;
+      var offset = 0;
+      while (true) {
+        final response = await _client
+            .from('candidates')
+            .select()
+            .eq('is_young_dem', true)
+            .order('estimated_age', ascending: true)
+            .range(offset, offset + pageSize - 1);
+        final page = (response as List<dynamic>)
+            .whereType<Map<String, dynamic>>()
+            .map(Candidate.fromJson)
+            .toList();
+        results.addAll(page);
+        if (page.length < pageSize) break;
+        offset += pageSize;
+      }
       return _applyHeadshots(results, await fetchEndorsementHeadshots());
     } catch (e) {
       debugPrint('❌ CandidateRepository.fetchYoungDemocrats error: $e');
@@ -1140,10 +1148,12 @@ class CandidateRepository {
         candidates = [];
       }
     } else {
-      candidates = await fetchCandidates(
+      // fetchAllCandidates paginates past the 1000-row cap; the old
+      // fetchCandidates(limit: 2000) issued a single .range(0,1999) that
+      // PostgREST silently truncated to 1000, dropping export rows.
+      candidates = await fetchAllCandidates(
         party: party,
         isYoungDem: isYoungDem,
-        limit: 2000,
       );
     }
 
@@ -1201,12 +1211,21 @@ class CandidateRepository {
     if (!isReady) return {};
 
     try {
-      final response = await _client
-          
-          .from('candidates')
-          .select('party, office_level');
-
-      final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
+      // Paginate past the PostgREST 1000-row cap; the candidates table is
+      // ~2869 rows, so a bare select would tally only the first page.
+      final rows = <Map<String, dynamic>>[];
+      const pageSize = 1000;
+      var offset = 0;
+      while (true) {
+        final response = await _client
+            .from('candidates')
+            .select('party, office_level')
+            .range(offset, offset + pageSize - 1);
+        final page = (response as List<dynamic>).cast<Map<String, dynamic>>();
+        rows.addAll(page);
+        if (page.length < pageSize) break;
+        offset += pageSize;
+      }
       final breakdown = <String, Map<String, int>>{};
 
       for (final r in rows) {
@@ -1228,13 +1247,22 @@ class CandidateRepository {
     if (!isReady) return {};
 
     try {
-      final response = await _client
-          
-          .from('candidates')
-          .select('district, party')
-          .eq('office_level', 'state');
-
-      final rows = (response as List<dynamic>).cast<Map<String, dynamic>>();
+      // Paginate past the 1000-row cap so contestation is computed over every
+      // state-office row, not just the first page.
+      final rows = <Map<String, dynamic>>[];
+      const pageSize = 1000;
+      var offset = 0;
+      while (true) {
+        final response = await _client
+            .from('candidates')
+            .select('district, party')
+            .eq('office_level', 'state')
+            .range(offset, offset + pageSize - 1);
+        final page = (response as List<dynamic>).cast<Map<String, dynamic>>();
+        rows.addAll(page);
+        if (page.length < pageSize) break;
+        offset += pageSize;
+      }
       final districtParties = <String, Set<String>>{};
 
       for (final r in rows) {

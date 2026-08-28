@@ -131,23 +131,31 @@ class OutreachRepository {
     return activities;
   }
 
-  /// Set an activity's status. Stamps completed_at when it becomes 'completed';
-  /// other transitions leave completed_at as it stands.
+  /// Set an activity's status. Stamps completed_at when it becomes 'completed'
+  /// and clears it on any move away from 'completed' (a reopen), so a reopened
+  /// activity never keeps a stale completion timestamp.
+  ///
+  /// Rethrows on failure: this write backs an optimistic UI whose revert path
+  /// depends on the exception surfacing. Callers wrap it in try/catch.
   Future<void> updateStatus(String id, String status) async {
     if (!isReady) return;
 
     try {
-      final fields = <String, dynamic>{'status': status};
-      if (status == 'completed') {
-        fields['completed_at'] = DateTime.now().toUtc().toIso8601String();
-      }
+      final fields = <String, dynamic>{
+        'status': status,
+        'completed_at': status == 'completed'
+            ? DateTime.now().toUtc().toIso8601String()
+            : null,
+      };
       await _client.from('outreach_activities').update(fields).eq('id', id);
     } catch (e) {
       debugPrint('❌ updateStatus: $e');
+      rethrow;
     }
   }
 
-  /// Record whether a member attended an activity.
+  /// Record whether a member attended an activity. Rethrows on failure so the
+  /// caller's optimistic-UI revert fires.
   Future<void> setAttendance(
       String activityId, String memberId, bool attended) async {
     if (!isReady) return;
@@ -160,6 +168,7 @@ class OutreachRepository {
           .eq('member_id', memberId);
     } catch (e) {
       debugPrint('❌ setAttendance: $e');
+      rethrow;
     }
   }
 
@@ -202,7 +211,9 @@ class OutreachRepository {
       return rows.length;
     } catch (e) {
       debugPrint('❌ addParticipants: $e');
-      return 0;
+      // Rethrow so a rejected write is not mistaken for "0 new (all already
+      // on the activity)". The caller surfaces the failure.
+      rethrow;
     }
   }
 
@@ -223,6 +234,7 @@ class OutreachRepository {
           .eq('member_id', memberId);
     } catch (e) {
       debugPrint('❌ updateParticipantRole: $e');
+      rethrow;
     }
   }
 
