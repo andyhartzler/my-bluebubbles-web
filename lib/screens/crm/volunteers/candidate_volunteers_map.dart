@@ -524,10 +524,34 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       _loadingMembers = false;
       _loadingCandidates = false;
     });
-    _flyTo(_moCenter, _initialZoom);
+    final statewide = _statewideCamera();
+    _flyTo(statewide.center, statewide.zoom);
   }
 
   // ── Camera ─────────────────────────────────────────────────────
+
+  /// The camera that frames the whole state in the CURRENT viewport.
+  ///
+  /// This must be COMPUTED and never hardcoded. A zoom level is an absolute
+  /// scale (z=6.4 means roughly 76 pixels per degree of latitude, forever), so
+  /// a fixed value shows a different amount of Missouri on every window size.
+  /// On a 963px-tall map pane, z=6.4 drew the state at 37% of the height with
+  /// black void on all sides; the fitted answer for that pane is z=7.72, which
+  /// fills 91% of it. `CameraFit.bounds` inverts the problem the right way
+  /// round: given these bounds and this viewport, solve for the zoom.
+  ///
+  /// Every path that means "show all of Missouri" goes through here. Three
+  /// places used to express that intent separately -- the initial
+  /// `initialCameraFit`, the recenter button, and the mode switch -- and the
+  /// mode switch was the one that hardcoded it and drifted.
+  ({LatLng center, double zoom}) _statewideCamera() {
+    final fit = CameraFit.bounds(
+      bounds: moBounds,
+      padding: const EdgeInsets.all(16),
+    ).fit(_mapController.camera);
+    return (center: fit.center, zoom: fit.zoom);
+  }
+
   void _flyTo(LatLng target, double zoom) {
     final camera = _mapController.camera;
     _cameraController.stop();
@@ -550,12 +574,8 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   void _recenter() {
     _clearSelection();
     // Snap Missouri back to filling the frame, the same fit the map opens with.
-    _mapController.fitCamera(
-      CameraFit.bounds(
-        bounds: moBounds,
-        padding: const EdgeInsets.all(16),
-      ),
-    );
+    final statewide = _statewideCamera();
+    _flyTo(statewide.center, statewide.zoom);
   }
 
   // ── Hit testing ────────────────────────────────────────────────

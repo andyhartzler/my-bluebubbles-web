@@ -9,7 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/screens/crm/volunteers/volunteers_map_models.dart'
-    show moMapOptions;
+    show moMapOptions, moBounds;
 
 // ═══════════════════════════════════════════════════════════════
 //  MISSOURI MAP WIDGET — flutter_map + real GeoJSON districts
@@ -591,7 +591,16 @@ class _MissouriMapWidgetState extends State<MissouriMapWidget>
           // Reset zoom button
           GestureDetector(
             onTap: () {
-              _flyTo(_moCenter, _initialZoom);
+              // Fit the state to THIS viewport rather than flying to a fixed
+              // zoom. A zoom level is an absolute scale, so the hardcoded
+              // constant drew Missouri small and adrift on a large screen and
+              // cropped it on a small one. Same defect, and same fix, as
+              // _statewideCamera() in candidate_volunteers_map.dart.
+              final fit = CameraFit.bounds(
+                bounds: moBounds,
+                padding: const EdgeInsets.all(16),
+              ).fit(_mapController.camera);
+              _flyTo(fit.center, fit.zoom);
             },
             child: Container(
               padding:
