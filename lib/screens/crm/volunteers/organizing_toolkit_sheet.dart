@@ -218,7 +218,11 @@ class _OrganizingToolkitSheetBodyState
   Color get _secondary => _vt.secondary;
   Color get _divider => _vt.divider;
   Color get _accent => _vt.accent;
-  Color get _onAccent => _vt.onAccent;
+  // Emphasis pair for anything that carries a LABEL on a filled surface.
+  // accent/onAccent is white on momentumBlue at 2.75:1 and fails even the 3:1
+  // large-text floor, so it is for non-text fills only.
+  Color get _emphasisFill => _vt.emphasisFill;
+  Color get _onEmphasis => _vt.onEmphasis;
   Color get _accentSoft => _vt.accentSoft;
   Color get _onAccentSoft => _vt.onAccentSoft;
 
@@ -1059,7 +1063,7 @@ class _OrganizingToolkitSheetBodyState
       child: Opacity(
         opacity: _canSave ? 1 : 0.5,
         child: Material(
-          color: _accent,
+          color: _emphasisFill,
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
             onTap: _canSave ? _save : null,
@@ -1072,11 +1076,11 @@ class _OrganizingToolkitSheetBodyState
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2.4, color: _onAccent),
+                          strokeWidth: 2.4, color: _onEmphasis),
                     )
                   : Text(_isEdit ? 'Save status' : 'Save plan',
                       style: TextStyle(
-                          color: _onAccent,
+                          color: _onEmphasis,
                           fontSize: 15,
                           fontWeight: FontWeight.w800)),
             ),

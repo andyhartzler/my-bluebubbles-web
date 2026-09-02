@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/screens/crm/volunteers/activities_hub_screen.dart';
 import 'package:bluebubbles/screens/crm/volunteers/candidate_volunteers_map.dart';
-import 'package:bluebubbles/screens/crm/volunteers/volunteers_theme.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATE VOLUNTEERS WORKSPACE (the "War Room" shell)
@@ -58,9 +58,11 @@ class _CandidateVolunteersWorkspaceState
   }
 }
 
-/// Compact sub-tab strip sitting under the Candidates area switcher. Uses a 2px
-/// accent underline for the active tab so it reads as a nested tab rather than a
-/// second heavyweight segmented control. Legible in both themes.
+/// Sub-tab strip sitting under the Candidates area switcher, in the Slack tab
+/// idiom: the brand gradient band, white labels against white70, and a
+/// sunriseGold indicator on the active tab. The labels sit at the band's left
+/// edge, which is the gradient's navy end, so white and white70 both clear
+/// 4.5:1 without a contrast shadow.
 class _TabBar extends StatelessWidget {
   const _TabBar({required this.active, required this.onChanged});
 
@@ -69,34 +71,21 @@ class _TabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vt = VolunteersTheme.of(context);
-
     return Container(
       height: 48,
-      decoration: BoxDecoration(
-        color: vt.surface,
-        border: Border(bottom: BorderSide(color: vt.divider)),
-      ),
+      decoration: BoxDecoration(gradient: BrandColors.getTileGradient()),
       child: Row(
         children: [
-          _tab(context, _WorkspaceTab.map, 'MAP', Icons.map_outlined, vt),
-          _tab(context, _WorkspaceTab.activities, 'ACTIVITIES',
-              Icons.event_note_outlined, vt),
+          _tab(_WorkspaceTab.map, 'MAP', Icons.map_outlined),
+          _tab(_WorkspaceTab.activities, 'ACTIVITIES', Icons.event_note_outlined),
         ],
       ),
     );
   }
 
-  Widget _tab(
-    BuildContext context,
-    _WorkspaceTab tab,
-    String label,
-    IconData icon,
-    VolunteersTheme vt,
-  ) {
+  Widget _tab(_WorkspaceTab tab, String label, IconData icon) {
     final selected = active == tab;
-    final activeColor = vt.accent;
-    final fg = selected ? activeColor : vt.secondary;
+    final fg = selected ? Colors.white : Colors.white70;
 
     return Material(
       color: Colors.transparent,
@@ -108,8 +97,8 @@ class _TabBar extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
-                color: selected ? activeColor : Colors.transparent,
-                width: 2,
+                color: selected ? BrandColors.sunriseGold : Colors.transparent,
+                width: 3,
               ),
             ),
           ),

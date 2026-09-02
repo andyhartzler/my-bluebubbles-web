@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/outreach_activity.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/outreach_repository.dart';
 import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
-import 'package:bluebubbles/screens/crm/volunteers/volunteers_map_models.dart';
-import 'package:bluebubbles/screens/crm/volunteers/volunteers_theme.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  ACTIVITY DETAIL (full-screen route)
@@ -17,9 +17,45 @@ import 'package:bluebubbles/screens/crm/volunteers/volunteers_theme.dart';
 //  (status, role, attendance) back through the repository. "Text roster" /
 //  "Email roster" resolve the roster's member ids to Member objects and hand
 //  them to the shipped bulk screens.
+//
+//  Painted in the Slack management language: BrandedBackground page, gradient
+//  header band, BrandedCard surfaces, white-pill roster rows.
 // ═══════════════════════════════════════════════════════════════
 
 const List<String> _kRoles = <String>['volunteer', 'captain', 'organizer'];
+
+/// Fill + foreground for a filled status chip on a branded gradient.
+///
+/// The foreground is picked per fill rather than fixed to white: the three
+/// brand state colors are light enough that white 10-12px text lands near
+/// 2.5:1 on them, while unityBlue clears 4.5:1 on all three. Cancelled
+/// inverts (navy fill, white text) so a dead activity reads as recessed
+/// rather than as another state color.
+///
+/// Shared by the hub, this screen and the region section so the three
+/// surfaces cannot drift apart.
+({Color fill, Color fg}) outreachStatusStyle(String status) {
+  switch (status) {
+    case 'planned':
+      return (fill: BrandColors.momentumBlue, fg: BrandColors.unityBlue);
+    case 'in_progress':
+      return (fill: BrandColors.warning, fg: BrandColors.unityBlue);
+    case 'completed':
+      return (fill: BrandColors.success, fg: BrandColors.unityBlue);
+    default:
+      return (fill: BrandColors.unityBlue, fg: Colors.white);
+  }
+}
+
+/// Filled-red chips use the deeper red rather than BrandColors.error: white on
+/// #EF4444 is 3.8:1 and unityBlue on it is 4.0:1, so neither foreground clears
+/// the bar. Error itself is still the right color for the large glyphs and
+/// tinted circles in the error state, where the 3:1 graphic threshold applies.
+final Color outreachDangerFill = Colors.red.shade700;
+
+/// Red that stays legible as TEXT on the navy end of the gradient (5.1:1),
+/// which BrandColors.error does not.
+final Color outreachDangerInk = Colors.red.shade300;
 
 class ActivityDetailScreen extends StatefulWidget {
   const ActivityDetailScreen({super.key, required this.activity});
@@ -41,6 +77,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   bool _loading = true;
   bool _errored = false;
   bool _busy = false; // guards bulk/status writes
+
+  /// Which roster-wide action is in flight, so only that button swaps its icon
+  /// for a spinner instead of the whole card going ambiguous.
+  _PendingAction? _pending;
 
   @override
   void initState() {
@@ -74,8 +114,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message, style: const TextStyle(color: Colors.white)),
+      backgroundColor: BrandColors.unityBlue,
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
   // ── Attendance ─────────────────────────────────────────────────
@@ -98,7 +141,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     final pending =
         _roster.where((e) => e.attended != true).map((e) => e.memberId).toList();
     if (pending.isEmpty) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _pending = _PendingAction.markAll;
+    });
     var failed = false;
     for (final memberId in pending) {
       try {
@@ -108,7 +154,10 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
       }
     }
     if (!mounted) return;
-    setState(() => _busy = false);
+    setState(() {
+      _busy = false;
+      _pending = null;
+    });
     if (failed) _snack('Some attendance could not be saved.');
     await _load();
   }
@@ -185,17 +234,27 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     return showDialog<_CompleteChoice>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Record attendance first?'),
+        backgroundColor: BrandColors.unityBlue,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Record attendance first?',
+            style: BrandTextStyles.title),
         content: Text(
-            '$unrecorded ${unrecorded == 1 ? 'person has' : 'people have'} no '
-            'attendance recorded. Record who showed before completing?'),
+          '$unrecorded ${unrecorded == 1 ? 'person has' : 'people have'} no '
+          'attendance recorded. Record who showed before completing?',
+          style: BrandTextStyles.bodySecondary,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(_CompleteChoice.recordNow),
-            child: const Text('Record now'),
+            style: TextButton.styleFrom(
+                foregroundColor: BrandColors.sunriseGold),
+            child: const Text('Record now',
+                style: TextStyle(fontWeight: FontWeight.w700)),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(_CompleteChoice.skip),
+            style: TextButton.styleFrom(foregroundColor: Colors.white70),
             child: const Text('Skip'),
           ),
         ],
@@ -220,10 +279,16 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
   Future<void> _textRoster() async {
     if (_busy) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _pending = _PendingAction.text;
+    });
     final members = await _resolveRosterMembers();
     if (!mounted) return;
-    setState(() => _busy = false);
+    setState(() {
+      _busy = false;
+      _pending = null;
+    });
     if (members == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -234,10 +299,16 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
   Future<void> _emailRoster() async {
     if (_busy) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _pending = _PendingAction.email;
+    });
     final members = await _resolveRosterMembers();
     if (!mounted) return;
-    setState(() => _busy = false);
+    setState(() {
+      _busy = false;
+      _pending = null;
+    });
     if (members == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -246,140 +317,259 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     );
   }
 
-  // ── Theme tokens (the ONE VolunteersTheme) ─────────────────────
-  // Page and cards both sit on `surface` and separate with hairline `divider`
-  // borders, exactly like the hub. `primary` is already light in dark schemes,
-  // so the old hand-lifted blue is gone.
-  VolunteersTheme get _vt => VolunteersTheme.of(context);
-  Color get _bg => _vt.surface;
-  Color get _surface => _vt.surface;
-  Color get _inset => _vt.inset;
-  Color get _action => _vt.accent;
-  Color get _text => _vt.text;
-  Color get _secondary => _vt.secondary;
-  Color get _divider => _vt.divider;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: _surface,
-        foregroundColor: _text,
-        elevation: 0,
-        shape: Border(bottom: BorderSide(color: _divider)),
-        title: Row(
-          children: [
-            Icon(_activity.kindIcon, size: 20, color: _action),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(_activity.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.w800)),
-            ),
-          ],
+      // The gradient fallback under BrandedBackground's asset, so a slow or
+      // missing image never flashes a white page behind the header band.
+      backgroundColor: BrandColors.unityBlue,
+      body: BrandedBackground(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _headerBand(),
+              Expanded(
+                child: _loading
+                    ? const Center(
+                        child: SizedBox(
+                          width: 26,
+                          height: 26,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2.6,
+                              color: BrandColors.unityBlue),
+                        ),
+                      )
+                    : _errored
+                        ? _errorState()
+                        : _content(),
+              ),
+            ],
+          ),
         ),
       ),
-      body: _loading
-          ? Center(
-              child: SizedBox(
-                width: 26,
-                height: 26,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2.6, color: _action),
-              ),
-            )
-          : _errored
-              ? _errorBody()
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    final wide = constraints.maxWidth >= 900;
-                    if (wide) {
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 6,
-                            child: SingleChildScrollView(
-                              padding: const EdgeInsets.all(20),
-                              child: _rosterSection(),
-                            ),
-                          ),
-                          Container(width: 1, color: _divider),
-                          Expanded(
-                            flex: 4,
-                            child: SingleChildScrollView(
-                              padding: const EdgeInsets.all(20),
-                              child: _infoSection(),
-                            ),
-                          ),
-                        ],
-                      );
-                    }
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _infoSection(),
-                          const SizedBox(height: 20),
-                          _rosterSection(),
-                        ],
-                      ),
-                    );
-                  },
-                ),
     );
   }
 
-  Widget _errorBody() => Center(
+  // ── Header band ────────────────────────────────────────────────
+  Widget _headerBand() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 8, 16, 16),
+      decoration: BoxDecoration(gradient: BrandColors.getTileGradient()),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IconButton(
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            tooltip: 'Back',
+          ),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(_activity.kindIcon, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_activity.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: BrandTextStyles.title),
+                  const SizedBox(height: 2),
+                  Text(_activity.kindLabel,
+                      style: BrandTextStyles.caption),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: _statusMenu(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusMenu() {
+    final transitions = _allowedTransitions;
+    final style = outreachStatusStyle(_activity.status);
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: style.fill,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(_activity.statusLabel,
+              style: TextStyle(
+                  color: style.fg,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800)),
+          if (transitions.isNotEmpty) ...[
+            const SizedBox(width: 4),
+            Icon(Icons.expand_more, size: 16, color: style.fg),
+          ],
+        ],
+      ),
+    );
+
+    if (transitions.isEmpty || _busy) return chip;
+
+    return PopupMenuButton<String>(
+      tooltip: 'Change status',
+      color: BrandColors.unityBlue,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: _requestStatus,
+      itemBuilder: (_) => [
+        for (final target in transitions)
+          PopupMenuItem<String>(
+            value: target,
+            child: Text(_transitionLabel(target),
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+      ],
+      child: chip,
+    );
+  }
+
+  // ── Body ───────────────────────────────────────────────────────
+  Widget _content() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 900;
+        if (wide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 6,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: _rosterCard(),
+                ),
+              ),
+              Expanded(
+                flex: 4,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(0, 16, 16, 16),
+                  child: _infoCard(),
+                ),
+              ),
+            ],
+          );
+        }
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _infoCard(),
+              const SizedBox(height: 24),
+              _rosterCard(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _errorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 44, color: _secondary),
-            const SizedBox(height: 14),
-            Text('Could not load this activity.',
-                style: TextStyle(color: _secondary, fontSize: 14)),
-            const SizedBox(height: 14),
-            TextButton(
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: BrandColors.error.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.error_outline,
+                  size: 56, color: BrandColors.error),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Could not load this activity',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: BrandColors.unityBlue,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'The roster and attendance could not be read. Check the '
+              'connection and try again.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: BrandColors.unityBlue.withValues(alpha: 0.7),
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
               onPressed: _load,
-              child: Text('Retry',
-                  style: TextStyle(
-                      color: _action,
-                      fontWeight: FontWeight.w800)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: BrandColors.unityBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
             ),
           ],
         ),
-      );
-
-  // ── Info / status ──────────────────────────────────────────────
-  Widget _infoSection() {
-    final geo = _geoLabels();
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _divider),
       ),
+    );
+  }
+
+  // ── Info card ──────────────────────────────────────────────────
+  Widget _infoCard() {
+    final geo = _geoLabels();
+    return BrandedCard(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text(_activity.kindLabel,
-                  style: TextStyle(
-                      color: _secondary,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700)),
-              const Spacer(),
-              _statusMenu(),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.info_outline,
+                    color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                  child: Text('Details', style: BrandTextStyles.title)),
             ],
           ),
-          const SizedBox(height: 12),
-          _kv('Date',
+          const SizedBox(height: 14),
+          _kv(
+              'Date',
               _activity.scheduledOn == null
                   ? 'No date set'
                   : _fmtDate(_activity.scheduledOn!)),
@@ -392,37 +582,59 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           if (_activity.completedAt != null)
             _kv('Completed', _fmtDate(_activity.completedAt!)),
           if (geo.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: [for (final g in geo) _readChip(g)],
+              children: [for (final g in geo) _pill(g)],
             ),
           ],
           if (_activity.description != null &&
               _activity.description!.trim().isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Text('NOTES',
-                style: TextStyle(
-                    color: _secondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1)),
-            const SizedBox(height: 6),
-            Text(_activity.description!,
-                style: TextStyle(color: _text, fontSize: 13.5, height: 1.4)),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('NOTES',
+                      style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1)),
+                  const SizedBox(height: 6),
+                  Text(_activity.description!,
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 14, height: 1.4)),
+                ],
+              ),
+            ),
           ],
           const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
-                child: _actionButton(
-                    Icons.sms_outlined, 'Text roster', _textRoster),
+                child: _secondaryAction(
+                  icon: Icons.sms_outlined,
+                  label: 'Text roster',
+                  busy: _pending == _PendingAction.text,
+                  onTap: _textRoster,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _actionButton(
-                    Icons.mail_outline, 'Email roster', _emailRoster),
+                child: _secondaryAction(
+                  icon: Icons.mail_outline,
+                  label: 'Email roster',
+                  busy: _pending == _PendingAction.email,
+                  onTap: _emailRoster,
+                ),
               ),
             ],
           ),
@@ -431,127 +643,115 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     );
   }
 
-  Widget _statusMenu() {
-    final transitions = _allowedTransitions;
-    final chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: _activity.statusColor,
-        borderRadius: BorderRadius.circular(999),
+  Widget _secondaryAction({
+    required IconData icon,
+    required String label,
+    required bool busy,
+    required VoidCallback onTap,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: _busy ? null : onTap,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        disabledForegroundColor: Colors.white54,
+        side: const BorderSide(color: Colors.white70),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(_activity.statusLabel,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800)),
-          if (transitions.isNotEmpty) ...[
-            const SizedBox(width: 4),
-            const Icon(Icons.expand_more, size: 16, color: Colors.white),
-          ],
-        ],
-      ),
-    );
-
-    if (transitions.isEmpty || _busy) return chip;
-
-    return PopupMenuButton<String>(
-      tooltip: 'Change status',
-      color: _surface,
-      onSelected: _requestStatus,
-      itemBuilder: (_) => [
-        for (final target in transitions)
-          PopupMenuItem<String>(
-            value: target,
-            child: Text(_transitionLabel(target),
-                style: TextStyle(color: _text, fontWeight: FontWeight.w600)),
-          ),
-      ],
-      child: chip,
+      icon: busy
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: Colors.white),
+            )
+          : Icon(icon, size: 18),
+      label: Text(label,
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
     );
   }
 
-  Widget _actionButton(IconData icon, String label, VoidCallback onTap) {
-    return Material(
-      color: _inset,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: _busy ? null : onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Opacity(
-          opacity: _busy ? 0.5 : 1,
-          child: Container(
-            height: 44,
-            alignment: Alignment.center,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 17, color: _action),
-                const SizedBox(width: 8),
-                Text(label,
-                    style: TextStyle(
-                        color: _action,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Roster ─────────────────────────────────────────────────────
-  Widget _rosterSection() {
+  // ── Roster card ────────────────────────────────────────────────
+  Widget _rosterCard() {
     final rostered = _roster.length;
     final attended = _roster.where((e) => e.attended == true).length;
     final noShow = _roster.where((e) => e.attended == false).length;
     final unrecorded = _roster.where((e) => e.attended == null).length;
+    final anyPending = _roster.any((e) => e.attended != true);
 
-    return Container(
+    return BrandedCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _divider),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text('ROSTER',
-                    style: TextStyle(
-                        color: _secondary,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.1)),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.groups_outlined,
+                    color: Colors.white, size: 20),
               ),
-              if (_roster.any((e) => e.attended != true))
-                TextButton(
+              const SizedBox(width: 12),
+              const Expanded(
+                  child: Text('Roster', style: BrandTextStyles.title)),
+              if (anyPending)
+                ElevatedButton.icon(
                   onPressed: _busy ? null : _markAllAttended,
-                  style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8)),
-                  child: Text('Mark all attended',
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: BrandColors.sunriseGold,
+                    foregroundColor: BrandColors.unityBlue,
+                    disabledBackgroundColor:
+                        BrandColors.sunriseGold.withValues(alpha: 0.5),
+                    disabledForegroundColor: BrandColors.unityBlue,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: _pending == _PendingAction.markAll
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: BrandColors.unityBlue),
+                        )
+                      : const Icon(Icons.done_all, size: 16),
+                  label: const Text('Mark all attended',
                       style: TextStyle(
-                          color: _action,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12.5)),
+                          fontSize: 12.5, fontWeight: FontWeight.w800)),
                 ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            '$rostered rostered  ·  $attended attended  ·  '
-            '$noShow no-show  ·  $unrecorded unrecorded',
-            style: TextStyle(color: _secondary, fontSize: 12.5),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _pill('$rostered rostered'),
+              // The three attendance states carry their own fills so the split
+              // reads without counting: null stays navy because "not yet
+              // recorded" must not look like a decision.
+              _countChip('$attended attended', BrandColors.success,
+                  BrandColors.unityBlue),
+              _countChip('$noShow no-show', outreachDangerFill, Colors.white),
+              _countChip('$unrecorded unrecorded', BrandColors.unityBlue,
+                  Colors.white),
+            ],
           ),
           const SizedBox(height: 14),
           if (_roster.isEmpty)
-            _emptyNote('No one on the roster yet.')
+            _inCardEmpty(
+              icon: Icons.person_add_alt_1_outlined,
+              title: 'Nobody on the roster yet',
+              body: 'Add volunteers from the organizing toolkit, then record '
+                  'who showed up here.',
+            )
           else
             for (final entry in _roster) _rosterRow(entry),
         ],
@@ -560,57 +760,48 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   }
 
   Widget _rosterRow(ActivityRosterEntry entry) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _avatar(entry.memberAvatarUrl, entry.memberName),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(entry.memberName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: _text,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600)),
-              ),
-              const SizedBox(width: 8),
-              _roleDropdown(entry),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _attendanceControl(entry),
-        ],
+    return BrandedActivityFeedItem(
+      primaryText: entry.memberName,
+      secondaryText: _roleLabel(entry.role),
+      showChevron: false,
+      leadingWidget: CorsAwareAvatar(
+        imageUrl: entry.memberAvatarUrl,
+        radius: 18,
+        backgroundColor: Colors.white.withValues(alpha: 0.2),
+        fallbackText: entry.memberName,
+        fallbackTextColor: Colors.white,
+        fallbackIconColor: Colors.white,
+      ),
+      trailing: _roleDropdown(entry),
+      expansion: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: _attendanceControl(entry),
       ),
     );
   }
 
   Widget _roleDropdown(ActivityRosterEntry entry) {
     return Container(
-      height: 34,
+      height: 32,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: _inset,
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: _divider),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: _kRoles.contains(entry.role) ? entry.role : 'volunteer',
           isDense: true,
-          icon: Icon(Icons.expand_more, color: _secondary, size: 18),
-          dropdownColor: _surface,
-          style: TextStyle(
-              color: _text, fontSize: 12.5, fontWeight: FontWeight.w600),
+          icon: const Icon(Icons.expand_more, color: Colors.white70, size: 18),
+          dropdownColor: BrandColors.unityBlue,
+          borderRadius: BorderRadius.circular(12),
+          style: const TextStyle(
+              color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w700),
           items: [
             for (final r in _kRoles)
               DropdownMenuItem<String>(
                 value: r,
-                child: Text('${r[0].toUpperCase()}${r.substring(1)}'),
+                child: Text(_roleLabel(r)),
               ),
           ],
           onChanged: (v) {
@@ -622,13 +813,11 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   }
 
   Widget _attendanceControl(ActivityRosterEntry entry) {
-    // Active segment = solid status fill with white text (the same language as
-    // the status chips), which clears 4.5:1 in both themes. Tinted-fill +
-    // colored-text could not reach that on the dark inset.
     Widget seg({
       required String label,
       required bool active,
-      required Color activeColor,
+      required Color fill,
+      required Color fg,
       VoidCallback? onTap,
     }) {
       return Expanded(
@@ -636,16 +825,17 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
+            borderRadius: BorderRadius.circular(8),
             child: Container(
               height: 32,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: active ? activeColor : Colors.transparent,
-                borderRadius: BorderRadius.circular(7),
+                color: active ? fill : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Text(label,
                   style: TextStyle(
-                      color: active ? Colors.white : _secondary,
+                      color: active ? fg : Colors.white70,
                       fontSize: 12,
                       fontWeight: FontWeight.w700)),
             ),
@@ -655,34 +845,35 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(3),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: _inset,
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: _divider),
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
-          // "Unrecorded" reflects the null state but cannot be re-selected once
-          // attendance is set (there is no clear-to-null path).
+          // "Unrecorded" shows the null state but cannot be re-selected: there
+          // is no clear-to-null write, and null is deliberately distinct from
+          // a recorded no-show.
           seg(
             label: 'Unrecorded',
             active: entry.attended == null,
-            // The cancelled-status grey: white text on it clears 4.5:1 in both
-            // themes, where `_secondary` (light in dark mode) would not.
-            activeColor: const Color(0xFF6B7280),
+            fill: BrandColors.unityBlue,
+            fg: Colors.white,
             onTap: null,
           ),
           seg(
             label: 'Attended',
             active: entry.attended == true,
-            activeColor: const Color(0xFF2E7D32),
+            fill: BrandColors.success,
+            fg: BrandColors.unityBlue,
             onTap: () => _setAttendance(entry, true),
           ),
           seg(
             label: 'No-show',
             active: entry.attended == false,
-            activeColor: const Color(0xFFC62828),
+            fill: outreachDangerFill,
+            fg: Colors.white,
             onTap: () => _setAttendance(entry, false),
           ),
         ],
@@ -693,76 +884,89 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   // ── Small building blocks ──────────────────────────────────────
   Widget _kv(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 92,
             child: Text(label,
-                style: TextStyle(
-                    color: _secondary,
+                style: const TextStyle(
+                    color: Colors.white70,
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600)),
           ),
           Expanded(
             child: Text(value,
-                style: TextStyle(
-                    color: _text, fontSize: 13.5, fontWeight: FontWeight.w600)),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600)),
           ),
         ],
       ),
     );
   }
 
-  Widget _readChip(String label) => Container(
+  Widget _pill(String label) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: _vt.accentSoft,
-          borderRadius: BorderRadius.circular(999),
+          color: Colors.white.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(label,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w700)),
+      );
+
+  Widget _countChip(String label, Color fill, Color fg) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Text(label,
             style: TextStyle(
-                color: _vt.onAccentSoft,
-                fontSize: 11,
-                fontWeight: FontWeight.w800)),
+                color: fg, fontSize: 11, fontWeight: FontWeight.w800)),
       );
 
-  Widget _emptyNote(String text) => Container(
+  Widget _inCardEmpty({
+    required IconData icon,
+    required String title,
+    required String body,
+  }) =>
+      Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _inset,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _divider),
+          color: Colors.white.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
         ),
-        child: Text(text, style: TextStyle(color: _secondary, fontSize: 12.5)),
-      );
-
-  Widget _avatar(String? url, String name) {
-    if (url != null && url.isNotEmpty) {
-      return ClipOval(
-        child: Image.network(url,
-            width: 36,
-            height: 36,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _initialsAvatar(name)),
-      );
-    }
-    return _initialsAvatar(name);
-  }
-
-  Widget _initialsAvatar(String name) => Container(
-        width: 36,
-        height: 36,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: MapPalette.avatarColorFor(name),
-          shape: BoxShape.circle,
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: Colors.white, size: 22),
+            ),
+            const SizedBox(height: 10),
+            Text(title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(body,
+                textAlign: TextAlign.center,
+                style: BrandTextStyles.caption),
+          ],
         ),
-        child: Text(_initials(name),
-            style: const TextStyle(
-                color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
       );
 
   List<String> _geoLabels() => [
@@ -782,21 +986,15 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 
   String _channelLabel(String key) => _channelLabels[key] ?? key;
 
+  String _roleLabel(String role) =>
+      role.isEmpty ? role : '${role[0].toUpperCase()}${role.substring(1)}';
+
   static const List<String> _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
   String _fmtDate(DateTime d) => '${_months[d.month - 1]} ${d.day}, ${d.year}';
-
-  String _initials(String name) {
-    final parts =
-        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return '?';
-    final first = parts.first[0];
-    final last = parts.length > 1 ? parts.last[0] : '';
-    return (first + last).toUpperCase();
-  }
 
   // Immutable ActivityRosterEntry rebuild helpers for optimistic updates.
   ActivityRosterEntry _withAttendance(ActivityRosterEntry e, bool attended) =>
@@ -821,3 +1019,6 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
 }
 
 enum _CompleteChoice { recordNow, skip }
+
+/// The roster-wide writes that own a spinner while they run.
+enum _PendingAction { text, email, markAll }

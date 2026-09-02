@@ -105,15 +105,91 @@ async function auditLogAction(params) {
     console.error("[send-email] audit_log insert failed:", e);
   }
 }
+// --- Header hygiene ---
+// Every header below is built by string interpolation, so a CR or LF anywhere
+// in a caller-supplied value injects arbitrary headers. Strip rather than
+// reject: a stray newline pasted into a display name should not fail an
+// otherwise valid send.
+function sanitizeHeader(value) {
+  return String(value ?? "").replace(/[\r\n]+/g, " ").trim();
+}
+// --- Base64 helpers ---
+function base64Bytes(bytes) {
+  let binary = "";
+  for (const byte of bytes){
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+// RFC 2045 caps encoded lines at 76 characters.
+function base64Body(text) {
+  return base64Bytes(new TextEncoder().encode(text)).replace(/(.{76})/g, "$1\r\n");
+}
+// --- RFC 2047 encoded-word ---
+// A header is ASCII by definition, so a curly quote, an accented name or an
+// emoji in a Subject is only reliable across clients once encoded. ASCII-only
+// values are returned untouched so plain subjects stay readable in the raw MIME.
+function encodeHeaderWord(value) {
+  const clean = sanitizeHeader(value);
+  if (!clean || !/[^\x20-\x7E]/.test(clean)) return clean;
+  const encoder = new TextEncoder();
+  // An encoded word may not exceed 75 characters. "=?UTF-8?B?" plus "?=" costs
+  // 12 and base64 grows in quanta of 4, so 45 source bytes is the largest chunk
+  // that always fits. Split on CHARACTER boundaries: each encoded word has to
+  // decode on its own, so a chunk must never end mid-sequence.
+  const chunks = [];
+  let current = "";
+  let currentBytes = 0;
+  for (const char of clean){
+    const size = encoder.encode(char).length;
+    if (currentBytes + size > 45 && current) {
+      chunks.push(current);
+      current = "";
+      currentBytes = 0;
+    }
+    current += char;
+    currentBytes += size;
+  }
+  if (current) chunks.push(current);
+  // Multiple encoded words fold onto continuation lines rather than running past
+  // the line limit.
+  return chunks.map((chunk)=>`=?UTF-8?B?${base64Bytes(encoder.encode(chunk))}?=`).join("\r\n ");
+}
 // --- Template variable replacement helper ---
-function mergeTemplate(text, variables) {
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function escapeHtml(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+// escapeValues says which part is being filled. The html body was already
+// escaped client-side, so substituting raw there reopens the hole: a member
+// named "Ben & Jerry" emits a bare ampersand and a value containing "<" is
+// parsed as a tag. The text/plain part must NOT be escaped, which is why the
+// caller has to say which one it is filling.
+function mergeTemplate(text, variables, escapeValues) {
   if (!variables) return text;
   let merged = text;
   for (const [key, value] of Object.entries(variables)){
-    const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
-    merged = merged.replace(regex, value || "");
+    // The key is caller-supplied, so one carrying regex metacharacters would
+    // otherwise break or hijack the match.
+    const regex = new RegExp(`{{\\s*${escapeRegExp(key)}\\s*}}`, "g");
+    // A legitimately falsy value (0, false, "") is a value, not a missing one.
+    const raw = value === null || value === undefined ? "" : String(value);
+    const replacement = escapeValues ? escapeHtml(raw) : raw;
+    // Function form: a value containing "$&" must not be read as a match
+    // reference.
+    merged = merged.replace(regex, ()=>replacement);
   }
   return merged;
+}
+// --- Minimal, email-client-safe document wrapper ---
+// Composed bodies arrive as bare fragments, which leaves every client guessing
+// at the charset. Wrap only when the body is not already a full document, so a
+// caller that sends one is never double-wrapped.
+function wrapHtmlDocument(html) {
+  if (/^\s*(<!doctype\s+html|<html[\s>])/i.test(html)) return html;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0; padding:0;">${html}</body></html>`;
 }
 // --- Gmail Auth Setup ---
 async function getGmailClient() {
@@ -141,16 +217,17 @@ async function sendSingleEmail({ gmail, to, cc, bcc, subject, htmlBody, textBody
   const boundaryOuter = "outer-boundary";
   const boundaryInner = "inner-boundary";
   const lines = [];
+  const addressList = (value)=>sanitizeHeader(Array.isArray(value) ? value.join(", ") : value);
   // Headers
-  lines.push(`From: ${displayName} <${senderEmail}>`);
-  lines.push(`To: ${to}`);
-  if (cc && cc.length) lines.push(`Cc: ${Array.isArray(cc) ? cc.join(", ") : cc}`);
-  if (bcc && bcc.length) lines.push(`Bcc: ${Array.isArray(bcc) ? bcc.join(", ") : bcc}`);
-  if (replyTo) lines.push(`Reply-To: ${replyTo}`);
+  lines.push(`From: ${encodeHeaderWord(displayName)} <${sanitizeHeader(senderEmail)}>`);
+  lines.push(`To: ${addressList(to)}`);
+  if (cc && cc.length) lines.push(`Cc: ${addressList(cc)}`);
+  if (bcc && bcc.length) lines.push(`Bcc: ${addressList(bcc)}`);
+  if (replyTo) lines.push(`Reply-To: ${sanitizeHeader(replyTo)}`);
   // Threading headers
-  if (inReplyTo) lines.push(`In-Reply-To: ${inReplyTo}`);
-  if (references) lines.push(`References: ${references}`);
-  lines.push(`Subject: ${subject}`);
+  if (inReplyTo) lines.push(`In-Reply-To: ${sanitizeHeader(inReplyTo)}`);
+  if (references) lines.push(`References: ${sanitizeHeader(references)}`);
+  lines.push(`Subject: ${encodeHeaderWord(subject)}`);
   lines.push(`MIME-Version: 1.0`);
   lines.push(`Content-Type: multipart/mixed; boundary="${boundaryOuter}"`);
   lines.push("");
@@ -158,28 +235,37 @@ async function sendSingleEmail({ gmail, to, cc, bcc, subject, htmlBody, textBody
   lines.push(`--${boundaryOuter}`);
   lines.push(`Content-Type: multipart/alternative; boundary="${boundaryInner}"`);
   lines.push("");
+  // Both bodies are UTF-8, so base64 is the honest transfer encoding: declaring
+  // 7bit over 8-bit content is a spec violation that survived only because
+  // charset="UTF-8" was declared alongside it. This is the PER-PART encoding.
+  // The base64 of rawMessage further down is the separate Gmail API layer, so
+  // each part body is still encoded exactly once.
   if (textBody) {
     lines.push(`--${boundaryInner}`);
     lines.push(`Content-Type: text/plain; charset="UTF-8"`);
-    lines.push(`Content-Transfer-Encoding: 7bit`);
+    lines.push(`Content-Transfer-Encoding: base64`);
     lines.push("");
-    lines.push(textBody);
+    lines.push(base64Body(textBody));
     lines.push("");
   }
   lines.push(`--${boundaryInner}`);
   lines.push(`Content-Type: text/html; charset="UTF-8"`);
-  lines.push(`Content-Transfer-Encoding: 7bit`);
+  lines.push(`Content-Transfer-Encoding: base64`);
   lines.push("");
-  lines.push(htmlBody);
+  lines.push(base64Body(wrapHtmlDocument(htmlBody)));
   lines.push("");
   lines.push(`--${boundaryInner}--`);
   lines.push("");
   // Attachments
   if (attachments && Array.isArray(attachments)) {
     for (const att of attachments){
+      // A filename is a header parameter like any other: a CR, an LF or a stray
+      // quote in it injects headers or breaks out of the quoted string.
+      const filename = sanitizeHeader(att.filename).replace(/"/g, "");
+      const mimeType = sanitizeHeader(att.mimeType).replace(/[";]/g, "") || "application/octet-stream";
       lines.push(`--${boundaryOuter}`);
-      lines.push(`Content-Type: ${att.mimeType || "application/octet-stream"}; name="${att.filename}"`);
-      lines.push(`Content-Disposition: attachment; filename="${att.filename}"`);
+      lines.push(`Content-Type: ${mimeType}; name="${filename}"`);
+      lines.push(`Content-Disposition: attachment; filename="${filename}"`);
       lines.push(`Content-Transfer-Encoding: base64`);
       lines.push("");
       lines.push(att.content);
@@ -262,6 +348,31 @@ Deno.serve(async (req)=>{
     const gmail = await getGmailClient();
     // --- Determine if this is a mail merge operation ---
     const isMailMerge = recipients && Array.isArray(recipients) && recipients.length > 0;
+    // A Cc or Bcc only becomes incoherent when MORE THAN ONE message goes out:
+    // copying the address on every send buries it under one message per
+    // recipient, and copying it on a single arbitrary send is a partial result
+    // nobody asked for. The composer offers both fields, so silently discarding
+    // them lies to the operator; refuse and say why instead.
+    //
+    // The condition is deliberately recipients.length > 1, NOT isMailMerge. The
+    // Flutter client ALWAYS populates `recipients` (crm_email_service.dart
+    // builds it unconditionally), so isMailMerge is true for every send this app
+    // makes, including a one-to-one email. Gating on isMailMerge rejected every
+    // Cc/Bcc send in the product, which is strictly worse than the silent drop
+    // it replaced. One recipient means one message, where a copy means exactly
+    // what the operator expects, so it is honoured below.
+    const copyRequested = (cc && cc.length) || (bcc && bcc.length);
+    if (isMailMerge && recipients.length > 1 && copyRequested) {
+      return new Response(JSON.stringify({
+        error: "cc and bcc are not supported when sending to more than one recipient. Each recipient gets a separate personalized message, so a copied address would receive one copy per recipient. Remove cc and bcc, or send to a single recipient."
+      }), {
+        status: 400,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
+      });
+    }
     let allRecipientEmails = [];
     let sentCount = 0;
     let failedCount = 0;
@@ -279,15 +390,18 @@ Deno.serve(async (req)=>{
             continue;
           }
           // Merge variables for this specific recipient
-          const mergedHtml = mergeTemplate(htmlBody, recipientVars);
-          const mergedText = textBody ? mergeTemplate(textBody, recipientVars) : undefined;
-          const mergedSubject = mergeTemplate(subject, recipientVars);
+          const mergedHtml = mergeTemplate(htmlBody, recipientVars, true);
+          const mergedText = textBody ? mergeTemplate(textBody, recipientVars, false) : undefined;
+          const mergedSubject = mergeTemplate(subject, recipientVars, false);
           // Send individual email
           const { gmail_message_id, gmail_thread_id } = await sendSingleEmail({
             gmail,
             to: recipientEmail,
-            cc: null,
-            bcc: null,
+            // Honoured only on a single-recipient send. The guard above rejects
+            // a multi-recipient send that asks for a copy, so reaching here with
+            // a copy set means there is exactly one message to copy.
+            cc,
+            bcc,
             subject: mergedSubject,
             htmlBody: mergedHtml,
             textBody: mergedText,
@@ -326,9 +440,9 @@ Deno.serve(async (req)=>{
         to
       ];
       // Merge variables (same for all recipients)
-      const mergedHtml = mergeTemplate(htmlBody, variables);
-      const mergedText = textBody ? mergeTemplate(textBody, variables) : undefined;
-      const mergedSubject = mergeTemplate(subject, variables);
+      const mergedHtml = mergeTemplate(htmlBody, variables, true);
+      const mergedText = textBody ? mergeTemplate(textBody, variables, false) : undefined;
+      const mergedSubject = mergeTemplate(subject, variables, false);
       const { gmail_message_id, gmail_thread_id } = await sendSingleEmail({
         gmail,
         to: toEmails.join(", "),

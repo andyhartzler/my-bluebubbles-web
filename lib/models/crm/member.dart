@@ -5,6 +5,10 @@ import 'package:collection/collection.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
 
+/// Why a member cannot be contacted, in the order [Member.contactBlocker]
+/// applies the conditions.
+enum ContactBlocker { optedOut, noPhone, notEligible }
+
 /// Member model - maps to Supabase 'members' table
 /// This is a separate model from BlueBubbles Contact/Handle
 class Member {
@@ -82,7 +86,7 @@ class Member {
   final MemberInternalInfo internalInfo;
 
   // Linkage to public.mo_voter_file (added in 20260421_02 migration).
-  // Read-only from the member detail screen — never used as a source of
+  // Read-only from the member detail screen, never used as a source of
   // truth over the member's self-reported values.
   final String? moVoterFileId;
 
@@ -567,13 +571,20 @@ class Member {
     return calculatedAge;
   }
 
+  /// Helper: The first reason this member cannot be contacted, or null when
+  /// they can be. This is the single definition of the rule: [canContact] is
+  /// derived from it, and callers that need to explain a skip read it directly
+  /// rather than restating the conditions.
+  ContactBlocker? get contactBlocker {
+    if (optOut) return ContactBlocker.optedOut;
+    if (phoneE164 == null || phoneE164!.isEmpty) return ContactBlocker.noPhone;
+    if (membershipEligible != true) return ContactBlocker.notEligible;
+    return null;
+  }
+
   /// Helper: Check if member can be contacted
   /// Member must not be opted out, have a valid phone, AND be membership eligible
-  bool get canContact =>
-      !optOut &&
-      phoneE164 != null &&
-      phoneE164!.isNotEmpty &&
-      (membershipEligible == true);
+  bool get canContact => contactBlocker == null;
 
   /// Helper: Format committees as string
   String get committeesString => committee?.join(', ') ?? 'None';
@@ -594,7 +605,7 @@ class Member {
     return primary?.publicUrl;
   }
 
-  /// Effective avatar URL — prefers the user-uploaded `avatarUrl`, falls
+  /// Effective avatar URL. Prefers the user-uploaded `avatarUrl`, falls
   /// back to the auto-fetched `primaryProfilePhotoUrl`. Used by the
   /// personalized home profile header and any future avatar surface.
   String? get effectiveAvatarUrl {

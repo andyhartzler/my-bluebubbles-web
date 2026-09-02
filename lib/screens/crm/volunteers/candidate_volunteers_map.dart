@@ -26,7 +26,7 @@ import 'volunteers_detail_panel.dart';
 import 'volunteers_theme.dart';
 
 // ═══════════════════════════════════════════════════════════════
-//  CANDIDATE VOLUNTEERS — "The Field Map"
+//  CANDIDATE VOLUNTEERS - "The Field Map"
 //  A Missouri-only interactive map: four geographies, a member-density
 //  choropleth, tap-a-region → candidates + resident members, desktop
 //  right rail / mobile draggable sheet. Missouri is masked so the camera
@@ -47,7 +47,7 @@ class CandidateVolunteersMap extends StatefulWidget {
 
   /// Fired by the statewide rail's "All activities" link and "This week"
   /// footer. The workspace shell flips its IndexedStack to the Activities tab.
-  /// Null when mounted outside the shell — the link is then hidden.
+  /// Null when mounted outside the shell - the link is then hidden.
   final VoidCallback? onOpenActivities;
 
   @override
@@ -1081,7 +1081,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   List<OrganizingPlay> _organizingPlays() {
     final plays = <OrganizingPlay>[];
 
-    // 1) Rally for a young dem — top young-dem district by member count.
+    // 1) Rally for a young dem - top young-dem district by member count.
     RegionData? topYoungDem;
     MapMode? topYoungDemMode;
     for (final mode in [
@@ -1115,7 +1115,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       ));
     }
 
-    // 2) Wake a quiet region — highest-member county with nothing planned.
+    // 2) Wake a quiet region - highest-member county with nothing planned.
     final withActivity = _regionsWithActivity[MapMode.county] ?? const <String>{};
     RegionData? quiet;
     for (final r in _regions[MapMode.county] ?? const <RegionData>[]) {
@@ -1138,7 +1138,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       ));
     }
 
-    // 3) Text bank for the ticket — a contested Dem race with 5+ members.
+    // 3) Text bank for the ticket - a contested Dem race with 5+ members.
     RegionData? contested;
     MapMode? contestedMode;
     for (final mode in [
@@ -1301,7 +1301,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     final maskColor = vt.mask;
     final polygons = <Polygon>[];
 
-    // The state silhouette is formed by the region polygons themselves — there
+    // The state silhouette is formed by the region polygons themselves - there
     // is no separate outline or out-of-state mask polygon. The old coarse
     // 60-point outline asset cut gold chords across the fills and the donut
     // mask painted maskColor over maskColor, so both are gone. A slightly
@@ -1435,7 +1435,9 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     );
   }
 
-  // ── Back-to-statewide pill (accent fill, onAccent content, both themes) ─
+  // Back-to-statewide pill. Uses the emphasis pair (gold fill, navy ink,
+  // 7.17:1), NOT accent/onAccent: white on momentumBlue measures 2.75:1 and
+  // fails even the 3:1 large-text floor.
   Widget _backToStatewidePill() {
     final vt = _vt;
     return Semantics(
@@ -1443,7 +1445,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       label: 'Back to Missouri statewide',
       excludeSemantics: true,
       child: Material(
-        color: vt.accent,
+        color: vt.emphasisFill,
         elevation: 3,
         shadowColor: Colors.black.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(999),
@@ -1457,16 +1459,16 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                  color: vt.onAccent.withValues(alpha: 0.18), width: 1),
+                  color: vt.onEmphasis.withValues(alpha: 0.18), width: 1),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.arrow_back_rounded, size: 16, color: vt.onAccent),
+                Icon(Icons.arrow_back_rounded, size: 16, color: vt.onEmphasis),
                 const SizedBox(width: 6),
                 Text('Missouri',
                     style: TextStyle(
-                        color: vt.onAccent,
+                        color: vt.onEmphasis,
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700)),
               ],
@@ -1500,11 +1502,14 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                 child: Container(
                   margin: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: _vt.accent,
+                    // Emphasis pair, not accent: the selected label sits on
+                    // this fill, and white on momentumBlue is 2.75:1. Gold also
+                    // matches the Slack tab indicator this workspace mirrors.
+                    color: _vt.emphasisFill,
                     borderRadius: BorderRadius.circular(999),
                     boxShadow: [
                       BoxShadow(
-                          color: _vt.accent.withValues(alpha: 0.30),
+                          color: _vt.emphasisFill.withValues(alpha: 0.30),
                           blurRadius: 6,
                           offset: const Offset(0, 2)),
                     ],
@@ -1548,7 +1553,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                   style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
-                    color: selected ? vt.onAccent : vt.secondary,
+                    color: selected ? vt.onEmphasis : vt.secondary,
                   )),
               if (count != null) ...[
                 const SizedBox(width: 3),
@@ -1559,7 +1564,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
                         color: selected
-                            ? vt.onAccent.withValues(alpha: 0.85)
+                            ? vt.onEmphasis.withValues(alpha: 0.85)
                             : vt.accent,
                       )),
                 ),
@@ -1770,7 +1775,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  CHOROPLETH LEGEND — bottom-left member-density scale.
+//  CHOROPLETH LEGEND - bottom-left member-density scale.
 //  Five swatches from the active theme ramp + "Members" label + min/max.
 // ═══════════════════════════════════════════════════════════════
 class ChoroplethLegend extends StatelessWidget {
@@ -1839,7 +1844,7 @@ class ChoroplethLegend extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  REGION SEARCH — Autocomplete over the loaded regions, all four modes.
+//  REGION SEARCH - Autocomplete over the loaded regions, all four modes.
 //  County names + synthetic "CD 3"/"HD 42"/"SD 15" labels. No network.
 // ═══════════════════════════════════════════════════════════════
 class _RegionSearchField extends StatelessWidget {
@@ -2032,7 +2037,7 @@ class _MobileSheet extends StatelessWidget {
 
 /// Activity-presence dot dropped on a region centroid. Filled with the
 /// highlight role, a thin surface ring and a soft shadow so it reads over any
-/// choropleth fill in both themes. Purely decorative — the map's tap handling
+/// choropleth fill in both themes. Purely decorative - the map's tap handling
 /// sits above it.
 class _ActivityDot extends StatelessWidget {
   const _ActivityDot();

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/outreach_activity.dart';
 import 'package:bluebubbles/services/crm/outreach_repository.dart';
 import 'package:bluebubbles/screens/crm/volunteers/activity_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/volunteers/organizing_toolkit_sheet.dart';
-import 'package:bluebubbles/screens/crm/volunteers/volunteers_theme.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  ACTIVITIES HUB (Tab 2 of the War Room workspace)
@@ -14,6 +14,10 @@ import 'package:bluebubbles/screens/crm/volunteers/volunteers_theme.dart';
 //  shipped OrganizingToolkitSheet create flow. Row tap pushes
 //  ActivityDetailScreen. Per-row roster/nominee/attended counts are loaded
 //  lazily and cached so the list never fires hundreds of queries up front.
+//
+//  Painted in the Slack management language: BrandedBackground page, one
+//  gradient header band carrying the title and every filter, and a gradient
+//  feed panel of white-pill rows underneath.
 // ═══════════════════════════════════════════════════════════════
 
 /// Quick date lens applied in-memory over the fetched list.
@@ -25,6 +29,10 @@ enum _HubView { list, board }
 /// Below this width four side-by-side status columns don't fit, so the Board
 /// toggle is hidden and the hub is forced to the List view.
 const double _kBoardMinWidth = 840;
+
+/// Below this width the header's create button drops its label, so the title
+/// keeps a readable share of the row on a phone.
+const double _kCompactHeaderWidth = 560;
 
 class ActivitiesHubScreen extends StatefulWidget {
   const ActivitiesHubScreen({super.key});
@@ -131,112 +139,100 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
     }).toList();
   }
 
+  bool get _filtersActive =>
+      _statuses.isNotEmpty || _kind != null || _dateLens != _DateLens.all;
+
   Future<void> _newActivity() async {
     final saved = await OrganizingToolkitSheet.show(context);
     if (saved == true) _load();
   }
 
-  // ── Theme tokens (the ONE VolunteersTheme) ─────────────────────
-  // Page and cards both sit on `surface` and separate with hairline `divider`
-  // borders, exactly like the Slack tabs; chip fills and roundels use `inset`.
-  // `primary` is already light in dark schemes, so the old blue-lift hack is
-  // gone. Accent is the single accent in both themes.
-  VolunteersTheme get _vt => VolunteersTheme.of(context);
-  bool get _isDark => _vt.isDark;
-  Color get _bg => _vt.surface;
-  Color get _surface => _vt.surface;
-  Color get _inset => _vt.inset;
-  Color get _action => _vt.accent;
-  Color get _text => _vt.text;
-  Color get _secondary => _vt.secondary;
-  Color get _divider => _vt.divider;
-  Color get _accent => _vt.accent;
-  Color get _onAccent => _vt.onAccent;
-  Color get _accentSoft => _vt.accentSoft;
-  Color get _onAccentSoft => _vt.onAccentSoft;
-  Color get _danger => _vt.danger;
-
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Board is desktop/tablet only. Below the threshold we hide the toggle
-        // and force List, so a resize down never leaves four columns crammed.
-        final boardAllowed = constraints.maxWidth >= _kBoardMinWidth;
-        final showBoard = boardAllowed && _view == _HubView.board;
-        return Container(
-          color: _bg,
-          child: Column(
+    return BrandedBackground(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Board is desktop/tablet only. Below the threshold we hide the
+          // toggle and force List, so a resize down never leaves four columns
+          // crammed.
+          final boardAllowed = constraints.maxWidth >= _kBoardMinWidth;
+          final showBoard = boardAllowed && _view == _HubView.board;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _header(boardAllowed),
-              _filterBar(),
+              _headerBand(
+                boardAllowed,
+                narrow: constraints.maxWidth < _kCompactHeaderWidth,
+              ),
               Expanded(child: showBoard ? _board() : _body()),
             ],
-          ),
-        );
-      },
-    );
-  }
-
-  // ── Header ─────────────────────────────────────────────────────
-  Widget _header(bool boardAllowed) {
-    return Container(
-      color: _surface,
-      padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text('Organizing activities',
-                style: TextStyle(
-                    color: _text, fontSize: 19, fontWeight: FontWeight.w800)),
-          ),
-          if (boardAllowed) ...[
-            _viewToggle(),
-            const SizedBox(width: 12),
-          ],
-          Material(
-            color: _accent,
-            borderRadius: BorderRadius.circular(10),
-            child: InkWell(
-              onTap: _newActivity,
-              borderRadius: BorderRadius.circular(10),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add, color: _onAccent, size: 18),
-                    const SizedBox(width: 6),
-                    Text('Plan activity',
-                        style: TextStyle(
-                            color: _onAccent,
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
-  // ── Filter bar ─────────────────────────────────────────────────
-  Widget _filterBar() {
+  // ── Header band ────────────────────────────────────────────────
+  // Title, view toggle, the create button and every filter live on ONE
+  // gradient band, so the light page below carries nothing but content.
+  Widget _headerBand(bool boardAllowed, {required bool narrow}) {
     return Container(
-      color: _surface,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(gradient: BrandColors.getTileGradient()),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.campaign_outlined,
+                    color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Organizing activities',
+                        style: BrandTextStyles.title),
+                    const SizedBox(height: 2),
+                    Text(_subtitle(), style: BrandTextStyles.caption),
+                  ],
+                ),
+              ),
+              if (boardAllowed) ...[
+                _viewToggle(),
+                const SizedBox(width: 10),
+              ],
+              IconButton(
+                onPressed: _loading ? null : _load,
+                tooltip: 'Refresh',
+                icon: _loading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.refresh, color: Colors.white),
+              ),
+              const SizedBox(width: 4),
+              _planButton(narrow: narrow),
+            ],
+          ),
+          const SizedBox(height: 14),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               for (final entry in OutreachDisplay.statuses.entries)
-                _statusChip(entry.key, entry.value.label, entry.value.color),
+                _statusChip(entry.key, entry.value.label),
               _kindMenu(),
             ],
           ),
@@ -247,8 +243,48 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
     );
   }
 
-  Widget _statusChip(String key, String label, Color color) {
+  // Gold with navy ink is the emphasis pair: it is the only button fill that
+  // holds 4.5:1 over both ends of the header gradient. Below the compact
+  // breakpoint the label would squeeze the title out, so it drops to the icon.
+  Widget _planButton({required bool narrow}) {
+    final style = ElevatedButton.styleFrom(
+      backgroundColor: BrandColors.sunriseGold,
+      foregroundColor: BrandColors.unityBlue,
+      padding: EdgeInsets.symmetric(horizontal: narrow ? 12 : 14, vertical: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    );
+    if (narrow) {
+      return Tooltip(
+        message: 'Plan activity',
+        child: ElevatedButton(
+          onPressed: _newActivity,
+          style: style,
+          child: const Icon(Icons.add, size: 18),
+        ),
+      );
+    }
+    return ElevatedButton.icon(
+      onPressed: _newActivity,
+      style: style,
+      icon: const Icon(Icons.add, size: 18),
+      label: const Text('Plan activity',
+          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800)),
+    );
+  }
+
+  String _subtitle() {
+    if (_loading) return 'Loading activities';
+    if (_errored) return 'Could not load activities';
+    final shown = _visible.length;
+    if (_filtersActive) {
+      return '$shown of ${_activities.length} shown';
+    }
+    return shown == 1 ? '1 activity' : '$shown activities';
+  }
+
+  Widget _statusChip(String key, String label) {
     final selected = _statuses.contains(key);
+    final style = outreachStatusStyle(key);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -264,15 +300,14 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
         },
         borderRadius: BorderRadius.circular(999),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: selected ? color : _inset,
+            color: selected ? style.fill : Colors.white.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: selected ? color : _divider),
           ),
           child: Text(label,
               style: TextStyle(
-                  color: selected ? Colors.white : _text,
+                  color: selected ? style.fg : Colors.white,
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700)),
         ),
@@ -285,23 +320,22 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
       height: 34,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: _inset,
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: _divider),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String?>(
           value: _kind,
           isDense: true,
-          icon: Icon(Icons.expand_more, color: _secondary, size: 18),
-          dropdownColor: _surface,
-          style: TextStyle(
-              color: _text, fontSize: 12.5, fontWeight: FontWeight.w600),
+          icon: const Icon(Icons.expand_more, color: Colors.white70, size: 18),
+          dropdownColor: BrandColors.unityBlue,
+          borderRadius: BorderRadius.circular(12),
+          style: const TextStyle(
+              color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w700),
           items: [
-            DropdownMenuItem<String?>(
+            const DropdownMenuItem<String?>(
               value: null,
-              child: Text('All kinds',
-                  style: TextStyle(color: _secondary, fontSize: 12.5)),
+              child: Text('All kinds'),
             ),
             for (final e in OutreachDisplay.kinds.entries)
               DropdownMenuItem<String?>(
@@ -318,100 +352,381 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
     );
   }
 
-  Widget _dateToggle() {
-    Widget seg(_DateLens lens, String label) {
-      final selected = _dateLens == lens;
-      return Expanded(
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => setState(() => _dateLens = lens),
-            child: Container(
-              height: 34,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: selected
-                    ? _accent.withValues(alpha: _isDark ? 0.28 : 0.12)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(label,
+  // Selected segments fill with unityBlue rather than a translucent white:
+  // white-on-white-over-gradient drops under 4:1 at the momentumBlue end,
+  // where navy holds 15:1 anywhere on the band.
+  Widget _segment({
+    required String label,
+    IconData? icon,
+    required bool selected,
+    required VoidCallback onTap,
+    bool expand = true,
+  }) {
+    final seg = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          height: 34,
+          padding: EdgeInsets.symmetric(horizontal: expand ? 8 : 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? BrandColors.unityBlue : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon,
+                    size: 16,
+                    color: selected ? Colors.white : Colors.white70),
+                const SizedBox(width: 6),
+              ],
+              Text(label,
                   style: TextStyle(
-                      color: selected ? _action : _secondary,
+                      color: selected ? Colors.white : Colors.white70,
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700)),
-            ),
+            ],
           ),
         ),
-      );
-    }
+      ),
+    );
+    return expand ? Expanded(child: seg) : seg;
+  }
 
+  Widget _dateToggle() {
     return Container(
-      padding: const EdgeInsets.all(3),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: _inset,
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _divider),
       ),
       child: Row(
         children: [
-          seg(_DateLens.all, 'All'),
-          seg(_DateLens.upcoming, 'Upcoming'),
-          seg(_DateLens.overdue, 'Overdue'),
+          for (final lens in _DateLens.values)
+            _segment(
+              label: _lensLabel(lens),
+              selected: _dateLens == lens,
+              onTap: () => setState(() => _dateLens = lens),
+            ),
         ],
       ),
     );
   }
 
+  String _lensLabel(_DateLens lens) {
+    switch (lens) {
+      case _DateLens.all:
+        return 'All';
+      case _DateLens.upcoming:
+        return 'Upcoming';
+      case _DateLens.overdue:
+        return 'Overdue';
+    }
+  }
+
   // ── List / Board toggle (desktop/tablet only) ──────────────────
   Widget _viewToggle() {
-    Widget seg(_HubView view, IconData icon, String label) {
-      final selected = _view == view;
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => setState(() => _view = view),
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            height: 34,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: selected ? _accent : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon,
-                    size: 16, color: selected ? _onAccent : _secondary),
-                const SizedBox(width: 6),
-                Text(label,
-                    style: TextStyle(
-                        color: selected ? _onAccent : _secondary,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700)),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
     return Container(
-      padding: const EdgeInsets.all(3),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: _inset,
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _divider),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          seg(_HubView.list, Icons.view_agenda_outlined, 'List'),
-          const SizedBox(width: 3),
-          seg(_HubView.board, Icons.view_column_outlined, 'Board'),
+          _segment(
+            label: 'List',
+            icon: Icons.view_agenda_outlined,
+            selected: _view == _HubView.list,
+            expand: false,
+            onTap: () => setState(() => _view = _HubView.list),
+          ),
+          const SizedBox(width: 4),
+          _segment(
+            label: 'Board',
+            icon: Icons.view_column_outlined,
+            selected: _view == _HubView.board,
+            expand: false,
+            onTap: () => setState(() => _view = _HubView.board),
+          ),
         ],
+      ),
+    );
+  }
+
+  // ── Body ───────────────────────────────────────────────────────
+  Widget _body() {
+    if (_loading) {
+      return const Center(
+        child: SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(
+              strokeWidth: 2.6, color: BrandColors.unityBlue),
+        ),
+      );
+    }
+    if (_errored) return _errorState();
+
+    final visible = _visible;
+    if (visible.isEmpty) return _emptyState();
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BrandCardDecoration.brandedCard(),
+          child: RefreshIndicator(
+            onRefresh: _load,
+            color: BrandColors.unityBlue,
+            backgroundColor: Colors.white,
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: visible.length,
+              itemBuilder: (_, i) => _activityRow(visible[i]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _activityRow(OutreachActivity a) {
+    final geo = _geoLabels(a);
+    final overdue = _overdueDays(a);
+    final style = outreachStatusStyle(a.status);
+
+    final head = <String>[
+      a.kindLabel,
+      a.scheduledOn == null ? 'No date' : _fmtDate(a.scheduledOn!),
+      if (geo.isNotEmpty) geo.join(', '),
+    ].join('  ·  ');
+
+    return FutureBuilder<_RowCounts>(
+      future: _countsFor(a.id),
+      builder: (context, snap) {
+        final counts = snap.data;
+        return BrandedActivityFeedItem(
+          primaryText: a.title,
+          secondaryText: head,
+          tertiaryText: counts == null
+              ? null
+              : '${counts.nominees == 1 ? '1 nominee' : '${counts.nominees} nominees'}'
+                  '  ·  ${counts.rostered == 1 ? '1 on roster' : '${counts.rostered} on roster'}'
+                  '  ·  ${counts.attended} attended',
+          leadingIcon: a.kindIcon,
+          onTap: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => ActivityDetailScreen(activity: a)),
+            );
+            // Status/attendance may have changed on the detail screen.
+            _load();
+          },
+          trailingChips: overdue == null
+              ? null
+              : [_overdueChip(overdue)],
+          // The feed item's own action pill is always white-on-fill, which the
+          // light state colors cannot carry; this owns the right edge instead.
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _statusPill(a.statusLabel, style),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _statusPill(String label, ({Color fill, Color fg}) style) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: style.fill,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(label.toUpperCase(),
+          style: TextStyle(
+              color: style.fg, fontSize: 10, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _overdueChip(int days) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: BrandColors.unityBlue,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.schedule, size: 12, color: outreachDangerInk),
+          const SizedBox(width: 4),
+          Text(days == 1 ? '1 day overdue' : '$days days overdue',
+              style: TextStyle(
+                  color: outreachDangerInk,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  // ── Empty / error states ───────────────────────────────────────
+  // Both sit on the light BrandedBackground, so every word here is unityBlue
+  // and never white. The empty state is what everyone sees first while the
+  // table is still empty, so it carries the create action rather than a note.
+  Widget _emptyState() {
+    final filtered = _filtersActive;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: BrandColors.momentumBlue.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                filtered ? Icons.filter_alt_off_outlined : Icons.event_available,
+                size: 56,
+                color: BrandColors.unityBlue,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              filtered
+                  ? 'No activities match these filters'
+                  : 'No organizing planned yet',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: BrandColors.unityBlue,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              filtered
+                  ? 'Clear a status, kind or date filter to widen the search.'
+                  : 'Canvasses, phone banks and days of action live here. Plan '
+                      'the first one and the roster, attendance and nominee '
+                      'coverage follow.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: BrandColors.unityBlue.withValues(alpha: 0.7),
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (filtered)
+              ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _statuses.clear();
+                    _kind = null;
+                    _dateLens = _DateLens.all;
+                  });
+                  _load();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: BrandColors.unityBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.filter_alt_off_outlined),
+                label: const Text('Clear filters'),
+              )
+            else
+              ElevatedButton.icon(
+                onPressed: _newActivity,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: BrandColors.sunriseGold,
+                  foregroundColor: BrandColors.unityBlue,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.add),
+                label: const Text('Plan the first activity',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _errorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: BrandColors.error.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.error_outline,
+                  size: 56, color: BrandColors.error),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Could not load activities',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: BrandColors.unityBlue,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'The activity list could not be read. Check the connection and '
+              'try again.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: BrandColors.unityBlue.withValues(alpha: 0.7),
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _load,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: BrandColors.unityBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -424,6 +739,18 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
   // persists via updateStatus; a failed write reverts. Filtered-out statuses
   // simply yield an empty column.
   Widget _board() {
+    if (_loading) {
+      return const Center(
+        child: SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(
+              strokeWidth: 2.6, color: BrandColors.unityBlue),
+        ),
+      );
+    }
+    if (_errored) return _errorState();
+
     final visible = _visible;
     final keys = OutreachDisplay.statuses.keys.toList(); // planned→cancelled
     final byStatus = <String, List<OutreachActivity>>{
@@ -434,7 +761,7 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      padding: const EdgeInsets.all(16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -449,87 +776,95 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
 
   Widget _column(String key, List<OutreachActivity> items) {
     final meta = OutreachDisplay.statuses[key]!;
+    final style = outreachStatusStyle(key);
     return DragTarget<OutreachActivity>(
       onWillAcceptWithDetails: (d) => d.data.status != key,
       onAcceptWithDetails: (d) => _moveTo(d.data, key),
       builder: (context, candidate, rejected) {
         final hovering = candidate.isNotEmpty;
         return Container(
+          // Clipped so a scrolled card never paints over the rounded corners.
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: _surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-                color: hovering ? meta.color : _divider,
-                width: hovering ? 1.6 : 1),
+            gradient: BrandColors.getTileGradient(),
+            borderRadius: BorderRadius.circular(16),
+            // Gold is the highlight ring everywhere else in the kit, and it is
+            // the only accent that stays visible over both ends of the tile
+            // gradient.
+            border: hovering
+                ? Border.all(color: BrandColors.sunriseGold, width: 2)
+                : null,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Thin top accent bar in the status color.
               Container(
-                height: 4,
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
                 decoration: BoxDecoration(
-                  color: meta.color,
-                  borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(14)),
+                  border: Border(
+                    bottom:
+                        BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
                 child: Row(
                   children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: style.fill,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(meta.label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: _text,
+                          style: const TextStyle(
+                              color: Colors.white,
                               fontSize: 13.5,
                               fontWeight: FontWeight.w800)),
                     ),
                     const SizedBox(width: 8),
-                    _countBadge(items.length, meta.color),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text('${items.length}',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800)),
+                    ),
                   ],
                 ),
               ),
-              Divider(height: 1, color: _divider),
               Expanded(
                 child: items.isEmpty
-                    ? Center(
+                    ? const Center(
                         child: Padding(
-                          padding: const EdgeInsets.all(16),
+                          padding: EdgeInsets.all(16),
                           child: Text('Nothing here',
-                              style: TextStyle(
-                                  color: _secondary,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600)),
+                              style: BrandTextStyles.caption),
                         ),
                       )
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(10),
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(10, 10, 10, 2),
                         itemCount: items.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 8),
-                        itemBuilder: (_, i) => _boardCard(items[i]),
+                        itemBuilder: (_, i) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _boardCard(items[i]),
+                        ),
                       ),
               ),
             ],
           ),
         );
       },
-    );
-  }
-
-  Widget _countBadge(int count, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text('$count',
-          style: const TextStyle(
-              color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w800)),
     );
   }
 
@@ -552,11 +887,14 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
 
   Widget _boardCardBody(OutreachActivity a, {bool dragging = false}) {
     final geo = _geoLabels(a);
+    final overdue = _overdueDays(a);
     return Material(
-      color: dragging ? _surface : _inset,
+      // In-column cards are the kit's white-10% inset on the column gradient.
+      // The drag proxy leaves that gradient behind, so it carries its own.
+      color: dragging ? Colors.transparent : Colors.white.withValues(alpha: 0.1),
       borderRadius: BorderRadius.circular(12),
       elevation: dragging ? 6 : 0,
-      shadowColor: Colors.black.withValues(alpha: 0.25),
+      shadowColor: Colors.black.withValues(alpha: 0.35),
       child: InkWell(
         onTap: dragging
             ? null
@@ -569,25 +907,31 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
               },
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.all(11),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _divider),
-          ),
+          padding: const EdgeInsets.all(12),
+          decoration: dragging
+              ? BrandCardDecoration.brandedCard(borderRadius: 12)
+              : null,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(a.kindIcon, size: 16, color: _action),
-                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(a.kindIcon, size: 16, color: Colors.white),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(a.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: _text,
+                        style: const TextStyle(
+                            color: Colors.white,
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                             height: 1.25)),
@@ -595,27 +939,21 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Text(
-                      a.scheduledOn == null
-                          ? 'No date'
-                          : _fmtDate(a.scheduledOn!),
-                      style: TextStyle(color: _secondary, fontSize: 11.5)),
-                  if (_overdueDays(a) case final d?) ...[
-                    const SizedBox(width: 8),
-                    Text('$d ${d == 1 ? 'day' : 'days'} overdue',
-                        style: TextStyle(
-                            color: _danger,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700)),
-                  ],
-                  if (geo.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Flexible(child: _regionChip(geo.first)),
-                  ],
-                ],
+              Text(
+                a.scheduledOn == null ? 'No date' : _fmtDate(a.scheduledOn!),
+                style: BrandTextStyles.caption,
               ),
+              if (geo.isNotEmpty || overdue != null) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    if (overdue != null) _overdueChip(overdue),
+                    if (geo.isNotEmpty) _regionChip(geo.first),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -625,18 +963,16 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
 
   Widget _regionChip(String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: _accentSoft,
-        borderRadius: BorderRadius.circular(999),
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Text(label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-              color: _onAccentSoft,
-              fontSize: 11,
-              fontWeight: FontWeight.w700)),
+          style: const TextStyle(
+              color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -686,209 +1022,11 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
-        content: Text(message),
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        backgroundColor: BrandColors.unityBlue,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ));
-  }
-
-  // ── Body ───────────────────────────────────────────────────────
-  Widget _body() {
-    if (_loading) {
-      return Center(
-        child: SizedBox(
-          width: 26,
-          height: 26,
-          child: CircularProgressIndicator(
-              strokeWidth: 2.6, color: _accent),
-        ),
-      );
-    }
-    if (_errored) {
-      return _centeredNote(
-        Icons.error_outline,
-        'Could not load activities.',
-        action: ('Retry', _load),
-      );
-    }
-
-    final visible = _visible;
-    if (visible.isEmpty) {
-      final filtersActive =
-          _statuses.isNotEmpty || _kind != null || _dateLens != _DateLens.all;
-      return _centeredNote(
-        Icons.event_note_outlined,
-        filtersActive
-            ? 'No activities match these filters.'
-            : 'No activities planned yet.',
-        action: filtersActive ? null : ('Plan the first one', _newActivity),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _load,
-      color: _accent,
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
-        itemCount: visible.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (_, i) => _activityRow(visible[i]),
-      ),
-    );
-  }
-
-  Widget _activityRow(OutreachActivity a) {
-    final geo = _geoLabels(a);
-    final overdue = _overdueDays(a);
-
-    return Material(
-      color: _surface,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => ActivityDetailScreen(activity: a)),
-          );
-          // Status/attendance may have changed on the detail screen.
-          _load();
-        },
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _divider),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _kindSquare(a.kindIcon),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(a.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: _text,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 3),
-                        Text(a.kindLabel,
-                            style: TextStyle(
-                                color: _secondary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _statusPill(a),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _metaLine(a, geo),
-              if (overdue != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  overdue == 1 ? '1 day overdue' : '$overdue days overdue',
-                  style: TextStyle(
-                      color: _danger,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _kindSquare(IconData icon) {
-    return Container(
-      width: 40,
-      height: 40,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: _accentSoft,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Icon(icon, size: 20, color: _onAccentSoft),
-    );
-  }
-
-  Widget _statusPill(OutreachActivity a) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: a.statusColor,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(a.statusLabel,
-          style: const TextStyle(
-              color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
-    );
-  }
-
-  Widget _metaLine(OutreachActivity a, List<String> geo) {
-    return FutureBuilder<_RowCounts>(
-      future: _countsFor(a.id),
-      builder: (context, snap) {
-        final parts = <String>[
-          a.scheduledOn == null ? 'No date' : _fmtDate(a.scheduledOn!),
-          if (geo.isNotEmpty) geo.join(', '),
-        ];
-        final counts = snap.data;
-        if (counts != null) {
-          parts.add(counts.nominees == 1
-              ? '1 nominee'
-              : '${counts.nominees} nominees');
-          parts.add(counts.rostered == 1
-              ? '1 on roster'
-              : '${counts.rostered} on roster');
-          parts.add('${counts.attended} attended');
-        }
-        return Text(
-          parts.join('  ·  '),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: _secondary, fontSize: 12.5, height: 1.3),
-        );
-      },
-    );
-  }
-
-  Widget _centeredNote(IconData icon, String text,
-      {(String, VoidCallback)? action}) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 44, color: _secondary),
-          const SizedBox(height: 14),
-          Text(text,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  color: _secondary, fontSize: 14, fontWeight: FontWeight.w600)),
-          if (action != null) ...[
-            const SizedBox(height: 14),
-            TextButton(
-              onPressed: action.$2,
-              child: Text(action.$1,
-                  style: TextStyle(
-                      color: _action,
-                      fontWeight: FontWeight.w800)),
-            ),
-          ],
-        ],
-      ),
-    );
   }
 
   // ── Helpers ────────────────────────────────────────────────────

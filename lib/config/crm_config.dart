@@ -80,9 +80,18 @@ class CRMConfig {
   ];
 
   /// Default snippet appended to mail merge campaigns to respect opt-out laws.
+  ///
+  /// Deliberately carries no {{opt_out_url}} token. Nothing in either repo mints
+  /// a per-recipient unsubscribe URL for CRM email: the only public unsubscribe
+  /// page is gated to job alerts and writes subscribed_to_job_alerts rather than
+  /// members.opt_out, and members.opt_out is written only by the Mautic webhook
+  /// and by an exec toggling it on the member detail screen. A token no sender
+  /// supplies ships to the recipient verbatim, so the snippet names the route
+  /// that actually works. Do not reintroduce the token until a real endpoint
+  /// exists and this screen can build a link per recipient.
   static const String defaultEmailOptOutSnippet =
-      'We respect your inbox. If you no longer wish to receive updates, click '
-      '{{opt_out_url}} to unsubscribe.';
+      'We respect your inbox. Reply to this email and ask to be removed, and we '
+      'will take you off the list.';
 
   /// List of organization-managed mailbox addresses. Used to determine
   /// whether an email originated from our team when parsing historical data.

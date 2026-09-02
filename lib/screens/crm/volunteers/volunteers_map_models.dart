@@ -95,7 +95,7 @@ extension MapModeInfo on MapMode {
       case MapMode.county:
         // An id that already carries "City" (e.g. St. Louis City, an
         // independent city keyed off geoid 29510) is a full region name on
-        // its own — never suffix it into "St. Louis City County".
+        // its own - never suffix it into "St. Louis City County".
         return id.endsWith('City') ? id : '$id County';
       case MapMode.congressional:
         return 'Congressional District $id';
@@ -332,7 +332,7 @@ class RegionSearchHit {
 ///
 /// A [result]-backed row that also resolves to a [candidate] renders the
 /// candidate photo and taps through to their profile. A result with no matched
-/// candidate renders initials-only and is NOT tappable — never fabricate a
+/// candidate renders initials-only and is NOT tappable - never fabricate a
 /// profile. [isNominee] flags the party-colored NOMINEE badge (derivable from
 /// `ElectionResult.advanced`).
 class CandidateDisplayRow {
