@@ -1,68 +1,95 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:bluebubbles/models/crm/candidate.dart' show Candidate;
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/outreach_activity.dart';
+import 'package:bluebubbles/providers/user_session_provider.dart';
 import 'package:bluebubbles/services/crm/outreach_repository.dart';
 
+import 'mobilize_models.dart';
 import 'volunteers_map_models.dart';
 import 'volunteers_theme.dart';
 
 // ═══════════════════════════════════════════════════════════════
-//  ORGANIZING TOOLKIT SHEET (Layer 2 of Candidate Volunteers)
-//  A modal bottom sheet that plans or updates an organizing activity. The
+//  ORGANIZING TOOLKIT (Layer 2 of Candidate Volunteers)
+//  Plans a new organizing activity or edits one that already exists. The
 //  create flow reads as a toolkit: pick a play (grouped by intent), then plan
 //  it: name, schedule, status, channel, the plan, editable geography, a
-//  searchable nominee picker and a per-row participant roster. Saving a new
-//  activity calls OutreachRepository.createActivity; editing an existing one
-//  flips its status via updateStatus. The stored kind/status/channel keys are
-//  unchanged, so old rows round-trip untouched.
+//  searchable nominee picker and a per-row participant roster. The stored
+//  kind/status/channel keys are unchanged, so old rows round-trip untouched.
 //
-//  Public entry: OrganizingToolkitSheet.show(...). Returns true if a save
-//  landed. Every color resolves from [VolunteersTheme] (the Slack palette).
+//  ONE FORM, TWO MOUNTS. [OrganizingToolkitForm] is the whole thing;
+//  [OrganizingToolkitSheet.show] is a thin wrapper that mounts it inside a
+//  modal bottom sheet. The Desk's PLAN section mounts the SAME widget inline
+//  with [OrganizingToolkitMount.inline], so the CRM has exactly one activity
+//  form rather than a modal and a fork of it.
+//
+//  SEEDING. Every caller passes one [OrganizingSeed] instead of the ten loose
+//  named parameters this used to take. Each of those call sites had rebuilt
+//  the same geo/candidate/participant logic by hand, which is precisely the
+//  drift the seed exists to end.
+//
+//  Every color resolves from [VolunteersTheme] (the Slack palette).
 // ═══════════════════════════════════════════════════════════════
 
 class OrganizingToolkitSheet {
   const OrganizingToolkitSheet._();
 
-  /// Modal bottom sheet / dialog. Returns true if an activity was saved.
+  /// Modal bottom sheet. Returns true if an activity was saved.
+  ///
+  /// [onSaved] additionally hands back the row as it now reads, for a caller
+  /// that renders the activity itself and would otherwise have to re-fetch it
+  /// to show the edit.
   static Future<bool?> show(
     BuildContext context, {
-    OutreachActivity? existing, // non-null = edit/read mode
-    List<String> counties = const <String>[],
-    List<String> congressionalDistricts = const <String>[],
-    List<String> senateDistricts = const <String>[],
-    List<String> houseDistricts = const <String>[],
-    List<Candidate> candidates = const <Candidate>[], // prefilled, selectable
-    List<Member> participants = const <Member>[], // prefilled participant roster
-    String? kind,
-    String? channel,
-    String? status,
-    String? titleSuggestion,
+    OutreachActivity? existing, // non-null = edit mode
+    OrganizingSeed seed = const OrganizingSeed.empty(),
+    ValueChanged<OutreachActivity>? onSaved,
   }) {
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _OrganizingToolkitSheetBody(
-        existing: existing,
-        counties: counties,
-        congressionalDistricts: congressionalDistricts,
-        senateDistricts: senateDistricts,
-        houseDistricts: houseDistricts,
-        candidates: candidates,
-        participants: participants,
-        kind: kind,
-        channel: channel,
-        status: status,
-        titleSuggestion: titleSuggestion,
-      ),
+      builder: (ctx) {
+        final media = MediaQuery.of(ctx);
+        return Padding(
+          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: media.size.height * 0.92),
+            child: Container(
+              decoration: BoxDecoration(
+                color: VolunteersTheme.of(ctx).surface,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: OrganizingToolkitForm(
+                existing: existing,
+                seed: seed,
+                onClose: () => Navigator.of(ctx).pop(),
+                onSaved: (activity) {
+                  onSaved?.call(activity);
+                  Navigator.of(ctx).pop(true);
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
-/// The four allowed channels + a "None" option, with display labels. Keys match
-/// the stored `channel` check constraint on outreach_activities.
+/// Where the form is mounted, which is the only thing that differs between the
+/// two containers: the sheet owns its own scroll, carries the title header and
+/// pays the device's bottom inset; inline it is one card inside the Desk's
+/// single scroll, so it must not scroll itself, must not repeat a header the
+/// section already draws, and must not add a device inset mid-page.
+enum OrganizingToolkitMount { sheet, inline }
+
+/// The four allowed channels, with display labels. Keys match the stored
+/// `channel` check constraint on outreach_activities.
 const Map<String, String> _kChannelLabels = <String, String>{
   'in_person': 'In person',
   'sms': 'Text',
@@ -110,40 +137,40 @@ class _Participant {
   String role = 'volunteer';
 }
 
-class _OrganizingToolkitSheetBody extends StatefulWidget {
-  const _OrganizingToolkitSheetBody({
-    required this.existing,
-    required this.counties,
-    required this.congressionalDistricts,
-    required this.senateDistricts,
-    required this.houseDistricts,
-    required this.candidates,
-    required this.participants,
-    required this.kind,
-    required this.channel,
-    required this.status,
-    required this.titleSuggestion,
+/// The activity form itself. Mount it in the sheet above, or inline anywhere
+/// that wants planning on the page rather than on top of it.
+class OrganizingToolkitForm extends StatefulWidget {
+  const OrganizingToolkitForm({
+    super.key,
+    this.existing,
+    this.seed = const OrganizingSeed.empty(),
+    required this.onSaved,
+    this.onClose,
+    this.mount = OrganizingToolkitMount.sheet,
   });
 
+  /// Non-null puts the form in edit mode, where every field the stored row
+  /// carries is editable and the seed is ignored in favour of the row.
   final OutreachActivity? existing;
-  final List<String> counties;
-  final List<String> congressionalDistricts;
-  final List<String> senateDistricts;
-  final List<String> houseDistricts;
-  final List<Candidate> candidates;
-  final List<Member> participants;
-  final String? kind;
-  final String? channel;
-  final String? status;
-  final String? titleSuggestion;
+
+  /// What a NEW activity starts life with. Ignored when [existing] is set.
+  final OrganizingSeed seed;
+
+  /// Called with the row as it now reads once the write lands. The sheet pops
+  /// on it; an inline mount reloads whatever it renders around the form. On a
+  /// create the id is the one the database just returned.
+  final ValueChanged<OutreachActivity> onSaved;
+
+  /// Close affordance for the sheet's header. Null draws no close button.
+  final VoidCallback? onClose;
+
+  final OrganizingToolkitMount mount;
 
   @override
-  State<_OrganizingToolkitSheetBody> createState() =>
-      _OrganizingToolkitSheetBodyState();
+  State<OrganizingToolkitForm> createState() => _OrganizingToolkitFormState();
 }
 
-class _OrganizingToolkitSheetBodyState
-    extends State<_OrganizingToolkitSheetBody> {
+class _OrganizingToolkitFormState extends State<OrganizingToolkitForm> {
   final OutreachRepository _repo = OutreachRepository();
 
   late final TextEditingController _titleCtrl;
@@ -171,32 +198,33 @@ class _OrganizingToolkitSheetBodyState
   bool _saving = false;
 
   bool get _isEdit => widget.existing != null;
+  bool get _inline => widget.mount == OrganizingToolkitMount.inline;
 
   @override
   void initState() {
     super.initState();
     final ex = widget.existing;
+    final seed = widget.seed;
 
-    _kind = widget.kind ?? ex?.kind ?? OutreachDisplay.kinds.keys.first;
-    _status = widget.status ?? ex?.status ?? 'planned';
-    _channel = widget.channel ?? ex?.channel;
+    _kind = seed.kind ?? ex?.kind ?? OutreachDisplay.kinds.keys.first;
+    _status = seed.status ?? ex?.status ?? 'planned';
+    _channel = seed.channel ?? ex?.channel;
     _scheduledOn = ex?.scheduledOn;
 
     _titleCtrl = TextEditingController(
-      text: ex?.title ?? widget.titleSuggestion ?? '',
+      text: ex?.title ?? seed.titleSuggestion ?? '',
     );
     _descCtrl = TextEditingController(text: ex?.description ?? '');
 
-    _counties = [...(ex?.counties ?? widget.counties)];
-    _cds = [...(ex?.congressionalDistricts ?? widget.congressionalDistricts)];
-    _sds = [...(ex?.senateDistricts ?? widget.senateDistricts)];
-    _hds = [...(ex?.houseDistricts ?? widget.houseDistricts)];
+    _counties = [...(ex?.counties ?? seed.counties)];
+    _cds = [...(ex?.congressionalDistricts ?? seed.congressionalDistricts)];
+    _sds = [...(ex?.senateDistricts ?? seed.senateDistricts)];
+    _hds = [...(ex?.houseDistricts ?? seed.houseDistricts)];
 
     // Seed every prefilled nominee as selected; the picker lets HQ narrow it.
     _selectedCandidateIds =
-        widget.candidates.map((c) => c.id).where((id) => id.isNotEmpty).toSet();
-    _participants =
-        widget.participants.map((m) => _Participant(m)).toList();
+        seed.candidates.map((c) => c.id).where((id) => id.isNotEmpty).toSet();
+    _participants = seed.participants.map((m) => _Participant(m)).toList();
   }
 
   @override
@@ -219,8 +247,8 @@ class _OrganizingToolkitSheetBodyState
   Color get _divider => _vt.divider;
   Color get _accent => _vt.accent;
   // Emphasis pair for anything that carries a LABEL on a filled surface.
-  // accent/onAccent is white on momentumBlue at 2.75:1 and fails even the 3:1
-  // large-text floor, so it is for non-text fills only.
+  // White on accent (momentumBlue) is 2.75:1 and fails even the 3:1
+  // large-text floor, so accent stays on rules, rings and strokes.
   Color get _emphasisFill => _vt.emphasisFill;
   Color get _onEmphasis => _vt.onEmphasis;
   Color get _accentSoft => _vt.accentSoft;
@@ -229,54 +257,150 @@ class _OrganizingToolkitSheetBodyState
   bool get _canSave => !_saving && _titleCtrl.text.trim().isNotEmpty;
 
   // ── Save ───────────────────────────────────────────────────────
+  //
+  // The two ids are never interchangeable: created_by references auth.users
+  // and organizer_member_id references public.members. Both are bare uuids, so
+  // a swap is only caught at insert time as an opaque 23503. They come from
+  // UserSessionProvider and nowhere else.
+  ({String userId, String memberId})? _actor() {
+    final session = context.read<UserSessionProvider>();
+    final memberId = session.currentMember?.id;
+    final userId = session.authUserId;
+    if (memberId == null || userId == null) return null;
+    return (userId: userId, memberId: memberId);
+  }
+
+  /// The organizer the roster names, if it names one. Whoever is given the
+  /// `organizer` role owns the activity; with nobody named, the repository
+  /// stamps the acting exec, which is the gap that left every activity in the
+  /// system anonymous.
+  String? _namedOrganizerId() {
+    for (final p in _participants) {
+      if (p.role == 'organizer') return p.member.id;
+    }
+    return null;
+  }
+
+  String? _trimmedOrNull(TextEditingController ctrl) {
+    final v = ctrl.text.trim();
+    return v.isEmpty ? null : v;
+  }
+
+  /// The row exactly as the form currently reads it. [id] is empty for a
+  /// create, which the database replaces.
+  OutreachActivity _formActivity({
+    required String id,
+    DateTime? completedAt,
+    String? organizerMemberId,
+    String? createdBy,
+  }) =>
+      OutreachActivity(
+        id: id,
+        kind: _kind,
+        title: _titleCtrl.text.trim(),
+        description: _trimmedOrNull(_descCtrl),
+        status: _status,
+        channel: _channel,
+        scheduledOn: _scheduledOn,
+        completedAt: completedAt,
+        counties: _counties,
+        congressionalDistricts: _cds,
+        senateDistricts: _sds,
+        houseDistricts: _hds,
+        organizerMemberId: organizerMemberId,
+        createdBy: createdBy,
+      );
+
+  /// The edited row, with completed_at kept honest: a status that did not move
+  /// keeps whatever timestamp it had, and one that moved off 'completed'
+  /// clears it rather than leaving a stale completion behind.
+  OutreachActivity _editedActivity(OutreachActivity ex) {
+    final completedAt = _status == ex.status
+        ? ex.completedAt
+        : (_status == 'completed' ? DateTime.now() : null);
+    return _formActivity(
+      id: ex.id,
+      completedAt: completedAt,
+      organizerMemberId: ex.organizerMemberId,
+      createdBy: ex.createdBy,
+    );
+  }
+
+  /// The columns an edit writes.
+  ///
+  /// Built from a whole rebuilt row rather than through copyWith because three
+  /// of the editable columns are nullable (channel, scheduled_on, description)
+  /// and a copyWith cannot express "clear this": an exec who removed the date
+  /// would silently keep the old one.
+  Map<String, dynamic> _updateFields(
+      OutreachActivity ex, OutreachActivity edited) {
+    final fields = edited.toInsertJson()..remove('created_by');
+    if (_status == ex.status) {
+      // completed_at is updateStatus's to own. An edit that left the status
+      // alone must not rewrite it.
+      fields.remove('completed_at');
+    }
+    return fields;
+  }
+
   Future<void> _save() async {
     if (_saving) return;
+
+    final actor = _actor();
+    if (actor == null) {
+      _snack('Could not tell who you are signed in as. Reload and try again.');
+      return;
+    }
+
     setState(() => _saving = true);
 
-    bool ok;
+    OutreachActivity? saved;
     try {
       if (_isEdit) {
-        await _repo.updateStatus(widget.existing!.id, _status);
-        ok = true;
+        final ex = widget.existing!;
+        final edited = _editedActivity(ex);
+        await _repo.updateActivity(ex.id, _updateFields(ex, edited));
+        saved = edited;
       } else {
-        final activity = OutreachActivity(
+        final draft = _formActivity(
           id: '',
-          kind: _kind,
-          title: _titleCtrl.text.trim(),
-          description:
-              _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-          status: _status,
-          channel: _channel,
-          scheduledOn: _scheduledOn,
           completedAt: _status == 'completed' ? DateTime.now() : null,
-          counties: _counties,
-          congressionalDistricts: _cds,
-          senateDistricts: _sds,
-          houseDistricts: _hds,
+          organizerMemberId: _namedOrganizerId(),
         );
         final id = await _repo.createActivity(
-          activity,
+          draft,
+          actorUserId: actor.userId,
+          actorMemberId: actor.memberId,
           candidateIds: _selectedCandidateIds.toList(),
           participants: [
             for (final p in _participants)
               OutreachParticipantInput(memberId: p.member.id, role: p.role),
           ],
         );
-        ok = id != null;
+        saved = id == null
+            ? null
+            : _formActivity(
+                id: id,
+                completedAt: draft.completedAt,
+                organizerMemberId: draft.organizerMemberId ?? actor.memberId,
+                createdBy: actor.userId,
+              );
       }
     } catch (_) {
-      ok = false;
+      saved = null;
     }
 
     if (!mounted) return;
-    if (ok) {
-      Navigator.of(context).pop(true);
+    setState(() => _saving = false);
+    if (saved != null) {
+      widget.onSaved(saved);
     } else {
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not save this activity. Try again.')),
-      );
+      _snack('Could not save this activity. Try again.');
     }
+  }
+
+  void _snack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _pickDate() async {
@@ -293,35 +417,29 @@ class _OrganizingToolkitSheetBodyState
   // ── Build ──────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
-    final maxHeight = media.size.height * 0.92;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        child: Container(
-          decoration: BoxDecoration(
-            color: _surface,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+    final fields = _fields();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!_inline) _header(),
+        if (_inline)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: fields,
+            ),
+          )
+        else
+          Flexible(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+              children: fields,
+            ),
           ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _header(),
-              Flexible(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-                  children: _isEdit ? _editFields() : _createFields(),
-                ),
-              ),
-              _saveBar(),
-            ],
-          ),
-        ),
-      ),
+        _saveBar(),
+      ],
     );
   }
 
@@ -346,105 +464,61 @@ class _OrganizingToolkitSheetBodyState
                         color: _text,
                         fontSize: 18,
                         fontWeight: FontWeight.w800)),
-                const SizedBox(height: 5),
+                const SizedBox(height: 4),
                 Container(
                   width: 40,
                   height: 3,
                   decoration: BoxDecoration(
                     color: _accent,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ],
             ),
           ),
-          InkWell(
-            onTap: () => Navigator.of(context).pop(),
-            borderRadius: BorderRadius.circular(18),
-            child: Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: _inset,
-                shape: BoxShape.circle,
+          if (widget.onClose != null)
+            // Material > InkWell, matching every other close affordance in
+            // this workspace: without it the ripple draws on whatever Material
+            // happens to be above, which on the inline mount is the page.
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: widget.onClose,
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _inset,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.close, color: _secondary, size: 18),
+                ),
               ),
-              child: Icon(Icons.close, color: _secondary, size: 18),
             ),
-          ),
         ],
       ),
     );
   }
 
-  // ── EDIT MODE ──────────────────────────────────────────────────
-  List<Widget> _editFields() {
-    final ex = widget.existing!;
-    return [
-      _summaryTile(ex),
-      const SizedBox(height: 20),
-      _label('STATUS'),
-      const SizedBox(height: 10),
-      _statusChips(),
-    ];
-  }
-
-  Widget _summaryTile(OutreachActivity ex) {
-    final geo = _allGeoLabels();
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _inset,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _divider),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(ex.kindIcon, size: 18, color: _accent),
-              const SizedBox(width: 8),
-              Text(ex.kindLabel,
-                  style: TextStyle(
-                      color: _secondary,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(ex.title,
-              style: TextStyle(
-                  color: _text, fontSize: 16, fontWeight: FontWeight.w700)),
-          if (ex.scheduledOn != null) ...[
-            const SizedBox(height: 6),
-            Text('Scheduled ${_fmtDate(ex.scheduledOn!)}',
-                style: TextStyle(color: _secondary, fontSize: 12.5)),
-          ],
-          if (geo.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [for (final g in geo) _readChip(g)],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ── CREATE MODE ────────────────────────────────────────────────
-  List<Widget> _createFields() {
-    final ideas = _ideaTitles();
+  // ── The fields ─────────────────────────────────────────────────
+  //
+  // ONE list for both modes. Edit mode used to offer a status chip row and
+  // nothing else, which made a saved activity permanently mis-titled and
+  // mis-dated. The two things it still leaves out are the nominee picker and
+  // the roster: both are stored in join tables this form does not read back,
+  // and both already have a home on the activity page.
+  List<Widget> _fields() {
+    final ideas = _isEdit ? const <String>[] : _ideaTitles();
     return [
       _label('PICK A PLAY'),
       const SizedBox(height: 12),
       _kindGroups(),
-      const SizedBox(height: 22),
+      const SizedBox(height: 24),
       if (ideas.isNotEmpty) ...[
         _ideaStrip(ideas),
-        const SizedBox(height: 18),
+        const SizedBox(height: 20),
       ],
       _label('NAME THE ACTIVITY'),
       const SizedBox(height: 8),
@@ -469,7 +543,7 @@ class _OrganizingToolkitSheetBodyState
       _textField(_descCtrl,
           'What is the plan, who runs it, and what does success look like',
           maxLines: 3),
-      const SizedBox(height: 22),
+      const SizedBox(height: 24),
       _label('WHERE'),
       const SizedBox(height: 10),
       _geoEditor('Counties', _counties, 'Add county'),
@@ -477,13 +551,17 @@ class _OrganizingToolkitSheetBodyState
       _geoEditor('Senate', _sds, 'Add SD #', digitsOnly: true),
       _geoEditor('House', _hds, 'Add HD #', digitsOnly: true),
       const SizedBox(height: 12),
-      _label('FOR WHICH NOMINEES'),
-      const SizedBox(height: 10),
-      _candidatePicker(),
-      const SizedBox(height: 22),
-      _label("WHO'S IN (${_participants.length})"),
-      const SizedBox(height: 10),
-      _participantRoster(),
+      if (_isEdit)
+        _emptyNote('Nominees and the roster are managed on the activity page.')
+      else ...[
+        _label('FOR WHICH NOMINEES'),
+        const SizedBox(height: 10),
+        _candidatePicker(),
+        const SizedBox(height: 24),
+        _label("WHO'S IN (${_participants.length})"),
+        const SizedBox(height: 10),
+        _participantRoster(),
+      ],
     ];
   }
 
@@ -522,12 +600,12 @@ class _OrganizingToolkitSheetBodyState
       color: Colors.transparent,
       child: InkWell(
         onTap: () => setState(() => _kind = key),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           decoration: BoxDecoration(
             color: selected ? _accentSoft : _inset,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: selected ? _accent : _divider),
           ),
           child: Row(
@@ -540,7 +618,7 @@ class _OrganizingToolkitSheetBodyState
                   color: selected
                       ? _onAccentSoft.withValues(alpha: 0.14)
                       : _surface,
-                  borderRadius: BorderRadius.circular(9),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(meta.icon,
                     size: 18, color: selected ? _onAccentSoft : _accent),
@@ -577,12 +655,13 @@ class _OrganizingToolkitSheetBodyState
 
   // ── Idea strip (client-side title templates) ───────────────────
   //
-  // Shown only when the sheet is seeded from a region and/or nominee. Tapping
-  // a chip drops the template into the title field so HQ names it in one tap.
+  // Shown only when a NEW activity is seeded from a region and/or nominee.
+  // Tapping a chip drops the template into the title field so HQ names it in
+  // one tap. An activity that already has a name has nothing to suggest.
   List<String> _ideaTitles() {
     final region = _seedRegionLabel();
     final nominee =
-        widget.candidates.isNotEmpty ? widget.candidates.first.name : null;
+        widget.seed.candidates.isNotEmpty ? widget.seed.candidates.first.name : null;
     final out = <String>[];
     if (region != null) out.add('Saturday canvass in $region');
     if (nominee != null) out.add('Text bank for $nominee');
@@ -877,28 +956,16 @@ class _OrganizingToolkitSheetBodyState
     );
   }
 
-  Widget _readChip(String label) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: _accentSoft,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(label,
-            style: TextStyle(
-                color: _onAccentSoft,
-                fontSize: 11,
-                fontWeight: FontWeight.w800)),
-      );
-
   // ── Nominee picker ─────────────────────────────────────────────
   Widget _candidatePicker() {
-    if (widget.candidates.isEmpty) {
+    final seeded = widget.seed.candidates;
+    if (seeded.isEmpty) {
       return _emptyNote('No nominees tied to this region yet.');
     }
     final q = _candSearchCtrl.text.trim().toLowerCase();
     final visible = q.isEmpty
-        ? widget.candidates
-        : widget.candidates
+        ? seeded
+        : seeded
             .where((c) =>
                 c.name.toLowerCase().contains(q) ||
                 c.office.toLowerCase().contains(q))
@@ -1053,12 +1120,18 @@ class _OrganizingToolkitSheetBodyState
 
   // ── Save bar ───────────────────────────────────────────────────
   Widget _saveBar() {
+    // The device inset belongs to the sheet, which sits against the bottom of
+    // the window. Inline the form is mid-page and adding it would open a gap.
+    final bottomInset =
+        _inline ? 0.0 : MediaQuery.of(context).padding.bottom;
     return Container(
       padding: EdgeInsets.fromLTRB(
-          16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+          _inline ? 0 : 16, 12, _inline ? 0 : 16, 12 + bottomInset),
       decoration: BoxDecoration(
-        color: _surface,
-        border: Border(top: BorderSide(color: _divider)),
+        color: _inline ? Colors.transparent : _surface,
+        border: _inline
+            ? null
+            : Border(top: BorderSide(color: _divider)),
       ),
       child: Opacity(
         opacity: _canSave ? 1 : 0.5,
@@ -1078,7 +1151,7 @@ class _OrganizingToolkitSheetBodyState
                       child: CircularProgressIndicator(
                           strokeWidth: 2.4, color: _onEmphasis),
                     )
-                  : Text(_isEdit ? 'Save status' : 'Save plan',
+                  : Text(_isEdit ? 'Save changes' : 'Save plan',
                       style: TextStyle(
                           color: _onEmphasis,
                           fontSize: 15,
@@ -1175,13 +1248,6 @@ class _OrganizingToolkitSheetBodyState
                 fontSize: 13,
                 fontWeight: FontWeight.w700)),
       );
-
-  List<String> _allGeoLabels() => [
-        for (final c in _counties) '$c County',
-        for (final d in _cds) 'CD $d',
-        for (final d in _sds) 'SD $d',
-        for (final d in _hds) 'HD $d',
-      ];
 
   static const List<String> _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',

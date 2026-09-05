@@ -6,8 +6,10 @@ import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/outreach_activity.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
 import 'package:bluebubbles/services/crm/outreach_repository.dart';
+import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
+import 'package:bluebubbles/screens/crm/volunteers/organizing_toolkit_sheet.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  ACTIVITY DETAIL (full-screen route)
@@ -48,14 +50,79 @@ const List<String> _kRoles = <String>['volunteer', 'captain', 'organizer'];
 }
 
 /// Filled-red chips use the deeper red rather than BrandColors.error: white on
-/// #EF4444 is 3.8:1 and unityBlue on it is 4.0:1, so neither foreground clears
-/// the bar. Error itself is still the right color for the large glyphs and
-/// tinted circles in the error state, where the 3:1 graphic threshold applies.
+/// #EF4444 measures 3.76:1 and unityBlue on it 3.32:1, so neither foreground
+/// clears the bar, while white on red.shade700 (#D32F2F) measures 4.98:1.
+/// Error itself is still the right color for the large glyphs and tinted
+/// circles in the error state, where the 3:1 graphic threshold applies.
 final Color outreachDangerFill = Colors.red.shade700;
 
-/// Red that stays legible as TEXT on the navy end of the gradient (5.1:1),
-/// which BrandColors.error does not.
-final Color outreachDangerInk = Colors.red.shade300;
+/// Red for the overdue chip, whose icon and label sit on a SOLID
+/// BrandColors.unityBlue fill at 10px bold. 10px bold is nowhere near the WCAG
+/// large-text exemption, which needs 18.66px bold or 24px regular, so the
+/// 4.5:1 normal-text floor binds.
+///
+/// Colors.red.shade200 (#EF9A9A) measures 5.81:1 on #273351. shade300
+/// (#E57373) stood here and measures 4.19:1, which fails, and the comment it
+/// carried claimed 5.1:1 and was simply wrong. Every ratio named in this file
+/// is computed from WCAG 2.x relative luminance against the ground it names.
+final Color outreachDangerInk = Colors.red.shade200;
+
+/// Opaque surface for the loading, empty and error blocks on both outreach
+/// screens.
+///
+/// Those blocks are centred, so they render at the MIDDLE of the page, and the
+/// window is resizable, so no horizontal position is knowable in advance. They
+/// therefore cannot take their legibility from the page ground.
+///
+/// BrandedBackground paints assets/images/Blue-Gradient-Background.png under
+/// Colors.white at 0.18 (brand_colors.dart). Decoding that asset shows a
+/// 3000x2400 image whose gradient is purely HORIZONTAL and constant down every
+/// column, running #37ACE7 at the left edge to #1E2F48 at the right, so the
+/// composited ground runs #5BBBEB to #465469 across the window.
+///
+/// No single foreground clears even the 3:1 graphic floor against both ends of
+/// that ground: unityBlue measures 5.81:1 at the far left and 1.63:1 at the far
+/// right, white measures 2.15:1 and 7.69:1 the other way, and pure black still
+/// only reaches 2.73:1 at the right. So the fix is a surface rather than a
+/// color, which is what the branded cards already do.
+///
+/// On the opaque #FFFFFF this returns, the palette these blocks already use is
+/// measured: unityBlue headings 12.51:1, unityBlue at 0.7 alpha body copy
+/// 4.95:1, the unityBlue glyph on the momentumBlue 0.15 circle 10.87:1, the
+/// BrandColors.error glyph on the error 0.12 circle 3.23:1, white on the
+/// unityBlue button 12.51:1 and unityBlue on the sunriseGold button 7.17:1.
+///
+/// Shared by the hub and this screen so the two cannot drift apart, the same
+/// reason outreachStatusStyle above is shared.
+Widget outreachStateSurface({required Widget child}) {
+  return Center(
+    // Scrolls rather than overflows: the card adds padding of its own, so on a
+    // short window the taller empty state would otherwise not fit.
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        // Caps the card on a wide window; it still shrink-wraps a small child
+        // such as the loading indicator.
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Card(
+          elevation: 4,
+          margin: EdgeInsets.zero,
+          // Named rather than taken from the theme: this sits on the branded
+          // page in both light and dark, so a theme surface color would move
+          // the ground the ratios above are measured against.
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: child,
+          ),
+        ),
+      ),
+    ),
+  );
+}
 
 class ActivityDetailScreen extends StatefulWidget {
   const ActivityDetailScreen({super.key, required this.activity});
@@ -73,6 +140,12 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   late OutreachActivity _activity;
   List<ActivityRosterEntry> _roster = <ActivityRosterEntry>[];
   int _nomineeCount = 0;
+
+  /// Who owns this activity and who filed it. Null until resolved, and null
+  /// forever for a row whose column was never stamped, which is every activity
+  /// created before organizer_member_id started being written.
+  String? _organizerName;
+  String? _createdByName;
 
   bool _loading = true;
   bool _errored = false;
@@ -97,10 +170,13 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
     try {
       final roster = await _repo.getRoster(_activity.id);
       final nominees = await _repo.activityCandidateCount(_activity.id);
+      final names = await _resolveAttribution();
       if (!mounted) return;
       setState(() {
         _roster = roster;
         _nomineeCount = nominees;
+        _organizerName = names.organizer;
+        _createdByName = names.creator;
         _loading = false;
       });
     } catch (_) {
@@ -109,6 +185,59 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
         _errored = true;
         _loading = false;
       });
+    }
+  }
+
+  /// Both attribution names in one query.
+  ///
+  /// THE TRAP: created_by references auth.users(id) and organizer_member_id
+  /// references public.members(id). Both are bare uuids, so the only thing
+  /// keeping them apart is resolving each through the right column,
+  /// members.user_id for the first and members.id for the second. Swap them and
+  /// the screen silently shows nobody.
+  ///
+  /// It reads members directly because neither repository exposes a user_id
+  /// lookup today. Fold it into OutreachRepository when one lands. Failure is
+  /// swallowed on purpose: a missing name must never blank the roster.
+  Future<({String? organizer, String? creator})> _resolveAttribution() async {
+    const empty = (organizer: null, creator: null);
+    final organizerMemberId = _activity.organizerMemberId;
+    final creatorUserId = _activity.createdBy;
+
+    final filters = <String>[
+      if (organizerMemberId != null) 'id.eq.$organizerMemberId',
+      if (creatorUserId != null) 'user_id.eq.$creatorUserId',
+    ];
+    if (filters.isEmpty) return empty;
+
+    final supabase = CRMSupabaseService();
+    if (!supabase.isInitialized) return empty;
+
+    try {
+      final response = await supabase.client
+          .from('members')
+          .select('id, user_id, name')
+          .or(filters.join(','));
+
+      String? organizer;
+      String? creator;
+      for (final row in (response as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map<String, dynamic>>()) {
+        final name = (row['name'] as String?)?.trim();
+        if (name == null || name.isEmpty) continue;
+        // The null guards are load-bearing: a member row with no auth account
+        // carries user_id null, which would match a null creatorUserId and
+        // credit the organizer with creating the activity.
+        if (organizerMemberId != null && row['id'] == organizerMemberId) {
+          organizer = name;
+        }
+        if (creatorUserId != null && row['user_id'] == creatorUserId) {
+          creator = name;
+        }
+      }
+      return (organizer: organizer, creator: creator);
+    } catch (_) {
+      return empty;
     }
   }
 
@@ -332,8 +461,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               _headerBand(),
               Expanded(
                 child: _loading
-                    ? const Center(
-                        child: SizedBox(
+                    ? outreachStateSurface(
+                        child: const SizedBox(
                           width: 26,
                           height: 26,
                           child: CircularProgressIndicator(
@@ -488,57 +617,54 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
   }
 
   Widget _errorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: BrandColors.error.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.error_outline,
-                  size: 56, color: BrandColors.error),
+    return outreachStateSurface(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: BrandColors.error.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: 20),
-            const Text(
-              'Could not load this activity',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: BrandColors.unityBlue,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
+            child: const Icon(Icons.error_outline,
+                size: 56, color: BrandColors.error),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Could not load this activity',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: BrandColors.unityBlue,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'The roster and attendance could not be read. Check the '
-              'connection and try again.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: BrandColors.unityBlue.withValues(alpha: 0.7),
-                fontSize: 14,
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'The roster and attendance could not be read. Check the '
+            'connection and try again.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: BrandColors.unityBlue.withValues(alpha: 0.7),
+              fontSize: 14,
             ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _load,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: BrandColors.unityBlue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 20, vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: _load,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: BrandColors.unityBlue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 20, vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
-          ],
-        ),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+          ),
+        ],
       ),
     );
   }
@@ -565,6 +691,13 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               const SizedBox(width: 12),
               const Expanded(
                   child: Text('Details', style: BrandTextStyles.title)),
+              IconButton(
+                onPressed: _busy ? null : _editDetails,
+                icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                disabledColor: Colors.white38,
+                tooltip: 'Edit details',
+                visualDensity: VisualDensity.compact,
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -577,6 +710,8 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
               _nomineeCount == 1 ? '1 nominee' : '$_nomineeCount nominees'),
           if (_activity.channel != null)
             _kv('Channel', _channelLabel(_activity.channel!)),
+          if (_organizerName != null) _kv('Organized by', _organizerName!),
+          if (_createdByName != null) _kv('Created by', _createdByName!),
           if (_activity.createdAt != null)
             _kv('Created', _fmtDate(_activity.createdAt!)),
           if (_activity.completedAt != null)
@@ -640,6 +775,21 @@ class _ActivityDetailScreenState extends State<ActivityDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Full edit of everything the row stores, through the same toolkit form the
+  /// rest of the CRM plans with. The form hands the edited row straight back,
+  /// so the screen repaints without a re-fetch; the roster and the nominee
+  /// links are untouched by an edit and stay as loaded.
+  Future<void> _editDetails() async {
+    await OrganizingToolkitSheet.show(
+      context,
+      existing: _activity,
+      onSaved: (updated) {
+        if (!mounted) return;
+        setState(() => _activity = updated);
+      },
     );
   }
 

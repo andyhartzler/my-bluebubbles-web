@@ -3,12 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/outreach_activity.dart';
 import 'package:bluebubbles/services/crm/outreach_repository.dart';
+import 'package:bluebubbles/services/crm/touchpoint_repository.dart';
+import 'package:bluebubbles/screens/crm/volunteers/mobilize_models.dart';
+import 'package:bluebubbles/screens/crm/volunteers/outreach_profile_cards.dart';
 import 'package:bluebubbles/screens/crm/volunteers/organizing_toolkit_sheet.dart';
 
-/// "Organizing" card for the member detail screen (Layer 2 of Candidate
-/// Volunteers). Lists the field activities this member took part in and offers
-/// a "Plan activity" entry point that opens the shared [OrganizingToolkitSheet]
-/// pre-seeded with this member as a participant and their county.
+/// The member detail screen's outreach column: what has been SENT to this
+/// member, then what has been ORGANIZED with them.
+///
+/// The contact block answers the question an exec actually has before picking
+/// up the phone, which is "have we already messaged them this week", and it
+/// renders itself only when there is something to report (spec 4.4, Phase 6).
 class MemberOutreachSection extends StatefulWidget {
   const MemberOutreachSection({super.key, required this.member});
 
@@ -20,6 +25,7 @@ class MemberOutreachSection extends StatefulWidget {
 
 class _MemberOutreachSectionState extends State<MemberOutreachSection> {
   final OutreachRepository _repo = OutreachRepository();
+  final TouchpointRepository _touchpoints = TouchpointRepository();
 
   bool _loading = true;
   Object? _error;
@@ -56,25 +62,18 @@ class _MemberOutreachSectionState extends State<MemberOutreachSection> {
     }
   }
 
-  /// Opens the shared log sheet. For a brand-new activity ([existing] null) it
-  /// seeds this member as a participant and their county; editing an existing
-  /// activity just hands the row back unchanged. Refreshes the list when the
-  /// sheet reports a save.
+  /// Opens the shared toolkit sheet. A brand-new activity is seeded with this
+  /// member on the roster and their county; an existing one opens on its own
+  /// stored values, so the seed has nothing to say. Refreshes the list when the
+  /// sheet reports a save. This screen has no Desk to scroll to, so it keeps
+  /// the modal mount.
   Future<void> _openSheet({OutreachActivity? existing}) async {
-    final counties = <String>[];
-    if (existing == null) {
-      final county = widget.member.county;
-      if (county != null && county.trim().isNotEmpty) counties.add(county.trim());
-    }
-
     final saved = await OrganizingToolkitSheet.show(
       context,
       existing: existing,
-      participants:
-          existing == null ? <Member>[widget.member] : const <Member>[],
-      counties: counties,
-      titleSuggestion:
-          existing == null ? 'Organizing with ${widget.member.name}' : null,
+      seed: existing == null
+          ? OrganizingSeed.forMember(widget.member)
+          : const OrganizingSeed.empty(),
     );
 
     if (saved == true) await _load();
@@ -83,213 +82,72 @@ class _MemberOutreachSectionState extends State<MemberOutreachSection> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-            color: theme.colorScheme.outline.withValues(alpha: 0.2)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _MemberOutreachHeader(count: _loading ? null : _activities.length),
-            const SizedBox(height: 12),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  'Could not load activities. Try again.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.error,
-                  ),
-                ),
-              )
-            else if (_activities.isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  'Nothing organized with this member yet.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              )
-            else
-              for (final activity in _activities.take(_maxRows)) ...[
-                _MemberOutreachRow(
-                  activity: activity,
-                  onTap: () => _openSheet(existing: activity),
-                ),
-                const Divider(height: 1),
-              ],
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton.icon(
-                onPressed: () => _openSheet(),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Plan activity'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// "Organizing" card header: a primary-filled badge, the title, and an optional
-/// count chip. Private to this file so the member section stays independently
-/// owned.
-class _MemberOutreachHeader extends StatelessWidget {
-  const _MemberOutreachHeader({this.count});
-
-  final int? count;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primary,
-            borderRadius: BorderRadius.circular(9),
-          ),
-          child: Icon(
-            Icons.campaign_outlined,
-            color: theme.colorScheme.onPrimary,
-            size: 20,
-          ),
+        RecentContactCard(
+          load: () => _touchpoints.forMember(widget.member.id),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            'Organizing',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        if (count != null && count! > 0)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              '$count',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onPrimaryContainer,
-                fontWeight: FontWeight.w700,
+        OutreachProfileCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OutreachProfileHeader(
+                icon: Icons.campaign_outlined,
+                title: 'Organizing',
+                count: _loading ? null : _activities.length,
               ),
-            ),
+              const SizedBox(height: 12),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'Could not load activities. Try again.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                )
+              else if (_activities.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'Nothing organized with this member yet.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else
+                for (final activity in _activities.take(_maxRows)) ...[
+                  OutreachProfileActivityRow(
+                    activity: activity,
+                    onTap: () => _openSheet(existing: activity),
+                  ),
+                  const Divider(height: 1),
+                ],
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.icon(
+                  onPressed: () => _openSheet(),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Plan activity'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                  ),
+                ),
+              ),
+            ],
           ),
+        ),
       ],
     );
-  }
-}
-
-/// One compact outreach row: kind icon, title, scheduled date, status chip.
-class _MemberOutreachRow extends StatelessWidget {
-  const _MemberOutreachRow({required this.activity, required this.onTap});
-
-  final OutreachActivity activity;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            Icon(
-              activity.kindIcon,
-              size: 20,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    activity.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (activity.scheduledOn != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        _formatDate(activity.scheduledOn!),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: activity.statusColor,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                activity.statusLabel,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Compact "MMM d, yyyy" without pulling in intl.
-  static String _formatDate(DateTime date) {
-    const months = <String>[
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 }

@@ -2,18 +2,21 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:universal_html/html.dart' as html;
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/models/crm/candidate.dart' show Candidate;
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/outreach_activity.dart';
+import 'package:bluebubbles/providers/user_session_provider.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/services/crm/candidate_member_link_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
-import 'package:bluebubbles/services/crm/outreach_repository.dart';
 
 import 'activity_detail_screen.dart';
-import 'organizing_toolkit_sheet.dart';
+import 'mobilize_models.dart';
 import 'outreach_region_section.dart';
 import 'volunteers_map_models.dart';
 import 'volunteers_theme.dart';
@@ -40,15 +43,16 @@ enum _MemberSort { nameAsc, recentlyContacted, leastRecentlyContacted }
 //  multi-select and a pinned bulk-action bar) when a region is.
 //
 //  ONE widget, both surfaces: the mounting decides the box (desktop rail
-//  360–440px; mobile DraggableScrollableSheet snapped 0.35 / 0.7 / 0.95).
+//  360 to 440px; mobile DraggableScrollableSheet snapped 0.35 / 0.7 / 0.95).
 //  The panel is size-agnostic and drives the sheet through [scrollController]
 //  so drag-to-expand works; the pinned action bar sits below the scroll view
 //  so it stays visible at every snap.
 // ═══════════════════════════════════════════════════════════════
 
 /// One "Organizing play" idea card on the front door of the rail. Computed by
-/// the map from data already in memory; [onStart] opens the toolkit sheet
-/// pre-seeded with the play's kind, geography and nominee.
+/// the map from data already in memory; [onStart] hands the play's region,
+/// kind, title and nominees to the Desk's PLAN section. It does NOT raise a
+/// modal: planning left the map with everything else that sends or schedules.
 class OrganizingPlay {
   const OrganizingPlay({
     required this.icon,
@@ -125,21 +129,20 @@ class _Palette {
   Color get text => vt.text;
   Color get secondary => vt.secondary;
   Color get divider => vt.divider;
-  Color get action => vt.accent;
 
+  /// NON-TEXT only: rules, rings, strokes, spinners. momentumBlue carries
+  /// white at 2.75:1 and sits at 4.55:1 on [surface] but only 3.36:1 on
+  /// [inset], so a caption painted in it passes on one row fill and fails on
+  /// the other. Inline links and emphasis text use [highlight] instead, which
+  /// measures 7.17:1 on surface and 5.29:1 on inset.
   Color get accent => vt.accent;
-  Color get onAccent => vt.onAccent;
   Color get accentSoft => vt.accentSoft;
   Color get onAccentSoft => vt.onAccentSoft;
   Color get highlight => vt.highlight;
-  Color get highlightSoft => vt.highlightSoft;
-  Color get onHighlightSoft => vt.onHighlightSoft;
 
   /// The emphasis pair, and the only filled pairing in this palette a control
-  /// may put a LABEL on: unityBlue content on a sunriseGold fill, 7.17:1.
-  /// [accent] is momentumBlue and carries white at 2.75:1, which fails both
-  /// the 4.5:1 text bar and the 3:1 large-text bar, so it stays on rules,
-  /// rings and strokes.
+  /// may put a LABEL or a GLYPH on: unityBlue content on a sunriseGold fill,
+  /// 7.17:1 either way round.
   Color get emphasisFill => vt.emphasisFill;
   Color get onEmphasis => vt.onEmphasis;
 
@@ -242,9 +245,7 @@ class VolunteersDetailPanel extends StatelessWidget {
     this.onHighlightYoungDems,
     required this.onClose,
     required this.onSelectHot,
-    required this.onTextMembers,
-    required this.onEmailMembers,
-    this.onLogOutreach,
+    required this.onMobilize,
     this.scrollController,
     this.showCloseButton = true,
   });
@@ -276,15 +277,11 @@ class VolunteersDetailPanel extends StatelessWidget {
   final VoidCallback onClose;
   final void Function(MapMode mode, String id) onSelectHot;
 
-  /// Existing bulk-send callbacks, signatures unchanged. The action bar
-  /// filters the current selection to valid members and calls these.
-  final void Function(List<Member> members) onTextMembers;
-  final void Function(List<Member> members) onEmailMembers;
-
-  /// Layer 2 outreach logging. Receives the currently selected members so the
-  /// map can seed the outreach sheet's participant roster. Null-safe: the "Log
-  /// outreach" button is hidden entirely while this is null.
-  final void Function(List<Member> members)? onLogOutreach;
+  /// The members pane's one outbound action. Everything that sends or
+  /// schedules now leaves through here: the bar publishes the selection, the
+  /// region and the intent, and the shell flips to the Desk. The panel never
+  /// pushes a bulk screen or opens a sheet of its own any more.
+  final void Function(MobilizeRequest request) onMobilize;
 
   /// Supplied on the mobile draggable sheet so the single scroll view drives
   /// drag-to-expand. Null on desktop (the rail owns its own controller).
@@ -304,9 +301,7 @@ class VolunteersDetailPanel extends StatelessWidget {
               pane:
                   pane == VolunteersPane.statewide ? VolunteersPane.combined : pane,
               onClose: onClose,
-              onTextMembers: onTextMembers,
-              onEmailMembers: onEmailMembers,
-              onLogOutreach: onLogOutreach,
+              onMobilize: onMobilize,
               scrollController: scrollController,
               showCloseButton: showCloseButton,
             ),
@@ -404,11 +399,11 @@ class VolunteersDetailPanel extends StatelessWidget {
       required String label,
       bool highlight = false,
       VoidCallback? onTap}) {
-    final fg = highlight ? p.onHighlightSoft : Colors.white;
+    final fg = highlight ? p.onEmphasis : Colors.white;
     final content = Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: highlight ? p.highlightSoft : Colors.white.withValues(alpha: 0.15),
+        color: highlight ? p.emphasisFill : Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -419,7 +414,7 @@ class VolunteersDetailPanel extends StatelessWidget {
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: highlight
-                  ? p.onHighlightSoft.withValues(alpha: 0.15)
+                  ? p.onEmphasis.withValues(alpha: 0.15)
                   : Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
@@ -466,8 +461,8 @@ class VolunteersDetailPanel extends StatelessWidget {
     return BrandedActivityFeedItem(
       leadingWidget: _iconTile(
         youngDem ? Icons.star_rounded : Icons.place_outlined,
-        fill: youngDem ? p.highlightSoft : swatch.withValues(alpha: 0.28),
-        iconColor: youngDem ? p.onHighlightSoft : Colors.white,
+        fill: youngDem ? p.emphasisFill : swatch.withValues(alpha: 0.28),
+        iconColor: youngDem ? p.onEmphasis : Colors.white,
       ),
       primaryText: h.mode.regionTitle(h.id),
       secondaryText: '${h.memberCount} member${h.memberCount == 1 ? '' : 's'}'
@@ -587,9 +582,7 @@ class _RegionDetailView extends StatefulWidget {
     required this.detail,
     required this.pane,
     required this.onClose,
-    required this.onTextMembers,
-    required this.onEmailMembers,
-    required this.onLogOutreach,
+    required this.onMobilize,
     required this.scrollController,
     required this.showCloseButton,
   });
@@ -597,9 +590,7 @@ class _RegionDetailView extends StatefulWidget {
   final RegionDetail detail;
   final VolunteersPane pane;
   final VoidCallback onClose;
-  final void Function(List<Member> members) onTextMembers;
-  final void Function(List<Member> members) onEmailMembers;
-  final void Function(List<Member> members)? onLogOutreach;
+  final void Function(MobilizeRequest request) onMobilize;
   final ScrollController? scrollController;
   final bool showCloseButton;
 
@@ -633,12 +624,151 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
   final Map<String, DateTime> _lastContactedOverride = <String, DateTime>{};
   final Map<String, String> _notesOverride = <String, String>{};
 
+  // ── Candidate links (spec 5.5) ──────────────────────────────────
+  final CandidateMemberLinkRepository _linkRepo =
+      CandidateMemberLinkRepository();
+
+  /// "n members linked" per candidate id. Absent means zero, which is what a
+  /// candidate with no volunteer base looks like.
+  Map<String, int> _linkCounts = const <String, int>{};
+
+  /// The candidate ids the counts were last fetched for, joined. The candidate
+  /// rows arrive after the first frame, so this is what turns "the list
+  /// changed" into exactly one more fetch rather than one per rebuild.
+  String _countedKey = '';
+
+  /// The candidate a link write is in flight for, so a second tap cannot fire
+  /// the same bulk insert.
+  String? _linkingCandidateId;
+
   RegionDetail get _d => widget.detail;
 
   @override
   void initState() {
     super.initState();
     _loadCommittees();
+    _ensureLinkCounts();
+  }
+
+  @override
+  void didUpdateWidget(covariant _RegionDetailView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _ensureLinkCounts();
+  }
+
+  /// Candidate ids on the ballot rows that resolve to a real profile. Only
+  /// those can be linked to: an unmatched result row has no candidates.id.
+  List<String> get _resolvedCandidateIds {
+    final ids = <String>{};
+    for (final group in _d.candidateGroups) {
+      for (final row in group.rows) {
+        final candidate = row.candidate;
+        if (candidate != null) ids.add(candidate.id);
+      }
+    }
+    final out = ids.toList()..sort();
+    return out;
+  }
+
+  void _ensureLinkCounts() {
+    final ids = _resolvedCandidateIds;
+    final key = ids.join(',');
+    if (key.isEmpty || key == _countedKey) return;
+    _countedKey = key;
+    _loadLinkCounts(ids);
+  }
+
+  Future<void> _loadLinkCounts(List<String> ids) async {
+    try {
+      final counts = await _linkRepo.linkCountsForCandidates(ids);
+      if (!mounted) return;
+      setState(() => _linkCounts = counts);
+    } catch (_) {
+      // A missing count only costs the "n members linked" line. The card and
+      // its link gesture still work, and the gesture reports for itself.
+    }
+  }
+
+  /// "Link this region's members" (spec 5.4). The whole region, not the
+  /// members pane's selection: the gesture is named after the region and this
+  /// pane is the ballot, which owns no selection.
+  Future<void> _linkRegionToCandidate(
+      BuildContext context, Candidate candidate) async {
+    if (_linkingCandidateId != null) return;
+    final people = _d.members;
+    final region = _d.mode.regionTitle(_d.id);
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (people.isEmpty) {
+      messenger.showSnackBar(
+          SnackBar(content: Text('No members live in $region.')));
+      return;
+    }
+
+    final session = context.read<UserSessionProvider>();
+    final actorMemberId = session.currentMember?.id;
+    final actorUserId = session.authUserId;
+    if (actorMemberId == null || actorUserId == null) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('Your session is still loading. Try again in a '
+              'moment.')));
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: _dialogSurface,
+        shape: _dialogShape,
+        titleTextStyle: _dialogTitleText,
+        contentTextStyle: _dialogBodyText,
+        title: Text('Link $region to ${candidate.name}?'),
+        content: SizedBox(
+          width: 380,
+          child: Text(
+              'All ${people.length} member${people.length == 1 ? '' : 's'} in '
+              '$region join ${candidate.name}\'s volunteer base. Members who '
+              'join $region later are not added on their own; use Refresh on '
+              'the Desk for that.'),
+        ),
+        actions: [
+          TextButton(
+              style: _dialogQuietAction,
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel')),
+          TextButton(
+              style: _dialogPrimaryAction,
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Link')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _linkingCandidateId = candidate.id);
+    try {
+      final added = await _linkRepo.linkMembers(
+        candidateId: candidate.id,
+        memberIds: people.map((m) => m.id).toList(),
+        sourceMode: _d.mode,
+        sourceRegionId: _d.id,
+        actorUserId: actorUserId,
+        actorMemberId: actorMemberId,
+      );
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        content: Text(added == 0
+            ? 'All of $region was already linked to ${candidate.name}.'
+            : 'Linked $added from $region to ${candidate.name}.'),
+      ));
+      await _loadLinkCounts(_resolvedCandidateIds);
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(const SnackBar(
+          content: Text('That did not save. Please try again.')));
+    } finally {
+      if (mounted) setState(() => _linkingCandidateId = null);
+    }
   }
 
   Future<void> _loadCommittees() async {
@@ -926,9 +1056,66 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
               ),
             ],
           ),
+          // Spec 2.5: mobilizing a whole region takes one press, not 41
+          // check boxes. It sits with the counts because it is a statement
+          // about the same number, and it stays put whether or not anything
+          // is selected, so the exec never has to hunt for it after Clear.
+          if (!_d.loadingMembers && _d.members.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _mobilizeAllAction(p),
+          ],
         ],
       ),
     );
+  }
+
+  /// "Mobilize all 41". The emphasis pair is the only filled pairing this
+  /// palette lets a label sit on (unityBlue on sunriseGold, 7.17:1 either way
+  /// round), and it reads as the header's one action against the gradient.
+  Widget _mobilizeAllAction(_Palette p) {
+    final total = _d.members.length;
+    return Semantics(
+      button: true,
+      label: 'Mobilize all $total members in ${_d.mode.regionTitle(_d.id)}',
+      child: Material(
+        color: p.emphasisFill,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: _mobilizeAll,
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.campaign_outlined, size: 16, color: p.onEmphasis),
+                const SizedBox(width: 7),
+                Text('Mobilize all $total',
+                    style: TextStyle(
+                        color: p.onEmphasis,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.2)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The area-wide gesture (spec 2.5). Every loaded member of the region, not
+  /// the selection and not the filtered view, because the label says "all".
+  /// Candidates are left empty for the same reason [_mobilizeSelection] does:
+  /// the map attaches them.
+  void _mobilizeAll() {
+    final members = _d.members;
+    if (members.isEmpty) return;
+    widget.onMobilize(MobilizeRequest(
+      members: members,
+      regionMode: _d.mode,
+      regionId: _d.id,
+    ));
   }
 
   /// Overline, region title and the gold rule, shared by both pane headers.
@@ -1065,7 +1252,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (var i = 0; i < groups.length; i++) ...[
-          if (i > 0) const SizedBox(height: 18),
+          if (i > 0) const SizedBox(height: 20),
           _candidateGroup(context, p, groups[i], showHeader: groups.length > 1),
         ],
       ],
@@ -1180,6 +1367,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
                   ],
                 ),
               ),
+              if (row.tappable) _candidateMoreMenu(context, p, row.candidate!),
               if (row.tappable)
                 Icon(Icons.chevron_right,
                     color: p.secondary.withValues(alpha: 0.6), size: 18),
@@ -1191,7 +1379,9 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
           // lives on its own InkWell so the tap never bubbles up to the card's
           // InkWell (which still one-taps to the candidate profile).
           if (row.tappable) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
+            _linkCountLine(p, row.candidate!),
+            const SizedBox(height: 8),
             _organizeButton(context, p, row),
           ],
         ],
@@ -1213,6 +1403,70 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
     );
   }
 
+  /// How big this nominee's volunteer base is (spec 5.5). It counts stored
+  /// links, not everyone in the region: a link is a row somebody wrote, so the
+  /// number holds still while the region's population moves under it.
+  Widget _linkCountLine(_Palette p, Candidate candidate) {
+    final linked = _linkCounts[candidate.id] ?? 0;
+    return Row(
+      children: [
+        Icon(Icons.link, size: 14, color: p.secondary),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            linked == 0
+                ? 'No members linked yet'
+                : '$linked member${linked == 1 ? '' : 's'} linked',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            // white70 on the card's white-10% fill over the navy panel:
+            // 5.49:1.
+            style: TextStyle(color: p.secondary, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The nominee card's overflow (spec 5.4): the batch link gesture, without a
+  /// trip through the Desk. It sits inside the card's InkWell and swallows its
+  /// own taps, so opening the menu never opens the candidate profile.
+  Widget _candidateMoreMenu(
+      BuildContext context, _Palette p, Candidate candidate) {
+    if (_linkingCandidateId == candidate.id) {
+      return Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        child: SizedBox(
+          width: 16,
+          height: 16,
+          child:
+              CircularProgressIndicator(strokeWidth: 2, color: p.highlight),
+        ),
+      );
+    }
+    return PopupMenuButton<String>(
+      tooltip: 'More actions',
+      position: PopupMenuPosition.under,
+      enabled: _linkingCandidateId == null,
+      onSelected: (value) {
+        if (value == 'link') _linkRegionToCandidate(context, candidate);
+        if (value == 'connect') _connectInDesk(candidate);
+      },
+      itemBuilder: (_) => [
+        _moreItem('link', Icons.link, "Link this region's members"),
+        _moreItem('connect', Icons.hub_outlined, 'Manage links in the Desk'),
+      ],
+      child: Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        child: Icon(Icons.more_vert, size: 18, color: p.secondary),
+      ),
+    );
+  }
+
   /// Compact "Organize for {first name}" action on a resolved nominee card.
   /// Filled emphasis pill: unityBlue caps on a sunriseGold fill, measured at
   /// 7.17:1. It was momentumBlue under white, which measures 2.75:1 and fails
@@ -1229,7 +1483,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
         color: p.emphasisFill,
         borderRadius: BorderRadius.circular(999),
         child: InkWell(
-          onTap: () => _openOrganize(context, row),
+          onTap: () => _openOrganize(row),
           borderRadius: BorderRadius.circular(999),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1255,22 +1509,41 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
     );
   }
 
-  /// Opens the create sheet pre-attached to this candidate and the current
-  /// region's single geo list. No members are pre-seeded, because the create
-  /// sheet's Step 3 lets the exec add them; this is the candidate-first flow.
-  void _openOrganize(BuildContext context, CandidateDisplayRow row) {
+  /// The Desk's CONNECT section, opened on this nominee with the region as the
+  /// audience. The card's own menu item stays the one-tap batch link (spec
+  /// 5.4); this is the way to the rest of that section, which only the Desk
+  /// has room for: unlink a batch, refresh a region, attach a different
+  /// nominee. It is also the only producer of [MobilizeIntent.connect].
+  void _connectInDesk(Candidate candidate) {
+    widget.onMobilize(MobilizeRequest(
+      members: _d.members,
+      candidates: <Candidate>[candidate],
+      regionMode: _d.mode,
+      regionId: _d.id,
+      intent: MobilizeIntent.connect,
+    ));
+  }
+
+  /// The nominee-first gesture. It used to raise the toolkit sheet as a modal
+  /// on top of the map, which is exactly what spec 2.2 moved off it: planning
+  /// is Desk work. It now hands the Desk a plan-intent request carrying this
+  /// nominee, the region, and the region's members as the audience, so the
+  /// PLAN section opens with the canvass already seeded and a roster to work
+  /// from rather than an empty sheet.
+  ///
+  /// The whole region's members rather than the selection, because this button
+  /// lives on the ballot pane, which owns no selection of its own.
+  void _openOrganize(CandidateDisplayRow row) {
     final candidate = row.candidate!;
-    OrganizingToolkitSheet.show(
-      context,
-      candidates: [candidate],
-      kind: 'canvass',
-      titleSuggestion: 'Canvass for ${candidate.name}',
-      counties: _d.mode == MapMode.county ? [_d.id] : const [],
-      congressionalDistricts:
-          _d.mode == MapMode.congressional ? [_d.id] : const [],
-      houseDistricts: _d.mode == MapMode.house ? [_d.id] : const [],
-      senateDistricts: _d.mode == MapMode.senate ? [_d.id] : const [],
-    );
+    widget.onMobilize(MobilizeRequest(
+      members: _d.members,
+      candidates: <Candidate>[candidate],
+      regionMode: _d.mode,
+      regionId: _d.id,
+      intent: MobilizeIntent.plan,
+      seedKind: 'canvass',
+      seedTitle: 'Canvass for ${candidate.name}',
+    ));
   }
 
   Widget _candidateAvatar(String name, String? url) {
@@ -1400,8 +1673,8 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
               child: Checkbox(
                 value: headerTri,
                 tristate: true,
-                activeColor: p.accent,
-                checkColor: p.onAccent,
+                activeColor: p.emphasisFill,
+                checkColor: p.onEmphasis,
                 // The panel is a branded navy surface, so the unchecked box
                 // needs an explicit white edge: the Material default is a
                 // dark outline that disappears here.
@@ -1426,7 +1699,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
             if (_selectedIds.isNotEmpty)
               Text('${_selectedIds.length} selected',
                   style: TextStyle(
-                      color: p.action,
+                      color: p.highlight,
                       fontSize: 12,
                       fontWeight: FontWeight.w700)),
           ],
@@ -1465,7 +1738,7 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
               onPressed: () => setState(() => _expanded = true),
               child: Text('Show all ${displayed.length}',
                   style: TextStyle(
-                      color: p.action,
+                      color: p.highlight,
                       fontWeight: FontWeight.w700)),
             ),
           ),
@@ -1728,8 +2001,8 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
             width: 34,
             child: Checkbox(
               value: selected,
-              activeColor: p.accent,
-              checkColor: p.onAccent,
+              activeColor: p.emphasisFill,
+              checkColor: p.onEmphasis,
               side: const BorderSide(color: Colors.white70, width: 1.5),
               visualDensity: VisualDensity.compact,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1873,10 +2146,22 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
       );
 
   // ── pinned action bar ───────────────────────────────────────────
+  /// One row plus the skip lines. Text, Email, Add-to-activity and Plan
+  /// activity all left for the Desk: the line is that anything which SENDS or
+  /// SCHEDULES is Desk work, and anything that annotates or exports the list in
+  /// front of you stays here, which is why the (⋮) menu is untouched.
+  ///
+  /// Selection is seeded to every contactable member, so an empty selection
+  /// means the exec pressed Clear. The footer does not disappear on them: it
+  /// keeps its line and offers the inverse of Clear. It does NOT repeat
+  /// MOBILIZE, because a mobilize with no audience is a lie; mobilizing the
+  /// whole region is the header's "Mobilize all n" (spec 2.5), which is on
+  /// screen at the same time.
   Widget _actionBar(BuildContext context, _Palette p,
       {required int textCount, required int emailCount}) {
     final selected = _selectedMembers;
     final selCount = selected.length;
+    if (selCount == 0) return _emptySelectionBar(context, p);
     // Skip counts operate on the whole selection, independent of the filter.
     final cantText = selected.where((m) => !m.canContact).length;
     final cantEmail =
@@ -1892,92 +2177,134 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (selCount > 0) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '$selCount selected · $textCount textable · $emailCount emailable',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '$selCount selected · $textCount textable · $emailCount emailable',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: p.text,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => setState(() => _selectedIds.clear()),
+                child: Text('Clear',
                     style: TextStyle(
-                        color: p.text,
+                        color: p.highlight,
                         fontSize: 12.5,
-                        fontWeight: FontWeight.w700),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: () => setState(() => _selectedIds.clear()),
-                  child: Text('Clear',
-                      style: TextStyle(
-                          color: p.action,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-          ],
-          // Skip-reason surfacing (§5.3): the Text/Email buttons still send
-          // only to the eligible subset; these lines explain who is excluded.
-          if (selCount > 0 && cantText > 0)
+                        fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Skip-reason surfacing (§5.3). The counts still describe the whole
+          // selection rather than a channel, because the Desk picks the
+          // channel now; it repeats these against whichever one is chosen.
+          if (cantText > 0)
             _skipLine(
                 p,
                 "$cantText of $selCount can't be texted: no phone or opted out",
                 () => _showSkipDetails(context, isText: true)),
-          if (selCount > 0 && cantEmail > 0)
+          if (cantEmail > 0)
             _skipLine(
                 p,
                 "$cantEmail of $selCount can't be emailed: no email on file",
                 () => _showSkipDetails(context, isText: false)),
           Row(
             children: [
+              // The count on the button is the SELECTION, not the textable
+              // subset: the Desk decides the channel, so promising a number
+              // here that only holds for one of them would be a lie.
               Expanded(
                 child: _actionButton(
-                  icon: Icons.sms_outlined,
-                  label: 'Text ($textCount)',
-                  enabled: textCount > 0,
-                  onTap: () => widget.onTextMembers(_selectedTextable),
+                  icon: Icons.campaign_outlined,
+                  label: 'MOBILIZE $selCount',
+                  onTap: _mobilizeSelection,
                 ),
               ),
               const SizedBox(width: 10),
-              Expanded(
-                child: _actionButton(
-                  icon: Icons.email_outlined,
-                  label: 'Email ($emailCount)',
-                  enabled: emailCount > 0,
-                  onTap: () => widget.onEmailMembers(_selectedEmailable),
-                ),
-              ),
-              if (selCount > 0) ...[
-                const SizedBox(width: 10),
-                _addToActivityButton(context, p),
-                const SizedBox(width: 10),
-                _moreMenu(context, p),
-              ],
+              _moreMenu(context, p),
             ],
           ),
-          if (widget.onLogOutreach != null) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                onPressed: () => widget.onLogOutreach!(_selectedMembers),
-                icon: const Icon(Icons.edit_note_outlined, size: 18),
-                label: const Text('Plan activity'),
-                style: TextButton.styleFrom(
-                  foregroundColor: p.action,
-                  textStyle: const TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 13.5),
-                  minimumSize: const Size(0, 40),
-                ),
-              ),
+        ],
+      ),
+    );
+  }
+
+  /// The footer with nothing selected: the counts line and "Select all", the
+  /// exact inverse of Clear. Both act on the whole region rather than the
+  /// filtered view, so the pair stays symmetric no matter which chips are on.
+  Widget _emptySelectionBar(BuildContext context, _Palette p) {
+    // Still loading, or a region nobody lives in: the list above already says
+    // so and a footer restating it would only take space from it.
+    if (_d.members.isEmpty) return const SizedBox.shrink();
+    final selectable = _d.members.where(_isSelectable).length;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+          16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(
+        color: p.surface,
+        border: Border(top: BorderSide(color: p.divider)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              selectable == 0
+                  ? 'No one selected · nobody here can be texted or emailed'
+                  : 'No one selected',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  color: p.secondary,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600),
+            ),
+          ),
+          if (selectable > 0) ...[
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: _selectAllContactable,
+              child: Text('Select all $selectable',
+                  style: TextStyle(
+                      color: p.highlight,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700)),
             ),
           ],
         ],
       ),
     );
+  }
+
+  /// Re-seed the selection to every contactable member of the region, which is
+  /// what Clear undid. Deliberately the same set [_seedIfNeeded] starts from,
+  /// so "Clear" then "Select all" is a round trip.
+  void _selectAllContactable() {
+    setState(() {
+      _selectedIds
+        ..clear()
+        ..addAll(_d.members.where(_isSelectable).map((m) => m.id));
+    });
+  }
+
+  /// Publish the current selection to the Desk. Candidates are left empty on
+  /// purpose: the map attaches them, because it owns the result-row-to-profile
+  /// classification and two derivations of that would drift.
+  void _mobilizeSelection() {
+    final members = _selectedMembers;
+    if (members.isEmpty) return;
+    widget.onMobilize(MobilizeRequest(
+      members: members,
+      regionMode: _d.mode,
+      regionId: _d.id,
+    ));
   }
 
   Widget _skipLine(_Palette p, String text, VoidCallback onDetails) {
@@ -1996,37 +2323,11 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
             onTap: onDetails,
             child: Text('Details',
                 style: TextStyle(
-                    color: p.action,
+                    color: p.highlight,
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700)),
           ),
         ],
-      ),
-    );
-  }
-
-  /// First-class "Add to activity" action, promoted out of the ⋮ menu so the
-  /// action bar is more than just Text/Email. Opens the same activity picker.
-  Widget _addToActivityButton(BuildContext context, _Palette p) {
-    return Material(
-      color: p.inset,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: () => _openAddToActivity(context),
-        borderRadius: BorderRadius.circular(12),
-        child: Tooltip(
-          message: 'Add selection to an activity',
-          child: Container(
-            height: 46,
-            width: 46,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: p.divider),
-            ),
-            child: Icon(Icons.playlist_add_outlined, size: 20, color: p.text),
-          ),
-        ),
       ),
     );
   }
@@ -2086,61 +2387,6 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
         ],
       ),
     );
-  }
-
-  // ── add-to-activity (§5.3) ──────────────────────────────────────
-  // Adds the current selection to an existing planned/in-progress activity in
-  // this region, or seeds the create sheet pre-filled with the selection and
-  // the region's geography. The picker sheet returns the user's choice; this
-  // method is the only place that touches the map's region context, so the
-  // sheet stays region-agnostic.
-  Future<void> _openAddToActivity(BuildContext context) async {
-    final members = _selectedMembers;
-    if (members.isEmpty) return;
-
-    final choice = await showModalBottomSheet<_AddToActivityChoice>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _AddToActivitySheet(
-        mode: _d.mode,
-        regionId: _d.id,
-        members: members,
-      ),
-    );
-    if (!mounted || choice == null) return;
-
-    switch (choice.kind) {
-      case _AddToActivityKind.added:
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(choice.addedCount > 0
-              ? 'Added ${choice.addedCount} to ${choice.title}'
-              : 'All selected members were already on ${choice.title}'),
-        ));
-        break;
-      case _AddToActivityKind.failed:
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Could not add to ${choice.title}. Please try again.'),
-        ));
-        break;
-      case _AddToActivityKind.newActivity:
-        // Seed the create sheet with the selection and the region's single geo
-        // key; the other three geo lists stay empty. Candidates are Phase 4.
-        await OrganizingToolkitSheet.show(
-          context,
-          participants: members,
-          counties: _d.mode == MapMode.county ? [_d.id] : const <String>[],
-          congressionalDistricts:
-              _d.mode == MapMode.congressional ? [_d.id] : const <String>[],
-          houseDistricts:
-              _d.mode == MapMode.house ? [_d.id] : const <String>[],
-          senateDistricts:
-              _d.mode == MapMode.senate ? [_d.id] : const <String>[],
-          titleSuggestion:
-              '${OutreachDisplay.kinds.values.first.label}: ${_d.mode.regionTitle(_d.id)}',
-        );
-        break;
-    }
   }
 
   String _textSkipReason(Member m) {
@@ -2470,38 +2716,37 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
 
   /// Pinned action-bar primary. Emphasis pair, unityBlue on sunriseGold at
   /// 7.17:1; it was white on momentumBlue at 2.75:1, which fails the 4.5:1
-  /// text bar. The [Opacity] on the disabled state drops the pair toward the
-  /// navy behind it and is not claimed to clear any bar.
+  /// text bar.
+  ///
+  /// The disabled state went with Text and Email. The bar itself only renders
+  /// while something is selected, so its one button is never dimmed, and an
+  /// always-true flag with a dead branch behind it is worse than no flag.
   Widget _actionButton({
     required IconData icon,
     required String label,
-    required bool enabled,
     required VoidCallback onTap,
   }) {
     final p = _Palette.of(context);
-    return Opacity(
-      opacity: enabled ? 1 : 0.45,
-      child: Material(
-        color: p.emphasisFill,
+    return Material(
+      color: p.emphasisFill,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            height: 46,
-            alignment: Alignment.center,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 17, color: p.onEmphasis),
-                const SizedBox(width: 7),
-                Text(label,
-                    style: TextStyle(
-                        color: p.onEmphasis,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800)),
-              ],
-            ),
+        child: Container(
+          height: 46,
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 17, color: p.onEmphasis),
+              const SizedBox(width: 8),
+              Text(label,
+                  style: TextStyle(
+                      color: p.onEmphasis,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800)),
+            ],
           ),
         ),
       ),
@@ -2600,280 +2845,4 @@ String _initials(String name) {
   final first = parts.first[0];
   final last = parts.length > 1 ? parts.last[0] : '';
   return (first + last).toUpperCase();
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  ADD-TO-ACTIVITY PICKER: the modal that lets the members action bar drop
-//  the current selection onto an existing region activity, or open the create
-//  sheet pre-seeded. Returns a [_AddToActivityChoice]; the panel does the
-//  region-aware follow-up (snackbar or create sheet). Null on dismiss.
-// ═══════════════════════════════════════════════════════════════
-
-enum _AddToActivityKind { added, newActivity, failed }
-
-class _AddToActivityChoice {
-  const _AddToActivityChoice.added(this.addedCount, this.title)
-      : kind = _AddToActivityKind.added;
-  const _AddToActivityChoice.newActivity()
-      : kind = _AddToActivityKind.newActivity,
-        addedCount = 0,
-        title = '';
-  const _AddToActivityChoice.failed(this.title)
-      : kind = _AddToActivityKind.failed,
-        addedCount = 0;
-
-  final _AddToActivityKind kind;
-
-  /// New participant rows the repository actually inserted (0 when every
-  /// selected member was already on the activity).
-  final int addedCount;
-  final String title;
-}
-
-class _AddToActivitySheet extends StatefulWidget {
-  const _AddToActivitySheet({
-    required this.mode,
-    required this.regionId,
-    required this.members,
-  });
-
-  final MapMode mode;
-  final String regionId;
-  final List<Member> members;
-
-  @override
-  State<_AddToActivitySheet> createState() => _AddToActivitySheetState();
-}
-
-class _AddToActivitySheetState extends State<_AddToActivitySheet> {
-  final OutreachRepository _repo = OutreachRepository();
-
-  List<OutreachActivity> _activities = const [];
-  bool _loading = true;
-  bool _adding = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final rows = await _repo.activitiesForRegion(widget.mode, widget.regionId);
-      if (!mounted) return;
-      // Only the actionable activities: planned or in progress. Filtered
-      // client-side so the repository stays a plain region query.
-      setState(() {
-        _activities = rows
-            .where((a) => a.status == 'planned' || a.status == 'in_progress')
-            .toList();
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _activities = const [];
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _addTo(OutreachActivity activity) async {
-    if (_adding) return;
-    setState(() => _adding = true);
-    final inputs = widget.members
-        .map((m) => OutreachParticipantInput(memberId: m.id))
-        .toList();
-    // PINNED: addParticipants dedupes on (activity_id, member_id) and returns
-    // the count of newly inserted rows; it rethrows on a rejected write so a
-    // failure is not mistaken for "everyone was already on the activity".
-    _AddToActivityChoice result;
-    try {
-      final added = await _repo.addParticipants(activity.id, inputs);
-      result = _AddToActivityChoice.added(added, activity.title);
-    } catch (_) {
-      result = _AddToActivityChoice.failed(activity.title);
-    }
-    if (!mounted) return;
-    Navigator.of(context).pop(result);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = _Palette.of(context);
-    final media = MediaQuery.of(context);
-    final maxHeight = media.size.height * 0.8;
-    final n = widget.members.length;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        child: Container(
-          decoration: BoxDecoration(
-            color: p.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _header(n),
-              Flexible(
-                child: _loading
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 40),
-                        child: Center(
-                          child: SizedBox(
-                            width: 26,
-                            height: 26,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2.5, color: p.accent),
-                          ),
-                        ),
-                      )
-                    : ListView(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
-                        children: [
-                          _newActivityTile(p),
-                          const SizedBox(height: 12),
-                          if (_activities.isEmpty)
-                            _emptyNote(p)
-                          else
-                            ...[for (final a in _activities) _activityRow(p, a)],
-                        ],
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _header(int n) {
-    final p = _Palette.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        gradient: BrandColors.getTileGradient(),
-        border: Border(bottom: BorderSide(color: p.divider)),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          _iconTile(Icons.playlist_add),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Add $n member${n == 1 ? '' : 's'} to an activity',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        shadows: _onGradient)),
-                const SizedBox(height: 5),
-                Container(
-                  width: 40,
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: p.highlight,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => Navigator.of(context).pop(),
-              borderRadius: BorderRadius.circular(18),
-              child: Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.close, color: Colors.white, size: 18),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _newActivityTile(_Palette p) => Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _adding
-              ? null
-              : () => Navigator.of(context)
-                  .pop(const _AddToActivityChoice.newActivity()),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: p.highlight),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.add_circle_outline, size: 20, color: p.text),
-                const SizedBox(width: 12),
-                Text('New activity',
-                    style: TextStyle(
-                        color: p.text,
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800)),
-              ],
-            ),
-          ),
-        ),
-      );
-
-  Widget _emptyNote(_Palette p) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: p.inset,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: p.divider),
-        ),
-        child: Text('No planned activities in this region yet.',
-            style: TextStyle(color: p.secondary, fontSize: 12.5)),
-      );
-
-  Widget _activityRow(_Palette p, OutreachActivity a) {
-    final kind = OutreachDisplay.kinds[a.kind];
-    final status = OutreachDisplay.statuses[a.status];
-    return BrandedActivityFeedItem(
-      leadingWidget: _iconTile(kind?.icon ?? a.kindIcon),
-      primaryText: a.title,
-      // Never an empty second line: fall back to the kind when an activity
-      // carries no date, the same way the rail's This-week rows read.
-      secondaryText: [
-        if (a.scheduledOn != null) _fmtDate(a.scheduledOn!),
-        kind?.label ?? a.kindLabel,
-      ].join(' · '),
-      onTap: _adding ? null : () => _addTo(a),
-      trailing: _brandBadge(
-        status?.label ?? a.statusLabel,
-        fill: status?.color ?? a.statusColor,
-      ),
-    );
-  }
-
-  static const List<String> _months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-  ];
-
-  String _fmtDate(DateTime d) => '${_months[d.month - 1]} ${d.day}, ${d.year}';
 }

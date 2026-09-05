@@ -13,6 +13,7 @@ import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/forms/widgets/email_html_preview.dart';
+import 'package:bluebubbles/models/crm/bulk_send_result.dart';
 import 'package:bluebubbles/models/crm/email_template.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
@@ -97,6 +98,10 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
   bool _crmReady = false;
   bool _loadingPreview = false;
   bool _sending = false;
+  // What the last send in this session did. The composer does not close itself
+  // on a send, so this is held until the exec leaves and is handed back then,
+  // for a caller that awaits this route.
+  BulkSendResult? _lastSendResult;
   bool _searching = false;
   bool _searchingCc = false;
   bool _searchingBcc = false;
@@ -922,11 +927,29 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
+    // Captured outside the try so the failure path can name exactly who the
+    // send was attempted against. Manual addresses carry no member id, so a
+    // send to a hand-typed address contributes nothing here, which is correct:
+    // the caller records member touchpoints.
+    var recipientMemberIds = const <String>[];
+    // Three outcomes, not two. Anything that throws before the provider call
+    // never reached an inbox; anything that throws after it (the
+    // last-contacted bookkeeping) did reach one, and recording that as a
+    // failure would be a lie.
+    var attemptedSend = false;
+    var providerAccepted = false;
+
     try {
       final recipients = await _resolveRecipients();
       if (recipients.emails.isEmpty) {
         throw CRMEmailException('No valid email addresses were found.');
       }
+
+      recipientMemberIds = <String>{
+        for (final member in recipients.members) member.id,
+        for (final member in recipients.ccMembers) member.id,
+        for (final member in recipients.bccMembers) member.id,
+      }.toList();
 
       final attachments = <CRMEmailAttachment>[];
       for (final file in _attachments) {
@@ -941,6 +964,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         members: recipients.members,
       );
 
+      attemptedSend = true;
       await _emailService.sendEmail(
         to: recipients.emails,
         subject: subject,
@@ -954,6 +978,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
         recipients: recipientPayloads,
         attachments: attachments,
       );
+      providerAccepted = true;
 
       final Map<String, Member> contactedMembers = {
         for (final member in recipients.members) member.id: member,
@@ -970,6 +995,7 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
       Navigator.of(context).pop();
       setState(() {
         _sending = false;
+        _lastSendResult = BulkSendResult.email(recipientMemberIds);
       });
 
       final totalCount =
@@ -984,13 +1010,40 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
     } catch (error) {
       if (!mounted) return;
       Navigator.of(context).pop();
-      setState(() {
-        _sending = false;
-      });
 
       final message = error is CRMEmailException ? error.message : 'Failed to send email: $error';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+
+      setState(() {
+        _sending = false;
+        // A pre-flight failure never reached the provider, so there is no
+        // outcome to hand back. The other two outcomes did reach it.
+        if (attemptedSend) {
+          _lastSendResult = providerAccepted
+              ? BulkSendResult.email(recipientMemberIds)
+              : BulkSendResult.emailFailed(recipientMemberIds, message);
+        }
+      });
+
+      // A failure NEVER closes the composer. The subject, the body and the
+      // attachments are exactly what a retry needs, and a relay timeout or a
+      // dropped connection is the case where retrying matters most. So say
+      // what happened, in full, and leave the draft alone.
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            providerAccepted
+                ? 'The email went out, but recording who was contacted failed. '
+                    'Do not send it again. $message'
+                : 'Not sent. $message Your draft is still here, so you can fix '
+                    'the problem and send again.',
+          ),
+          duration: const Duration(seconds: 12),
+          action: SnackBarAction(
+            label: 'Dismiss',
+            onPressed: () => messenger.hideCurrentSnackBar(),
+          ),
+        ),
       );
     }
   }
@@ -1646,7 +1699,8 @@ class _BulkEmailScreenState extends State<BulkEmailScreen> {
                     Padding(
                       padding: const EdgeInsets.only(right: 4),
                       child: IconButton(
-                        onPressed: () => Navigator.of(context).maybePop(),
+                        onPressed: () =>
+                            Navigator.of(context).maybePop(_lastSendResult),
                         icon: const Icon(Icons.arrow_back, color: Colors.white),
                         tooltip: 'Back',
                       ),

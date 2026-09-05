@@ -36,47 +36,137 @@ class OutreachRepository {
     }
   }
 
-  /// Insert an activity and, in the same call, its candidate and participant
-  /// links. Returns the new activity id, or null if the CRM is not ready or the
-  /// insert fails. created_by is stamped from the signed-in user.
+  /// Insert an activity with its candidate links and its participants in ONE
+  /// transaction, through the create_outreach_activity RPC. This used to be
+  /// three sequential inserts, so a failure on the second or third left an
+  /// orphan activity with a partial roster and no way to tell. Returns the new
+  /// activity id, or null if the CRM is not ready or the write fails.
+  ///
+  /// [actorUserId] is an auth.users id and [actorMemberId] is a public.members
+  /// id. They are separate parameters because both columns hold bare uuids, and
+  /// a swap would surface only as an opaque 23503 at insert time. The session
+  /// lives in the workspace, not here; the fallback to the signed-in user
+  /// covers created_by alone, and organizer_member_id is anonymous unless a
+  /// caller supplies it, which is how it came to be never set.
   Future<String?> createActivity(
     OutreachActivity activity, {
     List<String> candidateIds = const <String>[],
     List<OutreachParticipantInput> participants = const <OutreachParticipantInput>[],
+    String? actorUserId,
+    String? actorMemberId,
   }) async {
     if (!isReady) return null;
 
     try {
-      final insert = activity.toInsertJson();
-      insert['created_by'] =
-          _client.auth.currentUser?.id ?? activity.createdBy;
+      final payload = activity.toInsertJson();
+      payload['created_by'] =
+          actorUserId ?? _client.auth.currentUser?.id ?? activity.createdBy;
+      // The acting exec organizes it unless the form named someone else.
+      payload['organizer_member_id'] =
+          activity.organizerMemberId ?? actorMemberId;
 
-      final row = await _client
-          .from('outreach_activities')
-          .insert(insert)
-          .select('id')
-          .single();
-      final id = row['id'] as String;
-
-      final uniqueCandidateIds = candidateIds.toSet();
-      if (uniqueCandidateIds.isNotEmpty) {
-        await _client.from('outreach_activity_candidates').insert([
-          for (final candidateId in uniqueCandidateIds)
-            <String, dynamic>{'activity_id': id, 'candidate_id': candidateId},
-        ]);
-      }
-
-      if (participants.isNotEmpty) {
-        await _client.from('outreach_participants').insert([
-          for (final participant in participants) participant.toRow(id),
-        ]);
-      }
-
-      return id;
+      final id = await _client.rpc(
+        'create_outreach_activity',
+        params: <String, dynamic>{
+          'p_activity': payload,
+          'p_candidate_ids': candidateIds.toSet().toList(),
+          'p_participants': _participantRows(participants),
+        },
+      );
+      return id?.toString();
     } catch (e) {
       debugPrint('❌ createActivity: $e');
       return null;
     }
+  }
+
+  /// Deduped on member_id, first entry wins, because a roster assembled from a
+  /// map selection can name the same member twice.
+  List<Map<String, dynamic>> _participantRows(
+      List<OutreachParticipantInput> participants) {
+    final seen = <String>{};
+    return <Map<String, dynamic>>[
+      for (final participant in participants)
+        if (seen.add(participant.memberId)) participant.toJson(),
+    ];
+  }
+
+  /// Write only the keys present in [fields], so the toolkit form can save a
+  /// title edit without resending the roster. id and the server-managed columns
+  /// are stripped, created_by among them: attribution is written once, at
+  /// create, and is never rewritable.
+  ///
+  /// completed_at belongs to [updateStatus] and should not appear here.
+  ///
+  /// Rethrows on failure: this write backs an optimistic UI whose revert path
+  /// depends on the exception surfacing.
+  Future<void> updateActivity(String id, Map<String, dynamic> fields) async {
+    if (!isReady) return;
+
+    final writable = Map<String, dynamic>.from(fields)
+      ..remove('id')
+      ..remove('created_by')
+      ..remove('created_at')
+      ..remove('updated_at');
+    if (writable.isEmpty) return;
+
+    try {
+      await _client.from('outreach_activities').update(writable).eq('id', id);
+    } catch (e) {
+      debugPrint('❌ updateActivity: $e');
+      rethrow;
+    }
+  }
+
+  /// Replace an activity's nominee set through the
+  /// set_outreach_activity_candidates RPC, so an edit that drops one is a
+  /// single transaction rather than a delete that can land while the insert
+  /// fails. An empty list clears every link. Rethrows.
+  Future<void> setActivityCandidates(
+    String activityId,
+    List<String> candidateIds,
+  ) async {
+    if (!isReady) return;
+
+    try {
+      await _client.rpc(
+        'set_outreach_activity_candidates',
+        params: <String, dynamic>{
+          'p_activity_id': activityId,
+          'p_candidate_ids': candidateIds.toSet().toList(),
+        },
+      );
+    } catch (e) {
+      debugPrint('❌ setActivityCandidates: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete an activity. Both join tables cascade, so this takes the roster and
+  /// the nominee links with it; the caller confirms first. Rethrows.
+  Future<void> deleteActivity(String id) async {
+    if (!isReady) return;
+
+    try {
+      await _client.from('outreach_activities').delete().eq('id', id);
+    } catch (e) {
+      debugPrint('❌ deleteActivity: $e');
+      rethrow;
+    }
+  }
+
+  /// One activity by id, or null when it does not exist or the CRM is not
+  /// ready. The Desk needs this after promoting a touchpoint: the RPC returns
+  /// an id and the screen it opens takes a row.
+  Future<OutreachActivity?> activityById(String id) async {
+    if (!isReady) return null;
+
+    final row = await _client
+        .from('outreach_activities')
+        .select()
+        .eq('id', id)
+        .maybeSingle();
+    return row == null ? null : OutreachActivity.fromJson(row);
   }
 
   /// Activities that covered a region, most recent first. `.contains` maps to
@@ -217,6 +307,24 @@ class OutreachRepository {
     }
   }
 
+  /// Take one member off an activity's roster. Their attendance row goes with
+  /// them; there is no soft delete here. Rethrows so the caller's optimistic
+  /// revert fires.
+  Future<void> removeParticipant(String activityId, String memberId) async {
+    if (!isReady) return;
+
+    try {
+      await _client
+          .from('outreach_participants')
+          .delete()
+          .eq('activity_id', activityId)
+          .eq('member_id', memberId);
+    } catch (e) {
+      debugPrint('❌ removeParticipant: $e');
+      rethrow;
+    }
+  }
+
   /// Change a single participant's role. There is no bulk equivalent; the detail
   /// screen's role dropdown calls this per row.
   Future<void> updateParticipantRole(
@@ -242,6 +350,11 @@ class OutreachRepository {
   /// then created_at. Every provided filter is applied; the join-backed
   /// [candidateId]/[memberId] filters are resolved to an activity-id set first,
   /// then folded into a single column-filtered, paged query on the parent table.
+  ///
+  /// [memberId] and [organizerMemberId] ask different questions and are not
+  /// interchangeable: the first is "was on the roster", resolved through
+  /// outreach_participants, and the second is "ran it", a plain column filter.
+  /// MY DESK wants the second (spec 4.4).
   Future<List<OutreachActivity>> listActivities({
     List<String>? statuses,
     String? kind,
@@ -249,6 +362,7 @@ class OutreachRepository {
     String? regionId,
     String? candidateId,
     String? memberId,
+    String? organizerMemberId,
     DateTime? from,
     DateTime? to,
     int limit = 200,
@@ -286,6 +400,9 @@ class OutreachRepository {
       }
       if (kind != null) {
         query = query.eq('kind', kind);
+      }
+      if (organizerMemberId != null) {
+        query = query.eq('organizer_member_id', organizerMemberId);
       }
       if (regionMode != null && regionId != null) {
         query = query.contains(_geoColumn(regionMode), <String>[regionId]);

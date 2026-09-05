@@ -29,10 +29,12 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 //         secondary (white70) on surface .................... 7.03:1
 //         onAccentSoft (white) on accentSoft (white-20%) .... 6.68:1
 //         onEmphasis (unityBlue) on emphasisFill (gold) ..... 7.17:1
-//         onAccent (white) on accent (momentumBlue) ......... 2.75:1
-//     Only the last of those FAILS: 2.75:1 is under the 4.5:1 normal-text bar
-//     and under the 3:1 large-text and graphical-object bar as well. See
-//     [accent] for what that means for call sites.
+//         white on accent (momentumBlue) ................... 2.75:1
+//         accent on surface ................................ 4.55:1
+//         accent on inset .................................. 3.36:1
+//     The last three are why [accent] carries nothing at all: white on it
+//     fails every bar, and it is itself weaker on a row fill than on a panel.
+//     See [accent].
 // ═════════════════════════════════════════════════════════════
 class VolunteersTheme {
   const VolunteersTheme._({
@@ -42,7 +44,6 @@ class VolunteersTheme {
     required this.secondary,
     required this.divider,
     required this.accent,
-    required this.onAccent,
     required this.accentSoft,
     required this.onAccentSoft,
     required this.highlight,
@@ -74,14 +75,17 @@ class VolunteersTheme {
   /// focus rings, spinner and chart strokes, map selection rings. It sits at
   /// 4.55:1 against [surface], which clears the 3:1 bar for graphical objects.
   ///
-  /// DO NOT PUT TEXT ON IT. [onAccent] over [accent] measures 2.75:1, which
-  /// fails the 4.5:1 normal-text bar and the 3:1 large-text bar too. A filled
-  /// button or pill that carries a label uses [emphasisFill] / [onEmphasis]
-  /// instead, which measures 7.17:1. [onAccent] survives because a handful of
-  /// glyph-only call sites outside this file still read it; every one of those
-  /// is a contrast bug of the same 2.75:1 kind and none is text.
+  /// NOTHING MAY SIT ON IT. White over momentumBlue measures 2.75:1, which
+  /// fails the 4.5:1 normal-text bar, the 3:1 large-text bar and the 3:1
+  /// graphical-object bar alike, so it carries neither a label nor a glyph.
+  /// A filled control that carries either uses [emphasisFill] / [onEmphasis],
+  /// which measures 7.17:1. There is deliberately no `onAccent`: the pair
+  /// cannot be made to pass, and naming it only invited call sites to try.
+  ///
+  /// It is also weaker on [inset] than on [surface]: momentumBlue on the
+  /// white-10% row fill is 3.36:1, so even a caption that clears the bar on a
+  /// panel fails on a row. Emphasis text is [highlight] everywhere.
   final Color accent;
-  final Color onAccent;
 
   /// Soft accent surface: the signature white-20% icon tile / selected row.
   /// [onAccentSoft] over [accentSoft] measures 6.68:1.
@@ -100,13 +104,6 @@ class VolunteersTheme {
   final Color emphasisFill;
   final Color onEmphasis;
 
-  /// Older names for the same pair, kept as getters rather than as a second
-  /// set of fields so there is exactly one definition of the colours. The map
-  /// still reads them; fold those call sites onto [emphasisFill] /
-  /// [onEmphasis] and delete these two lines.
-  Color get highlightSoft => emphasisFill;
-  Color get onHighlightSoft => onEmphasis;
-
   /// High-contrast tooltip surface (inverse of the navy panel).
   final Color inverseSurface;
   final Color onInverseSurface;
@@ -123,7 +120,6 @@ class VolunteersTheme {
     secondary: Colors.white70,
     divider: Colors.white.withValues(alpha: 0.1),
     accent: BrandColors.momentumBlue,
-    onAccent: Colors.white,
     accentSoft: Colors.white.withValues(alpha: 0.2),
     onAccentSoft: Colors.white,
     highlight: BrandColors.sunriseGold,

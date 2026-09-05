@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/models/crm/bulk_send_result.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
@@ -95,6 +96,10 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
   List<Member> _previewMembers = [];
   bool _loadingPreview = false;
   bool _sending = false;
+  // What the last send in this session did. The composer does not close itself
+  // on a send, so this is held until the exec leaves and is handed back then,
+  // for a caller that awaits this route.
+  BulkSendResult? _lastSendResult;
   _SendKind _sendKind = _SendKind.none;
   DateTime? _sendStartedAt;
   int _currentProgress = 0;
@@ -595,7 +600,13 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
         _sendStartedAt = null;
       });
 
-      _showBrandedNotice(
+      // The composer stays open after a send. The per-member outcome is held
+      // here and handed back if the exec closes the screen, so a caller that
+      // awaits this route still learns what happened, and the exec decides
+      // when the composing is over.
+      _lastSendResult = BulkSendResult.sms(results);
+
+      await _showBrandedNotice(
         icon: Icons.check_circle_outline_rounded,
         title: 'Bulk message complete',
         lines: ['Successfully sent $successCount of $_totalMessages messages.'],
@@ -1009,7 +1020,8 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
               return Row(
                 children: [
                   IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
+                    onPressed: () =>
+                        Navigator.of(context).maybePop(_lastSendResult),
                     icon: const Icon(Icons.arrow_back_rounded, color: _onGradient),
                     tooltip: 'Back',
                   ),
@@ -2404,12 +2416,12 @@ class _BulkMessageScreenState extends State<BulkMessageScreen> {
     );
   }
 
-  void _showBrandedNotice({
+  Future<void> _showBrandedNotice({
     required IconData icon,
     required String title,
     required List<String> lines,
   }) {
-    _showBrandedDialog<void>(
+    return _showBrandedDialog<void>(
       title: title,
       content: Column(
         mainAxisSize: MainAxisSize.min,

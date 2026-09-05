@@ -4,6 +4,7 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/outreach_activity.dart';
 import 'package:bluebubbles/services/crm/outreach_repository.dart';
 import 'package:bluebubbles/screens/crm/volunteers/activity_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/volunteers/mobilize_models.dart';
 import 'package:bluebubbles/screens/crm/volunteers/organizing_toolkit_sheet.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -143,7 +144,13 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
       _statuses.isNotEmpty || _kind != null || _dateLens != _DateLens.all;
 
   Future<void> _newActivity() async {
-    final saved = await OrganizingToolkitSheet.show(context);
+    // The hub is the one entry point with nothing to seed from: no region, no
+    // nominee, no roster. It says so explicitly rather than relying on a
+    // default, so every caller of the toolkit passes a seed.
+    final saved = await OrganizingToolkitSheet.show(
+      context,
+      seed: const OrganizingSeed.empty(),
+    );
     if (saved == true) _load();
   }
 
@@ -243,9 +250,10 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
     );
   }
 
-  // Gold with navy ink is the emphasis pair: it is the only button fill that
-  // holds 4.5:1 over both ends of the header gradient. Below the compact
-  // breakpoint the label would squeeze the title out, so it drops to the icon.
+  // Gold with navy ink is the emphasis pair: the fill is opaque, so the label
+  // holds 7.17:1 wherever on the header gradient the button lands. Below the
+  // compact breakpoint the label would squeeze the title out, so it drops to
+  // the icon.
   Widget _planButton({required bool narrow}) {
     final style = ElevatedButton.styleFrom(
       backgroundColor: BrandColors.sunriseGold,
@@ -352,9 +360,10 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
     );
   }
 
-  // Selected segments fill with unityBlue rather than a translucent white:
-  // white-on-white-over-gradient drops under 4:1 at the momentumBlue end,
-  // where navy holds 15:1 anywhere on the band.
+  // Selected segments fill with OPAQUE unityBlue rather than a translucent
+  // white: a white label over white at 0.2 alpha measures 2.23:1 at the
+  // momentumBlue end of the band, where white on the opaque navy fill measures
+  // 12.51:1 and does not vary with whatever the band is doing underneath.
   Widget _segment({
     required String label,
     IconData? icon,
@@ -462,8 +471,8 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
   // ── Body ───────────────────────────────────────────────────────
   Widget _body() {
     if (_loading) {
-      return const Center(
-        child: SizedBox(
+      return outreachStateSurface(
+        child: const SizedBox(
           width: 26,
           height: 26,
           child: CircularProgressIndicator(
@@ -583,137 +592,72 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
   }
 
   // ── Empty / error states ───────────────────────────────────────
-  // Both sit on the light BrandedBackground, so every word here is unityBlue
-  // and never white. The empty state is what everyone sees first while the
-  // table is still empty, so it carries the create action rather than a note.
+  // Both are centred, so they render at the MIDDLE of the page, where the
+  // BrandedBackground ground is a mid blue rather than the light one an
+  // earlier comment here asserted. unityBlue measures 3.08:1 against that
+  // middle and 1.63:1 at the right edge, so this copy was close to invisible
+  // over most of a resizable window. Both now sit on outreachStateSurface, an
+  // opaque white card, which is the ground every ratio quoted on that helper
+  // is measured against and is what makes the unityBlue and unityBlue at 0.7
+  // alpha foregrounds below sound.
+  //
+  // The empty state is what everyone sees first while the table is still
+  // empty, so it carries the create action rather than a note.
   Widget _emptyState() {
     final filtered = _filtersActive;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: BrandColors.momentumBlue.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                filtered ? Icons.filter_alt_off_outlined : Icons.event_available,
-                size: 56,
-                color: BrandColors.unityBlue,
-              ),
+    return outreachStateSurface(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: BrandColors.momentumBlue.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: 20),
-            Text(
-              filtered
-                  ? 'No activities match these filters'
-                  : 'No organizing planned yet',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: BrandColors.unityBlue,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Icon(
+              filtered ? Icons.filter_alt_off_outlined : Icons.event_available,
+              size: 56,
+              color: BrandColors.unityBlue,
             ),
-            const SizedBox(height: 8),
-            Text(
-              filtered
-                  ? 'Clear a status, kind or date filter to widen the search.'
-                  : 'Canvasses, phone banks and days of action live here. Plan '
-                      'the first one and the roster, attendance and nominee '
-                      'coverage follow.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: BrandColors.unityBlue.withValues(alpha: 0.7),
-                fontSize: 14,
-                height: 1.4,
-              ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            filtered
+                ? 'No activities match these filters'
+                : 'No organizing planned yet',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: BrandColors.unityBlue,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(height: 20),
-            if (filtered)
-              ElevatedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _statuses.clear();
-                    _kind = null;
-                    _dateLens = _DateLens.all;
-                  });
-                  _load();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: BrandColors.unityBlue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                icon: const Icon(Icons.filter_alt_off_outlined),
-                label: const Text('Clear filters'),
-              )
-            else
-              ElevatedButton.icon(
-                onPressed: _newActivity,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: BrandColors.sunriseGold,
-                  foregroundColor: BrandColors.unityBlue,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                icon: const Icon(Icons.add),
-                label: const Text('Plan the first activity',
-                    style: TextStyle(fontWeight: FontWeight.w800)),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _errorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: BrandColors.error.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.error_outline,
-                  size: 56, color: BrandColors.error),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            filtered
+                ? 'Clear a status, kind or date filter to widen the search.'
+                : 'Canvasses, phone banks and days of action live here. Plan '
+                    'the first one and the roster, attendance and nominee '
+                    'coverage follow.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: BrandColors.unityBlue.withValues(alpha: 0.7),
+              fontSize: 14,
+              height: 1.4,
             ),
-            const SizedBox(height: 20),
-            const Text(
-              'Could not load activities',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: BrandColors.unityBlue,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'The activity list could not be read. Check the connection and '
-              'try again.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: BrandColors.unityBlue.withValues(alpha: 0.7),
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 20),
+          ),
+          const SizedBox(height: 20),
+          if (filtered)
             ElevatedButton.icon(
-              onPressed: _load,
+              onPressed: () {
+                setState(() {
+                  _statuses.clear();
+                  _kind = null;
+                  _dateLens = _DateLens.all;
+                });
+                _load();
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: BrandColors.unityBlue,
                 foregroundColor: Colors.white,
@@ -722,11 +666,78 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
+              icon: const Icon(Icons.filter_alt_off_outlined),
+              label: const Text('Clear filters'),
+            )
+          else
+            ElevatedButton.icon(
+              onPressed: _newActivity,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: BrandColors.sunriseGold,
+                foregroundColor: BrandColors.unityBlue,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.add),
+              label: const Text('Plan the first activity',
+                  style: TextStyle(fontWeight: FontWeight.w800)),
             ),
-          ],
-        ),
+        ],
+      ),
+    );
+  }
+
+  Widget _errorState() {
+    return outreachStateSurface(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: BrandColors.error.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.error_outline,
+                size: 56, color: BrandColors.error),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Could not load activities',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: BrandColors.unityBlue,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'The activity list could not be read. Check the connection and '
+            'try again.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: BrandColors.unityBlue.withValues(alpha: 0.7),
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: _load,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: BrandColors.unityBlue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 20, vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+          ),
+        ],
       ),
     );
   }
@@ -740,8 +751,8 @@ class _ActivitiesHubScreenState extends State<ActivitiesHubScreen> {
   // simply yield an empty column.
   Widget _board() {
     if (_loading) {
-      return const Center(
-        child: SizedBox(
+      return outreachStateSurface(
+        child: const SizedBox(
           width: 26,
           height: 26,
           child: CircularProgressIndicator(

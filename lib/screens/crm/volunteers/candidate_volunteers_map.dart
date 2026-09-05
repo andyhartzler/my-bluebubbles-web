@@ -17,10 +17,8 @@ import 'package:bluebubbles/services/crm/crosswalk_repository.dart';
 import 'package:bluebubbles/services/crm/election_results_repository.dart';
 import 'package:bluebubbles/services/crm/ge_nominee_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
-import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
-import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
 
-import 'organizing_toolkit_sheet.dart';
+import 'mobilize_models.dart';
 import 'volunteers_map_models.dart';
 import 'volunteers_detail_panel.dart';
 import 'volunteers_theme.dart';
@@ -36,10 +34,43 @@ import 'volunteers_theme.dart';
 // ═══════════════════════════════════════════════════════════════
 
 const double _kDesktopBreakpoint = 1200;
-const double _kPanelWidth = 400; // 360–440 rail per spec
+const double _kPanelWidth = 400; // 360 to 440 rail per spec
+
+/// "The Desk wrote something the map is showing."
+///
+/// The map used to learn this from a route pop, twice over: `_textMembers` /
+/// `_emailMembers` pushed a bulk screen and reloaded the region's members when
+/// it came back, and `_startPlay` reloaded the activity coverage when its modal
+/// reported a save. Both routes are gone. The Desk is a SIBLING of the map
+/// inside the workspace's IndexedStack, not a route on top of it, so nothing is
+/// ever popped back to and neither reload has a trigger any more.
+///
+/// Without this the map lies quietly: `last_contacted` stays at its pre-send
+/// value in the members pane's filter and its two recency sorts, and a region
+/// that just had an activity planned still reads as having none.
+///
+/// One signal rather than two, because both refreshes are a single cheap query
+/// fired only by a deliberate exec action, and two notifiers would mean two
+/// things for the Desk to remember to call.
+class DeskChanges {
+  DeskChanges._();
+
+  /// Bumped once per Desk write: a send that resolved, or an activity saved.
+  /// The value carries no meaning, only the change does.
+  static final ValueNotifier<int> written = ValueNotifier<int>(0);
+
+  /// Called by the Desk once a send resolves (delivered or failed), and once an
+  /// activity is saved.
+  static void notifyWritten() => written.value++;
+}
 
 class CandidateVolunteersMap extends StatefulWidget {
-  const CandidateVolunteersMap({super.key, this.height, this.onOpenActivities});
+  const CandidateVolunteersMap({
+    super.key,
+    this.height,
+    this.onOpenActivities,
+    this.onMobilize,
+  });
 
   /// Optional fixed height. When null (the default) the widget fills the
   /// available vertical space via an Expanded/SizedBox.expand parent.
@@ -49,6 +80,13 @@ class CandidateVolunteersMap extends StatefulWidget {
   /// footer. The workspace shell flips its IndexedStack to the Activities tab.
   /// Null when mounted outside the shell - the link is then hidden.
   final VoidCallback? onOpenActivities;
+
+  /// Fired by the members pane's MOBILIZE button. The workspace shell parks the
+  /// request on its handoff notifier and flips the IndexedStack to the Desk.
+  /// Null when mounted outside the shell, exactly like [onOpenActivities]; the
+  /// button is then inert rather than crashing, and the shell is the only real
+  /// mount site.
+  final void Function(MobilizeRequest request)? onMobilize;
 
   @override
   State<CandidateVolunteersMap> createState() => _CandidateVolunteersMapState();
@@ -93,6 +131,11 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   bool _loadingCandidates = false;
   int _selectionSeq = 0; // guards out-of-order async loads
 
+  /// The member (and, in county mode, candidate) loads the current selection
+  /// kicked off. Awaited by the organizing plays, which select a region and
+  /// then hand the Desk that region's real roster rather than an empty one.
+  Future<void>? _selectionLoad;
+
   // ── Interaction ──
   String? _hoveredId;
 
@@ -131,15 +174,35 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
           if (mounted) setState(() => _cameraMoving = false);
         }
       });
+    DeskChanges.written.addListener(_refreshAfterDeskWrite);
     _bootstrap();
   }
 
   @override
   void dispose() {
+    DeskChanges.written.removeListener(_refreshAfterDeskWrite);
     _pulseController.dispose();
     _cameraController.dispose();
     _mapController.dispose();
     super.dispose();
+  }
+
+  /// The two reloads the route pops used to do (see [DeskChanges]).
+  ///
+  /// Members: the same repository call the selection made, under the same
+  /// sequence number, so a reply that lands after the exec has moved to another
+  /// region is dropped exactly like any other stale load. [_loadMembers] never
+  /// raises the loading flag, so the list refreshes in place with no spinner
+  /// flash and no lost selection: the panel is keyed by region, and selection
+  /// is held by member id, not by object identity.
+  ///
+  /// Coverage: the one activity query, so the dots, the region chip and the
+  /// "this week" rail pick up an activity the Desk just planned.
+  void _refreshAfterDeskWrite() {
+    if (!mounted) return;
+    final id = _selectedId;
+    if (id != null) _loadMembers(_mode, id, _selectionSeq);
+    _loadActivityCoverage();
   }
 
   // ── Data load ──────────────────────────────────────────────────
@@ -422,14 +485,15 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       final fit = _fittedCamera(region);
       _flyTo(fit.center, fit.zoom);
     }
-    _loadMembers(mode, id, seq);
-    if (!mode.isDistrict) _loadCountyGroups(id, seq);
+    final loads = <Future<void>>[_loadMembers(mode, id, seq)];
+    if (!mode.isDistrict) loads.add(_loadCountyGroups(id, seq));
+    _selectionLoad = Future.wait(loads);
   }
 
   /// Frame the selected region's polygon in the current viewport: build a
   /// [LatLngBounds] over all of its ring points, fit it with 48px padding via
   /// flutter_map's [CameraFit], and clamp the derived zoom to the map's
-  /// 6.0–12.0 range. The camera then flies to that center+zoom with the same
+  /// 6.0 to 12.0 range. The camera then flies to that center+zoom with the same
   /// smooth tween used everywhere else.
   ({LatLng center, double zoom}) _fittedCamera(RegionData region) {
     var minLat = double.infinity, maxLat = -double.infinity;
@@ -624,68 +688,26 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     if (id != _hoveredId) setState(() => _hoveredId = id);
   }
 
-  // ── Member actions ─────────────────────────────────────────────
-  Future<void> _textMembers(List<Member> people) async {
-    final valid = people.where((m) => m.canContact).toList();
-    if (valid.isEmpty) {
-      _snack('None of those members can be texted.');
-      return;
-    }
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => BulkMessageScreen(initialManualMembers: valid),
+  // ── Mobilize handoff ───────────────────────────────────────────
+  /// The map no longer pushes a bulk screen or opens the toolkit sheet from the
+  /// members pane: both live on the Desk now. This is the one seam left, and it
+  /// only attaches the region's real candidate profiles before handing the
+  /// request up. The panel cannot do that itself without duplicating the
+  /// result-row-to-Candidate classification the map already owns.
+  void _handleMobilize(MobilizeRequest request) {
+    final handoff = widget.onMobilize;
+    if (handoff == null) return;
+    handoff(MobilizeRequest(
+      members: request.members,
+      candidates: request.candidates.isEmpty
+          ? _selectedCandidates()
+          : request.candidates,
+      regionMode: request.regionMode,
+      regionId: request.regionId,
+      intent: request.intent,
+      seedKind: request.seedKind,
+      seedTitle: request.seedTitle,
     ));
-    if (!mounted) return;
-    _offerLogIt(valid, kind: 'text_bank', channel: 'sms');
-    _refreshMembersAfterContact();
-  }
-
-  Future<void> _emailMembers(List<Member> people) async {
-    final valid =
-        people.where((m) => (m.preferredEmail ?? '').isNotEmpty).toList();
-    if (valid.isEmpty) {
-      _snack('None of those members have an email on file.');
-      return;
-    }
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => BulkEmailScreen(initialManualMembers: valid),
-    ));
-    if (!mounted) return;
-    _offerLogIt(valid, kind: 'email_blast', channel: 'email');
-    _refreshMembersAfterContact();
-  }
-
-  /// The bulk text/email screens stamp `last_contacted`. Reload the selected
-  /// region's members so the "never/not contacted" filters, recently-contacted
-  /// sort, and header counts reflect it instead of going stale until reselect.
-  void _refreshMembersAfterContact() {
-    final id = _selectedId;
-    if (id == null) return;
-    _loadMembers(_mode, id, _selectionSeq);
-  }
-
-  void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  // ── Outreach logging ───────────────────────────────────────────
-  /// The four district lists for the current selection, one populated by the
-  /// selected region's id (county mode → counties, etc.), the rest empty.
-  ({List<String> counties, List<String> cds, List<String> sds, List<String> hds})
-      _selectedGeo() {
-    final id = _selectedId;
-    if (id == null) {
-      return (counties: const [], cds: const [], sds: const [], hds: const []);
-    }
-    switch (_mode) {
-      case MapMode.county:
-        return (counties: [id], cds: const [], sds: const [], hds: const []);
-      case MapMode.congressional:
-        return (counties: const [], cds: [id], sds: const [], hds: const []);
-      case MapMode.senate:
-        return (counties: const [], cds: const [], sds: [id], hds: const []);
-      case MapMode.house:
-        return (counties: const [], cds: const [], sds: const [], hds: [id]);
-    }
   }
 
   /// Every real candidate profile tied to the currently selected region.
@@ -694,49 +716,6 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       .map((r) => r.candidate)
       .whereType<Candidate>()
       .toList();
-
-  Future<void> _openOutreachSheet(
-    List<Member> participants, {
-    String? kind,
-    String? channel,
-    String? status,
-    String? titleSuggestion,
-  }) async {
-    final geo = _selectedGeo();
-    final saved = await OrganizingToolkitSheet.show(
-      context,
-      counties: geo.counties,
-      congressionalDistricts: geo.cds,
-      senateDistricts: geo.sds,
-      houseDistricts: geo.hds,
-      candidates: _selectedCandidates(),
-      participants: participants,
-      kind: kind,
-      channel: channel,
-      status: status,
-      titleSuggestion: titleSuggestion,
-    );
-    // A save landed → new dots and counts must appear. Re-run the one query.
-    if (saved == true) await _loadActivityCoverage();
-  }
-
-  /// Post-send prompt: offer to record the just-completed bulk send as a
-  /// completed activity, prefilled with its channel and recipients.
-  void _offerLogIt(List<Member> participants,
-      {required String kind, required String channel}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: const Text('Save this as a completed activity?'),
-      action: SnackBarAction(
-        label: 'Save it',
-        onPressed: () => _openOutreachSheet(
-          participants,
-          kind: kind,
-          channel: channel,
-          status: 'completed',
-        ),
-      ),
-    ));
-  }
 
   // ── Search hits ────────────────────────────────────────────────
   List<RegionSearchHit> _allSearchHits() {
@@ -1002,10 +981,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       onHighlightYoungDems: _highlightYoungDems,
       onClose: _clearSelection,
       onSelectHot: _selectRegion,
-      onTextMembers: _textMembers,
-      onEmailMembers: _emailMembers,
-      onLogOutreach:
-          _selectedId == null ? null : (members) => _openOutreachSheet(members),
+      onMobilize: _handleMobilize,
       scrollController: scrollController,
       showCloseButton: showClose,
     );
@@ -1044,16 +1020,24 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     if (best != null) _changeMode(best);
   }
 
-  /// Real Candidate profiles tied to a district (for seeding a play's sheet).
+  /// Real Candidate profiles tied to a district, attached to a play's handoff
+  /// so the Desk's PLAN section arrives with the nominees already on it.
   List<Candidate> _nomineeCandidates(String officeType, String id) =>
       _rowsForDistrict(officeType, id)
           .map((r) => r.candidate)
           .whereType<Candidate>()
           .toList();
 
-  /// Open the toolkit sheet pre-seeded for a single region + nominee, from an
-  /// Organizing Play card. Reloads activity coverage on save so the new dots
-  /// and "this week" rows appear.
+  /// Start an Organizing Play. The play names a region, a kind and a title, and
+  /// all three go to the Desk's PLAN section: it used to raise the toolkit
+  /// sheet as a modal on top of the map, which is the popup spec 2.2 moved off
+  /// it.
+  ///
+  /// The region is SELECTED first rather than merely named. That frames it on
+  /// the camera, fills the panel behind the Desk so "Change" returns to it, and
+  /// loads its members, which is what lets the request carry a real audience.
+  /// Waiting on [_selectionLoad] is what makes the audience non-empty; without
+  /// it the Desk would arrive with the roster still in flight.
   Future<void> _startPlay({
     required MapMode mode,
     required String id,
@@ -1061,18 +1045,19 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     required String title,
     List<Candidate> candidates = const [],
   }) async {
-    final saved = await OrganizingToolkitSheet.show(
-      context,
-      counties: mode == MapMode.county ? [id] : const [],
-      congressionalDistricts: mode == MapMode.congressional ? [id] : const [],
-      senateDistricts: mode == MapMode.senate ? [id] : const [],
-      houseDistricts: mode == MapMode.house ? [id] : const [],
+    if (widget.onMobilize == null) return;
+    if (_selectedId != id || _mode != mode) _selectRegion(mode, id);
+    await _selectionLoad;
+    if (!mounted) return;
+    _handleMobilize(MobilizeRequest(
+      members: _selectedMembers,
       candidates: candidates,
-      participants: const [],
-      kind: kind,
-      titleSuggestion: title,
-    );
-    if (saved == true) await _loadActivityCoverage();
+      regionMode: mode,
+      regionId: id,
+      intent: MobilizeIntent.plan,
+      seedKind: kind,
+      seedTitle: title,
+    ));
   }
 
   /// Three deterministic organizing ideas computed from data already in memory.
@@ -1204,7 +1189,6 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
 
   // ── Map + floating chrome ──────────────────────────────────────
   Widget _mapStack(BuildContext context) {
-    final dark = _isDark;
     final vt = _vt;
     if (_loadingBase && _activeRegions.isEmpty) {
       return Container(
@@ -1234,7 +1218,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
               onExit: (_) {
                 if (_hoveredId != null) setState(() => _hoveredId = null);
               },
-              child: _buildFlutterMap(reduceMotion, dark),
+              child: _buildFlutterMap(reduceMotion),
             ),
           ),
 
@@ -1270,7 +1254,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
               top: 16,
               left: 0,
               right: 0,
-              child: Center(child: _regionTitleLockup(dark)),
+              child: Center(child: _regionTitleLockup()),
             ),
 
           // bottom-left: member-density legend
@@ -1296,7 +1280,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     );
   }
 
-  Widget _buildFlutterMap(bool reduceMotion, bool dark) {
+  Widget _buildFlutterMap(bool reduceMotion) {
     final vt = _vt;
     final maskColor = vt.mask;
     final polygons = <Polygon>[];
@@ -1422,7 +1406,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: vt.highlightSoft,
+        color: vt.emphasisFill,
         border: Border.all(color: vt.surface, width: 2),
         boxShadow: [
           BoxShadow(
@@ -1431,7 +1415,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
               spreadRadius: 1),
         ],
       ),
-      child: Icon(Icons.star_rounded, color: vt.onHighlightSoft, size: 16),
+      child: Icon(Icons.star_rounded, color: vt.onEmphasis, size: 16),
     );
   }
 
@@ -1648,10 +1632,11 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (youngDem) ...[
-                    // Paint on the inverseSurface tooltip: use the guaranteed
-                    // contrasting onInverseSurface role, not scheme.tertiary
-                    // (vt.highlight), which washes out on a light dark-mode
-                    // inverseSurface.
+                    // This paints on the inverse (white) tooltip, not on the
+                    // navy panel, so it takes onInverseSurface rather than
+                    // vt.highlight: gold on white is 1.75:1 and vanishes.
+                    // unityBlue on white is 12.51:1, and the 0.82 line below
+                    // still measures 7.11:1.
                     Icon(Icons.star_rounded,
                         size: 12, color: vt.onInverseSurface),
                     const SizedBox(width: 4),
@@ -1671,12 +1656,12 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   }
 
   // ── Region title lockup (top-center, selected) ─────────────────
-  /// Translucent lockup over the map: overline + region title, plus a
-  /// highlight-tinted "n activities here" chip when n > 0. Wrapped in
-  /// [IgnorePointer] so it never swallows a map tap. Both themes clear 4.5:1
-  /// (onSurface title on the glass surface; onTertiaryContainer chip text on
-  /// the tertiaryContainer chip).
-  Widget _regionTitleLockup(bool dark) {
+  /// Translucent lockup over the map: overline + region title, plus a gold
+  /// "n activities here" chip when n > 0. Wrapped in [IgnorePointer] so it
+  /// never swallows a map tap. The glass is 90% surface over the map mask, so
+  /// the title (white) clears 4.5:1 comfortably and the chip is the emphasis
+  /// pair at 7.17:1.
+  Widget _regionTitleLockup() {
     final vt = _vt;
     final id = _selectedId;
     if (id == null) return const SizedBox.shrink();
@@ -1718,7 +1703,7 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: vt.highlightSoft,
+        color: vt.emphasisFill,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -1728,14 +1713,14 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
             width: 7,
             height: 7,
             decoration: BoxDecoration(
-                shape: BoxShape.circle, color: vt.onHighlightSoft),
+                shape: BoxShape.circle, color: vt.onEmphasis),
           ),
           const SizedBox(width: 6),
           Text('$n ${n == 1 ? 'activity' : 'activities'} here',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: vt.onHighlightSoft,
+                color: vt.onEmphasis,
               )),
         ],
       ),
@@ -1743,7 +1728,6 @@ class _CandidateVolunteersMapState extends State<CandidateVolunteersMap>
   }
 
   // ── Glass chrome helper ────────────────────────────────────────
-  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
   VolunteersTheme get _vt => VolunteersTheme.of(context);
 
   Widget _glass({required double radius, required Widget child}) {
@@ -1811,7 +1795,7 @@ class ChoroplethLegend extends StatelessWidget {
             width: 160,
             height: 10,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(3),
+              borderRadius: BorderRadius.circular(4),
               child: Row(
                 children: [
                   for (var bin = 0; bin < 5; bin++)
@@ -1938,7 +1922,7 @@ class _RegionSearchField extends StatelessWidget {
               margin: const EdgeInsets.only(top: 6),
               decoration: BoxDecoration(
                 color: panelBg,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: vt.divider, width: 1),
                 boxShadow: [
                   BoxShadow(
@@ -2024,7 +2008,7 @@ class _MobileSheet extends StatelessWidget {
             height: 4,
             decoration: BoxDecoration(
               color: vt.divider,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(4),
             ),
           ),
           const SizedBox(height: 6),

@@ -42,6 +42,16 @@ class OutreachDisplay {
       statuses[status]?.color ?? const Color(0xFF6B7280);
 }
 
+/// Sentinel for [OutreachActivity.copyWith]: tells "not passed" apart from
+/// "set to null" so a nullable field can be cleared rather than only replaced.
+/// Its own private type, not a bare Object(), because const Object() instances
+/// are canonicalized and would compare identical to a caller's.
+class _Unchanged {
+  const _Unchanged();
+}
+
+const _Unchanged _unchanged = _Unchanged();
+
 /// One field outreach activity. Geometry-free: the four district arrays carry
 /// bare-digit district numbers and [counties] carries county names, matching
 /// the map's own region keys.
@@ -125,7 +135,8 @@ class OutreachActivity {
       };
 
   /// Writable columns only. Omits id/created_at/updated_at so the database
-  /// defaults them; the repository fills created_by from the signed-in user.
+  /// defaults them; the repository overwrites created_by and
+  /// organizer_member_id with the acting exec's two ids.
   Map<String, dynamic> toInsertJson() => <String, dynamic>{
         'kind': kind,
         'title': title,
@@ -142,24 +153,53 @@ class OutreachActivity {
         'created_by': createdBy,
       };
 
+  /// Every editable field, including the ones that can be CLEARED. Passing a
+  /// literal null to a [_unchanged]-defaulted parameter sets that field to
+  /// null; omitting the parameter leaves it alone. Without that distinction an
+  /// edit could only ever replace a date or a description, never remove one,
+  /// and `copyWith(status: 'planned', completedAt: null)` would silently keep a
+  /// stale completion timestamp on the reopened activity.
+  ///
+  /// id, created_by, created_at and updated_at are not editable and are carried
+  /// through unchanged: created_by is never rewritable and the other three are
+  /// the database's to set.
   OutreachActivity copyWith({
+    String? kind,
+    String? title,
+    Object? description = _unchanged,
     String? status,
-    DateTime? completedAt,
+    Object? channel = _unchanged,
+    Object? scheduledOn = _unchanged,
+    Object? completedAt = _unchanged,
+    List<String>? counties,
+    List<String>? congressionalDistricts,
+    List<String>? senateDistricts,
+    List<String>? houseDistricts,
+    Object? organizerMemberId = _unchanged,
   }) {
     return OutreachActivity(
       id: id,
-      kind: kind,
-      title: title,
-      description: description,
+      kind: kind ?? this.kind,
+      title: title ?? this.title,
+      description: identical(description, _unchanged)
+          ? this.description
+          : description as String?,
       status: status ?? this.status,
-      channel: channel,
-      scheduledOn: scheduledOn,
-      completedAt: completedAt ?? this.completedAt,
-      counties: counties,
-      congressionalDistricts: congressionalDistricts,
-      senateDistricts: senateDistricts,
-      houseDistricts: houseDistricts,
-      organizerMemberId: organizerMemberId,
+      channel: identical(channel, _unchanged) ? this.channel : channel as String?,
+      scheduledOn: identical(scheduledOn, _unchanged)
+          ? this.scheduledOn
+          : scheduledOn as DateTime?,
+      completedAt: identical(completedAt, _unchanged)
+          ? this.completedAt
+          : completedAt as DateTime?,
+      counties: counties ?? this.counties,
+      congressionalDistricts:
+          congressionalDistricts ?? this.congressionalDistricts,
+      senateDistricts: senateDistricts ?? this.senateDistricts,
+      houseDistricts: houseDistricts ?? this.houseDistricts,
+      organizerMemberId: identical(organizerMemberId, _unchanged)
+          ? this.organizerMemberId
+          : organizerMemberId as String?,
       createdBy: createdBy,
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -209,8 +249,9 @@ class OutreachParticipant {
       };
 }
 
-/// The fields the UI supplies when adding a participant to a new activity. The
-/// repository stamps activity_id at insert time.
+/// The fields the UI supplies when adding a participant. activity_id is
+/// stamped by create_outreach_activity for a new activity, and by the
+/// repository for one that already exists.
 class OutreachParticipantInput {
   const OutreachParticipantInput({
     required this.memberId,
@@ -222,11 +263,18 @@ class OutreachParticipantInput {
   final String role;
   final bool? attended;
 
-  /// One insert row for public.outreach_participants under [activityId].
-  Map<String, dynamic> toRow(String activityId) => <String, dynamic>{
-        'activity_id': activityId,
+  /// One entry of create_outreach_activity's p_participants array. The RPC
+  /// stamps activity_id from the row it just inserted, so it is absent here.
+  Map<String, dynamic> toJson() => <String, dynamic>{
         'member_id': memberId,
         'role': role,
         'attended': attended,
+      };
+
+  /// One insert row for public.outreach_participants under [activityId], for
+  /// the add-to-an-existing-activity path that already has the id.
+  Map<String, dynamic> toRow(String activityId) => <String, dynamic>{
+        'activity_id': activityId,
+        ...toJson(),
       };
 }
