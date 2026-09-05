@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/event.dart' show Event;
 import 'package:bluebubbles/models/crm/chapter.dart';
 import 'package:bluebubbles/models/crm/donor.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 
 /// Entity type for picker dialog
 enum EntityPickerType {
@@ -313,17 +313,15 @@ class _EntityPickerDialogState<T> extends State<EntityPickerDialog<T>> {
 
   Widget _buildMemberTile(Member member) {
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: _accentColor.withOpacity(0.1),
-        backgroundImage: member.primaryProfilePhotoUrl != null
-            ? CachedNetworkImageProvider(member.primaryProfilePhotoUrl!)
-            : null,
-        child: member.primaryProfilePhotoUrl == null
-            ? Text(
-                member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-                style: TextStyle(color: _accentColor),
-              )
-            : null,
+      // CorsAwareAvatar, not CircleAvatar plus a cached provider: the old
+      // form drew initials only when the url was null, so a 404 or a CORS
+      // refusal left an empty disc. White on the opaque unityBlue default is
+      // 12.51:1, against accent ink on a 10% accent tile that measured well
+      // under the 4.5:1 floor.
+      leading: CorsAwareAvatar(
+        imageUrl: member.effectiveAvatarUrl,
+        radius: 20,
+        fallbackText: member.name,
       ),
       title: Text(member.name),
       subtitle: member.preferredEmail != null

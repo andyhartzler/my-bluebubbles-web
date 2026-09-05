@@ -16,6 +16,36 @@ import 'package:universal_io/io.dart' as io;
 
 import 'supabase_service.dart';
 
+/// A member row together with the raw `updated_at` string that row carried.
+///
+/// [Member] does not model `updated_at`, so the value is kept verbatim as the
+/// server sent it. That string is the compare-and-swap token: a guarded write
+/// sends it back in the filter, so the write matches only the exact row
+/// version the caller was looking at.
+class MemberSnapshot {
+  const MemberSnapshot({required this.member, required this.updatedAt});
+
+  final Member member;
+
+  /// `public.members.updated_at`, maintained by the BEFORE UPDATE trigger
+  /// trg_members_updated_at (public.tg_set_updated_at), so it moves on every
+  /// update. Null only if the column was absent from the response.
+  final String? updatedAt;
+}
+
+/// Thrown when a guarded write matched no row, meaning `updated_at` moved
+/// between the read the caller edited and the write. The row was NOT changed.
+class StaleMemberWriteException implements Exception {
+  const StaleMemberWriteException(this.memberId);
+
+  final String memberId;
+
+  @override
+  String toString() =>
+      'This member was changed by someone else after you opened the editor, '
+      'so nothing was saved.';
+}
+
 /// Repository for member CRUD operations
 /// All Supabase queries for members go through here
 class MemberRepository {
@@ -55,6 +85,7 @@ class MemberRepository {
     'executive_committee',
     'executive_title',
     'executive_role',
+    'avatar_url',
     'profile_pictures',
     'last_contacted',
     'date_joined',
@@ -399,6 +430,31 @@ class MemberRepository {
     }
   }
 
+  /// Get a member by id together with the row version to guard writes with.
+  ///
+  /// Same single row as [getMemberById]; the difference is that the raw
+  /// `updated_at` survives instead of being dropped by [Member.fromJson].
+  /// Callers that will later save an edit must read through here, because the
+  /// token and the values being diffed have to come from one read.
+  Future<MemberSnapshot?> getMemberSnapshotById(String id) async {
+    if (!_isReady) return null;
+
+    try {
+      final response =
+          await _readClient.from('members').select().eq('id', id).single();
+
+      final json = _coerceJsonMap(response);
+      if (json == null) return null;
+      return MemberSnapshot(
+        member: Member.fromJson(json),
+        updatedAt: json['updated_at']?.toString(),
+      );
+    } catch (e) {
+      debugPrint('❌ Error fetching member snapshot by ID: $e');
+      return null;
+    }
+  }
+
   /// Fetch full member records for a set of ids (order not guaranteed).
   /// Used by roster-driven bulk actions that hold member ids but need Member
   /// objects to hand to the bulk message/email screens.
@@ -481,7 +537,7 @@ class MemberRepository {
 
       final response = await client
           .from('members')
-          .select('email, profile_pictures')
+          .select('email, avatar_url, profile_pictures')
           .inFilter('email', validEmails);
 
       debugPrint('[MemberRepository] Got ${(response as List).length} members with profile_pictures data');
@@ -490,6 +546,16 @@ class MemberRepository {
       for (final row in response as List<dynamic>) {
         final email = row['email']?.toString().toLowerCase();
         if (email == null || email.isEmpty) continue;
+
+        // The one resolver, in the same order as Member.effectiveAvatarUrl:
+        // an uploaded avatar_url wins, then the primary profile_pictures
+        // entry. Selecting profile_pictures alone strands every member who
+        // uploaded a headshot through the portal's AvatarUploadDialog.
+        final uploaded = row['avatar_url']?.toString().trim();
+        if (uploaded != null && uploaded.isNotEmpty) {
+          result[email] = uploaded;
+          continue;
+        }
 
         final profilePictures = row['profile_pictures'];
         if (profilePictures == null) continue;
@@ -1019,46 +1085,78 @@ class MemberRepository {
     }
   }
 
-  /// Update member's intro sent timestamp
-  Future<void> markIntroSent(String memberId) async {
-    if (!_isReady) return;
+  /// Update member's intro sent timestamp.
+  /// Returns true if the write succeeded. It used to return void after
+  /// swallowing its own exception, which made a failed write indistinguishable
+  /// from a successful one: a member whose intro_sent_at never landed would be
+  /// sent the intro again by the next bulk run while the send log said it had
+  /// already gone out.
+  Future<bool> markIntroSent(String memberId) async {
+    if (!_isReady) return false;
 
     try {
       await _writeClient
           .from('members')
           .update({'intro_sent_at': DateTime.now().toUtc().toIso8601String()})
           .eq('id', memberId);
+      return true;
     } catch (e) {
       debugPrint('❌ Error marking intro sent: $e');
+      return false;
     }
   }
 
-  /// Update member's opt-out status
-  Future<void> updateOptOutStatus(
+  /// Update member's opt-out status and return the row the server actually
+  /// holds afterwards.
+  ///
+  /// This deliberately has no catch. It used to swallow every exception, log
+  /// it to the console and return void, so the caller's await could not fail
+  /// and the UI merged the intended state locally. A member still opted IN in
+  /// the database was then displayed as opted OUT and kept receiving texts.
+  /// Anything that stops the write now reaches the caller: an RLS rejection or
+  /// a network error as the thrown PostgrestException, an uninitialised client
+  /// or an id that matched no row as a [StateError]. The returned [Member] is
+  /// built from the row the database sent back, so callers must display that
+  /// and never their own intent.
+  Future<MemberSnapshot> updateOptOutStatus(
     String memberId,
     bool optOut, {
     String? reason,
   }) async {
-    if (!_isReady) return;
-
-    try {
-      final data = {
-        'opt_out': optOut,
-        optOut ? 'opt_out_date' : 'opt_in_date':
-            DateTime.now().toUtc().toIso8601String(),
-      };
-
-      if (reason != null) {
-        data['opt_out_reason'] = reason;
-      }
-
-      await _writeClient
-          .from('members')
-          .update(data)
-          .eq('id', memberId);
-    } catch (e) {
-      debugPrint('❌ Error updating opt-out status: $e');
+    if (!_isReady) {
+      throw StateError(
+        'Supabase is not connected, so the opt-out change was not saved.',
+      );
     }
+
+    final data = {
+      'opt_out': optOut,
+      optOut ? 'opt_out_date' : 'opt_in_date':
+          DateTime.now().toUtc().toIso8601String(),
+    };
+
+    if (reason != null) {
+      data['opt_out_reason'] = reason;
+    }
+
+    final response = await _writeClient
+        .from('members')
+        .update(data)
+        .eq('id', memberId)
+        .select()
+        .maybeSingle();
+
+    final json = _coerceJsonMap(response);
+    if (json == null) {
+      throw StateError(
+        'The opt-out change matched no member row, so nothing was saved.',
+      );
+    }
+
+    return MemberSnapshot(
+      member: Member.fromJson(json),
+      updatedAt: json['updated_at']?.toString(),
+    );
   }
 
   /// Update member notes
@@ -1080,6 +1178,32 @@ class MemberRepository {
   }
 
   Future<Member?> updateMemberFields(String memberId, Map<String, dynamic> updates) async {
+    final snapshot = await updateMemberFieldsGuarded(
+      memberId,
+      updates,
+      expectedUpdatedAt: null,
+    );
+    return snapshot?.member;
+  }
+
+  /// Write [updates] and return the row the server holds afterwards.
+  ///
+  /// When [expectedUpdatedAt] is a value, the write is a compare-and-swap: the
+  /// filter carries `updated_at = <that value>`, so Postgres updates the row
+  /// only while it is still the version the caller read. `public.members` has
+  /// no other optimistic-locking support, and updated_at is genuinely
+  /// maintained by the BEFORE UPDATE trigger trg_members_updated_at, so any
+  /// other write moves it.
+  ///
+  /// Zero rows updated is NOT success: PostgREST answers a `.select()` on a
+  /// zero-row update with null, and this throws [StaleMemberWriteException]
+  /// rather than returning as if the write landed. Pass null for
+  /// [expectedUpdatedAt] only where last-write-wins is genuinely wanted.
+  Future<MemberSnapshot?> updateMemberFieldsGuarded(
+    String memberId,
+    Map<String, dynamic> updates, {
+    required String? expectedUpdatedAt,
+  }) async {
     if (!_isReady || updates.isEmpty) return null;
 
     final payload = <String, dynamic>{};
@@ -1118,18 +1242,28 @@ class MemberRepository {
     });
 
     try {
-      final response = await _writeClient
-          .from('members')
-          .update(payload)
-          .eq('id', memberId)
-          .select()
-          .maybeSingle();
+      var query = _writeClient.from('members').update(payload).eq('id', memberId);
+      if (expectedUpdatedAt != null) {
+        // Sent back exactly as the server rendered it, so Postgres compares
+        // two timestamptz values rather than two strings.
+        query = query.eq('updated_at', expectedUpdatedAt);
+      }
+
+      final response = await query.select().maybeSingle();
 
       final json = _coerceJsonMap(response);
       if (json == null) {
+        // No row came back. With a guard in the filter that means the guard
+        // did not match, which is a stale edit and not a transport problem.
+        if (expectedUpdatedAt != null) {
+          throw StaleMemberWriteException(memberId);
+        }
         throw const FormatException('Supabase returned an unexpected member payload');
       }
-      return Member.fromJson(json);
+      return MemberSnapshot(
+        member: Member.fromJson(json),
+        updatedAt: json['updated_at']?.toString(),
+      );
     } catch (e) {
       debugPrint('❌ Error updating member: $e');
       rethrow;

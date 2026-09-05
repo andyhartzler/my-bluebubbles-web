@@ -605,9 +605,15 @@ class Member {
     return primary?.publicUrl;
   }
 
-  /// Effective avatar URL. Prefers the user-uploaded `avatarUrl`, falls
-  /// back to the auto-fetched `primaryProfilePhotoUrl`. Used by the
-  /// personalized home profile header and any future avatar surface.
+  /// THE avatar resolver. Every surface that draws a member's face reads
+  /// this and nothing else.
+  ///
+  /// Prefers the user-uploaded `avatarUrl`, falls back to the primary entry
+  /// in `profile_pictures` via [primaryProfilePhotoUrl]. The order matters
+  /// less than the fallback: as of 2026-09 zero of the fifteen executive
+  /// committee members have `avatar_url` set and all fifteen have
+  /// `profile_pictures`, so any widget that reads [avatarUrl] on its own
+  /// renders initials for every exec. That was the top-bar identity chip.
   String? get effectiveAvatarUrl {
     final uploaded = avatarUrl;
     if (uploaded != null && uploaded.isNotEmpty) {
@@ -615,6 +621,11 @@ class Member {
     }
     return primaryProfilePhotoUrl;
   }
+
+  /// Whether [effectiveAvatarUrl] resolves to anything. Use this, not
+  /// [hasProfilePhoto], when the question is "will a face render", because
+  /// an uploaded avatar counts even with an empty `profile_pictures`.
+  bool get hasAvatar => effectiveAvatarUrl != null;
 
   /// Preferred school/education label prioritizing dedicated columns.
   String? get primarySchool => college ?? highSchool ?? schoolName;

@@ -572,17 +572,16 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
                                   itemBuilder: (context, index) {
                                     final member = searchResults[index];
                                     return ListTile(
-                                      leading: CircleAvatar(
-                                        backgroundImage: member.primaryProfilePhotoUrl != null
-                                            ? NetworkImage(member.primaryProfilePhotoUrl!)
-                                            : null,
-                                        backgroundColor: committee.primaryColor.withOpacity(0.2),
-                                        child: member.primaryProfilePhotoUrl == null
-                                            ? Text(
-                                                member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-                                                style: TextStyle(color: committee.primaryColor),
-                                              )
-                                            : null,
+                                      // CorsAwareAvatar, not CircleAvatar plus
+                                      // NetworkImage: the old form drew initials
+                                      // only when the URL was null, so a 404 or a
+                                      // CORS refusal left an empty disc and an
+                                      // unhandled image-stream exception. White on
+                                      // the opaque unityBlue default is 12.51:1.
+                                      leading: CorsAwareAvatar(
+                                        imageUrl: member.effectiveAvatarUrl,
+                                        radius: 20,
+                                        fallbackText: member.name,
                                       ),
                                       title: Text(member.name),
                                       subtitle: Text(member.preferredEmail ?? ''),
@@ -614,7 +613,7 @@ class _CommitteeMembersTabState extends State<CommitteeMembersTab> {
 
   Widget _buildMemberCard(Member member) {
     final theme = Theme.of(context);
-    final photoUrl = member.primaryProfilePhotoUrl;
+    final photoUrl = member.effectiveAvatarUrl;
     final schoolName = _getSchoolDisplayName(member);
 
     return Card(

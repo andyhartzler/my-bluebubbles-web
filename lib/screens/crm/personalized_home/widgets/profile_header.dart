@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
 
@@ -121,21 +122,20 @@ class ProfileHeader extends StatelessWidget {
             ),
           ),
           padding: const EdgeInsets.all(2),
-          child: CircleAvatar(
+          // CorsAwareAvatar, not CircleAvatar + NetworkImage. The latter
+          // renders its initials child ONLY when the url is null, so a 404,
+          // an expired storage path or a CORS-blocked host left an empty
+          // translucent disc plus an unhandled image-stream exception.
+          // This degrades to initials on every failure instead.
+          //
+          // No backgroundColor is passed on purpose: the widget's default is
+          // an OPAQUE unityBlue disc under white initials, 12.51:1, which
+          // holds at the light end of this gradient. A translucent white-15%
+          // fill measures 1.91:1 over that end.
+          child: CorsAwareAvatar(
+            imageUrl: avatarUrl,
             radius: radius,
-            backgroundColor: Colors.white.withOpacity(0.15),
-            backgroundImage:
-                avatarUrl != null ? NetworkImage(avatarUrl) : null,
-            child: avatarUrl == null
-                ? Text(
-                    _initials(member.name),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: isMobile ? 22 : 26,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                : null,
+            fallbackText: member.name,
           ),
         ),
         if (onEditAvatar != null)
@@ -208,12 +208,5 @@ class ProfileHeader extends StatelessWidget {
         ),
       );
     }).toList();
-  }
-
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
-    return (parts.first.characters.first + parts.last.characters.first).toUpperCase();
   }
 }

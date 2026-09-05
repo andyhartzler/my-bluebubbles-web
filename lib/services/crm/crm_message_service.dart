@@ -307,16 +307,44 @@ class CRMMessageService {
     final member = await _memberRepo.getMemberByPhone(address);
     if (member == null) return;
 
+    // updateOptOutStatus now throws rather than swallowing, which is right: a
+    // STOP whose write failed must never draw a confirmation saying the member
+    // was unsubscribed. But this method is invoked through unawaited(), so an
+    // escaping error would land in the zone as an unhandled async error and be
+    // seen by nobody. Catch it here, log it loudly because a dropped STOP is a
+    // compliance problem rather than a glitch, and deliberately do NOT mark the
+    // automation handled, so the next inbound message can try again.
     if (normalized == 'STOP') {
       if (member.optOut) return;
-      await _memberRepo.updateOptOutStatus(member.id, true, reason: 'STOP keyword');
+      try {
+        await _memberRepo.updateOptOutStatus(member.id, true,
+            reason: 'STOP keyword');
+      } catch (e, stack) {
+        Logger.error(
+          'STOP keyword could not be recorded for member ${member.id}. '
+          'They are still opted IN and no confirmation was sent.',
+          error: e,
+          trace: stack,
+        );
+        return;
+      }
       if (cacheKey != null) {
         _markAutomationHandled(cacheKey, messageTimestamp);
       }
       await _sendSingleMessage(phoneNumber: address, message: _stopResponse);
     } else if (normalized == 'START') {
       if (!member.optOut) return;
-      await _memberRepo.updateOptOutStatus(member.id, false);
+      try {
+        await _memberRepo.updateOptOutStatus(member.id, false);
+      } catch (e, stack) {
+        Logger.error(
+          'START keyword could not be recorded for member ${member.id}. '
+          'They are still opted OUT and no confirmation was sent.',
+          error: e,
+          trace: stack,
+        );
+        return;
+      }
       const response =
           'Welcome back! You are now opted in to Missouri Young Democrats messages.';
       if (cacheKey != null) {

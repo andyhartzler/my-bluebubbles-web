@@ -548,7 +548,7 @@ class _CommitteeSlackTabState extends State<CommitteeSlackTab>
       if (memberId != null && memberId.isNotEmpty) {
         linkedMember = _memberCache[memberId];
         if (linkedMember != null) {
-          final memberPhotoUrl = linkedMember.primaryProfilePhotoUrl;
+          final memberPhotoUrl = linkedMember.effectiveAvatarUrl;
           if (memberPhotoUrl != null && memberPhotoUrl.isNotEmpty) {
             avatarUrl = memberPhotoUrl;
           }

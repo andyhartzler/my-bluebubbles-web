@@ -360,7 +360,7 @@ class _CommitteeMemberMembersTabState extends State<CommitteeMemberMembersTab> {
 
   Widget _buildMemberCard(Member member) {
     final theme = Theme.of(context);
-    final photoUrl = member.primaryProfilePhotoUrl;
+    final photoUrl = member.effectiveAvatarUrl;
     final schoolName = _getSchoolDisplayName(member);
     final cd = member.congressionalDistrict;
     final age = _calculateAge(member.dateOfBirth);

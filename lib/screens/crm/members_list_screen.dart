@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/chapter.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
@@ -984,8 +985,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   static int _compareByPhotoThenName(Member a, Member b) {
-    final aHasPhoto = a.hasProfilePhoto;
-    final bHasPhoto = b.hasProfilePhoto;
+    final aHasPhoto = a.hasAvatar;
+    final bHasPhoto = b.hasAvatar;
     if (aHasPhoto != bHasPhoto) {
       return aHasPhoto ? -1 : 1;
     }
@@ -1332,8 +1333,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
               onPressed: _crmReady
                   ? () {
                       // Carry the active filters through, exactly as the email
-                      // button does. From a county-scoped list — the way the
-                      // Your Counties tile opens it — this means "text the
+                      // button does. From a county-scoped list, the way the
+                      // Your Counties tile opens it, this means "text the
                       // members I'm looking at" texts that county. Without it,
                       // an exec who filtered to Greene lost the scope on tap.
                       final filter = _buildCurrentMessageFilter();
@@ -1972,7 +1973,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -2024,7 +2025,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return Chip(
       avatar: Icon(icon, size: 16, color: theme.colorScheme.primary),
       label: Text(label),
-      backgroundColor: theme.colorScheme.primary.withOpacity(0.12),
+      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
       labelStyle: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
     );
   }
@@ -2080,7 +2081,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.people_outline, size: 76, color: theme.colorScheme.primary.withOpacity(0.25)),
+            Icon(Icons.people_outline, size: 76, color: theme.colorScheme.primary.withValues(alpha: 0.25)),
             const SizedBox(height: 16),
             Text(
               'No members match your filters',
@@ -2090,7 +2091,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
             Text(
               'Try adjusting your filters or refreshing to see everyone in your database.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -2107,7 +2108,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.account_tree_outlined, size: 76, color: theme.colorScheme.primary.withOpacity(0.25)),
+            Icon(Icons.account_tree_outlined, size: 76, color: theme.colorScheme.primary.withValues(alpha: 0.25)),
             const SizedBox(height: 16),
             Text(
               'No chapters found',
@@ -2117,7 +2118,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
             Text(
               'Try adjusting your search or refresh to pull the latest chapter roster.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -2151,7 +2152,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _buildInfoChip(
           Icons.block,
           'INELIGIBLE',
-          backgroundColor: Colors.white.withOpacity(0.25),
+          backgroundColor: Colors.white.withValues(alpha: 0.25),
         ),
       );
     }
@@ -2160,7 +2161,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _buildInfoChip(
           Icons.account_balance,
           districtLabel,
-          backgroundColor: Colors.white.withOpacity(0.18),
+          backgroundColor: Colors.white.withValues(alpha: 0.18),
         ),
       );
     }
@@ -2169,7 +2170,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _buildInfoChip(
           Icons.cake_outlined,
           '$age yrs',
-          backgroundColor: Colors.white.withOpacity(0.18),
+          backgroundColor: Colors.white.withValues(alpha: 0.18),
         ),
       );
     }
@@ -2178,61 +2179,61 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _buildInfoChip(
           Icons.auto_awesome,
           zodiac,
-          backgroundColor: Colors.white.withOpacity(0.18),
+          backgroundColor: Colors.white.withValues(alpha: 0.18),
         ),
       );
     }
     final borderRadius = BorderRadius.circular(isMobile ? 16 : 24);
     const textColor = Colors.white;
-    final detailIconColor = Colors.white.withOpacity(0.92);
+    final detailIconColor = Colors.white.withValues(alpha: 0.92);
     final detailTextStyle = (isMobile ? theme.textTheme.bodyMedium : theme.textTheme.bodyLarge)
             ?.copyWith(color: textColor, fontWeight: FontWeight.w600, height: 1.3) ??
         TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: isMobile ? 13.5 : 14.5);
 
     final executiveTitleStyle = (isMobile ? theme.textTheme.titleSmall : theme.textTheme.titleMedium)
             ?.copyWith(
-              color: Colors.white.withOpacity(0.95),
+              color: Colors.white.withValues(alpha: 0.95),
               fontWeight: FontWeight.w600,
               height: 1.25,
             ) ??
         TextStyle(
-          color: Colors.white.withOpacity(0.95),
+          color: Colors.white.withValues(alpha: 0.95),
           fontWeight: FontWeight.w600,
           fontSize: isMobile ? 15 : 17,
           height: 1.25,
         );
     final executiveRoleStyle = (isMobile ? theme.textTheme.bodySmall : theme.textTheme.bodyMedium)
             ?.copyWith(
-              color: Colors.white.withOpacity(0.82),
+              color: Colors.white.withValues(alpha: 0.82),
               fontWeight: FontWeight.w500,
               height: 1.2,
             ) ??
         TextStyle(
-          color: Colors.white.withOpacity(0.82),
+          color: Colors.white.withValues(alpha: 0.82),
           fontWeight: FontWeight.w500,
           fontSize: isMobile ? 12 : 13,
           height: 1.2,
         );
     final chapterPositionStyle = (isMobile ? theme.textTheme.titleSmall : theme.textTheme.titleMedium)
             ?.copyWith(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               fontWeight: FontWeight.w600,
               height: 1.22,
             ) ??
         TextStyle(
-          color: Colors.white.withOpacity(0.9),
+          color: Colors.white.withValues(alpha: 0.9),
           fontWeight: FontWeight.w600,
           fontSize: isMobile ? 14.5 : 16,
           height: 1.22,
         );
     final chapterAffiliationStyle = (isMobile ? theme.textTheme.bodySmall : theme.textTheme.bodyMedium)
             ?.copyWith(
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
               fontWeight: FontWeight.w500,
               height: 1.18,
             ) ??
         TextStyle(
-          color: Colors.white.withOpacity(0.8),
+          color: Colors.white.withValues(alpha: 0.8),
           fontWeight: FontWeight.w500,
           fontSize: isMobile ? 12.5 : 13.5,
           height: 1.18,
@@ -2307,7 +2308,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
                         child: Container(
                           padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12, vertical: isMobile ? 4 : 6),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.28),
+                            color: Colors.black.withValues(alpha: 0.28),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: const Text(
@@ -2390,7 +2391,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
     final BoxBorder? accentBorder = isExecutive
         ? Border.all(
-            color: _executiveAccentColor.withOpacity(0.65),
+            color: _executiveAccentColor.withValues(alpha: 0.65),
             width: isMobile ? 1.4 : 1.8,
           )
         : null;
@@ -2403,7 +2404,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
         borderRadius: borderRadius,
         boxShadow: [
           BoxShadow(
-            color: gradient.last.withOpacity(0.28),
+            color: gradient.last.withValues(alpha: 0.28),
             blurRadius: isMobile ? 16 : 24,
             offset: const Offset(0, 12),
           ),
@@ -2435,9 +2436,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 12, vertical: isMobile ? 4 : 6),
       decoration: BoxDecoration(
-        color: _executiveAccentColor.withOpacity(0.2),
+        color: _executiveAccentColor.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: _executiveAccentColor.withOpacity(0.7), width: 1),
+        border: Border.all(color: _executiveAccentColor.withValues(alpha: 0.7), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2460,30 +2461,29 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   Widget _buildProfileAvatar(Member member, {required bool isMobile}) {
     final double size = isMobile ? 56 : 72;
-    final String? photoUrl = member.primaryProfilePhotoUrl;
-    final borderColor = Colors.white.withOpacity(0.35);
+    // The one resolver: uploaded avatar first, then profile_pictures. The
+    // execs have no avatar_url at all, so anything narrower shows initials.
+    final String? photoUrl = member.effectiveAvatarUrl;
+    final borderColor = Colors.white.withValues(alpha: 0.35);
 
     Widget buildFallback() {
-      final trimmed = member.name.trim();
-      final String initial = trimmed.isNotEmpty ? trimmed[0].toUpperCase() : '?';
+      // An opaque unityBlue disc keeps the initials at 12.51:1 wherever the
+      // card gradient happens to be behind it. The off-brand gradient this
+      // replaces bottomed out at 4.18:1 on its light end.
       return Container(
         width: size,
         height: size,
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          gradient: LinearGradient(
-            colors: [Color(0xFF1B262C), Color(0xFF3282B8)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: BrandColors.unityBlue,
         ),
         child: Center(
           child: Text(
-            initial,
+            CorsAwareAvatar.initialsOf(member.name),
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w700,
-              fontSize: size * 0.45,
+              fontSize: size * 0.38,
             ),
           ),
         ),
@@ -2508,7 +2508,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
           placeholder: (context, url) => Container(
             width: size,
             height: size,
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             child: Center(
               child: SizedBox(
                 width: size * 0.4,
@@ -2543,7 +2543,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.white.withOpacity(0.18),
+        color: backgroundColor ?? Colors.white.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(

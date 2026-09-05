@@ -346,7 +346,7 @@ class SurveyRepository {
     if (memberIds.isNotEmpty) {
       final membersData = await _readClient
           .from('members')
-          .select('id, name, phone_e164, profile_pictures, slack_user_id')
+          .select('id, name, phone_e164, avatar_url, profile_pictures, slack_user_id')
           .inFilter('id', memberIds);
 
       for (final m in (membersData as List<dynamic>? ?? [])) {
@@ -369,7 +369,7 @@ class SurveyRepository {
     if (phonesWithoutMember.isNotEmpty) {
       final phoneMembers = await _readClient
           .from('members')
-          .select('id, name, phone_e164, profile_pictures, slack_user_id')
+          .select('id, name, phone_e164, avatar_url, profile_pictures, slack_user_id')
           .inFilter('phone_e164', phonesWithoutMember);
 
       for (final m in (phoneMembers as List<dynamic>? ?? [])) {
@@ -424,7 +424,14 @@ class SurveyRepository {
       }
 
       String? photoUrl;
-      if (member != null && member['profile_pictures'] != null) {
+      // Same order as Member.effectiveAvatarUrl: the user-uploaded avatar
+      // wins, then the primary profile_pictures entry. Selecting
+      // profile_pictures alone strands anyone who uploaded a headshot.
+      final uploaded = member?['avatar_url']?.toString().trim();
+      if (uploaded != null && uploaded.isNotEmpty) {
+        photoUrl = uploaded;
+      }
+      if (photoUrl == null && member != null && member['profile_pictures'] != null) {
         final photos = MemberProfilePhoto.parseList(member['profile_pictures']);
         if (photos.isNotEmpty) {
           final primary = photos.firstWhere(

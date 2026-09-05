@@ -16,10 +16,38 @@ import '../../../services/crm/candidate_repository.dart';
 import '../../../services/crm/member_repository.dart';
 import '../../../services/crm/subscriber_repository.dart';
 
-/// Endorsement submission review screen. Renders a MOYD-branded candidate
-/// hero, a navy stat band, a sticky section navigator, one card per form
-/// section (with policy grids where detected), documents and references,
-/// plus a collapsed submission-metadata tile at the bottom.
+/// THE ENDORSEMENT CANDIDATE REVIEW for one submission. Renders a
+/// MOYD-branded hero, a sticky section navigator, one card per form section
+/// (with policy grids where detected), documents and references and a
+/// collapsed submission-metadata tile, and on top of that the candidate
+/// machinery: the Gemini verdict block, the exec ballots and "Candidate
+/// Review" in the app bar.
+///
+/// TWO CALLERS, BOTH ENDORSEMENT. `form_results_screen.dart`, opening a row
+/// of the endorsement questionnaire's results, and
+/// `endorsement_hub_screen.dart`, opening a candidate from the hub. Nothing
+/// else pushes this screen.
+///
+/// MEMBERSHIP SUBMISSIONS GO SOMEWHERE ELSE, AND THE SPLIT IS DELIBERATE.
+/// The member profile does NOT push this screen. `_viewFormSubmission` in
+/// `member_detail_screen.dart` fetches the schema, and anything whose slug
+/// does not start with `endorsement-questionnaire` opens
+/// `MemberSubmissionScreen` instead, which renders the same answers in the
+/// profile's own surface with no scoring surface at all. It matches on the
+/// PREFIX because that slug has already been renamed once, when the 2026
+/// suffix came off.
+///
+/// Do not "simplify" that branch back into this screen. A member's own
+/// membership form is never scored, and routing it here is what put an exec
+/// "Not scored yet" verdict placeholder over a member's answers under a page
+/// titled "Candidate Review".
+///
+/// Inside the screen every candidate-specific element still keys on the
+/// form's own scoring declaration, [SubmissionReviewBody.isCandidateReview],
+/// rather than on the caller, so a form that arrives here by mistake degrades
+/// instead of lying. That is a BACKSTOP, not the routing rule. The routing
+/// rule is the branch in the member profile, and it is the thing that keeps a
+/// membership submission off this screen in the first place.
 class SubmissionDetailScreen extends StatefulWidget {
   /// Constructor with pre-loaded data
   final FormSubmission? submission;
@@ -89,7 +117,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
   @override
   void dispose() {
     // Closes the ballot repository's realtime channel; null when this form is
-    // not an endorsement questionnaire and no ballot was ever fetched.
+    // not the candidate review and no ballot was ever fetched.
     _votes?.dispose();
     super.dispose();
   }
@@ -142,7 +170,10 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
 
   Future<void> _loadAiScore() async {
     final s = submission;
-    if (s == null) return;
+    // An unscored form has no rows in either scoring table. Skipping the two
+    // queries is also what guarantees a membership submission can never pick
+    // up a verdict by accident.
+    if (s == null || !_isCandidateReview) return;
     try {
       final score = await _aiScoreRepo.loadOne(s.id);
       final history = await _aiScoreRepo.loadHistory(s.id);
@@ -156,21 +187,33 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     }
   }
 
-  /// True for the endorsement questionnaire, which is the only form on this
-  /// screen the executive committee casts ballots on.
-  bool get _isEndorsementQuestionnaire =>
-      (form?.slug ?? '').startsWith('endorsement-questionnaire');
+  /// Whether this page is a candidate review (see
+  /// [SubmissionReviewBody.isCandidateReview]). False until the form loads.
+  bool get _isCandidateReview {
+    final f = form;
+    return f != null && SubmissionReviewBody.isCandidateReview(f);
+  }
 
-  /// The exec ballot block, or null for any other form.
+  /// App bar title. Names the real thing on the page: the candidate review
+  /// for the questionnaire, otherwise the form's own title ("Membership
+  /// Form"), so a member's submission never reads as a candidate review.
+  String get _title {
+    final f = form;
+    if (f == null) return 'Submission';
+    return _isCandidateReview ? 'Candidate Review' : f.title;
+  }
+
+  /// The exec ballot block, or null for any form that is not the candidate
+  /// review: the executive committee only casts ballots on the questionnaire.
   ///
-  /// This screen is where the 24 questionnaire submissions with no linked CRM
+  /// This screen is where the questionnaire submissions with no linked CRM
   /// candidate land, so without this they were the only submissions in the
   /// set whose page did not show who had voted. Ballots key on the SUBMISSION
   /// id (`endorsement_votes.candidate_id` is that id as text), which this
   /// screen has, so no candidate link is needed.
   Widget? _ballotBlock() {
     final s = submission;
-    if (s == null || s.id.isEmpty || !_isEndorsementQuestionnaire) return null;
+    if (s == null || s.id.isEmpty || !_isCandidateReview) return null;
     final repo = _votes ??= (EndorsementVoteRepository()..load());
     return ExecBallotBlock(votes: repo, submissionId: s.id);
   }
@@ -219,7 +262,7 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
     );
   }
 
-  /// Jump from the survey review straight to the candidate's full CRM
+  /// Jump from the questionnaire review straight to the candidate's full CRM
   /// profile (money, research, pipeline) when the submission is linked.
   Future<void> _openCandidateProfile(BuildContext context) async {
     final id = submission?.candidateId;
@@ -248,9 +291,10 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Candidate Review',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        title: Text(
+          _title,
+          style: const TextStyle(
+              color: Colors.white, fontWeight: FontWeight.w700),
         ),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -363,7 +407,8 @@ class _SubmissionDetailScreenState extends State<SubmissionDetailScreen> {
 
     final buffer = StringBuffer();
     buffer.writeln('Form: ${form!.title}');
-    buffer.writeln('Candidate: ${model.candidateName}');
+    buffer.writeln(
+        '${_isCandidateReview ? 'Candidate' : 'Name'}: ${model.candidateName}');
     if (model.office != null) buffer.writeln('Office: ${model.office}');
     if (model.district != null) buffer.writeln('District: ${model.district}');
     if (model.email != null) buffer.writeln('Email: ${model.email}');
@@ -439,7 +484,7 @@ class _SubscriberDetailBottomSheet extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -449,7 +494,7 @@ class _SubscriberDetailBottomSheet extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 28,
-                      backgroundColor: Colors.teal.withOpacity(0.1),
+                      backgroundColor: Colors.teal.withValues(alpha: 0.1),
                       child: Text(
                         subscriber.name.isNotEmpty
                             ? subscriber.name[0].toUpperCase()

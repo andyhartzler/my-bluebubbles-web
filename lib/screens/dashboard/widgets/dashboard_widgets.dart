@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import '../../../models/crm/dashboard_metrics.dart';
 import '../../../models/crm/member.dart';
 import '../models/dashboard_widget_config.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 
 // Brand colors
 const _unityBlue = Color(0xFF273351);
@@ -2051,75 +2052,19 @@ class LeaderboardWidget extends StatelessWidget {
     );
   }
 
-  /// Build member avatar with photo or initials fallback
+  /// Build member avatar with photo or initials fallback.
+  ///
+  /// CorsAwareAvatar rather than the per-name gradient disc this used to
+  /// draw: white initials on the sunriseGold stop of that gradient measure
+  /// 1.74:1, under both the 4.5:1 normal-text and 3:1 large-text floors, and
+  /// white on momentumBlue is 2.75:1. The opaque unityBlue default is
+  /// 12.51:1. The caller already supplies a resolved url.
   Widget _buildMemberAvatar(String name, String? photoUrl) {
-    const size = 32.0;
-
-    // Generate initials for fallback
-    final parts = name.trim().split(RegExp(r'\s+'));
-    final initials =
-        parts.length >= 2 && parts.first.isNotEmpty && parts.last.isNotEmpty
-        ? '${parts.first[0]}${parts.last[0]}'.toUpperCase()
-        : (name.isNotEmpty ? name[0].toUpperCase() : '?');
-
-    // Generate a consistent color based on the name
-    final colorIndex = name.hashCode.abs() % WidgetGradients.all.length;
-    final gradientColors = WidgetGradients.all[colorIndex];
-
-    Widget fallback = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: gradientColors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Center(
-        child: Text(
-          initials,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-          ),
-        ),
-      ),
+    return CorsAwareAvatar(
+      imageUrl: photoUrl,
+      radius: 16,
+      fallbackText: name,
     );
-
-    if (photoUrl != null && photoUrl.isNotEmpty) {
-      return ClipOval(
-        child: Image.network(
-          photoUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => fallback,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey[200],
-              ),
-              child: const Center(
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    return fallback;
   }
 
   Widget _buildEmptyState() {
@@ -2475,93 +2420,19 @@ class MemberListWidget extends StatelessWidget {
   }
 
   Widget _buildMemberAvatar(Member member) {
-    final photoUrl = member.primaryProfilePhotoUrl;
-    final size = 44.0;
-
-    // Generate initials for fallback
-    final initials = _getInitials(member.name);
-
-    // Generate a consistent color based on the member's name
-    final colorIndex = member.name.hashCode.abs() % WidgetGradients.all.length;
-    final gradientColors = WidgetGradients.all[colorIndex];
-
-    Widget fallback = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: gradientColors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Center(
-        child: Text(
-          initials,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-      ),
+    // CorsAwareAvatar rather than the per-member gradient disc this used to
+    // draw. Two reasons. It read the raw profile_pictures column, so an
+    // uploaded avatar_url never showed; effectiveAvatarUrl is the one
+    // resolver. And the gradient ground failed contrast badly at its light
+    // end: white initials on the sunriseGold stop measure 1.74:1, which is
+    // under both the 4.5:1 normal-text and 3:1 large-text floors, and white
+    // on momentumBlue is 2.75:1. The opaque unityBlue default is 12.51:1 and
+    // holds on every surface this widget lands on.
+    return CorsAwareAvatar(
+      imageUrl: member.effectiveAvatarUrl,
+      radius: 22,
+      fallbackText: member.name,
     );
-
-    if (photoUrl != null && photoUrl.isNotEmpty) {
-      return ClipOval(
-        child: Image.network(
-          photoUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => fallback,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey[200],
-              ),
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                        : null,
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    return fallback;
-  }
-
-  String _getInitials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) {
-      return parts[0].isNotEmpty ? parts[0][0].toUpperCase() : '?';
-    }
-    // Check both parts are non-empty before indexing
-    final first = parts[0];
-    final last = parts[parts.length - 1];
-    if (first.isEmpty || last.isEmpty) {
-      return first.isNotEmpty
-          ? first[0].toUpperCase()
-          : (last.isNotEmpty ? last[0].toUpperCase() : '?');
-    }
-    return '${first[0]}${last[0]}'.toUpperCase();
   }
 
   Widget _buildEmptyState() {

@@ -902,11 +902,14 @@ class _CommitteeOverviewTabState extends State<CommitteeOverviewTab> {
           ),
           child: Row(
             children: [
+              // The card behind this row is the unityBlue to momentumBlue
+              // tile gradient. White initials on a white-20% disc measure
+              // 2.23:1 over the momentumBlue end and fail both floors, so
+              // take the opaque unityBlue default at 12.51:1 instead.
               CorsAwareAvatar(
                 imageUrl: leader.photoUrl,
                 radius: 20,
                 fallbackText: leader.name,
-                backgroundColor: Colors.white.withOpacity(0.2),
                 fallbackTextColor: Colors.white,
               ),
               const SizedBox(width: 12),

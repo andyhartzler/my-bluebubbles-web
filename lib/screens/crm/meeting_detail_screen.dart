@@ -22,6 +22,7 @@ import 'package:bluebubbles/screens/crm/widgets/meeting_commitments_panel.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 import 'package:bluebubbles/services/crm/storage_uri_resolver.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
@@ -999,21 +1000,22 @@ class _MeetingDetailScreenState extends State<MeetingDetailScreen> {
     }
 
     // Get profile photo URL from member if available
-    final profilePhotoUrl = attendance.member?.primaryProfilePhotoUrl;
+    final profilePhotoUrl = attendance.member?.effectiveAvatarUrl;
 
     return Card(
       color: highlight ? theme.colorScheme.primary.withOpacity(0.12) : null,
       elevation: highlight ? 2 : 0,
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: highlight ? theme.colorScheme.primary : theme.colorScheme.primary.withOpacity(0.2),
-          foregroundColor: highlight ? theme.colorScheme.onPrimary : theme.colorScheme.primary,
-          backgroundImage: profilePhotoUrl != null ? NetworkImage(profilePhotoUrl) : null,
-          child: profilePhotoUrl == null
-              ? Text(attendance.participantName.isNotEmpty
-                  ? attendance.participantName.substring(0, 1).toUpperCase()
-                  : '?')
-              : null,
+        // CorsAwareAvatar, not CircleAvatar plus a bare NetworkImage: the
+        // old form drew initials only when the url was null, so a 404, an
+        // expired storage path or a CORS refusal yielded an empty disc plus
+        // an unhandled image-stream exception. White on the opaque unityBlue
+        // default is 12.51:1, which holds whether or not the row is
+        // highlighted, where the old translucent primary tile did not.
+        leading: CorsAwareAvatar(
+          imageUrl: profilePhotoUrl,
+          radius: 20,
+          fallbackText: attendance.participantName,
         ),
         title: Text(attendance.participantName),
         subtitle: Text(subtitleParts.join(' • ')),

@@ -624,10 +624,13 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Opaque unityBlue disc, not a translucent white fill: this
+              // chip sits on the unityBlue to momentumBlue gradient, where
+              // white on white-30% measures 2.01:1. The opaque default is
+              // 12.51:1 anywhere on that gradient.
               CorsAwareAvatar(
                 imageUrl: leader.photoUrl,
                 radius: 14,
-                backgroundColor: Colors.white.withOpacity(0.3),
                 fallbackText: leader.name,
                 fallbackIconColor: Colors.white,
                 fallbackTextColor: Colors.white,

@@ -390,7 +390,7 @@ class _JobApplicantsScreenState extends State<JobApplicantsScreen> {
   void _showApplicantDetails(BuildContext context, JobApplication application, Member? member) {
     final theme = Theme.of(context);
     final statusColor = Color(JobApplication.statusColor(application.status));
-    final photoUrl = member?.primaryProfilePhotoUrl;
+    final photoUrl = member?.effectiveAvatarUrl;
 
     showModalBottomSheet(
       context: context,

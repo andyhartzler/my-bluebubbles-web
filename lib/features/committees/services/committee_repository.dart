@@ -186,7 +186,8 @@ class CommitteeRepository {
       // Use ilike to handle variations like "Communications" matching "Communications Committee"
       final data = await _readClient
           .from('members')
-          .select('id, name, executive_title, executive_role, profile_pictures, email, phone')
+          .select(
+              'id, name, executive_title, executive_role, avatar_url, profile_pictures, email, phone')
           .eq('executive_committee', true)
           .ilike('executive_role', '%$committeeName%');
 
@@ -198,7 +199,11 @@ class CommitteeRepository {
           memberId: member.id,
           name: member.name,
           title: member.executiveTitle,
-          photoUrl: member.primaryProfilePhotoUrl,
+          // THE resolver, not the raw column. CommitteeLeader.photoUrl feeds
+          // five leader surfaces, and every executive has profile_pictures
+          // while none has avatar_url, so a raw avatar_url read here would
+          // blank all of them.
+          photoUrl: member.effectiveAvatarUrl,
           email: member.preferredEmail,
           phone: member.primaryPhone,
         ));
@@ -925,7 +930,7 @@ class CommitteeRepository {
           ...record,
           'linked_member': member?.toJson(),
           'linked_subscriber': subscriber != null ? _subscriberToJson(subscriber) : null,
-          'profile_photo_url': member?.primaryProfilePhotoUrl,
+          'profile_photo_url': member?.effectiveAvatarUrl,
           'county': county,
         });
       }

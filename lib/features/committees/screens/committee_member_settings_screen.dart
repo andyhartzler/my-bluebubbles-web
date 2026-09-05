@@ -584,7 +584,7 @@ class _CommitteeMemberSettingsScreenState
   }
 
   Widget _buildPhotoSection(Member? member) {
-    final photoUrl = member?.primaryProfilePhotoUrl;
+    final photoUrl = member?.effectiveAvatarUrl;
 
     return Container(
       padding: const EdgeInsets.all(24),

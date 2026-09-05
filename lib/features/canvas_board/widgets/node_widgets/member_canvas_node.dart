@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bluebubbles/features/canvas_board/models/canvas_node.dart';
 import 'package:bluebubbles/features/canvas_board/widgets/node_widgets/base_canvas_node.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 
 /// Available fields that can be displayed on a member node
 enum MemberDisplayField {
@@ -204,28 +204,21 @@ class MemberCanvasNode extends StatelessWidget {
 
   Widget _buildMemberContent() {
     final m = member!;
-    final photoUrl = m.primaryProfilePhotoUrl;
+    final photoUrl = m.effectiveAvatarUrl;
     final fields = displayFields;
 
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          CircleAvatar(
+          // CorsAwareAvatar, not CircleAvatar plus a cached provider: the
+          // old form drew initials only when the url was null, so a 404 or a
+          // CORS refusal left an empty disc. White on the opaque unityBlue
+          // default is 12.51:1.
+          CorsAwareAvatar(
+            imageUrl: photoUrl,
             radius: 24,
-            backgroundColor: accentColor.withOpacity(0.1),
-            backgroundImage:
-                photoUrl != null ? CachedNetworkImageProvider(photoUrl) : null,
-            child: photoUrl == null
-                ? Text(
-                    m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      color: accentColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  )
-                : null,
+            fallbackText: m.name,
           ),
           const SizedBox(width: 12),
           Expanded(

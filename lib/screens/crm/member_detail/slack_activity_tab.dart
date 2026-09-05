@@ -217,7 +217,7 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
     final shouldShowLinkButton = widget.member.slackUserId == null;
 
     // Prioritize member's main profile photo, fall back to Slack avatar
-    final avatarUrl = widget.member.primaryProfilePhotoUrl ?? profile?.avatarUrl;
+    final avatarUrl = widget.member.effectiveAvatarUrl ?? profile?.avatarUrl;
 
     return Card(
       child: Padding(

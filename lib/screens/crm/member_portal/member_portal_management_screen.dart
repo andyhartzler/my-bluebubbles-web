@@ -26,6 +26,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/utils/markdown_quill_loader.dart';
 import 'package:bluebubbles/utils/quill_html_converter.dart';
 import 'package:mime_type/mime_type.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 
 class MemberPortalManagementScreen extends StatefulWidget {
   /// Initial tab to focus on mount. Order: 0 Overview · 1 Meetings ·
@@ -1269,24 +1271,26 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       }
 
       // Get profile picture from member if available
-      String? profileImageUrl = attendance.member?.primaryProfilePhotoUrl;
-
-      final initials = attendance.participantName.isNotEmpty
-          ? attendance.participantName.substring(0, 1).toUpperCase()
-          : '?';
+      String? profileImageUrl = attendance.member?.effectiveAvatarUrl;
 
       return ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-        leading: profileImageUrl != null && profileImageUrl.isNotEmpty
-            ? CircleAvatar(
-                backgroundImage: NetworkImage(profileImageUrl),
-                backgroundColor: attendance.checkedIn == true ? _momentumBlue : Colors.grey.shade800,
-              )
-            : CircleAvatar(
-                backgroundColor: attendance.checkedIn == true ? _momentumBlue : Colors.grey.shade800,
-                foregroundColor: Colors.white,
-                child: Text(initials),
-              ),
+        // CorsAwareAvatar, not CircleAvatar plus a bare NetworkImage: the old
+        // form drew initials only when the url was null, so a 404, an expired
+        // storage path or a CORS refusal yielded an empty disc plus an
+        // unhandled image-stream exception. It also dropped the checked-in
+        // cue on the photo branch. White on momentumBlue is 2.75:1 and fails
+        // even the 3:1 large-text floor, so the checked-in disc is unityBlue
+        // at 12.51:1 and the not-checked-in one keeps grey 800, which is
+        // 10.05:1 under white.
+        leading: CorsAwareAvatar(
+          imageUrl: profileImageUrl,
+          radius: 20,
+          backgroundColor: attendance.checkedIn == true
+              ? BrandColors.unityBlue
+              : Colors.grey.shade800,
+          fallbackText: attendance.participantName,
+        ),
         title: Text(
           attendance.participantName,
           style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),

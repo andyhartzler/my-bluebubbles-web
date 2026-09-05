@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 
 /// Selection mode for the recipient selector
 enum RecipientMode { individual, group, eventAttendees }
@@ -215,7 +216,7 @@ class _RecipientSelectorWidgetState extends State<RecipientSelectorWidget> {
       // Search by name OR phone
       final nameResults = await _client
           .from('members')
-          .select('id, name, phone_e164, profile_pictures')
+          .select('id, name, phone_e164, avatar_url, profile_pictures')
           .not('opt_out', 'eq', true)
           .not('phone_e164', 'is', null)
           .ilike('name', '%$query%')
@@ -225,7 +226,7 @@ class _RecipientSelectorWidgetState extends State<RecipientSelectorWidget> {
       if (query.contains(RegExp(r'\d'))) {
         phoneResults = List<Map<String, dynamic>>.from(await _client
             .from('members')
-            .select('id, name, phone_e164, profile_pictures')
+            .select('id, name, phone_e164, avatar_url, profile_pictures')
             .not('opt_out', 'eq', true)
             .not('phone_e164', 'is', null)
             .ilike('phone_e164', '%$query%')
@@ -419,26 +420,22 @@ class _RecipientSelectorWidgetState extends State<RecipientSelectorWidget> {
 
   Widget _buildMemberAvatar(Map<String, dynamic> member) {
     final name = member['name']?.toString() ?? '';
-    final profilePics = member['profile_pictures'];
-    final photos = MemberProfilePhoto.parseList(profilePics);
-    final url = photos.isNotEmpty ? photos.first.publicUrl : null;
+    // Member.effectiveAvatarUrl is the one resolver: uploaded avatar_url
+    // first, then the PRIMARY profile_pictures entry. The old code took
+    // photos.first, which is a different rule and picks the wrong face for
+    // anyone with more than one photo, and it read no avatar_url at all.
+    final url = Member.fromJson(member).effectiveAvatarUrl;
 
-    if (url != null && url.isNotEmpty) {
-      return CircleAvatar(
-        backgroundImage: NetworkImage(url),
-        backgroundColor: BrandColors.unityBlue.withOpacity(0.1),
-      );
-    }
-
-    return CircleAvatar(
-      backgroundColor: BrandColors.unityBlue.withOpacity(0.1),
-      child: Text(
-        name.isNotEmpty ? name[0].toUpperCase() : '?',
-        style: const TextStyle(
-          color: BrandColors.unityBlue,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+    // CorsAwareAvatar, not CircleAvatar plus a bare NetworkImage: the old
+    // form drew initials only when the url was null, so a 404, an expired
+    // storage path or a CORS refusal left an empty disc and an unhandled
+    // image-stream exception. White on the opaque unityBlue default is
+    // 12.51:1, against unityBlue ink on a 10% unityBlue tile that measured
+    // 1.28:1 and failed both floors outright.
+    return CorsAwareAvatar(
+      imageUrl: url,
+      radius: 20,
+      fallbackText: name,
     );
   }
 

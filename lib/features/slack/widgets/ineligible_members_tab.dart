@@ -302,10 +302,13 @@ class _IneligibleMemberCard extends StatelessWidget {
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.red.shade300, width: 2),
                       ),
+                      // The card is the unityBlue to momentumBlue tile
+                      // gradient. White initials on a white-20% disc measure
+                      // 2.23:1 over the momentumBlue end; the opaque unityBlue
+                      // default is 12.51:1 anywhere on it.
                       child: CorsAwareAvatar(
-                        imageUrl: member.primaryProfilePhotoUrl,
+                        imageUrl: member.effectiveAvatarUrl,
                         radius: 26,
-                        backgroundColor: Colors.white.withOpacity(0.2),
                         fallbackText: member.name,
                         fallbackTextColor: Colors.white,
                       ),

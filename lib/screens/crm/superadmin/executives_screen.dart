@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 
 import 'activity_screen.dart';
 import 'superadmin_user_pages_screen.dart';
@@ -68,13 +70,22 @@ class _ExecutivesScreenState extends State<ExecutivesScreen> {
       final response = await client
           .from('members')
           .select(
-              'id, name, email, executive_title, executive_role, last_sign_in_at, executive_committee')
+              'id, name, email, executive_title, executive_role, last_sign_in_at, executive_committee, avatar_url, profile_pictures')
           .eq('executive_committee', true)
           .order('name', ascending: true);
 
       final list = (response as List)
           .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
           .toList();
+
+      // Resolve the face ONCE, at the source, so the card never touches a raw
+      // column. Member.effectiveAvatarUrl prefers an uploaded avatar_url and
+      // falls back to the primary profile_pictures entry: as of 2026-09 every
+      // executive has the second and none has the first, so a narrower read
+      // renders initials for all fifteen.
+      for (final row in list) {
+        row['resolved_avatar_url'] = Member.fromJson(row).effectiveAvatarUrl;
+      }
 
       // Pull active mail_aliases in parallel. RLS lets superadmins read every
       // row; revoked rows are filtered client-side so we still see history if
@@ -908,12 +919,15 @@ class _ExecCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: BrandColors.unityBlue,
-                  child: Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(color: Colors.white),
-                  ),
+                // White on the opaque unityBlue disc is 12.51:1, unchanged
+                // from the initials-only avatar this replaces; what changes is
+                // that a face now renders when there is one, and that a failed
+                // load degrades back to those initials instead of an empty
+                // disc.
+                CorsAwareAvatar(
+                  imageUrl: exec['resolved_avatar_url'] as String?,
+                  radius: 20,
+                  fallbackText: name,
                 ),
                 const SizedBox(width: 12),
                 Expanded(

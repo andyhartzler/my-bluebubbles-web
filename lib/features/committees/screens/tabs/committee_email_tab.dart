@@ -13,6 +13,7 @@ import 'package:bluebubbles/models/crm/message_filter.dart';
 import 'package:bluebubbles/screens/crm/file_picker_materializer.dart';
 import 'package:bluebubbles/services/crm/crm_email_service.dart';
 import 'package:bluebubbles/utils/quill_html_converter.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 
 class CommitteeEmailTab extends StatefulWidget {
   final Committee committee;
@@ -666,12 +667,14 @@ class _CommitteeEmailTabState extends State<CommitteeEmailTab>
           ),
           const SizedBox(height: 8),
           ..._membersWithEmail.take(10).map((member) => ListTile(
-            leading: CircleAvatar(
-              backgroundColor: committee.primaryColor.withOpacity(0.2),
-              child: Text(
-                member.name.isNotEmpty ? member.name[0] : '?',
-                style: TextStyle(color: committee.primaryColor),
-              ),
+            // This drew initials unconditionally and never read a photo, on
+            // a 20% committee-colour tile whose ratio varies per committee.
+            // effectiveAvatarUrl is the one resolver, and white on the opaque
+            // unityBlue default is 12.51:1 for every committee.
+            leading: CorsAwareAvatar(
+              imageUrl: member.effectiveAvatarUrl,
+              radius: 20,
+              fallbackText: member.name,
             ),
             title: Text(member.name),
             subtitle: Text(member.preferredEmail ?? ''),

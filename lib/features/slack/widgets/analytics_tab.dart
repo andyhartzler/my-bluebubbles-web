@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -1864,7 +1863,7 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
                           final member = _results[index];
                           return ListTile(
                             leading: CorsAwareAvatar(
-                              imageUrl: member.primaryProfilePhotoUrl,
+                              imageUrl: member.effectiveAvatarUrl,
                               radius: 20,
                               fallbackText: member.name,
                             ),
@@ -1895,28 +1894,6 @@ class _MemberSearchDialogState extends State<_MemberSearchDialog> {
     );
   }
 
-  Widget _buildMemberAvatar(Member member) {
-    final photoUrl = member.primaryProfilePhotoUrl;
-    final initial = member.name.isNotEmpty ? member.name[0].toUpperCase() : '?';
-
-    if (photoUrl == null) {
-      return CircleAvatar(child: Text(initial));
-    }
-
-    return CachedNetworkImage(
-      imageUrl: photoUrl,
-      imageBuilder: (context, imageProvider) =>
-          CircleAvatar(backgroundImage: imageProvider),
-      placeholder: (context, url) => CircleAvatar(
-        child: const SizedBox(
-          width: 16,
-          height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      ),
-      errorWidget: (context, url, error) => CircleAvatar(child: Text(initial)),
-    );
-  }
 }
 
 /// Quick view dialog for unmatched user from membership changes

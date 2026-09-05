@@ -88,6 +88,44 @@ class OrganizingToolkitSheet {
 /// section already draws, and must not add a device inset mid-page.
 enum OrganizingToolkitMount { sheet, inline }
 
+/// The one map geography a nominee's office fills, with the district in the
+/// map's bare-digit key form. Null when the office has no single mappable
+/// district: statewide, US Senate, county, municipal, school and judicial
+/// races all return null and contribute nothing, because a district written
+/// here that the exec never chose would be a guess on the activity row.
+///
+/// The office text is the primary signal and office_level only a backstop:
+/// the live `candidates.office` values are "State Representative" / "State
+/// House of Representatives", "State Senator" / "State Senate" and "U.S.
+/// Representative", and office_level is null on some of those rows.
+({MapMode mode, String id})? nomineeDistrict(Candidate candidate) {
+  final district = (candidate.district ?? '').trim();
+  if (!RegExp(r'\d').hasMatch(district)) return null;
+  final office = candidate.office.toLowerCase();
+  final level = (candidate.officeLevel ?? '').toLowerCase();
+
+  final MapMode? mode;
+  if (office.contains('state sen') || office.contains('senate district')) {
+    mode = MapMode.senate;
+  } else if (office.contains('state rep') ||
+      office.contains('state house') ||
+      office.contains('house district') ||
+      (office.contains('representative') && level == 'state')) {
+    mode = MapMode.house;
+  } else if (office.contains('congress') ||
+      office.contains('u.s. rep') ||
+      office.contains('us rep') ||
+      office.contains('u.s. house') ||
+      office.contains('us house') ||
+      (office.contains('representative') && level == 'federal')) {
+    mode = MapMode.congressional;
+  } else {
+    mode = null;
+  }
+  if (mode == null) return null;
+  return (mode: mode, id: bareDigits(district));
+}
+
 /// The four allowed channels, with display labels. Keys match the stored
 /// `channel` check constraint on outreach_activities.
 const Map<String, String> _kChannelLabels = <String, String>{
@@ -224,6 +262,18 @@ class _OrganizingToolkitFormState extends State<OrganizingToolkitForm> {
     // Seed every prefilled nominee as selected; the picker lets HQ narrow it.
     _selectedCandidateIds =
         seed.candidates.map((c) => c.id).where((id) => id.isNotEmpty).toSet();
+
+    // A new activity also starts with the districts its nominees run in. The
+    // exec attached the nominees, so the system already knows where they are
+    // on the ballot; the form used to show a filled nominee list over three
+    // empty "Add # " fields and ask for the numbers again. The region the
+    // seed carried stays first, the nominees' districts are folded in behind
+    // it, and every chip stays removable. An edit keeps the stored row as is.
+    if (ex == null) {
+      for (final c in seed.candidates) {
+        _addNomineeDistrict(c);
+      }
+    }
     _participants = seed.participants.map((m) => _Participant(m)).toList();
   }
 
@@ -236,6 +286,28 @@ class _OrganizingToolkitFormState extends State<OrganizingToolkitForm> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// Fold one nominee's district into the matching WHERE list, deduped.
+  ///
+  /// This only ever ADDS. A nominee with no mappable district adds nothing,
+  /// and nothing is removed here, so a statewide nominee cannot blank a
+  /// district another nominee supplied and a district the region or the exec
+  /// put there stays put. Deselecting a nominee in the picker leaves its
+  /// district chip in place for the same reason: the form cannot tell whether
+  /// the exec still wants that district, and the chip's own remove control is
+  /// one tap away.
+  void _addNomineeDistrict(Candidate c) {
+    final hit = nomineeDistrict(c);
+    if (hit == null) return;
+    final List<String>? list = switch (hit.mode) {
+      MapMode.congressional => _cds,
+      MapMode.senate => _sds,
+      MapMode.house => _hds,
+      MapMode.county => null,
+    };
+    if (list == null || list.contains(hit.id)) return;
+    list.add(hit.id);
   }
 
   // ── Palette (the ONE VolunteersTheme, resolved per build) ──────
@@ -1000,6 +1072,7 @@ class _OrganizingToolkitFormState extends State<OrganizingToolkitForm> {
               _selectedCandidateIds.remove(c.id);
             } else {
               _selectedCandidateIds.add(c.id);
+              _addNomineeDistrict(c);
             }
           }),
           borderRadius: BorderRadius.circular(12),

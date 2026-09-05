@@ -33,6 +33,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bluebubbles/screens/crm/bulk_email_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
 import 'package:bluebubbles/screens/crm/events_screen.dart';
 import 'package:bluebubbles/screens/crm/donor_command_center.dart';
@@ -2969,9 +2971,9 @@ Future<void> setSystemTrayContextMenu({bool windowHidden = false}) async {
 
 /// Top-bar badge showing who's currently signed in.
 ///
-/// Desktop: pill with initials avatar + display name (and a shield icon when
-/// the session is superadmin), opens a popup menu on click.
-/// Mobile (compact): just the initials avatar circle, popup on tap.
+/// Desktop: pill with the member's photo + display name (and a shield icon
+/// when the session is superadmin), opens a popup menu on click.
+/// Mobile (compact): just the photo circle, popup on tap.
 ///
 /// Popup offers "My Profile" (opens the member-detail screen for the current
 /// session's member) and "Sign Out".
@@ -2988,31 +2990,21 @@ class _CurrentUserBadge extends StatelessWidget {
   final VoidCallback onSignOut;
   final bool compact;
 
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
-    return (parts.first.characters.first + parts.last.characters.first)
-        .toUpperCase();
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final name = session.displayName;
     final isSuper = session.isSuperadmin;
 
-    final avatar = CircleAvatar(
+    // The photo comes from the Member resolver, never from avatar_url alone:
+    // no exec has avatar_url set, every exec has profile_pictures, so a raw
+    // read drew initials for all fifteen. The initials fallback is white on
+    // an opaque unityBlue disc, 12.51:1 in either app theme.
+    final avatar = CorsAwareAvatar(
+      imageUrl: session.currentMember?.effectiveAvatarUrl,
       radius: compact ? 14 : 13,
-      backgroundColor: theme.colorScheme.primary,
-      foregroundColor: theme.colorScheme.onPrimary,
-      child: Text(
-        _initials(name),
-        style: TextStyle(
-          fontSize: compact ? 11 : 11,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+      backgroundColor: BrandColors.unityBlue,
+      fallbackText: name,
     );
 
     return PopupMenuButton<String>(

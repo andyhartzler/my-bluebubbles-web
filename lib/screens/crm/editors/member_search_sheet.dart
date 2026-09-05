@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 
 Future<Member?> showMemberSearchSheet(BuildContext context) {
   return showModalBottomSheet<Member>(
@@ -124,15 +124,17 @@ class _MemberSearchSheetState extends State<_MemberSearchSheet> {
                   itemCount: _results.length,
                   itemBuilder: (context, index) {
                     final member = _results[index];
-                    final profilePhotoUrl = member.primaryProfilePhotoUrl;
+                    final profilePhotoUrl = member.effectiveAvatarUrl;
                     return ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage: profilePhotoUrl != null
-                            ? CachedNetworkImageProvider(profilePhotoUrl)
-                            : null,
-                        child: profilePhotoUrl == null
-                            ? Text(member.name.isNotEmpty ? member.name[0].toUpperCase() : '?')
-                            : null,
+                      // CorsAwareAvatar, not CircleAvatar plus a cached
+                      // provider: the old form drew initials only when the url
+                      // was null, so a 404 or a CORS refusal left an empty
+                      // disc. White on the opaque unityBlue default is
+                      // 12.51:1.
+                      leading: CorsAwareAvatar(
+                        imageUrl: profilePhotoUrl,
+                        radius: 20,
+                        fallbackText: member.name,
                       ),
                       title: Text(member.name),
                       subtitle: Text(member.phoneE164 ?? member.phone ?? member.email ?? 'No contact info'),

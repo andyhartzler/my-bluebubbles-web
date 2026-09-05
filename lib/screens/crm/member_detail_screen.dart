@@ -6,6 +6,7 @@ import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
@@ -16,9 +17,10 @@ import 'package:bluebubbles/screens/crm/voter_file/voter_crossref_card.dart';
 import 'package:bluebubbles/services/crm/voter_file_service.dart';
 import 'package:bluebubbles/screens/crm/member_detail/email_history_tab.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
-import 'package:bluebubbles/screens/crm/editors/member_edit_sheet.dart';
 import 'package:bluebubbles/screens/crm/member_detail/slack_activity_tab.dart';
+import 'package:bluebubbles/screens/crm/member_detail/member_submission_screen.dart';
 import 'package:bluebubbles/screens/crm/volunteers/member_outreach_section.dart';
+import 'package:bluebubbles/screens/crm/widgets/member_profile_sections.dart';
 import 'package:bluebubbles/services/crm/crm_email_service.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
@@ -90,6 +92,216 @@ class _DonorProfile {
   final List<_DonationRecord> donations;
 }
 
+enum _TriState { yes, no, unanswered }
+
+enum _FieldKind {
+  text,
+  longText,
+  email,
+  phone,
+  date,
+  triBool,
+
+  /// Free text that renders as chips when it carries a comma (languages).
+  chipsText,
+  social,
+
+  /// address, city, state and county as one block, one Apple Maps link.
+  addressBlock,
+
+  /// Derived by on_member_updated_lookup_districts; read only in both modes.
+  districts,
+
+  /// The committee array, edited through crm_set_member_committees only.
+  committees,
+}
+
+/// One answer on the profile sheet. The same spec drives read mode (the filled
+/// part) and edit mode (the complete form).
+class _ProfileField {
+  const _ProfileField(
+    this.key,
+    this.label, {
+    this.kind = _FieldKind.text,
+    this.capitalizeWords = false,
+    this.platform,
+    this.readOnly = false,
+    this.helper,
+    this.onlyWithoutAddress = false,
+  });
+
+  final String key;
+  final String label;
+  final _FieldKind kind;
+  final bool capitalizeWords;
+  final _SocialPlatform? platform;
+
+  /// Rendered in edit mode as a value with a caption rather than an input.
+  final bool readOnly;
+
+  /// Helper text under the input, or the read-only caption.
+  final String? helper;
+
+  /// county lives in the address block; it repeats in Districts only when no
+  /// address block rendered it.
+  final bool onlyWithoutAddress;
+
+  /// Long fields break the two-up flow and take the full width.
+  bool get isLong => kind == _FieldKind.longText || kind == _FieldKind.addressBlock;
+}
+
+/// One question group on the profile sheet.
+class _ProfileSection {
+  const _ProfileSection({
+    required this.id,
+    required this.title,
+    required this.fields,
+    this.caption,
+    this.cascade = const [],
+  });
+
+  final String id;
+  final String title;
+  final List<_ProfileField> fields;
+
+  /// One line under the header in read mode.
+  final String? caption;
+
+  /// Cascade banner sentences shown above the inputs in edit mode. A section
+  /// carries one when saving it fires a trigger the exec should know about.
+  final List<String> cascade;
+}
+
+const String _districtsCaption = 'Districts are computed from the address.';
+
+/// The membership form asks who you are, how to reach you, where you live,
+/// what you study or do, where you organize, what you care about, and last,
+/// background. The sheet follows that order. Executive fields live in the
+/// header, and the system columns live on Sheet 2.
+const List<_ProfileSection> _profileSections = [
+  _ProfileSection(
+    id: 'about',
+    title: 'About',
+    // date_of_birth drives update_membership_eligible, which is what gates
+    // texting from the CRM.
+    cascade: [
+      'Date of birth sets membership eligibility. An ineligible member cannot be texted from the CRM.',
+    ],
+    fields: [
+      _ProfileField('preferred_pronouns', 'Pronouns'),
+      _ProfileField('date_of_birth', 'Date of birth', kind: _FieldKind.date),
+      _ProfileField('languages', 'Languages', kind: _FieldKind.chipsText),
+    ],
+  ),
+  _ProfileSection(
+    id: 'contact',
+    title: 'Contact',
+    // phone_e164 is the messaging key, and an address write recomputes county
+    // and all three districts. email is class C and gets its own dialog.
+    cascade: [
+      'Phone is how texts reach this member. Changing it changes who receives them.',
+      'Saving a new address recomputes county and all three districts. That takes a moment.',
+    ],
+    fields: [
+      _ProfileField('email', 'Email', kind: _FieldKind.email),
+      _ProfileField('phone', 'Phone', kind: _FieldKind.phone),
+      _ProfileField('school_email', 'School email', kind: _FieldKind.email),
+      _ProfileField('address_block', 'Address', kind: _FieldKind.addressBlock),
+    ],
+  ),
+  _ProfileSection(
+    id: 'districts',
+    title: 'Districts',
+    caption: _districtsCaption,
+    fields: [
+      _ProfileField('county', 'County', readOnly: true, onlyWithoutAddress: true),
+      _ProfileField(
+        'congressional_district',
+        'Congressional district',
+        readOnly: true,
+        helper: _districtsCaption,
+      ),
+      _ProfileField('house_district', 'House district', readOnly: true),
+      _ProfileField('senate_district', 'Senate district', readOnly: true),
+      _ProfileField('registered_voter', 'Registered voter', kind: _FieldKind.triBool),
+    ],
+  ),
+  _ProfileSection(
+    id: 'school_work',
+    title: 'School and work',
+    fields: [
+      _ProfileField('in_school', 'In school'),
+      _ProfileField('college', 'College', capitalizeWords: true),
+      _ProfileField('high_school', 'High school', capitalizeWords: true),
+      _ProfileField('school_name', 'School', capitalizeWords: true),
+      _ProfileField('graduation_year', 'Graduation year'),
+      _ProfileField('education_level', 'Education level'),
+      _ProfileField('employed', 'Employed'),
+      _ProfileField('industry', 'Industry', capitalizeWords: true),
+    ],
+  ),
+  _ProfileSection(
+    id: 'chapter',
+    title: 'Chapter',
+    cascade: [
+      'Committees set Slack channel membership. Executive Committee is not changed here.',
+    ],
+    fields: [
+      _ProfileField('current_chapter_member', 'Current chapter member'),
+      _ProfileField('chapter_name', 'Chapter name', capitalizeWords: true),
+      _ProfileField('chapter_position', 'Chapter position', capitalizeWords: true),
+      _ProfileField('date_elected', 'Date elected', kind: _FieldKind.date),
+      _ProfileField('term_expiration', 'Term expiration', kind: _FieldKind.date),
+      _ProfileField('committee', 'Committees', kind: _FieldKind.committees),
+    ],
+  ),
+  _ProfileSection(
+    id: 'involvement',
+    title: 'Involvement and interests',
+    fields: [
+      _ProfileField('why_join', 'Why join', kind: _FieldKind.longText),
+      _ProfileField('passionate_issues', 'Passionate issues', kind: _FieldKind.longText),
+      _ProfileField('why_issues_matter', 'Why these issues matter', kind: _FieldKind.longText),
+      _ProfileField('areas_of_interest', 'Areas of interest', kind: _FieldKind.longText),
+      _ProfileField('desire_to_lead', 'Desire to lead'),
+      _ProfileField('hours_per_week', 'Hours per week'),
+      _ProfileField('political_experience', 'Political experience', kind: _FieldKind.longText),
+      _ProfileField('current_involvement', 'Current involvement', kind: _FieldKind.longText),
+      _ProfileField('leadership_experience', 'Leadership experience', kind: _FieldKind.longText),
+      _ProfileField('qualified_experience', 'Qualified experience', kind: _FieldKind.longText),
+      _ProfileField('goals_and_ambitions', 'Goals and ambitions', kind: _FieldKind.longText),
+      _ProfileField('referral_source', 'Referral source'),
+      _ProfileField('accommodations', 'Accommodations', kind: _FieldKind.longText),
+    ],
+  ),
+  _ProfileSection(
+    id: 'social',
+    title: 'Social',
+    fields: [
+      _ProfileField('instagram', 'Instagram', kind: _FieldKind.social, platform: _SocialPlatform.instagram),
+      _ProfileField('tiktok', 'TikTok', kind: _FieldKind.social, platform: _SocialPlatform.tiktok),
+      _ProfileField('x', 'X', kind: _FieldKind.social, platform: _SocialPlatform.x),
+    ],
+  ),
+  // Last on purpose: the most sensitive data on the page and the least needed
+  // to make a call.
+  _ProfileSection(
+    id: 'background',
+    title: 'Background',
+    caption: 'Self reported on the membership form.',
+    fields: [
+      _ProfileField('gender_identity', 'Gender identity'),
+      _ProfileField('race', 'Race'),
+      _ProfileField('hispanic_latino', 'Hispanic or Latino', kind: _FieldKind.triBool),
+      _ProfileField('sexual_orientation', 'Sexual orientation'),
+      _ProfileField('religion', 'Religion'),
+      _ProfileField('disability', 'Disability'),
+      _ProfileField('community_type', 'Community type'),
+      _ProfileField('zodiac_sign', 'Zodiac sign'),
+    ],
+  ),
+];
+
 /// Detailed view of a single member
 class MemberDetailScreen extends StatefulWidget {
   final Member member;
@@ -133,6 +345,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final Set<String> _deletingReportIds = <String>{};
   String? _reportComposerError;
   bool _refreshingMember = false;
+  bool _togglingOptOut = false;
   WalletPassMember? _walletPass;
   bool _loadingWalletPass = false;
   bool _sendingWalletPush = false;
@@ -141,7 +354,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   bool _loadingDonorProfile = false;
   String? _donorError;
 
-  // MO voter file cross-reference — lazy, read-only.
+  // MO voter file cross-reference. Lazy, read-only.
   VoterFileRecord? _voterRecord;
   bool _loadingVoterRecord = false;
   final NumberFormat _currencyFormat = NumberFormat.simpleCurrency();
@@ -163,27 +376,45 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     return email != null && email.trim().isNotEmpty;
   }
 
-  static const Map<String, List<Color>> _sectionPalette = {
-    'Contact Information': [Color(0xFF0052D4), Color(0xFF65C7F7)],
-    'Chapter Involvement': [Color(0xFF11998e), Color(0xFF38ef7d)],
-    'Social Profiles': [Color(0xFFee0979), Color(0xFFff6a00)],
-    'Political & Civic': [Color(0xFF4776E6), Color(0xFF8E54E9)],
-    'Education & Employment': [Color(0xFFf7971e), Color(0xFFffd200)],
-    'Personal Details': [Color(0xFF654ea3), Color(0xFFeaafc8)],
-    'Goals & Interests': [Color(0xFF36d1dc), Color(0xFF5b86e5)],
-    'Engagement & Interests': [Color(0xFF36d1dc), Color(0xFF5b86e5)],
-    'Notes & Engagement': [Color(0xFFb24592), Color(0xFFf15f79)],
-    'Metadata': [Color(0xFF232526), Color(0xFF414345)],
-    'CRM Metadata': [Color(0xFF232526), Color(0xFF414345)],
-  };
+  // ── Per-section edit state ───────────────────────────────────
+  // One section is in edit mode at a time. Controllers, picked dates and
+  // tri-state values are keyed by column; committees are a set of the
+  // NON-executive names, since Executive Committee is never edited here.
+  static const String _aboutTitleGroup = 'about_title';
+  String? _editingSection;
+  final GlobalKey<FormState> _editFormKey = GlobalKey<FormState>();
+  final Map<String, TextEditingController> _editControllers = {};
+  final Map<String, DateTime?> _editDates = {};
+  final Map<String, bool?> _editBools = {};
+  Set<String> _editCommittees = <String>{};
+  List<String> _knownCommittees = const [];
+  bool _showCommitteeInput = false;
+  bool _savingSection = false;
+  bool _savingNotes = false;
+  String? _editError;
+  String? _editErrorTitle;
 
-  static const LinearGradient _walletPassGradient = LinearGradient(
-    colors: [Color(0xFF0F4C75), Color(0xFF3282B8)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
+  /// The member row the open editor was seeded from, and the `updated_at` that
+  /// exact row carried. They are captured together in _beginEdit and only ever
+  /// move together, because they describe one row version.
+  ///
+  /// [_editBaseline] is what _computeUpdates diffs against, never _member: a
+  /// row arriving from anywhere else while the editor is open would otherwise
+  /// look like a field this exec had changed and be written back, reverting
+  /// whoever really changed it.
+  ///
+  /// [_editBaselineUpdatedAt] is the compare-and-swap token the save sends
+  /// back, so Postgres writes only while the row is still that version.
+  Member? _editBaseline;
+  String? _editBaselineUpdatedAt;
 
+  /// The row the diff runs against. _member is only the fallback for code that
+  /// reads it outside an edit session.
+  Member get _diffBase => _editBaseline ?? _member;
 
+  /// True between an address save and the refetch that picks up the
+  /// districts the trigger recomputed; S3 shows a caption meanwhile.
+  bool _districtsRefreshing = false;
   @override
   void initState() {
     super.initState();
@@ -220,33 +451,54 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
   }
 
+
   @override
   void dispose() {
+    _disposeEditControllers(immediately: true);
     _notesController.dispose();
     _reportNotesController.dispose();
     super.dispose();
   }
 
   Future<void> _saveNotes() async {
-    if (!_crmReady) return;
+    if (!_crmReady || _savingNotes) return;
 
+    setState(() => _savingNotes = true);
     try {
-      await _memberRepo.updateNotes(_member.id, _notesController.text);
+      // Written through the guarded path with no expectation, so notes stay
+      // last-write-wins as they always have, but the server row comes back.
+      // That row carries the new version token, which re-bases an open section
+      // edit instead of leaving its guard pointing at a row this write just
+      // replaced.
+      final snapshot = await _memberRepo.updateMemberFieldsGuarded(
+        _member.id,
+        {'notes': _notesController.text},
+        expectedUpdatedAt: null,
+      );
       if (!mounted) return;
-      final updated = _member.copyWith(notes: _notesController.text);
+      if (snapshot == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notes were not saved. Try again.')),
+        );
+        return;
+      }
+      final updated = snapshot.member;
       setState(() {
         _member = updated;
         _editingNotes = false;
+        _rebaseOpenEdit(snapshot);
       });
       _memberLookup.cacheMember(updated);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notes saved')),
+        const SnackBar(content: Text('Notes saved. Mautic will refresh this contact.')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving notes: $e')),
       );
+    } finally {
+      if (mounted) setState(() => _savingNotes = false);
     }
   }
 
@@ -578,43 +830,80 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
   }
 
+  /// Flip the member's opt-out flag and show whatever the database ended up
+  /// holding.
+  ///
+  /// Nothing here merges the intended state locally. The repository returns the
+  /// row the server wrote and throws if it did not write one, so the only way
+  /// to reach the success path is with a row in hand. A member who is still
+  /// opted in cannot be displayed as opted out, which is the direction of this
+  /// bug that keeps sending texts to someone the CRM says was unsubscribed.
   Future<void> _toggleOptOut() async {
-    if (!_crmReady) return;
+    if (!_crmReady || _togglingOptOut) return;
     final newOptOutStatus = !_member.optOut;
 
+    setState(() => _togglingOptOut = true);
     try {
-      await _memberRepo.updateOptOutStatus(
+      final snapshot = await _memberRepo.updateOptOutStatus(
         _member.id,
         newOptOutStatus,
         reason: newOptOutStatus ? 'Manually opted out' : null,
       );
 
       if (!mounted) return;
-      final updated = _member.copyWith(
-        optOut: newOptOutStatus,
-        optOutDate: newOptOutStatus ? DateTime.now() : _member.optOutDate,
-        optInDate: !newOptOutStatus ? DateTime.now() : _member.optInDate,
-      );
       setState(() {
-        _member = updated;
+        _member = snapshot.member;
+        _rebaseOpenEdit(snapshot);
       });
-      _memberLookup.cacheMember(updated);
+      _memberLookup.cacheMember(snapshot.member);
 
+      // Read off the saved row, not off the toggle that was requested.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(newOptOutStatus ? 'Member opted out' : 'Member opted in'),
+          content: Text(
+            snapshot.member.optOut ? 'Member opted out' : 'Member opted in',
+          ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating opt-out status: $e')),
+        SnackBar(
+          content: Text(
+            'Opt-out status was NOT changed. This member is still '
+            '${_member.optOut ? 'opted out' : 'opted in'}. $e',
+          ),
+        ),
       );
+    } finally {
+      if (mounted) setState(() => _togglingOptOut = false);
     }
   }
 
+  /// Reload the member from the server.
+  ///
+  /// This will not run while a section is in edit mode. The screen used to
+  /// reassign _member from here regardless, and the initState refetch, the
+  /// post-address refetch and the pull-to-refresh all land at times nobody
+  /// controls. With the editor open that swapped the row the controllers were
+  /// seeded from, so a field a different exec had just changed no longer
+  /// matched this exec's untouched controller, entered the diff as an edit and
+  /// was written back on save, silently reverting them.
   Future<void> _fetchLatestMember({bool showFeedback = false}) async {
     if (!_crmReady || _refreshingMember) return;
+    if (_editingSection != null) {
+      if (showFeedback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Save or cancel the open edit first. Refreshing now would '
+              'replace the values you are editing.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() => _refreshingMember = true);
 
@@ -866,25 +1155,23 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
   }
 
-  Future<void> _editMember() async {
-    if (!_crmReady) return;
-
-    final updated = await showModalBottomSheet<Member?>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => FractionallySizedBox(
-        heightFactor: 0.9,
-        child: MemberEditSheet(member: _member),
-      ),
-    );
-
-    if (!mounted || updated == null) return;
-    setState(() => _member = updated);
-    _memberLookup.cacheMember(updated);
-  }
-
+  /// Upload a new profile photo.
+  ///
+  /// Blocked while a section is in edit mode. The upload writes
+  /// profile_pictures and returns the whole member row, which this method
+  /// assigns to _member; doing that under an open editor is the same clobber
+  /// _fetchLatestMember was doing, and it moves the row version the pending
+  /// save is guarded on.
   Future<void> _selectProfilePhoto() async {
     if (!_crmReady || _uploadingPhoto) return;
+    if (_editingSection != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Save or cancel the open edit before changing the photo.'),
+        ),
+      );
+      return;
+    }
 
     final result = await file_picker.FilePicker.platform.pickFiles(
       type: file_picker.FileType.custom,
@@ -2007,8 +2294,6 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_member.name),
-        backgroundColor: _member.membershipEligible == false ? Colors.red : null,
-        foregroundColor: _member.membershipEligible == false ? Colors.white : null,
         actions: [
           IconButton(
             icon: _refreshingMember
@@ -2138,191 +2423,168 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
   }
 
-  /// Build member activity section (forms, votes, jobs)
-  /// Returns null if there's no activity to show
-  Widget? _buildMemberActivitySection() {
-    // Don't show anything if still loading or no data
-    if (_loadingMemberActivity) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 16),
-        child: const Padding(
-          padding: EdgeInsets.all(16),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      );
-    }
+  // ── Sheet 2, R5: activity ────────────────────────────────────
+
+  /// Forms submitted, votes cast and job applications. Null while loading and
+  /// null when there is nothing to show: Sheet 2 never carries a spinner card
+  /// or an empty placeholder for this block.
+  Widget? _buildMemberActivityBlock({required bool first}) {
+    if (_loadingMemberActivity) return null;
 
     final hasFormSubmissions = _formSubmissions.isNotEmpty;
     final hasVotes = _votesCast.isNotEmpty;
     final hasJobApplications = _jobApplications.isNotEmpty;
+    if (!hasFormSubmissions && !hasVotes && !hasJobApplications) return null;
 
-    // If no activity at all, return null (no placeholder)
-    if (!hasFormSubmissions && !hasVotes && !hasJobApplications) {
-      return null;
-    }
-
-    final theme = Theme.of(context);
     final dateFormat = DateFormat('MMM d, y');
-    final sectionWidgets = <Widget>[];
+    final subsections = <Widget>[];
 
-    // Form Submissions Section
     if (hasFormSubmissions) {
-      sectionWidgets.add(
+      subsections.add(
         _buildActivitySubsection(
-          title: 'Form Submissions',
+          title: 'Form submissions',
           icon: Icons.assignment_outlined,
           count: _formSubmissions.length,
           children: _formSubmissions.take(3).map((submission) {
-            return ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
+            return _activityRow(
+              icon: Icons.description_outlined,
+              title: submission.displayName != 'Anonymous'
+                  ? submission.displayName
+                  : 'Form submission',
+              subtitle: dateFormat.format(submission.createdAt),
+              trailing: SubmissionStatusBadge(status: submission.status, compact: true),
               onTap: () => _viewFormSubmission(submission),
-              leading: Icon(Icons.description_outlined, size: 20, color: theme.colorScheme.primary),
-              title: Text(
-                submission.displayName != 'Anonymous'
-                    ? submission.displayName
-                    : 'Form Submission',
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-              ),
-              subtitle: Text(dateFormat.format(submission.createdAt)),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SubmissionStatusBadge(status: submission.status, compact: true),
-                  const SizedBox(width: 4),
-                  Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.onSurfaceVariant),
-                ],
-              ),
             );
           }).toList(),
         ),
       );
     }
 
-    // Votes Section
     if (hasVotes) {
-      sectionWidgets.add(
+      subsections.add(
         _buildActivitySubsection(
-          title: 'Votes Cast',
+          title: 'Votes cast',
           icon: Icons.how_to_vote_outlined,
           count: _votesCast.length,
           children: _votesCast.take(3).map((vote) {
             final title = vote['form_schemas']?['title']?.toString() ?? 'Vote';
-            final voteId = vote['form_schemas']?['id']?.toString() ?? vote['voting_form_id']?.toString();
+            final voteId = vote['form_schemas']?['id']?.toString() ??
+                vote['voting_form_id']?.toString();
             final createdAtRaw = vote['created_at'];
-            final createdAt = createdAtRaw != null
-                ? DateTime.tryParse(createdAtRaw.toString())
-                : null;
+            final createdAt =
+                createdAtRaw != null ? DateTime.tryParse(createdAtRaw.toString()) : null;
             final voteData = vote['vote_data'] as Map<String, dynamic>?;
             final schema = vote['form_schemas']?['schema'] as Map<String, dynamic>?;
-
-            // Get the vote choice label (not just the ID)
-            String? voteChoice = _getVoteChoiceLabel(voteData, schema);
-
-            return ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
+            final voteChoice = _getVoteChoiceLabel(voteData, schema);
+            final subtitleParts = <String>[
+              if (createdAt != null) dateFormat.format(createdAt),
+              if (voteChoice != null) 'Voted: $voteChoice',
+            ];
+            return _activityRow(
+              icon: Icons.check_circle_outline,
+              title: title,
+              subtitle: subtitleParts.isEmpty ? null : subtitleParts.join('  '),
               onTap: voteId != null ? () => _viewVoteDetails(voteId) : null,
-              leading: Icon(Icons.check_circle_outline, size: 20, color: Colors.green),
-              title: Text(
-                title,
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-                overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (createdAt != null) Text(dateFormat.format(createdAt)),
-                  if (voteChoice != null)
-                    Text(
-                      'Voted: $voteChoice',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: Colors.green,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                ],
-              ),
-              trailing: voteId != null
-                  ? Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.onSurfaceVariant)
-                  : null,
             );
           }).toList(),
         ),
       );
     }
 
-    // Job Applications Section
     if (hasJobApplications) {
-      sectionWidgets.add(
+      subsections.add(
         _buildActivitySubsection(
-          title: 'Job Applications',
+          title: 'Job applications',
           icon: Icons.work_outline,
           count: _jobApplications.length,
           children: _jobApplications.take(3).map((job) {
             final title = job['form_schemas']?['title']?.toString() ?? 'Application';
             final createdAtRaw = job['created_at'];
-            final createdAt = createdAtRaw != null
-                ? DateTime.tryParse(createdAtRaw.toString())
-                : null;
+            final createdAt =
+                createdAtRaw != null ? DateTime.tryParse(createdAtRaw.toString()) : null;
             final status = job['status']?.toString() ?? 'submitted';
-            return ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.business_center_outlined, size: 20, color: Colors.purple),
-              title: Text(
-                title,
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-                overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: createdAt != null ? Text(dateFormat.format(createdAt)) : null,
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.purple.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  status,
-                  style: theme.textTheme.labelSmall?.copyWith(color: Colors.purple),
-                ),
-              ),
+            return _activityRow(
+              icon: Icons.business_center_outlined,
+              title: title,
+              subtitle: createdAt != null ? dateFormat.format(createdAt) : null,
+              trailing: _profileTag(status),
             );
           }).toList(),
         ),
       );
     }
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        profileSectionHeader(title: 'Activity', first: first),
+        profileSectionBody(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: subsections,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Small unityBlue-on-chip-fill tag (11.27:1, computed) for a status word.
+  Widget _profileTag(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: ProfileTokens.fill,
+        borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
+      ),
+      child: Text(text, style: ProfileText.chip),
+    );
+  }
+
+  /// One tappable row inside an activity subsection. Built by hand rather than
+  /// as a ListTile so no Theme colour reaches the sheet.
+  Widget _activityRow({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, size: 20, color: ProfileTokens.inkMuted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.all(8),
-                  child: const Icon(Icons.history, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 12),
                 Text(
-                  'Member Activity',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  title,
+                  style: ProfileText.value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+                if (subtitle != null) Text(subtitle, style: ProfileText.caption),
               ],
             ),
-            const SizedBox(height: 16),
-            ...sectionWidgets,
+          ),
+          if (trailing != null) ...[const SizedBox(width: 8), trailing],
+          if (onTap != null) ...[
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right, size: 20, color: ProfileTokens.inkMuted),
           ],
-        ),
+        ],
+      ),
+    );
+    if (onTap == null) return row;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+        onTap: onTap,
+        child: row,
       ),
     );
   }
@@ -2333,63 +2595,58 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     required int count,
     required List<Widget> children,
   }) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '$count',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ...children,
-        if (count > 3)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              '+${count - 3} more',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: ProfileTokens.inkMuted),
+              const SizedBox(width: 8),
+              Expanded(child: Text(title.toUpperCase(), style: ProfileText.label)),
+              _profileTag('$count'),
+            ],
           ),
-        const SizedBox(height: 12),
-      ],
+          const SizedBox(height: 4),
+          ...children,
+          if (count > 3)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 4),
+              child: Text('+${count - 3} more', style: ProfileText.caption),
+            ),
+        ],
+      ),
     );
   }
 
-  void _viewFormSubmission(FormSubmission submission) {
+  /// Endorsement questionnaires go to the candidate review, which is built for
+  /// them: it carries the Gemini verdict block and is titled Candidate Review.
+  /// Every other form, membership above all, is never scored, so it opens the
+  /// read-only submission view instead. FormSubmission does not carry the slug,
+  /// so the schema is fetched first and the branch is taken on its slug.
+  Future<void> _viewFormSubmission(FormSubmission submission) async {
+    bool isEndorsement = false;
+    try {
+      final form = await _formsService.getForm(submission.formId);
+      isEndorsement = form.slug?.startsWith('endorsement-questionnaire') ?? false;
+    } catch (e) {
+      debugPrint('_viewFormSubmission: could not load form ${submission.formId}: $e');
+    }
+    if (!mounted) return;
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => SubmissionDetailScreen(
-          formId: submission.formId,
-          submissionId: submission.id,
-        ),
+        builder: (context) => isEndorsement
+            ? SubmissionDetailScreen(
+                formId: submission.formId,
+                submissionId: submission.id,
+              )
+            : MemberSubmissionScreen(
+                formId: submission.formId,
+                submissionId: submission.id,
+              ),
       ),
     );
   }
@@ -2411,387 +2668,2238 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
   }
 
+  // ── Overview tab ─────────────────────────────────────────────
+
+  /// Two white sheets on the branded ground, one column, centred at 1120.
+  /// Sheet 1 is the profile in the order the member filled it in; Sheet 2 is
+  /// what the CRM knows. Every piece of content sits on one of them, because
+  /// BrandedBackground is not light and no single ink passes at both of its
+  /// ends (see ProfileTokens).
   Widget _buildOverviewTab(BuildContext context) {
-    final theme = Theme.of(context);
-    final phoneDisplay = _cleanText(_member.phone);
-    final phoneE164 = _cleanText(_member.phoneE164);
-    final primaryPhone = phoneDisplay ?? phoneE164;
-    final phoneCopyValue = phoneE164 ?? phoneDisplay;
-    final email = _cleanText(_member.email);
-    final county = _cleanText(_member.county);
-    final addressParts = _buildAddressParts(
-      street: _member.address,
-      city: _member.city,
-      county: _member.county,
-      state: _member.state,
-    );
-    final addressDisplay = addressParts.isEmpty ? null : addressParts.join('\n');
-    final addressCopyValue = addressParts.isEmpty ? null : addressParts.join(', ');
-    final addressLink = _buildAppleMapsLink(addressParts);
-    final districtLabel = _formatDistrict(_member.congressionalDistrict);
-    final committees = (_member.committee != null && _member.committee!.isNotEmpty)
-        ? _member.committeesString
-        : null;
-    final notesValue = _cleanText(_member.notes);
-    final isExecutive = _member.executiveCommittee;
-    final executiveTitle =
-        _cleanText(_member.executiveTitle) ?? (isExecutive ? 'Executive Committee' : null);
-    final executiveRole = _cleanText(_member.executiveRoleDisplay);
-    final chapterStatus = _cleanText(_member.currentChapterMember);
-    final chapterName = _cleanText(_member.chapterName);
-    final chapterPosition = _cleanText(_member.chapterPosition);
-    final graduationYear = _cleanText(_member.graduationYear);
-    final schoolEmail = _cleanText(_member.schoolEmail);
-    final dateElected = _member.dateElected;
-    final termExpiration = _member.termExpiration;
-    final college = _cleanText(_member.college);
-    final highSchool = _cleanText(_member.highSchool);
-    final legacySchool =
-        (college == null && highSchool == null) ? _cleanText(_member.schoolName) : null;
-
-    final walletSection = _buildWalletPassSection();
-    final donorSection = _buildDonorSection();
-    final activitySection = _buildMemberActivitySection();
-
-    final sections = <Widget?>[
-      walletSection,
-      donorSection,
-      activitySection,
-      _buildOptionalSection('Contact Information', [
-        _copyRow('Phone', primaryPhone, copyValue: phoneCopyValue),
-        _copyRow('Email', email),
-        _copyRow('School Email', schoolEmail),
-        _copyRow('Address', addressDisplay, copyValue: addressCopyValue, link: addressLink),
-      ]),
-      _buildOptionalSection('Chapter Involvement', [
-        _infoRowOrNull('Current Chapter Member', chapterStatus),
-        _infoRowOrNull('Chapter Name', chapterName),
-        _infoRowOrNull('Chapter Position', chapterPosition),
-        if (dateElected != null) _buildInfoRow('Date Elected', _formatDateOnly(dateElected)),
-        if (termExpiration != null)
-          _buildInfoRow('Term Expiration', _formatDateOnly(termExpiration)),
-        _infoRowOrNull('Graduation Year', graduationYear),
-      ]),
-      _buildOptionalSection('Social Profiles', [
-        _socialRow(_SocialPlatform.instagram, 'Instagram', _member.instagram),
-        _socialRow(_SocialPlatform.tiktok, 'TikTok', _member.tiktok),
-        _socialRow(_SocialPlatform.x, 'X (Twitter)', _member.x),
-      ]),
-      _buildOptionalSection('Political & Civic', [
-        _infoRowOrNull('County', county),
-        if (districtLabel != null) _buildInfoRow('Congressional District', districtLabel),
-        if (committees != null) _buildInfoRow('Committees', committees),
-        if (_member.registeredVoter != null)
-          _buildInfoRow('Registered Voter', _member.registeredVoter! ? 'Yes' : 'No'),
-        _infoRowOrNull('Political Experience', _member.politicalExperience),
-        _infoRowOrNull('Current Involvement', _member.currentInvolvement),
-      ]),
-      _buildOptionalSection('Education & Employment', [
-        _infoRowOrNull('Education Level', _member.educationLevel),
-        _infoRowOrNull('In School', _member.inSchool),
-        _infoRowOrNull('College', college),
-        _infoRowOrNull('High School', highSchool),
-        _infoRowOrNull('School (Legacy)', legacySchool),
-        _infoRowOrNull('Employed', _member.employed),
-        _infoRowOrNull('Industry', _member.industry),
-        _infoRowOrNull('Leadership Experience', _member.leadershipExperience),
-      ]),
-      _buildOptionalSection('Personal Details', [
-        if (_member.dateOfBirth != null)
-          _buildInfoRow('Date of Birth', _formatDateOnly(_member.dateOfBirth!)),
-        if (_member.age != null) _buildInfoRow('Age', '${_member.age} years old'),
-        _infoRowOrNull('Pronouns', _member.preferredPronouns),
-        _infoRowOrNull('Gender Identity', _member.genderIdentity),
-        _infoRowOrNull('Race', _member.race),
-        _infoRowOrNull('Sexual Orientation', _member.sexualOrientation),
-        if (_member.hispanicLatino != null)
-          _buildInfoRow('Hispanic/Latino', _member.hispanicLatino! ? 'Yes' : 'No'),
-        _infoRowOrNull('Languages', _member.languages),
-        _infoRowOrNull('Community Type', _member.communityType),
-        _infoRowOrNull('Disability', _member.disability),
-        _infoRowOrNull('Religion', _member.religion),
-        _infoRowOrNull('Zodiac Sign', _member.zodiacSign),
-      ]),
-      _buildOptionalSection('Engagement & Interests', [
-        _infoRowOrNull('Desire to Lead', _member.desireToLead),
-        _infoRowOrNull('Hours per Week', _member.hoursPerWeek),
-        _infoRowOrNull('Why Join', _member.whyJoin),
-        _infoRowOrNull('Goals & Ambitions', _member.goalsAndAmbitions),
-        _infoRowOrNull('Qualified Experience', _member.qualifiedExperience),
-        _infoRowOrNull('Referral Source', _member.referralSource),
-        _infoRowOrNull('Passionate Issues', _member.passionateIssues),
-        _infoRowOrNull('Why Issues Matter', _member.whyIssuesMatter),
-        _infoRowOrNull('Areas of Interest', _member.areasOfInterest),
-        _infoRowOrNull('Accommodations', _member.accommodations),
-      ]),
-    ].whereType<Widget>().toList();
-
-    final metadataSection = _buildOptionalSection('CRM Metadata', [
-      _copyRow('Member ID', _member.id),
-      if (_member.lastContacted != null)
-        _buildInfoRow('Last Contacted', _formatDate(_member.lastContacted!)),
-      if (_member.introSentAt != null)
-        _buildInfoRow('Intro Sent', _formatDate(_member.introSentAt!)),
-      if (_member.dateJoined != null)
-        _buildInfoRow('Date Joined', _formatDate(_member.dateJoined!)),
-      if (_member.createdAt != null)
-        _buildInfoRow('Added to System', _formatDate(_member.createdAt!)),
-      _infoRowOrNull('Opt-Out Reason', _member.optOutReason),
-      if (_member.optOutDate != null)
-        _buildInfoRow('Opt-Out Date', _formatDateOnly(_member.optOutDate!)),
-      if (_member.optInDate != null)
-        _buildInfoRow('Opt-In Date', _formatDateOnly(_member.optInDate!)),
-    ]);
-
-    final notesChildren = <Widget>[];
-    if (!_editingNotes && notesValue == null) {
-      notesChildren.add(TextButton.icon(
-        icon: const Icon(Icons.add),
-        label: const Text('Add notes'),
-        onPressed: () => setState(() => _editingNotes = true),
-      ));
-    }
-    if (!_editingNotes && notesValue != null) {
-      notesChildren.add(Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(notesValue),
-          const SizedBox(height: 8),
-          TextButton.icon(
-            icon: const Icon(Icons.edit),
-            label: const Text('Edit'),
-            onPressed: () => setState(() => _editingNotes = true),
-          ),
-        ],
-      ));
-    }
-    if (_editingNotes) {
-      notesChildren.add(Column(
-        children: [
-          TextField(
-            controller: _notesController,
-            maxLines: 5,
-            decoration: const InputDecoration(
-              hintText: 'Add notes about this member...',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () {
-                  _notesController.text = _member.notes ?? '';
-                  setState(() => _editingNotes = false);
-                },
-                child: const Text('Cancel'),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: _saveNotes,
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-        ],
-      ));
-    }
-    final notesSection = notesChildren.isEmpty ? null : _buildSection('Notes', notesChildren);
-    final internalReportsSection = _buildInternalReportsSection();
-
-    final allSections = <Widget>[
-      ...sections,
-      if (_voterRecord != null)
-        VoterCrossRefCard(
-          record: _voterRecord!,
-          memberDateOfBirth: _member.dateOfBirth,
-        ),
-      if (internalReportsSection != null) internalReportsSection,
-      if (notesSection != null) notesSection,
-      if (metadataSection != null) metadataSection,
-    ];
-
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 768;
-        final listPadding =
-            isWide ? const EdgeInsets.symmetric(horizontal: 32, vertical: 24) : const EdgeInsets.all(16);
-        final chipsAlignment = isWide ? WrapAlignment.start : WrapAlignment.center;
-        final actionsAlignment = isWide ? WrapAlignment.start : WrapAlignment.center;
-
-        Widget? sectionLayout;
-        if (allSections.isNotEmpty) {
-          if (isWide) {
-            const double spacing = 24;
-            const double maxCardWidth = 420;
-            const double minCardWidth = 320;
-            final double availableWidth = constraints.maxWidth - listPadding.horizontal;
-            double cardWidth = maxCardWidth;
-            if (availableWidth < maxCardWidth * 2 + spacing) {
-              if (availableWidth >= minCardWidth * 2 + spacing) {
-                cardWidth = (availableWidth - spacing) / 2;
-              } else {
-                cardWidth = availableWidth;
-              }
-            }
-
-            sectionLayout = Wrap(
-              spacing: spacing,
-              runSpacing: spacing,
-              alignment: WrapAlignment.start,
-              children: allSections
-                  .map(
-                    (section) => SizedBox(
-                      width: cardWidth.clamp(minCardWidth, maxCardWidth).toDouble(),
-                      child: section,
-                    ),
-                  )
-                  .toList(),
-            );
-          } else {
-            sectionLayout = Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (int i = 0; i < allSections.length; i++) ...[
-                  allSections[i],
-                  if (i != allSections.length - 1) const SizedBox(height: 24),
-                ],
-              ],
-            );
-          }
-        }
+        final wide = constraints.maxWidth >= 768;
+        final listPadding = wide
+            ? const EdgeInsets.symmetric(horizontal: 32, vertical: 24)
+            : const EdgeInsets.all(16);
 
         return MobileAwareSelectionArea(
           child: ListView(
             padding: listPadding,
             children: [
-              Center(child: _buildProfilePhoto()),
-            const SizedBox(height: 16),
-            Center(
-              child: Column(
-                children: [
-                  Text(
-                    _member.name,
-                    style: theme.textTheme.headlineSmall,
-                    textAlign: TextAlign.center,
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: ProfileTokens.maxSheetWidth),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildProfileSheet(wide: wide),
+                      const SizedBox(height: 24),
+                      _buildRecordSheet(),
+                      const SizedBox(height: 32),
+                    ],
                   ),
-                  if (isExecutive && (executiveTitle != null || executiveRole != null)) ...[
-                    const SizedBox(height: 6),
-                    if (executiveTitle != null)
-                      Text(
-                        executiveTitle,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    if (executiveRole != null)
-                      Text(
-                        executiveRole,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.textTheme.bodySmall?.color?.withOpacity(0.75),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              alignment: chipsAlignment,
-              runAlignment: chipsAlignment,
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                if (_member.lastContacted != null)
-                  Chip(
-                    avatar: const Icon(Icons.schedule_send, size: 18),
-                    label: Text('Last contacted ${_formatDate(_member.lastContacted!)}'),
-                  ),
-                if (_member.introSentAt != null)
-                  Chip(
-                    avatar: const Icon(Icons.auto_awesome, size: 18),
-                    label: Text('Intro sent ${_formatDate(_member.introSentAt!)}'),
-                  ),
-              ],
-            ),
-            if (_member.lastContacted != null || _member.introSentAt != null)
-              const SizedBox(height: 8),
-            if (_member.optOut)
-              Align(
-                alignment: isWide ? Alignment.centerLeft : Alignment.center,
-                child: const Chip(
-                  label: Text('OPTED OUT'),
-                  backgroundColor: Colors.red,
-                  labelStyle: TextStyle(color: Colors.white),
                 ),
               ),
-            if (_member.membershipEligible == false)
-              Align(
-                alignment: isWide ? Alignment.centerLeft : Alignment.center,
-                child: const Chip(
-                  label: Text('INELIGIBLE'),
-                  backgroundColor: Colors.red,
-                  labelStyle: TextStyle(color: Colors.white),
-                ),
-              ),
-            if (_crmReady)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16.0),
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  alignment: actionsAlignment,
-                  children: [
-                    OutlinedButton.icon(
-                      icon: _uploadingPhoto
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(
-                              _member.hasProfilePhoto
-                                  ? Icons.photo_camera_outlined
-                                  : Icons.add_a_photo_outlined,
-                            ),
-                      label: Text(_uploadingPhoto
-                          ? 'Uploading...'
-                          : (_member.hasProfilePhoto ? 'Update Photo' : 'Add Photo')),
-                      onPressed: _uploadingPhoto ? null : _selectProfilePhoto,
-                    ),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('Edit Member'),
-                      onPressed: _editMember,
-                    ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 24),
-            ..._buildMeetingAttendanceSection(),
-            if (_crmReady || sectionLayout != null) const SizedBox(height: 24),
-            if (sectionLayout != null) ...[
-              sectionLayout,
-              const SizedBox(height: 24),
             ],
-            MemberOutreachSection(member: _member),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              icon: Icon(_member.optOut ? Icons.check_circle : Icons.block),
-              label: Text(_member.optOut ? 'Opt In' : 'Opt Out'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _member.optOut ? Colors.green : Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: _crmReady ? _toggleOptOut : null,
-            ),
-          ],
           ),
         );
       },
+    );
+  }
+
+  // ── Sheet 1: the profile ─────────────────────────────────────
+
+  Widget _buildProfileSheet({required bool wide}) {
+    final sectionWidgets = <Widget>[];
+    final omitted = <_ProfileSection>[];
+    for (final section in _profileSections) {
+      final built = _buildProfileSection(section, first: sectionWidgets.isEmpty);
+      if (built == null) {
+        omitted.add(section);
+      } else {
+        sectionWidgets.add(built);
+      }
+    }
+
+    final children = <Widget>[_buildHeaderBand(wide: wide)];
+
+    if (sectionWidgets.isEmpty) {
+      // The sheet never disappears, so the page never reads as broken.
+      final firstName = _member.name.trim().split(RegExp(r'\s+')).first;
+      children.add(profileSectionHeader(title: 'Profile', first: true));
+      children.add(
+        profileSectionBody(
+          child: Text(
+            'Only a name is on file for $firstName.',
+            style: ProfileText.value,
+          ),
+        ),
+      );
+    } else {
+      children.addAll(sectionWidgets);
+    }
+
+    if (omitted.isNotEmpty && _editingSection == null) {
+      // One chip per omitted section. This is how a hidden field becomes
+      // editable without showing empty rows in read mode.
+      children.add(
+        Container(
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: ProfileTokens.hairline)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final section in omitted)
+                profileAddChip(
+                  title: section.title,
+                  onTap: () => _beginEdit(section.id),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ProfileSheet(children: children);
+  }
+
+  /// Solid unityBlue band fused to the top of Sheet 1. White on it is 12.51:1
+  /// and white70 is 7.03:1 (both documented in volunteers_theme.dart).
+  Widget _buildHeaderBand({required bool wide}) {
+    final isExecutive = _member.executiveCommittee;
+    final executiveTitle = _cleanText(_member.executiveTitle) ?? 'Executive Committee';
+    final executiveRole = _cleanText(_member.executiveRoleDisplay);
+    final chapterName = _cleanText(_member.chapterName);
+
+    final pills = <Widget>[
+      if (isExecutive)
+        const ProfilePill(label: 'Executive Committee', style: ProfilePillStyle.emphasis),
+      if (_member.optOut) const ProfilePill(label: 'Opted out', style: ProfilePillStyle.danger),
+      if (_member.membershipEligible == false)
+        const ProfilePill(label: 'Ineligible', style: ProfilePillStyle.danger),
+      if (chapterName != null)
+        ProfilePill(label: 'Chapter $chapterName', style: ProfilePillStyle.soft),
+    ];
+
+    final blocker = _member.contactBlocker;
+    final contactReason = switch (blocker) {
+      ContactBlocker.optedOut => 'Opted out',
+      ContactBlocker.noPhone => 'No phone on file',
+      ContactBlocker.notEligible => 'Not eligible',
+      null => null,
+    };
+
+    final actions = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: wide ? WrapAlignment.end : WrapAlignment.center,
+      children: [
+        ProfileActionPill(
+          icon: Icons.message_outlined,
+          label: 'Text',
+          onPressed: _member.canContact ? _startChat : null,
+          disabledReason: contactReason,
+        ),
+        ProfileActionPill(
+          icon: Icons.email_outlined,
+          label: 'Email',
+          onPressed: _crmReady && _hasEmailRecipient ? _composeEmail : null,
+          disabledReason: _hasEmailRecipient ? null : 'No email on file',
+          busy: _sendingEmail,
+        ),
+        ProfileActionPill(
+          icon: Icons.auto_awesome_outlined,
+          label: 'Intro',
+          onPressed: _member.canContact && _crmReady ? _sendIntro : null,
+          disabledReason: contactReason,
+          busy: _sendingIntro,
+        ),
+        ProfileActionPill(
+          icon: _member.hasProfilePhoto
+              ? Icons.photo_camera_outlined
+              : Icons.add_a_photo_outlined,
+          label: _member.hasProfilePhoto ? 'Update photo' : 'Add photo',
+          onPressed: _crmReady && _editingSection == null ? _selectProfilePhoto : null,
+          busy: _uploadingPhoto,
+        ),
+      ],
+    );
+
+    final photo = _buildHeaderPhoto(radius: wide ? 48 : 40);
+
+    final executiveLine = isExecutive
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  executiveRole == null ? executiveTitle : '$executiveTitle · $executiveRole',
+                  style: ProfileText.headerLine,
+                  textAlign: wide ? TextAlign.start : TextAlign.center,
+                ),
+              ),
+              const SizedBox(width: 4),
+              _headerEditButton(),
+            ],
+          )
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [_headerEditButton()],
+          );
+
+    final textColumn = Column(
+      crossAxisAlignment: wide ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+      children: [
+        Text(
+          _member.name,
+          style: ProfileText.headerName,
+          textAlign: wide ? TextAlign.start : TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        executiveLine,
+        if (pills.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: wide ? WrapAlignment.start : WrapAlignment.center,
+            children: pills,
+          ),
+        ],
+      ],
+    );
+
+    Widget content;
+    if (wide) {
+      content = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          photo,
+          const SizedBox(width: 20),
+          Expanded(child: textColumn),
+          const SizedBox(width: 16),
+          Flexible(child: actions),
+        ],
+      );
+    } else {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(child: photo),
+          const SizedBox(height: 12),
+          textColumn,
+          const SizedBox(height: 16),
+          actions,
+        ],
+      );
+    }
+
+    return Container(
+      color: ProfileTokens.band,
+      padding: EdgeInsets.all(wide ? 24 : 20),
+      child: content,
+    );
+  }
+
+  /// White70 pencil on the band, 7.03:1 (documented). Opens About plus the two
+  /// executive title fields as one group.
+  Widget _headerEditButton() {
+    return IconButton(
+      tooltip: 'Edit About and title',
+      icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.white70),
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      onPressed: _crmReady ? () => _beginEdit(_aboutTitleGroup) : null,
+    );
+  }
+
+  /// The real photo. effectiveAvatarUrl prefers the member's own upload and
+  /// falls through profile_pictures via MemberProfilePhoto.publicUrl; every
+  /// executive has profile_pictures and none has avatar_url, so a raw
+  /// avatar_url read is exactly why everyone showed initials before. The
+  /// sunriseGold ring is a mark, not text. Tap to update.
+  Widget _buildHeaderPhoto({required double radius}) {
+    final avatar = CorsAwareAvatar(
+      imageUrl: _member.effectiveAvatarUrl,
+      radius: radius,
+      backgroundColor: Colors.white.withValues(alpha: 0.2),
+      fallbackText: _member.name,
+      fallbackTextColor: Colors.white,
+      fallbackIconColor: Colors.white,
+    );
+
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: _crmReady && !_uploadingPhoto && _editingSection == null
+            ? _selectProfilePhoto
+            : null,
+        child: Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: BrandColors.sunriseGold, width: 2),
+          ),
+          child: _uploadingPhoto
+              ? SizedBox(
+                  width: radius * 2,
+                  height: radius * 2,
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                )
+              : avatar,
+        ),
+      ),
+    );
+  }
+
+  // ── Sheet 1: sections in read mode and edit mode ─────────────
+
+  /// Returns null when the section has nothing to show and is not being
+  /// edited. In edit mode every field of the section renders as an input,
+  /// empty ones included, so edit mode is the complete form and read mode is
+  /// the filled part of it.
+  Widget? _buildProfileSection(_ProfileSection section, {required bool first}) {
+    final editingGroup = _editingSection == _aboutTitleGroup && section.id == 'about';
+    final editing = _editingSection == section.id || editingGroup;
+
+    if (editing) {
+      final title = editingGroup ? 'About and title' : section.title;
+      final fields = _fieldsForEdit(_editingSection!);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          profileSectionHeader(title: title, first: first),
+          profileSectionBody(child: _buildSectionEditor(section, title, fields)),
+        ],
+      );
+    }
+
+    final addressShown = _buildAddressParts(
+      street: _member.address,
+      city: _member.city,
+      county: _member.county,
+      state: _member.state,
+    ).isNotEmpty;
+
+    final items = <ProfileFlowItem>[];
+    for (final field in section.fields) {
+      if (field.onlyWithoutAddress && addressShown) continue;
+      final built = _readField(field);
+      if (built != null) items.add(ProfileFlowItem(built, isLong: field.isLong));
+    }
+    if (items.isEmpty) return null;
+
+    String? caption = section.caption;
+    if (section.id == 'districts' && _districtsRefreshing) {
+      caption = 'Updating from the new address';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        profileSectionHeader(
+          title: section.title,
+          first: first,
+          trailing: profileEditButton(
+            section: section.title,
+            onPressed: _crmReady ? () => _beginEdit(section.id) : null,
+          ),
+        ),
+        profileSectionBody(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (caption != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(caption, style: ProfileText.caption),
+                ),
+              ProfileFieldFlow(items: items),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Map<String, dynamic> get _memberJson => _member.toJson();
+
+  DateTime? _dateFor(String key) {
+    switch (key) {
+      case 'date_of_birth':
+        return _member.dateOfBirth;
+      case 'date_elected':
+        return _member.dateElected;
+      case 'term_expiration':
+        return _member.termExpiration;
+    }
+    return null;
+  }
+
+  bool? _boolFor(String key) {
+    switch (key) {
+      case 'registered_voter':
+        return _member.registeredVoter;
+      case 'hispanic_latino':
+        return _member.hispanicLatino;
+    }
+    return null;
+  }
+
+  /// A field in read mode, or null when its cleaned value is empty.
+  Widget? _readField(_ProfileField field) {
+    switch (field.kind) {
+      case _FieldKind.text:
+      case _FieldKind.longText:
+      case _FieldKind.email:
+      case _FieldKind.chipsText:
+        final cleaned = _cleanText(_memberJson[field.key]?.toString());
+        if (cleaned == null) return null;
+        final String value = field.key == 'congressional_district'
+            ? (_formatDistrict(cleaned) ?? cleaned)
+            : cleaned;
+        if (field.key == 'school_name' &&
+            (_cleanText(_member.college) != null || _cleanText(_member.highSchool) != null)) {
+          return null;
+        }
+        if (field.kind == _FieldKind.longText) {
+          return ProfileLongText(label: field.label, value: value);
+        }
+        if (field.kind == _FieldKind.chipsText && value.contains(',')) {
+          final parts = value
+              .split(',')
+              .map((part) => part.trim())
+              .where((part) => part.isNotEmpty)
+              .toList();
+          return profileChips(parts, label: field.label);
+        }
+        if (field.kind == _FieldKind.email) {
+          return ProfileField(
+            label: field.label,
+            value: value,
+            onCopy: () => _copyToClipboard(field.label, value),
+          );
+        }
+        return ProfileField(label: field.label, value: value);
+
+      case _FieldKind.districts:
+        return null;
+
+      case _FieldKind.phone:
+        final display = _cleanText(_member.phone) ?? _cleanText(_member.phoneE164);
+        if (display == null) return null;
+        final copyValue = _cleanText(_member.phoneE164) ?? display;
+        return ProfileField(
+          label: field.label,
+          value: display,
+          onCopy: () => _copyToClipboard(field.label, copyValue),
+        );
+
+      case _FieldKind.date:
+        final date = _dateFor(field.key);
+        if (date == null) return null;
+        var text = _formatDateOnly(date);
+        if (field.key == 'date_of_birth' && _member.age != null) {
+          text = '$text (${_member.age})';
+        }
+        return ProfileField(label: field.label, value: text);
+
+      case _FieldKind.triBool:
+        final value = _boolFor(field.key);
+        if (value == null) return null;
+        return ProfileField(label: field.label, value: value ? 'Yes' : 'No');
+
+      case _FieldKind.social:
+        final raw = _cleanText(_memberJson[field.key]?.toString());
+        if (raw == null) return null;
+        final uri = _resolveSocialLink(field.platform!, raw);
+        final display = _formatSocialDisplay(field.platform!, raw, uri);
+        final copyTarget = uri?.toString() ?? raw;
+        return ProfileField(
+          label: field.label,
+          value: display,
+          link: uri,
+          onOpenLink: _openLink,
+          onCopy: () => _copyToClipboard(field.label, copyTarget),
+        );
+
+      case _FieldKind.addressBlock:
+        final parts = _buildAddressParts(
+          street: _member.address,
+          city: _member.city,
+          county: _member.county,
+          state: _member.state,
+        );
+        if (parts.isEmpty) return null;
+        final link = _buildAppleMapsLink(parts);
+        return ProfileField(
+          label: field.label,
+          value: parts.join('\n'),
+          link: link,
+          onOpenLink: _openLink,
+          onCopy: () => _copyToClipboard(field.label, parts.join(', ')),
+        );
+
+      case _FieldKind.committees:
+        final committees = _member.committee ?? const <String>[];
+        if (committees.isEmpty) return null;
+        return profileChips(
+          _orderedCommittees(committees),
+          label: field.label,
+          locked: const {_executiveCommittee},
+        );
+    }
+  }
+
+  static const String _executiveCommittee = 'Executive Committee';
+
+  /// Executive Committee first when present, then the rest in stored order.
+  List<String> _orderedCommittees(List<String> committees) {
+    final rest = committees.where((c) => c != _executiveCommittee).toList();
+    if (committees.contains(_executiveCommittee)) {
+      return [_executiveCommittee, ...rest];
+    }
+    return rest;
+  }
+
+  void _copyToClipboard(String label, String value) {
+    Clipboard.setData(ClipboardData(text: value));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$label copied')),
+    );
+  }
+
+  // ── Sheet 1: the edit affordance ─────────────────────────────
+
+  /// Which fields an edit group carries. The header pencil opens About plus
+  /// the member's name and the two executive text fields as one group.
+  List<_ProfileField> _fieldsForEdit(String groupId) {
+    if (groupId == _aboutTitleGroup) {
+      return [
+        const _ProfileField('name', 'Name', capitalizeWords: true),
+        ..._profileSections.firstWhere((s) => s.id == 'about').fields,
+        const _ProfileField('executive_title', 'Executive title'),
+        const _ProfileField('executive_role', 'Executive role'),
+      ];
+    }
+    return _profileSections.firstWhere((s) => s.id == groupId).fields;
+  }
+
+  _ProfileSection _sectionForEdit(String groupId) {
+    final id = groupId == _aboutTitleGroup ? 'about' : groupId;
+    return _profileSections.firstWhere((s) => s.id == id);
+  }
+
+  /// Opens a section in edit mode. One section at a time: opening another
+  /// asks before discarding a dirty one.
+  Future<void> _beginEdit(String groupId) async {
+    if (!_crmReady || _savingSection) return;
+    if (_editingSection == groupId) return;
+
+    if (_editingSection != null && _editIsDirty()) {
+      final openTitle = _editingSection == _aboutTitleGroup
+          ? 'About and title'
+          : _sectionForEdit(_editingSection!).title;
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => _profileDialog(
+          dialogContext,
+          title: 'Discard changes to $openTitle?',
+          body: 'The edits you made to $openTitle have not been saved.',
+          cancelLabel: 'Keep editing',
+          confirmLabel: 'Discard',
+          confirmColor: ProfileTokens.ink,
+        ),
+      );
+      if (discard != true || !mounted) return;
+    }
+
+    // One read seeds the controllers AND supplies the row version the save is
+    // guarded on. They have to come from the same read: a token belonging to a
+    // different row version would either refuse a good save or, worse, pass a
+    // save whose diff was taken against something else.
+    final snapshot = await _memberRepo.getMemberSnapshotById(_member.id);
+    if (!mounted) return;
+    if (snapshot == null || snapshot.updatedAt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not read this member to edit it. Check your connection and '
+            'try again.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Assigned before the seeding loop and outside setState on purpose: the
+    // loop reads _member for phone, dates and tri-state values, so the row it
+    // seeds from has to be in place first, and the single setState at the end
+    // of this method is what publishes all of it in one frame.
+    _disposeEditControllers();
+    _member = snapshot.member;
+    _editBaseline = snapshot.member;
+    _editBaselineUpdatedAt = snapshot.updatedAt;
+    _memberLookup.cacheMember(snapshot.member);
+
+    final original = _diffBase.toJson();
+    for (final field in _fieldsForEdit(groupId)) {
+      switch (field.kind) {
+        case _FieldKind.date:
+          final date = _dateFor(field.key);
+          _editDates[field.key] = date;
+          _addEditController(field.key, date == null ? '' : _formatDateOnly(date));
+          break;
+        case _FieldKind.triBool:
+          _editBools[field.key] = _boolFor(field.key);
+          break;
+        case _FieldKind.phone:
+          _addEditController(
+            field.key,
+            _cleanText(_member.phone) ?? _cleanText(_member.phoneE164) ?? '',
+          );
+          break;
+        case _FieldKind.addressBlock:
+          for (final key in _addressKeys) {
+            _addEditController(key, _cleanText(original[key]?.toString()) ?? '');
+          }
+          break;
+        case _FieldKind.committees:
+          _editCommittees = (_member.committee ?? const <String>[])
+              .where((c) => c != _executiveCommittee)
+              .toSet();
+          _addEditController('committee_new', '');
+          unawaited(_loadKnownCommittees());
+          break;
+        case _FieldKind.districts:
+          break;
+        case _FieldKind.text:
+        case _FieldKind.longText:
+        case _FieldKind.email:
+        case _FieldKind.chipsText:
+        case _FieldKind.social:
+          _addEditController(field.key, _cleanText(original[field.key]?.toString()) ?? '');
+          break;
+      }
+    }
+
+    setState(() {
+      _editingSection = groupId;
+      _editError = null;
+      _editErrorTitle = null;
+      _showCommitteeInput = false;
+      if (!_editingNotes) {
+        _notesController.text = _member.notes ?? '';
+      }
+    });
+  }
+
+  static const List<String> _addressKeys = ['address', 'city', 'state', 'county'];
+
+  void _addEditController(String key, String text) {
+    final controller = TextEditingController(text: text);
+    // Save is disabled while nothing has changed, so every keystroke has to
+    // re-evaluate the diff.
+    controller.addListener(_onEditChanged);
+    _editControllers[key] = controller;
+  }
+
+  void _onEditChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Detaches the edit controllers now and disposes them after the frame, so
+  /// a TextFormField still mounted for one more build never touches a disposed
+  /// controller. [immediately] is for dispose(), where there is no next frame.
+  void _disposeEditControllers({bool immediately = false}) {
+    final retired = List<TextEditingController>.of(_editControllers.values);
+    for (final controller in retired) {
+      controller.removeListener(_onEditChanged);
+    }
+    _editControllers.clear();
+    _editDates.clear();
+    _editBools.clear();
+    _editCommittees = <String>{};
+    if (immediately) {
+      for (final controller in retired) {
+        controller.dispose();
+      }
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final controller in retired) {
+        controller.dispose();
+      }
+    });
+  }
+
+  Future<void> _loadKnownCommittees() async {
+    final known = await _memberRepo.getUniqueCommittees();
+    if (!mounted) return;
+    setState(() => _knownCommittees = known);
+  }
+
+  void _cancelEdit() {
+    if (_savingSection) return;
+    _disposeEditControllers();
+    setState(() {
+      _editingSection = null;
+      _editError = null;
+      _editErrorTitle = null;
+      _editBaseline = null;
+      _editBaselineUpdatedAt = null;
+    });
+  }
+
+  /// Re-bases the open editor on a row THIS screen just wrote. The diff
+  /// baseline and the guard token move together because they describe the same
+  /// row version; moving one without the other would either revert a field or
+  /// refuse the next save for no reason. Call inside setState.
+  void _rebaseOpenEdit(MemberSnapshot snapshot) {
+    if (_editingSection == null) return;
+    _editBaseline = snapshot.member;
+    _editBaselineUpdatedAt = snapshot.updatedAt;
+  }
+
+  bool _editIsDirty() => _computeUpdates().isNotEmpty || _committeesChanged();
+
+  bool _committeesChanged() {
+    if (_editingSection != 'chapter') return false;
+    final current = (_diffBase.committee ?? const <String>[])
+        .where((c) => c != _executiveCommittee)
+        .toSet();
+    return !const SetEquality<String>().equals(current, _editCommittees);
+  }
+
+  /// Diff the inputs against the row the editor was SEEDED from, exactly as
+  /// the retired edit sheet did: only changed keys go in the payload, a cleared value
+  /// writes null, unchanged keys are omitted. committee never appears here (it
+  /// goes through the RPC) and executive_committee has no input at all.
+  ///
+  /// The base is _editBaseline and never _member. A row that arrives from
+  /// anywhere else while the editor is open would otherwise differ from this
+  /// exec's untouched controller, enter the diff as an edit nobody made, and be
+  /// written back over whoever really changed it.
+  Map<String, dynamic> _computeUpdates() {
+    final groupId = _editingSection;
+    if (groupId == null) return const {};
+    final original = _diffBase.toJson();
+    final updates = <String, dynamic>{};
+
+    void diffText(String key) {
+      final controller = _editControllers[key];
+      if (controller == null) return;
+      final text = controller.text.trim();
+      final originalText = (original[key]?.toString() ?? '').trim();
+      if (text.isEmpty && originalText.isEmpty) return;
+      if (text.isEmpty) {
+        updates[key] = null;
+      } else if (text != originalText) {
+        updates[key] = text;
+      }
+    }
+
+    for (final field in _fieldsForEdit(groupId)) {
+      switch (field.kind) {
+        case _FieldKind.text:
+        case _FieldKind.longText:
+        case _FieldKind.email:
+        case _FieldKind.chipsText:
+        case _FieldKind.social:
+          diffText(field.key);
+          break;
+        case _FieldKind.addressBlock:
+          for (final key in _addressKeys) {
+            diffText(key);
+          }
+          break;
+        case _FieldKind.date:
+          final picked = _editDates[field.key];
+          final newText = picked == null ? null : _isoDate(picked);
+          final originalText = _cleanText(original[field.key]?.toString());
+          if (newText != originalText) updates[field.key] = newText;
+          break;
+        case _FieldKind.triBool:
+          final newValue = _editBools[field.key];
+          final originalValue = original[field.key] as bool?;
+          if (newValue != originalValue) updates[field.key] = newValue;
+          break;
+        case _FieldKind.phone:
+          final controller = _editControllers[field.key];
+          if (controller == null) break;
+          final text = controller.text.trim();
+          final originalPhone = _cleanText(original['phone']?.toString());
+          final originalE164 = _cleanText(original['phone_e164']?.toString());
+          if (text.isEmpty) {
+            if (originalPhone != null) updates['phone'] = null;
+            if (originalE164 != null) updates['phone_e164'] = null;
+          } else {
+            final normalized = _normalizePhone(text);
+            if (text != originalPhone) updates['phone'] = text;
+            if (normalized != null && normalized != originalE164) {
+              updates['phone_e164'] = normalized;
+            }
+          }
+          break;
+        case _FieldKind.committees:
+        case _FieldKind.districts:
+          break;
+      }
+    }
+    return updates;
+  }
+
+  String _isoDate(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
+
+  /// E.164 from what an exec types, in this order: strip everything but digits
+  /// and a leading plus; 10 digits get +1; 11 digits starting with 1 get +;
+  /// a leading plus with 8 to 15 digits after it is kept; anything else is
+  /// invalid. cleansePhoneNumber in string_utils only strips characters, it
+  /// does not produce E.164, so it is not used here. phone_e164 is the
+  /// messaging key (Handle.address), so a wrong value silently breaks contact.
+  String? _normalizePhone(String raw) {
+    final trimmed = raw.trim();
+    final hasPlus = trimmed.startsWith('+');
+    final digits = trimmed.replaceAll(RegExp(r'\D'), '');
+    if (hasPlus) {
+      if (digits.length >= 8 && digits.length <= 15) return '+$digits';
+      return null;
+    }
+    if (digits.length == 10) return '+1$digits';
+    if (digits.length == 11 && digits.startsWith('1')) return '+$digits';
+    return null;
+  }
+
+  static const _emailPattern = r'^[^@\s]+@[^@\s]+\.[^@\s]+$';
+
+  String? _validateEmail(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return null;
+    if (RegExp(_emailPattern).hasMatch(text)) return null;
+    return 'Enter a valid email address';
+  }
+
+  String? _validatePhone(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return null;
+    if (_normalizePhone(text) != null) return null;
+    return 'Enter a phone number with area code';
+  }
+
+  /// The section body in edit mode: cascade banner, every field as an input,
+  /// the inline error if the last save failed, then Cancel and Save.
+  Widget _buildSectionEditor(_ProfileSection section, String title, List<_ProfileField> fields) {
+    final dirty = _editIsDirty();
+    final items = <ProfileFlowItem>[
+      for (final field in fields)
+        ProfileFlowItem(_editField(field), isLong: field.isLong || field.kind == _FieldKind.committees),
+    ];
+
+    return Form(
+      key: _editFormKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (section.cascade.isNotEmpty) profileCascadeBanner(section.cascade),
+          ProfileFieldFlow(items: items),
+          if (_editError != null)
+            profileErrorBanner(
+              // A partial save is not "could not save": part of it committed,
+              // and the banner has to say which part.
+              title: _editErrorTitle ?? 'Could not save $title',
+              message: _editError!,
+            ),
+          profileEditActions(
+            onCancel: _cancelEdit,
+            onSave: dirty ? () => _saveSection(title) : null,
+            saving: _savingSection,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _editInputPadding(Widget child) {
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: child);
+  }
+
+  Widget _editField(_ProfileField field) {
+    switch (field.kind) {
+      case _FieldKind.text:
+      case _FieldKind.chipsText:
+      case _FieldKind.social:
+      case _FieldKind.email:
+        if (field.readOnly) return _readOnlyEditField(field);
+        return _editInputPadding(
+          TextFormField(
+            controller: _editControllers[field.key],
+            style: profileInputText,
+            cursorColor: ProfileTokens.ink,
+            textCapitalization:
+                field.capitalizeWords ? TextCapitalization.words : TextCapitalization.none,
+            keyboardType:
+                field.kind == _FieldKind.email ? TextInputType.emailAddress : TextInputType.text,
+            validator: field.kind == _FieldKind.email ? _validateEmail : null,
+            decoration: profileInput(field.label, helper: field.helper),
+          ),
+        );
+
+      case _FieldKind.longText:
+        return _editInputPadding(
+          TextFormField(
+            controller: _editControllers[field.key],
+            style: profileInputText,
+            cursorColor: ProfileTokens.ink,
+            minLines: 3,
+            maxLines: 8,
+            decoration: profileInput(field.label),
+          ),
+        );
+
+      case _FieldKind.phone:
+        return _editInputPadding(
+          TextFormField(
+            controller: _editControllers[field.key],
+            style: profileInputText,
+            cursorColor: ProfileTokens.ink,
+            keyboardType: TextInputType.phone,
+            validator: _validatePhone,
+            decoration: profileInput(field.label),
+          ),
+        );
+
+      case _FieldKind.date:
+        return _editInputPadding(_dateInput(field));
+
+      case _FieldKind.triBool:
+        return _editInputPadding(_triStateInput(field));
+
+      case _FieldKind.addressBlock:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final entry in const [
+              ('address', 'Street address', false),
+              ('city', 'City', true),
+              ('state', 'State', false),
+              ('county', 'County', true),
+            ])
+              _editInputPadding(
+                TextFormField(
+                  controller: _editControllers[entry.$1],
+                  style: profileInputText,
+                  cursorColor: ProfileTokens.ink,
+                  textCapitalization:
+                      entry.$3 ? TextCapitalization.words : TextCapitalization.none,
+                  decoration: profileInput(entry.$2),
+                ),
+              ),
+          ],
+        );
+
+      case _FieldKind.districts:
+        return _readOnlyEditField(field);
+
+      case _FieldKind.committees:
+        return _committeeEditor(field);
+    }
+  }
+
+  /// Derived columns render in edit mode as they do in read mode, with the
+  /// reason they cannot be typed into. A hand edit to a district would be
+  /// overwritten on the next address save.
+  Widget _readOnlyEditField(_ProfileField field) {
+    final read = _readField(field);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        read ?? ProfileField(label: field.label, value: 'Not on file'),
+        if (field.helper != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(field.helper!, style: ProfileText.caption),
+          ),
+      ],
+    );
+  }
+
+  Widget _dateInput(_ProfileField field) {
+    final controller = _editControllers[field.key];
+    final hasValue = _editDates[field.key] != null;
+
+    Future<void> pick() async {
+      final initial = _editDates[field.key] ?? DateTime.now();
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: initial,
+        firstDate: DateTime(1900),
+        lastDate: DateTime(2100),
+        builder: (context, child) => Theme(
+          data: profileDatePickerTheme(context),
+          child: child ?? const SizedBox.shrink(),
+        ),
+      );
+      if (picked == null || !mounted) return;
+      setState(() {
+        _editDates[field.key] = picked;
+        controller?.text = _formatDateOnly(picked);
+      });
+    }
+
+    return TextFormField(
+      controller: controller,
+      readOnly: true,
+      style: profileInputText,
+      onTap: pick,
+      decoration: profileInput(
+        field.label,
+        helper: field.helper,
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (hasValue)
+              IconButton(
+                tooltip: 'Clear ${field.label}',
+                icon: Icon(Icons.clear, size: 18, color: ProfileTokens.inkMuted),
+                onPressed: () => setState(() {
+                  _editDates[field.key] = null;
+                  controller?.text = '';
+                }),
+              ),
+            IconButton(
+              tooltip: 'Pick ${field.label}',
+              icon: Icon(Icons.calendar_today_outlined, size: 18, color: ProfileTokens.inkMuted),
+              onPressed: pick,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _triStateInput(_ProfileField field) {
+    final value = _editBools[field.key];
+    final selected = value == null
+        ? _TriState.unanswered
+        : (value ? _TriState.yes : _TriState.no);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(field.label.toUpperCase(), style: ProfileText.label),
+        const SizedBox(height: 8),
+        SegmentedButton<_TriState>(
+          style: profileSegmentedStyle(),
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(value: _TriState.yes, label: Text('Yes')),
+            ButtonSegment(value: _TriState.no, label: Text('No')),
+            ButtonSegment(value: _TriState.unanswered, label: Text('Not answered')),
+          ],
+          selected: {selected},
+          onSelectionChanged: (set) {
+            final pick = set.first;
+            setState(() {
+              _editBools[field.key] = switch (pick) {
+                _TriState.yes => true,
+                _TriState.no => false,
+                _TriState.unanswered => null,
+              };
+            });
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Toggle chips from getUniqueCommittees merged with the member's own list,
+  /// so a committee only this member holds still appears. Executive Committee
+  /// is rendered locked and never toggled here: it gates CRM access and
+  /// changes only through Superadmin > Executives.
+  Widget _committeeEditor(_ProfileField field) {
+    final current = _member.committee ?? const <String>[];
+    final hasExecutive = current.contains(_executiveCommittee);
+    final options = <String>{
+      ..._knownCommittees,
+      ...current,
+      ..._editCommittees,
+    }..remove(_executiveCommittee);
+    final sorted = options.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    Widget chip({
+      required String label,
+      required bool selected,
+      required bool enabled,
+      bool locked = false,
+    }) {
+      return FilterChip(
+        label: Text(label),
+        avatar: locked ? const Icon(Icons.lock_outline, size: 14) : null,
+        selected: selected,
+        showCheckmark: false,
+        onSelected: enabled
+            ? (value) => setState(() {
+                  if (value) {
+                    _editCommittees.add(label);
+                  } else {
+                    _editCommittees.remove(label);
+                  }
+                })
+            : null,
+        // Selected: unityBlue fill, white label, 12.51:1. Unselected: chip
+        // fill with unityBlue label, 11.27:1, and a unityBlue 0.60 border,
+        // 3.70:1. Disabled keeps the same inks so the locked chip stays
+        // legible.
+        selectedColor: ProfileTokens.ink,
+        backgroundColor: ProfileTokens.fill,
+        disabledColor: selected ? ProfileTokens.ink : ProfileTokens.fill,
+        labelStyle: ProfileText.chip.copyWith(color: selected ? Colors.white : ProfileTokens.ink),
+        iconTheme: IconThemeData(color: selected ? Colors.white : ProfileTokens.ink, size: 14),
+        side: BorderSide(color: selected ? ProfileTokens.ink : ProfileTokens.border),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      );
+    }
+
+    final newController = _editControllers['committee_new'];
+
+    void addNew() {
+      final name = newController?.text.trim() ?? '';
+      if (name.isEmpty) return;
+      if (name == _executiveCommittee) {
+        setState(() {
+          _editError = 'Executive Committee is managed in Superadmin > Executives.';
+        });
+        return;
+      }
+      setState(() {
+        _editCommittees.add(name);
+        newController?.clear();
+        _showCommitteeInput = false;
+      });
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(field.label.toUpperCase(), style: ProfileText.label),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (hasExecutive)
+                chip(label: _executiveCommittee, selected: true, enabled: false, locked: true),
+              for (final option in sorted)
+                chip(
+                  label: option,
+                  selected: _editCommittees.contains(option),
+                  enabled: true,
+                ),
+              ActionChip(
+                label: const Text('+ Add'),
+                labelStyle: ProfileText.chip,
+                backgroundColor: Colors.white,
+                side: BorderSide(color: ProfileTokens.border),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
+                ),
+                onPressed: () => setState(() => _showCommitteeInput = true),
+              ),
+            ],
+          ),
+          if (_showCommitteeInput) ...[
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: newController,
+              autofocus: true,
+              style: profileInputText,
+              cursorColor: ProfileTokens.ink,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => addNew(),
+              decoration: profileInput(
+                'New committee',
+                suffixIcon: IconButton(
+                  tooltip: 'Add committee',
+                  icon: Icon(Icons.add, size: 18, color: ProfileTokens.inkMuted),
+                  onPressed: addNew,
+                ),
+              ),
+            ),
+          ],
+          if (hasExecutive)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Executive Committee membership is managed in Superadmin > Executives.',
+                style: ProfileText.caption,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// White dialog, radius 16, max width 440, padding 24, unityBlue ink. The
+  /// confirm button takes the caller's colour: unityBlue for an ordinary
+  /// choice, #B91C1C for the one write on this page that touches auth.
+  Widget _profileDialog(
+    BuildContext dialogContext, {
+    required String title,
+    required String body,
+    required String cancelLabel,
+    required String confirmLabel,
+    required Color confirmColor,
+  }) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ProfileTokens.sheetRadius)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: ProfileTokens.ink,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                body,
+                style: const TextStyle(color: ProfileTokens.ink, fontSize: 14, height: 1.45),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    style: TextButton.styleFrom(foregroundColor: ProfileTokens.ink),
+                    child: Text(cancelLabel),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: confirmColor,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Text(confirmLabel),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The one field whose save is not a plain update. Both consequences from
+  /// the write hazards are stated in plain words before the write runs.
+  /// The wording follows the trigger as it is now written, and nothing further.
+  /// It used to promise that the save "rewrites the member's login identity",
+  /// which was not true of every member: the trigger keyed on members.id, and
+  /// for anyone whose members.user_id points at a different account that is the
+  /// wrong row. The trigger now follows user_id and falls back to id only when
+  /// user_id is null, so there are three outcomes and the copy names all three
+  /// rather than promising the one that usually happens.
+  Future<bool> _confirmEmailChange(String? newEmail) async {
+    final oldEmail = _cleanText(_member.email) ?? 'none on file';
+    final body = 'Saving a new email address does this, and you cannot undo it from here.\n\n'
+        'Sign-in: the new address is written to the account this member signs in with, '
+        'which is their linked login account, or their own member record if no login has '
+        'been linked yet. They keep the same password and get no confirmation email. If '
+        'this member has no login account at all, nothing about signing in changes and only '
+        'the member record is updated.\n\n'
+        'The save is refused outright if another account already uses this address, '
+        'ignoring capitalisation, or if you clear the address entirely. Nothing is written '
+        'in either case.\n\n'
+        'Mautic: the member is re-synced. Mautic matches on email, so a new address can '
+        'create a second Mautic contact and point this member at it, leaving the old contact '
+        'and its history behind.\n\n'
+        'From: $oldEmail\n'
+        'To: ${newEmail ?? 'none'}';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => _profileDialog(
+        dialogContext,
+        title: 'Change this member\'s email?',
+        body: body,
+        cancelLabel: 'Cancel',
+        confirmLabel: 'Change email',
+        confirmColor: ProfileTokens.danger,
+      ),
+    );
+    return confirmed == true;
+  }
+
+  /// Save the open section. Only changed keys go to the guarded field write;
+  /// the server row it returns becomes _member (never the local edits merged
+  /// in, because for class B fields the returned row is the state BEFORE the
+  /// async trigger lands). committee goes through crm_set_member_committees,
+  /// which preserves Executive Committee no matter what is sent.
+  ///
+  /// Two properties this method has to hold, both of which it used to break.
+  ///
+  /// The screen always shows what COMMITTED. This is two writes, and the second
+  /// can fail after the first landed. The old code assigned _member only on the
+  /// all-succeeded path, so a committee failure after a successful field write
+  /// left the exec looking at their pre-save values while the server row held
+  /// the new ones. Now `current` accumulates whatever came back and is assigned
+  /// on EVERY exit, so there is no path that commits a write and hides it.
+  ///
+  /// The failure message says WHICH part failed and what survived. A single
+  /// "Could not save X" over a half-applied save is worse than no message,
+  /// because it invites the exec to retype values that are already stored.
+  Future<void> _saveSection(String title) async {
+    if (_savingSection) return;
+    final form = _editFormKey.currentState;
+    if (form != null && !form.validate()) return;
+
+    final updates = _computeUpdates();
+    final committeesChanged = _committeesChanged();
+    if (updates.isEmpty && !committeesChanged) return;
+
+    // The guard token is captured with the row the editor was seeded from. Its
+    // absence means the editor was opened without one, which _beginEdit refuses
+    // to do, so this is a real defensive stop rather than a fallback to an
+    // unguarded write.
+    final expectedUpdatedAt = _editBaselineUpdatedAt;
+    if (expectedUpdatedAt == null) {
+      setState(() {
+        _editErrorTitle = 'Cannot save $title safely';
+        _editError = 'This screen has lost track of which version of the member '
+            'it is editing, so it will not write over the record blind. Cancel '
+            'this edit and open it again.';
+      });
+      return;
+    }
+
+    if (updates.containsKey('email')) {
+      final confirmed = await _confirmEmailChange(updates['email'] as String?);
+      if (!confirmed || !mounted) return;
+    }
+
+    setState(() {
+      _savingSection = true;
+      _editError = null;
+      _editErrorTitle = null;
+    });
+
+    var current = _member;
+    var fieldsCommitted = false;
+    var committeesCommitted = false;
+    String? failedPart;
+    Object? failure;
+
+    if (updates.isNotEmpty) {
+      try {
+        final saved = await _memberRepo.updateMemberFieldsGuarded(
+          _member.id,
+          updates,
+          expectedUpdatedAt: expectedUpdatedAt,
+        );
+        if (saved == null) {
+          throw StateError('The server did not return the saved member row.');
+        }
+        current = saved.member;
+        fieldsCommitted = true;
+        // The row moved, so the baseline and the token move with it. A retry
+        // after a committee failure then sends only what is still unsaved and
+        // guards on the version this write produced.
+        if (mounted) setState(() => _rebaseOpenEdit(saved));
+      } catch (e) {
+        failedPart = 'fields';
+        failure = e;
+      }
+    }
+
+    if (failure == null && committeesChanged) {
+      try {
+        await _supabaseService.client.rpc(
+          'crm_set_member_committees',
+          params: {
+            'p_member_id': _member.id,
+            'p_committees': _editCommittees.toList(),
+          },
+        );
+        committeesCommitted = true;
+      } catch (e) {
+        failedPart = 'committees';
+        failure = e;
+      }
+
+      // Reloaded whether or not the RPC threw, because the RPC's own failure
+      // does not prove it wrote nothing, and because the field write above may
+      // have committed. Reading here is the only way the screen can show what
+      // the server actually holds.
+      try {
+        final refreshed = await _memberRepo.getMemberSnapshotById(_member.id);
+        if (refreshed == null) {
+          throw StateError('The member could not be reloaded.');
+        }
+        current = refreshed.member;
+        if (mounted) setState(() => _rebaseOpenEdit(refreshed));
+      } catch (e) {
+        failedPart = committeesCommitted ? 'committee reload' : failedPart;
+        failure ??= e;
+      }
+    }
+
+    if (!mounted) return;
+
+    final addressChanged = _addressKeys.any(updates.containsKey);
+
+    if (failure == null) {
+      final consequences = <String>[
+        if (updates.containsKey('phone') || updates.containsKey('phone_e164'))
+          'Texts now go to the new number.',
+        if (addressChanged) 'Districts are recomputing.',
+        if (updates.containsKey('date_of_birth')) 'Eligibility recomputed.',
+        if (updates.containsKey('email')) 'Login and Mautic contact updated.',
+        if (committeesChanged) 'Slack channel membership is syncing.',
+        'Mautic will refresh this contact.',
+      ];
+
+      _disposeEditControllers();
+      setState(() {
+        _member = current;
+        if (!_editingNotes) _notesController.text = current.notes ?? '';
+        _editingSection = null;
+        _editBaseline = null;
+        _editBaselineUpdatedAt = null;
+        _savingSection = false;
+        if (addressChanged) _districtsRefreshing = true;
+      });
+      _memberLookup.cacheMember(current);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$title saved. ${consequences.join(' ')}')),
+      );
+      if (addressChanged) unawaited(_refetchAfterDistrictTrigger());
+      return;
+    }
+
+    // Failure. The editor stays open with every typed value intact, and the row
+    // on screen becomes whatever the server confirmed, so a partly applied save
+    // is visible rather than hidden behind the old values.
+    final saved = <String>[
+      if (fieldsCommitted) 'the field changes',
+      if (committeesCommitted) 'the committee changes',
+    ];
+    final String headline;
+    switch (failedPart) {
+      case 'fields':
+        headline = failure is StaleMemberWriteException
+            ? 'Nothing was saved: this member changed while you were editing'
+            : 'Nothing was saved to $title';
+        break;
+      case 'committees':
+        headline = 'Part of $title was saved';
+        break;
+      default:
+        headline = 'Saved, but this screen could not be refreshed';
+    }
+
+    final detail = StringBuffer();
+    if (saved.isEmpty) {
+      detail.write('Nothing was written. ');
+    } else {
+      detail.write('Already saved: ${saved.join(' and ')}. ');
+    }
+    if (failedPart == 'fields' && failure is StaleMemberWriteException) {
+      detail.write(
+        'Someone else changed this member after you opened the editor, so the '
+        'write was refused rather than overwriting them. Cancel this edit and '
+        'open it again to see their version, then re-apply your changes. ',
+      );
+    } else if (failedPart == 'committees') {
+      detail.write('The committee change failed and was not applied. ');
+    } else if (failedPart == 'committee reload') {
+      detail.write(
+        'The committee change was applied, but this screen could not read the '
+        'member back, so what you see may be out of date. Refresh to check. ',
+      );
+    }
+    detail.write(failure.toString());
+
+    setState(() {
+      _member = current;
+      _savingSection = false;
+      _editErrorTitle = headline;
+      _editError = detail.toString();
+    });
+    _memberLookup.cacheMember(current);
+  }
+
+  /// on_member_updated_lookup_districts runs after the address write; four
+  /// seconds is long enough for it to land so S3 shows the recomputed
+  /// districts rather than the stale ones.
+  Future<void> _refetchAfterDistrictTrigger() async {
+    await Future<void>.delayed(const Duration(seconds: 4));
+    if (!mounted) return;
+    await _fetchLatestMember(showFeedback: false);
+    if (!mounted) return;
+    setState(() => _districtsRefreshing = false);
+  }
+
+  // ── Sheet 2: the record ──────────────────────────────────────
+
+  Widget _buildRecordSheet() {
+    final blocks = <Widget>[];
+    void add(Widget? block) {
+      if (block != null) blocks.add(block);
+    }
+
+    add(_buildStatusStrip(first: true));
+    add(_buildNotesBlock());
+    if (_crmReady) add(_buildInternalReportsBlock());
+    add(_buildMeetingsBlock());
+    add(_buildMemberActivityBlock(first: false));
+    add(_buildDonorBlock());
+    add(_buildWalletBlock());
+    if (_voterRecord != null) {
+      add(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            profileSectionHeader(title: 'Voter file'),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+              child: VoterCrossRefCard(
+                record: _voterRecord!,
+                memberDateOfBirth: _member.dateOfBirth,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    add(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          profileSectionHeader(title: 'Outreach'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+            child: MemberOutreachSection(member: _member),
+          ),
+        ],
+      ),
+    );
+
+    return ProfileSheet(children: blocks);
+  }
+
+  /// R1: one line of status facts, each rendered only when set, with the
+  /// opt-out toggle at the right end. Always renders.
+  Widget _buildStatusStrip({required bool first}) {
+    final facts = <Widget>[
+      if (_member.dateJoined != null) profileFact('Joined', _formatDateOnly(_member.dateJoined!)),
+      if (_member.createdAt != null) profileFact('Added', _formatDateOnly(_member.createdAt!)),
+      if (_member.lastContacted != null)
+        profileFact('Last contacted', _formatDate(_member.lastContacted!)),
+      if (_member.introSentAt != null) profileFact('Intro sent', _formatDate(_member.introSentAt!)),
+      if (_member.optOutDate != null)
+        profileFact(
+          'Opt out',
+          [
+            _formatDateOnly(_member.optOutDate!),
+            if (_cleanText(_member.optOutReason) != null) _cleanText(_member.optOutReason)!,
+          ].join(', '),
+        ),
+      if (_member.optInDate != null)
+        profileFact('Opted back in', _formatDateOnly(_member.optInDate!)),
+      if (_member.membershipEligible != null)
+        profileFact('Eligible', _member.membershipEligible! ? 'Yes' : 'No'),
+      if (_cleanText(_member.moVoterFileId) != null) profileFact('Voter file', 'Linked'),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        profileSectionHeader(title: 'Membership status', first: first),
+        profileSectionBody(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: facts.isEmpty
+                    ? Text('No status dates on file.', style: ProfileText.caption)
+                    : Wrap(spacing: 16, runSpacing: 8, children: facts),
+              ),
+              const SizedBox(width: 16),
+              OutlinedButton(
+                onPressed: _crmReady && !_togglingOptOut ? _toggleOptOut : null,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: ProfileTokens.ink,
+                  side: const BorderSide(color: ProfileTokens.ink, width: 1.5),
+                  textStyle: ProfileText.button,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+                  ),
+                ),
+                child: Text(_member.optOut ? 'Opt in' : 'Opt out'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// R2: the notes editor. Read state is the quote block with an Edit link;
+  /// edit state is a TextField, then Cancel and Save. Always renders.
+  Widget _buildNotesBlock() {
+    final notesValue = _cleanText(_member.notes);
+
+    Widget body;
+    if (_editingNotes) {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _notesController,
+            style: profileInputText,
+            cursorColor: ProfileTokens.ink,
+            minLines: 3,
+            maxLines: 8,
+            decoration: profileInput('Notes'),
+          ),
+          profileEditActions(
+            onCancel: () {
+              _notesController.text = _member.notes ?? '';
+              setState(() => _editingNotes = false);
+            },
+            onSave: _saveNotes,
+            saving: _savingNotes,
+          ),
+        ],
+      );
+    } else if (notesValue != null) {
+      body = ProfileLongText(value: notesValue);
+    } else {
+      body = Text('No notes yet.', style: ProfileText.caption);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        profileSectionHeader(
+          title: 'Notes',
+          trailing: _editingNotes
+              ? null
+              : TextButton(
+                  onPressed: _crmReady ? () => setState(() => _editingNotes = true) : null,
+                  style: TextButton.styleFrom(
+                    foregroundColor: ProfileTokens.ink,
+                    textStyle: ProfileText.link,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: Text(notesValue == null ? 'Add notes' : 'Edit'),
+                ),
+        ),
+        profileSectionBody(child: body),
+      ],
+    );
+  }
+
+  /// R4: the latest meeting and the attendance button. Renders only when there
+  /// is attendance to show, it is still loading, or the load failed; the
+  /// Meetings tab already carries the empty state.
+  Widget? _buildMeetingsBlock() {
+    if (!_crmReady) return null;
+    if (!_loadingAttendance && _attendanceError == null && _meetingAttendance.isEmpty) {
+      return null;
+    }
+
+    Widget body;
+    if (_loadingAttendance) {
+      body = const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.4,
+              valueColor: AlwaysStoppedAnimation<Color>(BrandColors.momentumBlue),
+            ),
+          ),
+        ),
+      );
+    } else if (_attendanceError != null) {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          profileErrorBanner(
+            title: 'Could not load meeting attendance',
+            message: _attendanceError!,
+          ),
+          TextButton.icon(
+            onPressed: _loadMeetingAttendance,
+            style: TextButton.styleFrom(foregroundColor: ProfileTokens.ink),
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('Try again'),
+          ),
+        ],
+      );
+    } else {
+      final latest = _latestMeeting!;
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildMeetingSummaryRow(latest),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.event_note, size: 18),
+              label: Text('Meeting attendance (${_meetingAttendance.length})'),
+              onPressed: _showMeetingAttendanceSheet,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ProfileTokens.ink,
+                side: const BorderSide(color: ProfileTokens.ink, width: 1.5),
+                textStyle: ProfileText.button,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        profileSectionHeader(title: 'Meetings'),
+        profileSectionBody(child: body),
+      ],
+    );
+  }
+
+  // ── Sheet 2, R6: donor activity ──────────────────────────────
+
+  /// Renders only on data or on error, never a loading card of its own.
+  Widget? _buildDonorBlock() {
+    if (!_crmReady || _loadingDonorProfile) return null;
+
+    Widget body;
+    if (_donorError != null) {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          profileErrorBanner(
+            title: 'Could not load donor details',
+            message: _donorError!,
+          ),
+          TextButton.icon(
+            onPressed: _loadDonorProfile,
+            style: TextButton.styleFrom(foregroundColor: ProfileTokens.ink),
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('Try again'),
+          ),
+        ],
+      );
+    } else {
+      final donor = _donorProfile;
+      if (donor == null) return null;
+
+      final totalDonated = donor.totalDonated ?? 0;
+      final firstDonation = donor.firstDonationAt ?? donor.donations.lastOrNull?.createdAt;
+      final lastDonation = donor.lastDonationAt ?? donor.donations.firstOrNull?.createdAt;
+      final recentDonations = donor.donations.take(5).toList(growable: false);
+      final profileUrl = _buildDonorProfileUrl(donor);
+
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _buildDonorStatTile(label: 'Total donated', value: _formatCurrency(totalDonated)),
+              _buildDonorStatTile(label: 'Donations', value: donor.donationCount.toString()),
+              if (firstDonation != null)
+                _buildDonorStatTile(label: 'First donation', value: _formatDateOnly(firstDonation)),
+              if (lastDonation != null)
+                _buildDonorStatTile(label: 'Last donation', value: _formatDate(lastDonation)),
+            ],
+          ),
+          if (donor.isRecurringDonor)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Row(
+                children: [
+                  Icon(Icons.autorenew, size: 16, color: ProfileTokens.inkMuted),
+                  const SizedBox(width: 6),
+                  _profileTag('Recurring donor'),
+                ],
+              ),
+            ),
+          const SizedBox(height: 12),
+          if (recentDonations.isNotEmpty) ...[
+            Text('RECENT DONATIONS', style: ProfileText.label),
+            const SizedBox(height: 4),
+            for (final donation in recentDonations) _buildDonationTile(donation),
+          ] else
+            Text('No donation history on file.', style: ProfileText.caption),
+          if (profileUrl != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: TextButton.icon(
+                onPressed: () => _openLink(profileUrl),
+                style: TextButton.styleFrom(
+                  foregroundColor: ProfileTokens.ink,
+                  textStyle: ProfileText.link,
+                ),
+                icon: const Icon(Icons.open_in_new, size: 16),
+                label: const Text('View full donor profile'),
+              ),
+            ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        profileSectionHeader(title: 'Donor activity'),
+        profileSectionBody(child: body),
+      ],
+    );
+  }
+
+  Widget _buildDonationTile(_DonationRecord donation) {
+    final amountLabel =
+        donation.amount != null ? _formatCurrency(donation.amount!) : 'Unknown amount';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(Icons.volunteer_activism_outlined, size: 18, color: ProfileTokens.inkMuted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(amountLabel, style: ProfileText.value),
+                Text(_formatDonationSubtitle(donation), style: ProfileText.caption),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Chip fill under a unityBlue 22 w800 value (11.27:1, computed) and a
+  /// muted label.
+  Widget _buildDonorStatTile({required String label, required String value}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: ProfileTokens.fill,
+        borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(value, style: ProfileText.statValue),
+          const SizedBox(height: 2),
+          Text(label.toUpperCase(), style: ProfileText.label),
+        ],
+      ),
+    );
+  }
+
+  // ── Sheet 2, R7: wallet pass ─────────────────────────────────
+
+  Widget? _buildWalletBlock() {
+    if (!_walletService.isReady) return null;
+
+    final pass = _walletPass;
+    Widget body;
+    if (_loadingWalletPass) {
+      body = Row(
+        children: [
+          const SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.4,
+              valueColor: AlwaysStoppedAnimation<Color>(BrandColors.momentumBlue),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Text('Loading wallet pass details…', style: ProfileText.caption)),
+        ],
+      );
+    } else if (_walletPassError != null) {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          profileErrorBanner(
+            title: 'Could not load wallet pass info',
+            message: _walletPassError!,
+          ),
+          TextButton.icon(
+            onPressed: _loadWalletPassInfo,
+            style: TextButton.styleFrom(foregroundColor: ProfileTokens.ink),
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('Try again'),
+          ),
+        ],
+      );
+    } else if (pass == null) {
+      body = Text(
+        'No wallet pass has been generated for this member yet.',
+        style: ProfileText.caption,
+      );
+    } else {
+      final summary = pass.isActive ? 'Active pass on file.' : 'Pass found but not currently active.';
+      final registrationSummary = pass.isRegistered
+          ? 'Registered on ${pass.registrationCount} device${pass.registrationCount == 1 ? '' : 's'}.'
+          : 'Not registered for push notifications yet.';
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$summary $registrationSummary', style: ProfileText.value),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildWalletStatusChip('Pass generated', pass.hasPass),
+              _buildWalletStatusChip('Active', pass.isActive),
+              _buildWalletStatusChip('Push registered', pass.isRegistered),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if ((pass.passSerial ?? '').isNotEmpty)
+            Text('Pass serial: ${pass.passSerial}', style: ProfileText.caption),
+          if (pass.passGeneratedAt != null)
+            Text('Generated ${_formatDate(pass.passGeneratedAt!)}', style: ProfileText.caption),
+          Text('Registered devices: ${pass.registrationCount}', style: ProfileText.caption),
+        ],
+      );
+    }
+
+    final canSendPush =
+        pass != null && pass.hasPass && !_loadingWalletPass && _walletPassError == null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        profileSectionHeader(
+          title: 'Wallet pass',
+          trailing: IconButton(
+            tooltip: 'Refresh wallet pass data',
+            onPressed: _loadingWalletPass ? null : _loadWalletPassInfo,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            icon: Icon(Icons.refresh, size: 20, color: ProfileTokens.inkMuted),
+          ),
+        ),
+        profileSectionBody(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              body,
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: ProfileTokens.ink,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: ProfileTokens.fill,
+                    disabledForegroundColor: ProfileTokens.inkMuted,
+                    textStyle: ProfileText.button,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+                    ),
+                  ),
+                  onPressed:
+                      canSendPush && !_sendingWalletPush ? _sendWalletPushToMember : null,
+                  icon: _sendingWalletPush
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.notifications_active_outlined, size: 18),
+                  label: Text(_sendingWalletPush ? 'Sending…' : 'Send push notification'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Active is the emphasis pair, sunriseGold under unityBlue (7.17:1,
+  /// documented); inactive is the chip fill under unityBlue (11.27:1).
+  Widget _buildWalletStatusChip(String label, bool isActive) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isActive ? ProfileTokens.emphasisFill : ProfileTokens.fill,
+        borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isActive ? Icons.check_circle : Icons.radio_button_unchecked,
+            size: 14,
+            color: ProfileTokens.ink,
+          ),
+          const SizedBox(width: 6),
+          Text(label, style: ProfileText.chip),
+        ],
+      ),
+    );
+  }
+
+  // ── Sheet 2, R3: internal reports ────────────────────────────
+
+  Widget _buildInternalReportsBlock() {
+    final reports = _member.internalInfo.reports;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        profileSectionHeader(title: 'Internal reports'),
+        profileSectionBody(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildReportComposer(),
+              const SizedBox(height: 12),
+              if (reports.isEmpty)
+                Text(
+                  'No internal reports yet. Add a note or upload supporting documents.',
+                  style: ProfileText.caption,
+                )
+              else
+                for (final entry in reports) _buildReportEntryTile(entry),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReportComposer() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _reportNotesController,
+          style: profileInputText,
+          cursorColor: ProfileTokens.ink,
+          minLines: 3,
+          maxLines: 6,
+          decoration: profileInput('Internal notes about this member'),
+        ),
+        const SizedBox(height: 8),
+        if (_pendingReportFiles.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _pendingReportFiles
+                  .map(
+                    (file) => InputChip(
+                      label: Text(file.name, style: ProfileText.chip),
+                      backgroundColor: ProfileTokens.fill,
+                      deleteIconColor: ProfileTokens.inkMuted,
+                      side: BorderSide.none,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
+                      ),
+                      onDeleted:
+                          _savingReportEntry ? null : () => _removePendingReportFile(file),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton.icon(
+              onPressed: _savingReportEntry ? null : _pickReportFiles,
+              style: TextButton.styleFrom(
+                foregroundColor: ProfileTokens.ink,
+                textStyle: ProfileText.button,
+              ),
+              icon: const Icon(Icons.attach_file, size: 18),
+              label: const Text('Add files'),
+            ),
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: _savingReportEntry ? null : _saveReportEntry,
+              style: FilledButton.styleFrom(
+                backgroundColor: ProfileTokens.ink,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: ProfileTokens.fill,
+                disabledForegroundColor: ProfileTokens.inkMuted,
+                textStyle: ProfileText.button,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+                ),
+              ),
+              icon: _savingReportEntry
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.save_outlined, size: 18),
+              label: Text(_savingReportEntry ? 'Saving...' : 'Save report'),
+            ),
+          ],
+        ),
+        if (_reportComposerError != null)
+          profileErrorBanner(title: 'Could not save report', message: _reportComposerError!),
+      ],
+    );
+  }
+
+  Widget _buildReportEntryTile(MemberInternalReportEntry entry) {
+    final attachments = entry.attachments;
+    final timestamp = entry.updatedAt ?? entry.createdAt;
+    final typeLabel = (entry.type ?? (entry.hasAttachments ? 'file' : 'note')).toUpperCase();
+    final isUpdating = _updatingReportIds.contains(entry.id) || entry.isPending;
+    final isDeleting = _deletingReportIds.contains(entry.id);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ProfileTokens.fill,
+        borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(typeLabel, style: ProfileText.label),
+                    if (timestamp != null)
+                      Text(_formatReportTimestamp(timestamp), style: ProfileText.caption),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: isUpdating
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(ProfileTokens.ink),
+                        ),
+                      )
+                    : Icon(Icons.edit_outlined, size: 20, color: ProfileTokens.inkMuted),
+                tooltip: 'Edit report notes',
+                onPressed: (isUpdating || isDeleting) ? null : () => _editReportEntry(entry),
+              ),
+              IconButton(
+                icon: isDeleting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(ProfileTokens.ink),
+                        ),
+                      )
+                    : Icon(Icons.delete_outline, size: 20, color: ProfileTokens.inkMuted),
+                tooltip: 'Delete report',
+                onPressed: (isDeleting || isUpdating) ? null : () => _deleteReportEntry(entry),
+              ),
+            ],
+          ),
+          if ((entry.description ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SelectableText(entry.description!, style: ProfileText.longText),
+          ],
+          if (attachments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: attachments
+                  .map(
+                    (attachment) => OutlinedButton.icon(
+                      onPressed: attachment.isLocalPlaceholder
+                          ? null
+                          : () => _openAttachment(attachment),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: ProfileTokens.ink,
+                        side: BorderSide(color: ProfileTokens.border),
+                        textStyle: ProfileText.chip,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
+                        ),
+                      ),
+                      icon: Icon(_attachmentIcon(attachment), size: 16),
+                      label: Text(attachment.filename ?? attachment.path.split('/').last),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          if (entry.isPending) ...[
+            const SizedBox(height: 12),
+            const LinearProgressIndicator(
+              minHeight: 2,
+              color: BrandColors.momentumBlue,
+              backgroundColor: Colors.white,
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -2838,53 +4946,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     return null;
   }
 
-  bool _hasText(String? value) => _cleanText(value) != null;
 
   String? _formatDistrict(String? value) => Member.formatDistrictLabel(value);
-
-  Widget? _infoRowOrNull(String label, String? value, {Widget? trailing, Uri? link}) {
-    final cleaned = _cleanText(value);
-    if (cleaned == null) return null;
-    return _buildInfoRow(label, cleaned, trailing: trailing, link: link);
-  }
-
-  Widget? _copyRow(String label, String? value, {String? copyValue, Uri? link}) {
-    final cleaned = _cleanText(value);
-    if (cleaned == null) return null;
-
-    final toCopy = _cleanText(copyValue) ?? cleaned;
-    final actions = <Widget>[
-      IconButton(
-        icon: const Icon(Icons.copy, size: 20),
-        tooltip: 'Copy $label',
-        onPressed: () {
-          Clipboard.setData(ClipboardData(text: toCopy));
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$label copied')),
-          );
-        },
-      ),
-      if (link != null)
-        IconButton(
-          icon: const Icon(Icons.open_in_new, size: 20),
-          tooltip: 'Open $label',
-          onPressed: () => _openLink(link),
-        ),
-    ];
-
-    return _buildInfoRow(
-      label,
-      cleaned,
-      trailing: actions.isEmpty
-          ? null
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: actions,
-            ),
-      link: link,
-    );
-  }
-
   List<String> _buildAddressParts({
     String? street,
     String? city,
@@ -2928,697 +4991,6 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         .join(', ');
     if (query.isEmpty) return null;
     return Uri.https('maps.apple.com', '/', {'q': query});
-  }
-
-  Widget? _socialRow(_SocialPlatform platform, String label, String? value) {
-    final cleaned = _cleanText(value);
-    if (cleaned == null) return null;
-
-    final uri = _resolveSocialLink(platform, cleaned);
-    final display = _formatSocialDisplay(platform, cleaned, uri);
-    final copyTarget = uri?.toString() ?? cleaned;
-
-    return _copyRow(label, display, copyValue: copyTarget, link: uri);
-  }
-
-  Widget? _buildOptionalSection(String title, Iterable<Widget?> rows) {
-    final visible = rows.whereType<Widget>().toList();
-    if (visible.isEmpty) return null;
-    return _buildSection(title, visible);
-  }
-
-  Widget? _buildDonorSection() {
-    if (!_crmReady) return null;
-
-    if (_loadingDonorProfile) {
-      return _buildSection(
-        'Donor Activity',
-        const [
-          Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 8.0),
-              child: CircularProgressIndicator(),
-            ),
-          ),
-        ],
-      );
-    }
-
-    if (_donorError != null) {
-      return _buildSection(
-        'Donor Activity',
-        [
-          Text(
-            'Unable to load donor details right now.',
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _donorError!,
-            style: const TextStyle(color: Colors.grey),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: _loadDonorProfile,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try again'),
-            ),
-          ),
-        ],
-      );
-    }
-
-    final donor = _donorProfile;
-    if (donor == null) return null;
-
-    final totalDonated = donor.totalDonated ?? 0;
-    final donationCount = donor.donationCount;
-    final firstDonation = donor.firstDonationAt ?? donor.donations.lastOrNull?.createdAt;
-    final lastDonation = donor.lastDonationAt ?? donor.donations.firstOrNull?.createdAt;
-    final recentDonations = donor.donations.take(5).toList(growable: false);
-    final profileUrl = _buildDonorProfileUrl(donor);
-
-    final stats = <Widget>[
-      _buildDonorStatTile(
-        label: 'Total Donated',
-        value: _formatCurrency(totalDonated),
-        icon: Icons.volunteer_activism_outlined,
-        color: Colors.green.shade700,
-      ),
-      _buildDonorStatTile(
-        label: 'Donations',
-        value: donationCount.toString(),
-        icon: Icons.receipt_long_outlined,
-      ),
-      if (firstDonation != null)
-        _buildDonorStatTile(
-          label: 'First Donation',
-          value: _formatDateOnly(firstDonation),
-          icon: Icons.flag_outlined,
-        ),
-      if (lastDonation != null)
-        _buildDonorStatTile(
-          label: 'Last Donation',
-          value: _formatDate(lastDonation),
-          icon: Icons.history_toggle_off,
-        ),
-    ];
-
-    final children = <Widget>[
-      Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: stats,
-      ),
-    ];
-
-    if (donor.isRecurringDonor) {
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Chip(
-              avatar: Icon(
-                Icons.autorenew,
-                size: 18,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              label: const Text('Recurring donor'),
-              backgroundColor:
-                  Theme.of(context).colorScheme.primary.withOpacity(0.12),
-              labelStyle:
-                  TextStyle(color: Theme.of(context).colorScheme.primary),
-            ),
-          ),
-        ),
-      );
-    }
-
-    children.add(const SizedBox(height: 12));
-
-    if (recentDonations.isNotEmpty) {
-      children.addAll(
-        [
-          Text(
-            'Recent Donations',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Column(
-            children: [
-              for (int i = 0; i < recentDonations.length; i++) ...[
-                _buildDonationTile(recentDonations[i]),
-                if (i != recentDonations.length - 1)
-                  const Divider(height: 12),
-              ],
-            ],
-          ),
-        ],
-      );
-    } else {
-      children.add(const Text('No donation history on file.'));
-    }
-
-    if (profileUrl != null) {
-      children.addAll([
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: () => _openLink(profileUrl),
-            icon: const Icon(Icons.open_in_new),
-            label: const Text('View full donor profile'),
-          ),
-        ),
-      ]);
-    }
-
-    return _buildSection('Donor Activity', children);
-  }
-
-  Widget _buildDonationTile(_DonationRecord donation) {
-    final amountLabel = donation.amount != null
-        ? _formatCurrency(donation.amount!)
-        : 'Unknown amount';
-
-    return ListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.volunteer_activism_outlined),
-      title: Text(amountLabel),
-      subtitle: Text(_formatDonationSubtitle(donation)),
-    );
-  }
-
-  Widget _buildDonorStatTile({
-    required String label,
-    required String value,
-    required IconData icon,
-    Color? color,
-  }) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color ?? theme.colorScheme.primary),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              Text(
-                label,
-                style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget? _buildWalletPassSection() {
-    if (!_walletService.isReady) return null;
-
-    final pass = _walletPass;
-    Widget body;
-    if (_loadingWalletPass) {
-      body = Row(
-        children: const [
-          SizedBox(
-            height: 22,
-            width: 22,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.4,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-            ),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Loading wallet pass details…',
-              style: TextStyle(color: Colors.white70),
-            ),
-          ),
-        ],
-      );
-    } else if (_walletPassError != null) {
-      body = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Unable to load wallet pass info right now.',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _walletPassError!,
-            style: const TextStyle(color: Colors.white70),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: _loadWalletPassInfo,
-            style: TextButton.styleFrom(foregroundColor: Colors.white),
-            child: const Text('Try again'),
-          ),
-        ],
-      );
-    } else if (pass == null) {
-      body = const Text(
-        'No wallet pass has been generated for this member yet.',
-        style: TextStyle(color: Colors.white70),
-      );
-    } else {
-      final summary = pass.isActive
-          ? 'Active pass on file.'
-          : 'Pass found but not currently active.';
-      final registrationSummary = pass.isRegistered
-          ? 'Registered on ${pass.registrationCount} device${pass.registrationCount == 1 ? '' : 's'}.'
-          : 'Not registered for push notifications yet.';
-      body = Text(
-        '$summary $registrationSummary',
-        style: const TextStyle(color: Colors.white70),
-      );
-    }
-
-    final canSendPush =
-        pass != null && pass.hasPass && !_loadingWalletPass && _walletPassError == null;
-
-    final children = <Widget>[
-      Row(
-        children: [
-          const Icon(Icons.wallet_giftcard_outlined, color: Colors.white),
-          const SizedBox(width: 8),
-          const Text(
-            'Wallet Pass Status',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const Spacer(),
-          IconButton(
-            onPressed: _loadWalletPassInfo,
-            icon: _loadingWalletPass
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Icon(Icons.refresh),
-            color: Colors.white,
-            tooltip: 'Refresh wallet pass data',
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      body,
-    ];
-
-    if (!_loadingWalletPass && _walletPassError == null && pass != null) {
-      children.addAll([
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildWalletStatusChip('Pass Generated', pass.hasPass),
-            _buildWalletStatusChip('Active', pass.isActive),
-            _buildWalletStatusChip('Push Registered', pass.isRegistered),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if ((pass.passSerial ?? '').isNotEmpty)
-          Text(
-            'Pass serial: ${pass.passSerial}',
-            style: const TextStyle(color: Colors.white70),
-          ),
-        if (pass.passGeneratedAt != null)
-          Text(
-            'Generated ${_formatDate(pass.passGeneratedAt!)}',
-            style: const TextStyle(color: Colors.white70),
-          ),
-        Text(
-          'Registered devices: ${pass.registrationCount}',
-          style: const TextStyle(color: Colors.white70),
-        ),
-      ]);
-    }
-
-    children.add(const SizedBox(height: 16));
-    children.add(
-      Align(
-        alignment: Alignment.centerRight,
-        // Translucent white pill + white foreground blends with the wallet
-        // gradient instead of stamping a harsh solid-white rectangle on it.
-        child: ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.white.withOpacity(0.18),
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: BorderSide(color: Colors.white.withOpacity(0.28)),
-            ),
-          ),
-          onPressed: canSendPush && !_sendingWalletPush ? _sendWalletPushToMember : null,
-          icon: _sendingWalletPush
-              ? const SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : const Icon(Icons.notifications_active_outlined),
-          label: Text(_sendingWalletPush ? 'Sending…' : 'Send Push Notification'),
-        ),
-      ),
-    );
-
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: const BoxDecoration(gradient: _walletPassGradient),
-        padding: const EdgeInsets.all(20),
-        child: DefaultTextStyle.merge(
-          style: const TextStyle(color: Colors.white),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: children,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWalletStatusChip(String label, bool isActive) {
-    final background = Colors.white.withOpacity(isActive ? 0.18 : 0.08);
-    final borderColor = Colors.white.withOpacity(isActive ? 0.9 : 0.45);
-    final icon = isActive ? Icons.check_circle : Icons.radio_button_unchecked;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(label),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfilePhoto() {
-    const double size = 120;
-    final theme = Theme.of(context);
-    final photoUrl = _member.primaryProfilePhotoUrl;
-    final borderColor = theme.colorScheme.primary.withOpacity(0.35);
-
-    Widget buildFallback() {
-      final trimmed = _member.name.trim();
-      final initial = trimmed.isNotEmpty ? trimmed[0].toUpperCase() : '?';
-      return Container(
-        width: size,
-        height: size,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF1B262C), Color(0xFF3282B8)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Center(
-          child: Text(
-            initial,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 48,
-            ),
-          ),
-        ),
-      );
-    }
-
-    Widget content;
-    if (photoUrl != null && photoUrl.isNotEmpty) {
-      content = ClipOval(
-        child: Image.network(
-          photoUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => buildFallback(),
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return Center(
-              child: SizedBox(
-                width: size * 0.4,
-                height: size * 0.4,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    } else {
-      content = ClipOval(child: buildFallback());
-    }
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: borderColor, width: 4),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: content,
-    );
-  }
-
-  Widget? _buildInternalReportsSection() {
-    if (!_crmReady) return null;
-
-    final reports = _member.internalInfo.reports;
-    final children = <Widget>[
-      _buildReportComposer(),
-    ];
-
-    if (reports.isEmpty) {
-      children.add(const SizedBox(height: 12));
-      children.add(
-        const Text('No internal reports yet. Add a note or upload supporting documents.'),
-      );
-    } else {
-      children.add(const SizedBox(height: 16));
-      for (final entry in reports) {
-        children.add(_buildReportEntryTile(entry));
-      }
-    }
-
-    return _buildSection('Internal Reports', children);
-  }
-
-  Widget _buildReportComposer() {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: _reportNotesController,
-          maxLines: 5,
-          decoration: InputDecoration(
-            hintText: 'Add internal notes about this member...',
-            border: const OutlineInputBorder(),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: theme.colorScheme.primary),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        if (_pendingReportFiles.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _pendingReportFiles
-                  .map(
-                    (file) => Chip(
-                      label: Text(file.name),
-                      onDeleted: _savingReportEntry
-                          ? null
-                          : () => _removePendingReportFile(file),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            TextButton.icon(
-              onPressed: _savingReportEntry ? null : _pickReportFiles,
-              icon: const Icon(Icons.attach_file),
-              label: const Text('Add Files'),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              onPressed: _savingReportEntry ? null : _saveReportEntry,
-              icon: _savingReportEntry
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.save_outlined),
-              label: Text(_savingReportEntry ? 'Saving...' : 'Save Report'),
-            ),
-          ],
-        ),
-        if (_reportComposerError != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            _reportComposerError!,
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildReportEntryTile(MemberInternalReportEntry entry) {
-    final attachments = entry.attachments;
-    final timestamp = entry.updatedAt ?? entry.createdAt;
-    final typeLabel = (entry.type ?? (entry.hasAttachments ? 'file' : 'note')).toUpperCase();
-    final isUpdating = _updatingReportIds.contains(entry.id) || entry.isPending;
-    final isDeleting = _deletingReportIds.contains(entry.id);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.2)),
-        color: Theme.of(context).cardColor.withOpacity(0.95),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      typeLabel,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    if (timestamp != null)
-                      Text(
-                        _formatReportTimestamp(timestamp),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
-                      ),
-                  ],
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: isUpdating
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.edit_outlined),
-                    tooltip: 'Edit report notes',
-                    onPressed: (isUpdating || isDeleting) ? null : () => _editReportEntry(entry),
-                  ),
-                  IconButton(
-                    icon: isDeleting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.delete_outline),
-                    tooltip: 'Delete report',
-                    onPressed: (isDeleting || isUpdating) ? null : () => _deleteReportEntry(entry),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          if ((entry.description ?? '').isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(entry.description!),
-          ],
-          if (attachments.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: attachments
-                  .map(
-                    (attachment) => OutlinedButton.icon(
-                      onPressed: attachment.isLocalPlaceholder
-                          ? null
-                          : () => _openAttachment(attachment),
-                      icon: Icon(_attachmentIcon(attachment)),
-                      label: Text(attachment.filename ?? attachment.path.split('/').last),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ],
-          if (entry.isPending) ...[
-            const SizedBox(height: 12),
-            const LinearProgressIndicator(minHeight: 2),
-          ],
-        ],
-      ),
-    );
   }
 
   Future<void> _openAttachment(MemberInternalReportAttachment attachment) async {
@@ -3696,131 +5068,6 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       return '${difference.inDays} day${difference.inDays == 1 ? '' : 's'} ago';
     }
     return '${timestamp.month}/${timestamp.day}/${timestamp.year}';
-  }
-
-  Widget _buildSection(String title, List<Widget> children) {
-    if (children.isEmpty) return const SizedBox.shrink();
-
-    final theme = Theme.of(context);
-    final palette = _sectionPalette[title];
-    final colorScheme = theme.colorScheme;
-    final bool isDark = theme.brightness == Brightness.dark;
-    final surfaceColor = colorScheme.surface;
-    final List<Color>? blendedPalette = palette?.map((color) {
-      final double blendFactor = isDark ? 0.35 : 0.8;
-      return Color.lerp(color, surfaceColor, blendFactor)!;
-    }).toList();
-
-    final Color baseBackground = blendedPalette != null && blendedPalette.isNotEmpty
-        ? Color.lerp(blendedPalette.first, blendedPalette.last, 0.5) ?? surfaceColor
-        : colorScheme.surfaceVariant.withOpacity(isDark ? 0.5 : 0.9);
-    final Brightness backgroundBrightness = ThemeData.estimateBrightnessForColor(baseBackground);
-    final Color effectiveColor = backgroundBrightness == Brightness.dark
-        ? Colors.white
-        : theme.textTheme.bodyMedium?.color ?? colorScheme.onSurface;
-
-    final BoxDecoration decoration = blendedPalette != null
-        ? BoxDecoration(
-            gradient: LinearGradient(
-              colors: blendedPalette,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.4 : 0.12),
-                blurRadius: 24,
-                offset: const Offset(0, 18),
-              ),
-            ],
-          )
-        : BoxDecoration(
-            color: baseBackground,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: colorScheme.outline.withOpacity(isDark ? 0.4 : 0.25)),
-          );
-
-    final sectionTheme = theme.copyWith(
-      textTheme: theme.textTheme.apply(
-        bodyColor: effectiveColor,
-        displayColor: effectiveColor,
-      ),
-      iconTheme: theme.iconTheme.copyWith(color: effectiveColor),
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: decoration,
-          padding: const EdgeInsets.all(20),
-          child: Theme(
-            data: sectionTheme,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: children,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value, {Widget? trailing, Uri? link}) {
-    final theme = Theme.of(context);
-    final labelColor = theme.textTheme.bodyMedium?.color?.withOpacity(0.75) ??
-        theme.colorScheme.onSurface.withOpacity(0.65);
-    final labelStyle = theme.textTheme.labelMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: labelColor,
-        ) ??
-        TextStyle(
-          fontWeight: FontWeight.w600,
-          color: labelColor,
-        );
-
-    final baseValueStyle = theme.textTheme.bodyMedium ?? const TextStyle();
-    final baseValueColor = baseValueStyle.color ?? theme.colorScheme.onSurface;
-    final linkStyle = baseValueStyle.copyWith(
-      color: baseValueColor,
-      decoration: TextDecoration.underline,
-      decorationColor: baseValueColor.withOpacity(0.8),
-    );
-    final valueWidget = link != null
-        ? InkWell(
-            onTap: () => _openLink(link),
-            child: Text(value, style: linkStyle),
-          )
-        : Text(value, style: baseValueStyle);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: labelStyle),
-          const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: valueWidget),
-              if (trailing != null) ...[
-                const SizedBox(width: 8),
-                Flexible(child: trailing),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
   }
 
   Uri? _resolveSocialLink(_SocialPlatform platform, String value) {
@@ -3938,10 +5185,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
   }
 
-  String _formatDateOnly(DateTime date) {
-    final d = date.toLocal();
-    return '${d.month}/${d.day}/${d.year}';
-  }
+  String _formatDateOnly(DateTime date) => DateFormat('MMM d, y').format(date.toLocal());
 
   MeetingAttendance? get _latestMeeting {
     if (_meetingAttendance.isEmpty) return null;
@@ -3955,73 +5199,6 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         return bDate.compareTo(aDate);
       });
     return sorted.firstOrNull;
-  }
-
-  List<Widget> _buildMeetingAttendanceSection() {
-    if (!_crmReady) return const [];
-
-    final widgets = <Widget>[];
-    if (_loadingAttendance) {
-      widgets.add(
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 12.0),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      );
-    } else if (_attendanceError != null) {
-      widgets.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: Card(
-            child: ListTile(
-              leading: const Icon(Icons.error_outline),
-              title: const Text('Unable to load meeting attendance'),
-              subtitle: Text(_attendanceError!),
-              trailing: IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: _loadMeetingAttendance,
-              ),
-            ),
-          ),
-        ),
-      );
-    } else if (_meetingAttendance.isEmpty) {
-      widgets.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: Card(
-            child: ListTile(
-              leading: const Icon(Icons.event_busy),
-              title: const Text('No meetings recorded yet'),
-              subtitle: const Text('This member has not attended any tracked meetings.'),
-            ),
-          ),
-        ),
-      );
-    } else {
-      final latest = _latestMeeting;
-      if (latest != null) {
-        widgets.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12.0),
-            child: _buildMeetingSummaryCard(latest),
-          ),
-        );
-      }
-    }
-
-    widgets.add(
-      Align(
-        alignment: Alignment.center,
-        child: OutlinedButton.icon(
-          icon: const Icon(Icons.event_note),
-          label: Text('Meeting Attendance (${_meetingAttendance.length})'),
-          onPressed: _meetingAttendance.isEmpty ? null : _showMeetingAttendanceSheet,
-        ),
-      ),
-    );
-
-    return widgets;
   }
 
   /// Build the Meetings tab showing all meetings the member attended
@@ -4209,7 +5386,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
@@ -4235,7 +5412,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                           Text(
                             dateLabel,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               fontSize: 14,
                             ),
                           ),
@@ -4244,7 +5421,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                     ),
                     Icon(
                       Icons.chevron_right,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                     ),
                   ],
                 ),
@@ -4273,7 +5450,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -4294,16 +5471,40 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
   }
 
-  Card _buildMeetingSummaryCard(MeetingAttendance attendance) {
+  /// The latest meeting as one tappable row on the chip fill.
+  Widget _buildMeetingSummaryRow(MeetingAttendance attendance) {
     final dateLabel = attendance.formattedMeetingDate ?? 'Date unavailable';
-    final durationLabel = attendance.durationSummary;
-    return Card(
-      child: ListTile(
-        leading: const Icon(Icons.event_available),
-        title: Text(attendance.meetingLabel),
-        subtitle: Text('Last attended $dateLabel • $durationLabel'),
-        trailing: const Icon(Icons.open_in_new),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
         onTap: () => _navigateToMeeting(attendance),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: ProfileTokens.fill,
+            borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.event_available, size: 20, color: ProfileTokens.inkMuted),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(attendance.meetingLabel, style: ProfileText.value),
+                    Text(
+                      'Last attended $dateLabel, ${attendance.durationSummary}',
+                      style: ProfileText.caption,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.open_in_new, size: 18, color: ProfileTokens.inkMuted),
+            ],
+          ),
+        ),
       ),
     );
   }

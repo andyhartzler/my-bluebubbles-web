@@ -233,7 +233,10 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
     final theme = Theme.of(context);
     final greeting = _getGreeting();
     final firstName = session.displayName.split(' ').first;
-    final photoUrl = session.currentMember?.primaryProfilePhotoUrl;
+    // The one resolver: an uploaded avatar_url first, then the primary
+    // profile_pictures entry. Reading profile_pictures alone hides the
+    // headshot of anyone who uploaded through the personalized home.
+    final photoUrl = session.currentMember?.effectiveAvatarUrl;
 
     return Container(
       padding: EdgeInsets.fromLTRB(horizontalPadding, 48, horizontalPadding, 24),
@@ -256,7 +259,11 @@ class _CommitteeHubScreenState extends State<CommitteeHubScreen> {
             child: CorsAwareAvatar(
               imageUrl: photoUrl,
               radius: 32,
-              backgroundColor: _momentumBlue,
+              // White initials on a solid momentumBlue disc measure 2.75:1,
+              // under both the 4.5:1 normal-text and 3:1 large-text floors.
+              // momentumBlue is a non-text-use color. An opaque unityBlue
+              // disc carries white at 12.51:1 and holds on any surface.
+              backgroundColor: _unityBlue,
               fallbackText: session.displayName,
               fallbackIconColor: Colors.white,
               fallbackTextColor: Colors.white,

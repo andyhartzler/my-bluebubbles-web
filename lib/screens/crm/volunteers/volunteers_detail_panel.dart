@@ -213,9 +213,18 @@ Widget _iconTile(IconData icon, {Color? fill, Color? iconColor}) => Container(
     );
 
 /// Compact badge: the kit's white-15% pill at the 6px compact-badge radius.
-/// White caps on the default fill measure 7.9:1. [fill] is overridden by the
-/// status-coded and party-coded callers, whose colours are chosen elsewhere
-/// and are NOT measured here, so this carries no guarantee for those.
+///
+/// The default fill has TWO grounds in this file and therefore two figures.
+/// As `_districtChip` it sits straight on the navy panel, composites to
+/// #47516B, and carries white caps at 7.90:1. As `_geoChip` it sits inside a
+/// BrandedActivityFeedItem, whose pill is already white-10% over the panel,
+/// so it composites one layer lighter to #5A6279 and the same caps measure
+/// 6.07:1. Both clear the 4.5:1 text bar; the single 7.9:1 this comment used
+/// to quote only ever described the first of them.
+///
+/// [fill] is overridden by the status-coded and party-coded callers, whose
+/// colours are chosen elsewhere and are NOT measured here, so this carries no
+/// guarantee for those.
 Widget _brandBadge(String label, {Color fill = const Color(0x26FFFFFF)}) =>
     Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -328,8 +337,19 @@ class VolunteersDetailPanel extends StatelessWidget {
                 fontWeight: FontWeight.w800,
                 height: 1.1,
                 letterSpacing: -0.3)),
+        // The member count gets a sentence to live in before it appears as a
+        // bare figure in the first stat row. Only once the district signal has
+        // loaded: "across 0 priority districts" would be a false statement.
+        if (hotRegions.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+              '$statewideMembers member${statewideMembers == 1 ? '' : 's'} '
+              'across ${hotRegions.length} priority '
+              'district${hotRegions.length == 1 ? '' : 's'}',
+              style: TextStyle(color: p.secondary, fontSize: 13, height: 1.3)),
+        ],
         const SizedBox(height: 16),
-        _statTiles(p),
+        _statRows(p),
         const SizedBox(height: 24),
         _sectionHeader(p, 'PRIORITY DISTRICTS'),
         const SizedBox(height: 10),
@@ -350,102 +370,143 @@ class VolunteersDetailPanel extends StatelessWidget {
     );
   }
 
-  // ── stat tiles ─────────────────────────────────────────────────
-  /// IntrinsicHeight is load-bearing, not decoration. This Row is a direct
-  /// child of a ListView, so its incoming height constraint is unbounded, and
-  /// CrossAxisAlignment.stretch under an unbounded cross axis forces an
-  /// infinite child height: the sliver then stops building and the rail
-  /// silently truncates, with the assert stripped in release. IntrinsicHeight
-  /// bounds the Row first so the three tiles can match heights safely.
-  Widget _statTiles(_Palette p) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: _statTile(p,
-                icon: Icons.groups_outlined,
-                value: '$statewideMembers',
-                label: 'members'),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _statTile(p,
-                icon: Icons.star_rounded,
-                value: '$statewideYoungDems',
-                label: 'young dems on the\nNovember ballot',
-                highlight: true,
-                onTap: onHighlightYoungDems),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _statTile(p,
-                icon: Icons.how_to_vote_outlined,
-                value: '$statewideNominees',
-                label: 'Democratic\nnominees'),
-          ),
-        ],
-      ),
+  // ── stat rows ──────────────────────────────────────────────────
+  /// Three full-width rows, one per statewide figure. Three tiles across a
+  /// 300 px rail were about 84 px each, which cannot hold a two-word label
+  /// beside a 22 px value: the middle label ran to three lines and stretched
+  /// its neighbours to match. One row per stat gives every label a single
+  /// line. A Column has no unbounded cross axis inside the ListView, so the
+  /// IntrinsicHeight the old Row needed is gone with it.
+  Widget _statRows(_Palette p) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _statRow(p,
+            icon: Icons.groups_outlined,
+            value: '$statewideMembers',
+            label: 'Members'),
+        const SizedBox(height: 8),
+        _statRow(p,
+            icon: Icons.star_rounded,
+            value: '$statewideYoungDems',
+            label: 'Young Dem nominees',
+            tooltip: 'Young Dems on the November ballot',
+            highlight: true,
+            onTap: onHighlightYoungDems),
+        const SizedBox(height: 8),
+        _statRow(p,
+            icon: Icons.how_to_vote_outlined,
+            value: '$statewideNominees',
+            label: 'Democratic nominees'),
+      ],
     );
   }
 
-  /// BrandedStatCard, scaled to three-across in a 360px rail: same icon tile,
-  /// same big value over a muted label, smaller type. The highlight variant
-  /// fills with sunriseGold and flips its foreground to unityBlue, which is
-  /// the kit's emphasis pairing (6.9:1) rather than white on gold.
-  Widget _statTile(_Palette p,
+  /// One 56 px stat row: the kit's 36 px icon tile, the value, then the label
+  /// on one line. Measured pairs, each computed from the hex values in
+  /// BrandColors and reported to two places:
+  ///   white value and label on the white-10% row fill, which composites to
+  ///     #3D4762 over unityBlue ........................... 9.23:1
+  ///   white glyph on the white-20% icon well, which is painted INSIDE that
+  ///     white-10% row rather than on unityBlue, so it composites to
+  ///     #646C81 ......................................... 5.25:1
+  ///   unityBlue value and label on the sunriseGold row .... 7.17:1
+  ///   unityBlue glyph on its unityBlue-15% well over gold, which composites
+  ///     to #DDA41C ....................................... 5.60:1
+  ///   unityBlue at 0.70 chevron on gold, #675B3E .......... 3.83:1, which
+  ///     clears the 3:1 bar for a graphical object
+  ///
+  /// The icon well is the one pair here that does NOT carry the palette's
+  /// documented figure. volunteers_theme.dart states onAccentSoft over
+  /// accentSoft at 6.68:1, and that is white-20% over unityBlue (#525C74):
+  /// the ground a tile has when it sits straight on the panel. No default
+  /// tile on this rail has that ground: the plain stat rows here, and every
+  /// [BrandedActivityFeedItem] leading tile below them, put it inside a
+  /// white-10% fill, so the real ground is one layer lighter and the glyph
+  /// measures 5.25:1. It still clears the 4.5:1 text bar and the 3:1
+  /// graphical bar, so nothing here is illegible, but do not quote 6.68:1 for
+  /// a tile that sits on a row. The gold row is the exception and is measured
+  /// on its own ground above: its well is unityBlue-15% over gold, not white.
+  ///
+  /// The label is white rather than white70 on the plain rows: white70 on the
+  /// same fill is 5.51:1 and passes, but the three-tile version failed on its
+  /// lighter fill with exactly that ink, and one ink per role is simpler.
+  ///
+  /// The value hugs its digits instead of sitting in a fixed 64 px column.
+  /// Roboto measured at these sizes: "Young Dem nominees" and "Democratic
+  /// nominees" are both about 128 px at 13 px, and the row has 244 px inside
+  /// its padding on a 300 px rail. A 64 px value column plus the chevron
+  /// leaves the gold label about 100 px, so it would have been the one label
+  /// that ellipsised. Hugging the value leaves it 139 px with a two digit
+  /// count and 126 px with three, so the label holds one line until the Young
+  /// Dem count reaches three digits, at which point the ellipsis and the
+  /// tooltip take over. The tooltip carries the full phrase for the shortened
+  /// label either way, on the kit's inverse surface (unityBlue on white,
+  /// 12.51:1).
+  Widget _statRow(_Palette p,
       {required IconData icon,
       required String value,
       required String label,
+      String? tooltip,
       bool highlight = false,
       VoidCallback? onTap}) {
     final fg = highlight ? p.onEmphasis : Colors.white;
-    final content = Container(
-      padding: const EdgeInsets.all(12),
+    Widget row = Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: highlight ? p.emphasisFill : Colors.white.withValues(alpha: 0.15),
+        color:
+            highlight ? p.emphasisFill : Colors.white.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: highlight
-                  ? p.onEmphasis.withValues(alpha: 0.15)
-                  : Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 16, color: fg),
-          ),
-          const SizedBox(height: 10),
+          _iconTile(icon,
+              fill: highlight ? p.onEmphasis.withValues(alpha: 0.15) : null,
+              iconColor: fg),
+          const SizedBox(width: 8),
           Text(value,
               style: TextStyle(
                   color: fg,
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  height: 1.0)),
-          const SizedBox(height: 4),
-          Text(label,
-              style: TextStyle(
-                  color: highlight
-                      ? fg.withValues(alpha: 0.85)
-                      : Colors.white70,
-                  fontSize: 11.5,
-                  height: 1.15,
-                  fontWeight: FontWeight.w600)),
+                  height: 1.0,
+                  fontFeatures: const [FontFeature.tabularFigures()])),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: fg, fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+          if (onTap != null)
+            Icon(Icons.chevron_right,
+                size: 20, color: fg.withValues(alpha: 0.70)),
         ],
       ),
     );
-    if (onTap == null) return content;
+    if (tooltip != null) {
+      row = Tooltip(
+        message: tooltip,
+        decoration: BoxDecoration(
+          color: p.vt.inverseSurface,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        textStyle: TextStyle(
+            color: p.vt.onInverseSurface,
+            fontSize: 12,
+            fontWeight: FontWeight.w600),
+        child: row,
+      );
+    }
+    if (onTap == null) return row;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: content,
+        child: row,
       ),
     );
   }
@@ -465,8 +526,10 @@ class VolunteersDetailPanel extends StatelessWidget {
         iconColor: youngDem ? p.onEmphasis : Colors.white,
       ),
       primaryText: h.mode.regionTitle(h.id),
+      // Prose, not a dotted joiner, and "on the ballot" rather than "running":
+      // these are November nominees. Never a vote count or a percentage.
       secondaryText: '${h.memberCount} member${h.memberCount == 1 ? '' : 's'}'
-          '${youngDem ? ' · young dem running' : ''}',
+          '${youngDem ? ', Young Dem on the ballot' : ''}',
       onTap: () => onSelectHot(h.mode, h.id),
     );
   }
@@ -489,8 +552,11 @@ class VolunteersDetailPanel extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: TextButton(
               onPressed: onOpenActivities,
+              // sunriseGold, 7.17:1 on surface. Not [accent]: momentumBlue is
+              // the palette's non-text role, and 4.55:1 on this surface does
+              // not buy it a text job.
               style: TextButton.styleFrom(
-                foregroundColor: p.accent,
+                foregroundColor: p.highlight,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 minimumSize: const Size(0, 36),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1420,7 +1486,8 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             // white70 on the card's white-10% fill over the navy panel:
-            // 5.49:1.
+            // 5.51:1, the same pairing and the same figure the stat rows
+            // quote.
             style: TextStyle(color: p.secondary, fontSize: 12),
           ),
         ),

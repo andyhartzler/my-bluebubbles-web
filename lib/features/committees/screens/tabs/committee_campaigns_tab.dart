@@ -749,17 +749,19 @@ class _CommitteeCampaignsTabState extends State<CommitteeCampaignsTab> {
 
   Widget _buildParticipantAvatar(CampaignParticipant participant) {
     final photoUrl = participant.profilePhotoUrl ??
-        participant.linkedMember?.primaryProfilePhotoUrl;
+        participant.linkedMember?.effectiveAvatarUrl;
 
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: _unityBlue, width: 2),
       ),
+      // momentumBlue at 30% over the white-10% tile measures 2.57:1 under
+      // white initials, and even solid momentumBlue is only 2.75:1. The
+      // opaque unityBlue default is 12.51:1.
       child: CorsAwareAvatar(
         imageUrl: photoUrl,
         radius: 14,
-        backgroundColor: _momentumBlue.withOpacity(0.3),
         fallbackText: participant.name,
         fallbackIconColor: Colors.white,
         fallbackTextColor: Colors.white,

@@ -1,0 +1,22 @@
+-- APPLIED TO PRODUCTION 2026-09-05.
+--
+-- A safety net that can itself throw is not a safety net.
+--
+-- sync_table_to_knowledge wraps its body in an exception handler whose own
+-- comment states the intent: the search document is a derivative and must never
+-- break the row. Correct. But the HANDLER called public.log_enrichment_failure,
+-- which `authenticated` had no EXECUTE on, so the handler raised, that raise
+-- escaped, and a deliberately non-fatal sync failure became a fatal UPDATE.
+--
+-- Effect: NO authenticated user could update a member row at all. Not a member
+-- editing their profile through the portal, not an exec through the CRM. Every
+-- such UPDATE died with "permission denied for function log_enrichment_failure",
+-- nowhere near the actual cause.
+--
+-- Fixed in two places: grant EXECUTE so the logger works (it is SECURITY DEFINER,
+-- so the caller gains nothing beyond appending to the failure log), and nest the
+-- log call so a future permission change can never again take a row down with it.
+-- The full function body was reinstalled with that nested block; see the applied
+-- migration knowledge_sync_failure_must_not_break_the_row.
+grant execute on function public.log_enrichment_failure(text, text, text, text, text)
+  to authenticated;

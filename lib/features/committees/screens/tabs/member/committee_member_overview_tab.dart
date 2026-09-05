@@ -389,10 +389,12 @@ class _CommitteeMemberOverviewTabState
       ),
       child: Row(
         children: [
+          // Same tile gradient as the workspace header. White on a
+          // white-20% disc measures 2.23:1 over the momentumBlue end, so
+          // take the opaque unityBlue default at 12.51:1.
           CorsAwareAvatar(
             imageUrl: leader.photoUrl,
             radius: 20,
-            backgroundColor: Colors.white.withOpacity(0.2),
             fallbackText: leader.name,
             fallbackIconColor: Colors.white,
             fallbackTextColor: Colors.white,

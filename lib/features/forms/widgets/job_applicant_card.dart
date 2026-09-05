@@ -206,7 +206,7 @@ class JobApplicantCard extends StatelessWidget {
   }
 
   Widget _buildAvatar(ThemeData theme) {
-    final photoUrl = member?.primaryProfilePhotoUrl;
+    final photoUrl = member?.effectiveAvatarUrl;
 
     if (photoUrl != null && photoUrl.isNotEmpty) {
       return CircleAvatar(

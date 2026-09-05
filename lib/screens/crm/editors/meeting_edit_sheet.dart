@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/editors/member_search_sheet.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_repository.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 
 enum _MeetingFieldType { text, multiline, integer, dateTime }
 
@@ -244,19 +244,14 @@ class _MeetingEditSheetState extends State<MeetingEditSheet> {
           if (selectedMember != null) ...[
             Row(
               children: [
-                CircleAvatar(
+                // CorsAwareAvatar, not CircleAvatar plus a cached provider:
+                // the old form drew initials only when the url was null, so a
+                // 404 or a CORS refusal left an empty disc. White on the
+                // opaque unityBlue default is 12.51:1.
+                CorsAwareAvatar(
+                  imageUrl: selectedMember.effectiveAvatarUrl,
                   radius: 24,
-                  backgroundImage: selectedMember.primaryProfilePhotoUrl != null
-                      ? CachedNetworkImageProvider(selectedMember.primaryProfilePhotoUrl!)
-                      : null,
-                  child: selectedMember.primaryProfilePhotoUrl == null
-                      ? Text(
-                          selectedMember.name.isNotEmpty
-                              ? selectedMember.name[0].toUpperCase()
-                              : '?',
-                          style: theme.textTheme.titleMedium,
-                        )
-                      : null,
+                  fallbackText: selectedMember.name,
                 ),
                 const SizedBox(width: 12),
                 Expanded(

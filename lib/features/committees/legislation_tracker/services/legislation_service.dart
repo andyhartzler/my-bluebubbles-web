@@ -189,7 +189,7 @@ class LegislationService {
         final results = await Future.wait([
           _supabase
               .from('members')
-              .select('id, name, profile_pictures')
+              .select('id, name, avatar_url, profile_pictures')
               .eq('id', positionSetBy)
               .maybeSingle(),
           _supabase
@@ -205,9 +205,13 @@ class LegislationService {
         if (memberResponse != null) {
           final Map<String, dynamic> setter = Map<String, dynamic>.from(memberResponse);
 
-          // Check if member has profile_pictures
+          // Same order as Member.effectiveAvatarUrl: a user-uploaded
+          // avatar_url counts as having a face, so the Slack fallback below
+          // must not fire for a member who has one.
+          final uploaded = setter['avatar_url']?.toString().trim();
           final profilePics = setter['profile_pictures'];
-          bool hasProfilePic = profilePics is List && profilePics.isNotEmpty;
+          bool hasProfilePic = (uploaded != null && uploaded.isNotEmpty) ||
+              (profilePics is List && profilePics.isNotEmpty);
 
           // If no profile picture, use slack avatar
           if (!hasProfilePic && slackMapping != null && slackMapping['cached_avatar_path'] != null) {
@@ -830,7 +834,7 @@ class LegislationService {
         // Only select columns that exist on members table
         final membersResponse = await _supabase
             .from('members')
-            .select('id, name, profile_pictures')
+            .select('id, name, avatar_url, profile_pictures')
             .inFilter('id', authorIds);
 
         for (final member in (membersResponse as List)) {
@@ -850,12 +854,18 @@ class LegislationService {
       if (authorId != null && authorInfo.containsKey(authorId)) {
         final author = authorInfo[authorId]!;
         noteJson['author_name'] = author['name'];
-        // Handle profile pictures - get first photo URL if available
-        final profilePics = author['profile_pictures'];
-        if (profilePics is List && profilePics.isNotEmpty) {
-          final firstPic = profilePics.first;
-          if (firstPic is Map) {
-            noteJson['author_avatar_url'] = firstPic['public_url'] ?? firstPic['url'];
+        // Same order as Member.effectiveAvatarUrl: the user-uploaded avatar
+        // wins, then the first profile_pictures entry.
+        final uploaded = author['avatar_url']?.toString().trim();
+        if (uploaded != null && uploaded.isNotEmpty) {
+          noteJson['author_avatar_url'] = uploaded;
+        } else {
+          final profilePics = author['profile_pictures'];
+          if (profilePics is List && profilePics.isNotEmpty) {
+            final firstPic = profilePics.first;
+            if (firstPic is Map) {
+              noteJson['author_avatar_url'] = firstPic['public_url'] ?? firstPic['url'];
+            }
           }
         }
       }

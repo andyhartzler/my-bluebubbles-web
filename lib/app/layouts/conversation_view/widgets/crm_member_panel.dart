@@ -7,6 +7,7 @@ import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 
 /// Side panel showing CRM member info in chat view
 class CRMMemberPanel extends StatefulWidget {
@@ -93,10 +94,15 @@ class _CRMMemberPanelState extends State<CRMMemberPanel> {
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
+        // This panel drew initials unconditionally and never read a photo at
+        // all, so an exec's face never appeared here. effectiveAvatarUrl is
+        // the one resolver, and white on the opaque unityBlue default is
+        // 12.51:1.
         Center(
-          child: CircleAvatar(
+          child: CorsAwareAvatar(
+            imageUrl: _member!.effectiveAvatarUrl,
             radius: 40,
-            child: Text(_member!.name[0].toUpperCase(), style: const TextStyle(fontSize: 24)),
+            fallbackText: _member!.name,
           ),
         ),
         const SizedBox(height: 12),

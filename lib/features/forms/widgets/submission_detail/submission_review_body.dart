@@ -16,21 +16,37 @@ import 'section_card.dart';
 import 'section_nav_bar.dart';
 import 'verdict_block.dart';
 
-/// The candidate-review content, shared between [SubmissionDetailScreen] and
+/// The submission-review content, shared between [SubmissionDetailScreen] and
 /// the Questionnaire tab on `CandidateDetailScreen` so both surfaces render
 /// the identical redesigned review: hero, navy stat band, sticky section
-/// navigator, verdict block, then the questionnaire sections flowed into two
-/// columns on wide screens.
+/// navigator, then the form's sections flowed into two columns on wide
+/// screens. The Gemini verdict block renders only for a form that is scored
+/// (see [isCandidateReview]); a membership submission is the same read of
+/// "what they filled in" with no scoring surface at all.
 ///
 /// A plain Column (no scroll view of its own) so hosts can embed it in
 /// whatever scrolling context they already have. The section navigator syncs
 /// to the nearest ancestor [Scrollable] (Host A's CustomScrollView, Host B's
 /// ListView) and pins a duplicate of itself through an [OverlayPortal] once
-/// the in-flow row scrolls past the viewport top — no host-specific code.
+/// the in-flow row scrolls past the viewport top, with no host-specific code.
 class SubmissionReviewBody extends StatefulWidget {
   final FormSchema form;
   final FormSubmission submission;
   final AiAlignmentScore? aiAlignment;
+
+  /// Whether [form] is reviewed as a candidate: it carries a scoring config
+  /// (`schema.scoring`), which is the form's own declaration that answers are
+  /// judged for alignment. In production that is exactly one form, the
+  /// endorsement questionnaire. Everything candidate-specific on this page
+  /// (the Gemini verdict and its placeholder, the exec ballots, the
+  /// "Candidate Review" title) keys on this one fact so a membership or
+  /// chartering submission can never grow a scoring surface.
+  ///
+  /// Why not the slug: it was renamed once already (the 2026 suffix came off
+  /// `endorsement-questionnaire`) and a string match goes stale silently. Why
+  /// not form_type: the questionnaire and the membership form are both
+  /// 'registration'.
+  static bool isCandidateReview(FormSchema form) => form.schema.scoring != null;
 
   /// Superseded scoring runs for this submission (see
   /// [EndorsementAiScoreRepository.loadHistory]). Empty renders nothing.
@@ -102,7 +118,7 @@ class _SubmissionReviewBodyState extends State<SubmissionReviewBody> {
     super.didChangeDependencies();
     // Host A yields the CustomScrollView position, Host B the ListView
     // position. When neither exists the nav renders in-flow only and taps
-    // fall back to Scrollable.ensureVisible — no crash, pinning never engages.
+    // fall back to Scrollable.ensureVisible: no crash, pinning never engages.
     final pos = Scrollable.maybeOf(context)?.position;
     if (!identical(pos, _position)) {
       _position?.removeListener(_onScrollTick);
@@ -212,7 +228,7 @@ class _SubmissionReviewBodyState extends State<SubmissionReviewBody> {
         setState(() {});
       }
     } else if (_pinController.isShowing) {
-      // Hide is instant — avoids ghost bars during fast flings.
+      // Hide is instant, which avoids ghost bars during fast flings.
       _pinController.hide();
     }
 
@@ -386,10 +402,14 @@ class _SubmissionReviewBodyState extends State<SubmissionReviewBody> {
                 history: widget.aiHistory,
               ),
             )
-          else
-            // Defensive: all 75 endorsement submissions carry a score today.
-            // An unscored one gets an honest placeholder rather than a silent
-            // gap where the verdict belongs.
+          else if (SubmissionReviewBody.isCandidateReview(widget.form))
+            // Only a scored form ever earns the placeholder. Most
+            // questionnaire submissions carry a score today, so an unscored
+            // one gets an honest notice rather than a silent gap where the
+            // verdict belongs. A form that is never scored (membership,
+            // chartering) says nothing about scoring at all: this placeholder
+            // once rendered on a member's submission and read as a missing
+            // candidate verdict.
             ReviewCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

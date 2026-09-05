@@ -20,6 +20,7 @@ import 'editors/chapter_edit_sheet.dart';
 import 'bulk_email_screen.dart';
 import 'bulk_message_screen.dart';
 import 'member_detail_screen.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 
 class ChapterDetailScreen extends StatefulWidget {
   final Chapter chapter;
@@ -888,7 +889,13 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
 
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(child: Text(member.name.isNotEmpty ? member.name[0].toUpperCase() : '?')),
+      // Drew initials unconditionally and never read a photo. White on the
+      // opaque unityBlue default is 12.51:1.
+      leading: CorsAwareAvatar(
+        imageUrl: member.effectiveAvatarUrl,
+        radius: 20,
+        fallbackText: member.name,
+      ),
       title: Text(member.name),
       subtitle: subtitle.isEmpty ? null : Text(subtitle),
       trailing: IconButton(

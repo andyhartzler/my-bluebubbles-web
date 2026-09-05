@@ -1362,14 +1362,14 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
 
   Widget _buildParticipantAvatar(CampaignParticipant participant) {
     final photoUrl = participant.profilePhotoUrl ??
-        participant.linkedMember?.primaryProfilePhotoUrl;
+        participant.linkedMember?.effectiveAvatarUrl;
 
+    // White initials on a momentumBlue-30% disc measure under 2:1 on a light
+    // card. The opaque unityBlue default is 12.51:1 wherever this lands.
     return CorsAwareAvatar(
       imageUrl: photoUrl,
       radius: 28,
-      backgroundColor: _momentumBlue.withOpacity(0.3),
       fallbackText: participant.name,
-      fallbackIconColor: _momentumBlue,
       fallbackTextColor: Colors.white,
     );
   }

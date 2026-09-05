@@ -1,0 +1,21 @@
+-- APPLIED TO PRODUCTION 2026-09-05.
+--
+-- sync_member_email_to_auth wrote to auth.users WHERE id = NEW.id and to
+-- auth.identities WHERE user_id = NEW.id. That is members.id, not
+-- members.user_id, and those are NOT the same thing.
+--
+-- For most members the auto-created auth user reuses the member id, so the two
+-- agree and the bug is invisible. They diverge exactly where it matters: the
+-- duplicate-auth-account cleanup, where accounts differing only by email case
+-- were parked. Rogelio Rodriguez, a sitting executive, has members.id pointing at
+-- a parked duplicate (rodriguez82002+dup-2025-11@) while his real login lives at
+-- members.user_id (Rodriguez82002@, capital R).
+--
+-- So editing his email rewrote the orphan and left the account he actually signs
+-- in with on the old address, silently. The CRM edit dialog promised "it rewrites
+-- the member's login identity", which was false on precisely the row that mattered.
+--
+-- The reinstalled function targets COALESCE(NEW.user_id, NEW.id), warns and
+-- returns when no auth row exists there, and compares addresses case
+-- insensitively because the duplicates this hid behind differ only by case.
+-- See the applied migration email_sync_must_follow_user_id_not_member_id.
