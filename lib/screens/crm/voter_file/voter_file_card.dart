@@ -5,26 +5,51 @@ import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/voter_file_record.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/voter_file/voter_history_strip.dart';
+import 'package:bluebubbles/screens/crm/widgets/member_profile_sections.dart';
 
 /// Composed card showing the MO voter-file record for a candidate or
 /// donor. Replaces the previous chip-soup with a clean labeled
 /// definition list:
 ///
-///   Status                Active (10y registered)
-///   Registered Since      Apr 2014 · 12 years
-///   Party                 Democrat
-///   Birth Year            1985 (~age 41)
-///   Precinct / Ward       0125 / 02
-///   Congressional         CD-01
-///   MO House              D-77
-///   MO Senate             SD-05
-///   County                St. Louis County
+///   STATUS                Active
+///   REGISTERED            Apr 2014 · 12 years
+///   BIRTH YEAR            1985 (~age 41)
+///   RESIDENCE             St. Louis County · 63101
+///   PRECINCT              Precinct 0125 · Ward 02
+///   CONGRESSIONAL         CD-01
+///   MO HOUSE              HD-77
+///   MO SENATE             SD-05
 ///
-/// Followed by the chronological [VoterHistoryStrip] showing election-
-/// by-election participation and primary/general aggregates.
+/// Followed by the chronological [VoterHistoryStrip] showing election
+/// by election participation and primary/general aggregates.
 ///
 /// Optional staff-debug ExpansionTile exposes match_confidence and
 /// match_method when [showDebug] is true.
+///
+/// COLOUR RULES. This card is rendered by the donor and candidate detail
+/// screens inside [CandidateUI.card], whose fill is unityBlue #273351 at
+/// alpha 0.9 over the screen scaffold. So the real composited parent is a
+/// near-solid navy: exactly unityBlue over the dark scaffolds (white on
+/// it 12.51:1) and at worst #3D4762 where the scaffold is white (white on
+/// it 9.23:1). Every piece of readable text is FULL WHITE at alpha 1.0
+/// and hierarchy is size, weight and letter spacing only, following the
+/// member_profile_sections idiom. Alpha appears only on the decorative
+/// row rules (ProfileTokens.hairline), which nothing is read against.
+///
+/// Anything that carries meaning through colour sits on a SOLID fill
+/// under an ink that clears 4.5:1 on it, never as coloured text on the
+/// card. Ratios computed with the WCAG 2.1 relative luminance formula:
+///
+///   Active      success #10B981 under unityBlue ink ............ 4.93:1
+///   Inactive    sunriseGold #FDB813 under unityBlue ink ........ 7.17:1
+///   Cancelled   ProfileTokens.danger #B91C1C under white ink ... 6.47:1
+///   Unknown     unityBlue #273351 under white ink, white edge .. 12.51:1
+///   src chip    unityBlue #273351 under white ink, white edge .. 12.51:1
+///
+/// The card header accent is sunriseGold, which [CandidateUI.card] draws
+/// as a full-strength icon on a 15 percent tint of itself over the card:
+/// 5.32:1 on the tile over unityBlue, 4.06:1 on the tile over #3D4762,
+/// both above the 3:1 bar for a meaningful icon.
 class VoterFileCard extends StatelessWidget {
   final VoterFileRecord record;
   final String? dobSource;
@@ -54,7 +79,7 @@ class VoterFileCard extends StatelessWidget {
     return CandidateUI.card(
       'Missouri Voter File',
       Icons.how_to_vote,
-      BrandColors.steelBlue,
+      ProfileTokens.emphasisFill,
       child: Padding(
         padding: const EdgeInsets.only(top: 14),
         child: !hasAnyData
@@ -67,21 +92,11 @@ class VoterFileCard extends StatelessWidget {
                   const SizedBox(height: 18),
 
                   // ── Voting history table ──
-                  Row(
+                  const Row(
                     children: [
-                      Icon(Icons.history,
-                          size: 14,
-                          color: BrandColors.sunriseGold.withOpacity(0.8)),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Voting History',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.85),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                      Icon(Icons.history, size: 14, color: ProfileTokens.ink),
+                      SizedBox(width: 6),
+                      Text('VOTING HISTORY', style: ProfileText.label),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -113,7 +128,7 @@ class VoterFileCard extends StatelessWidget {
       rows.add(_registeredSinceRow(record.registrationDate!));
     }
 
-    // Birth year — MO releases year only; mirror the dob_source-aware
+    // Birth year: MO releases year only; mirror the dob_source-aware
     // pattern from candidate_detail_screen.dart so we never synthesize
     // a fake month/day.
     if (record.birthYear != null) {
@@ -144,7 +159,7 @@ class VoterFileCard extends StatelessWidget {
       rows.add(_DefRow(label: 'Precinct', value: precinctWard.join(' · ')));
     }
 
-    // Districts — render together so users can see them at a glance.
+    // Districts: render together so users can see them at a glance.
     if ((record.congressionalDistrict ?? '').isNotEmpty) {
       rows.add(_DefRow(
         label: 'Congressional',
@@ -169,19 +184,32 @@ class VoterFileCard extends StatelessWidget {
 
   _DefRow _statusRow() {
     final s = (record.voterStatus ?? '').toLowerCase();
-    Color dot;
+    // Status carries meaning through colour, so it is a chip on a SOLID
+    // fill under an ink that clears 4.5:1 on that fill (ratios in the
+    // class doc). Never coloured text, never alpha.
+    Color fill;
+    Color ink;
+    Color edge;
     String label;
     if (s == 'active') {
-      dot = BrandColors.success;
+      fill = BrandColors.success;
+      ink = ProfileTokens.onEmphasis;
+      edge = BrandColors.success;
       label = 'Active';
     } else if (s == 'inactive') {
-      dot = BrandColors.sunriseGold;
+      fill = ProfileTokens.emphasisFill;
+      ink = ProfileTokens.onEmphasis;
+      edge = ProfileTokens.emphasisFill;
       label = 'Inactive';
     } else if (s == 'cancelled' || s == 'canceled') {
-      dot = BrandColors.republicanRed;
+      fill = ProfileTokens.danger;
+      ink = ProfileTokens.ink;
+      edge = ProfileTokens.danger;
       label = 'Cancelled';
     } else {
-      dot = Colors.white54;
+      fill = ProfileTokens.fill;
+      ink = ProfileTokens.ink;
+      edge = ProfileTokens.border;
       label = record.voterStatus ?? 'Unknown';
     }
     return _DefRow(
@@ -189,26 +217,7 @@ class VoterFileCard extends StatelessWidget {
       valueWidget: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: dot,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(color: dot.withOpacity(0.5), blurRadius: 6),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: dot,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          _solidChip(label, fill: fill, ink: ink, edge: edge),
         ],
       ),
     );
@@ -227,22 +236,14 @@ class VoterFileCard extends StatelessWidget {
   // ────────────────────────────────────────────────────────────────────
 
   Widget _emptyState() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 18),
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 18),
       child: Row(
         children: [
-          Icon(Icons.info_outline,
-              size: 16, color: Colors.white.withOpacity(0.5)),
-          const SizedBox(width: 8),
+          Icon(Icons.info_outline, size: 16, color: ProfileTokens.ink),
+          SizedBox(width: 8),
           Expanded(
-            child: Text(
-              'No voter file linked.',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.65),
-                fontSize: 13,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
+            child: Text('No voter file linked.', style: ProfileText.caption),
           ),
         ],
       ),
@@ -256,67 +257,48 @@ class VoterFileCard extends StatelessWidget {
         Row(
           children: [
             if (record.voterId.isNotEmpty) ...[
-              Icon(Icons.badge_outlined,
-                  size: 12, color: Colors.white.withOpacity(0.45)),
+              const Icon(Icons.badge_outlined, size: 12, color: ProfileTokens.ink),
               const SizedBox(width: 4),
               Text(
                 'Voter ID ${record.voterId}',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.45),
-                  fontSize: 10,
+                style: const TextStyle(
+                  color: ProfileTokens.ink,
+                  fontSize: 11,
                   fontFamily: 'monospace',
                 ),
               ),
             ],
             const Spacer(),
             if ((dobSource ?? '').isNotEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: BrandColors.steelBlue.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(
-                      color: BrandColors.steelBlue.withOpacity(0.3)),
-                ),
-                child: Text(
-                  'src: $dobSource',
-                  style: TextStyle(
-                    color: BrandColors.steelBlue,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
-                  ),
-                ),
+              _solidChip(
+                'src: $dobSource',
+                fill: ProfileTokens.fill,
+                ink: ProfileTokens.ink,
+                edge: ProfileTokens.border,
               ),
           ],
         ),
         if (showDebug && (matchConfidence != null || matchMethod != null)) ...[
           const SizedBox(height: 6),
-          Theme(
-            data: Theme.of(context).copyWith(
-              dividerColor: Colors.transparent,
-              unselectedWidgetColor: Colors.white54,
-            ),
-            child: ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: const EdgeInsets.only(left: 4, bottom: 8),
-              title: Text(
-                'Match diagnostics',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.65),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              iconColor: Colors.white70,
-              collapsedIconColor: Colors.white54,
-              children: [
-                _debugRow('match_confidence',
-                    matchConfidence?.toStringAsFixed(2) ?? '—'),
-                _debugRow('match_method', matchMethod ?? '—'),
-                if (dobSource != null) _debugRow('dob_source', dobSource!),
-              ],
-            ),
+          // Colours are set directly on the tile, never derived from the
+          // ambient theme. An empty Border on both shapes removes the divider
+          // rules the tile would otherwise draw from the theme.
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: const EdgeInsets.only(left: 4, bottom: 8),
+            shape: const Border(),
+            collapsedShape: const Border(),
+            iconColor: ProfileTokens.ink,
+            collapsedIconColor: ProfileTokens.ink,
+            textColor: ProfileTokens.ink,
+            collapsedTextColor: ProfileTokens.ink,
+            title: const Text('MATCH DIAGNOSTICS', style: ProfileText.label),
+            children: [
+              _debugRow('match_confidence',
+                  matchConfidence?.toStringAsFixed(2) ?? 'n/a'),
+              _debugRow('match_method', matchMethod ?? 'n/a'),
+              if (dobSource != null) _debugRow('dob_source', dobSource!),
+            ],
           ),
         ],
       ],
@@ -331,9 +313,9 @@ class VoterFileCard extends StatelessWidget {
               width: 130,
               child: Text(
                 k,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.55),
-                  fontSize: 10,
+                style: const TextStyle(
+                  color: ProfileTokens.ink,
+                  fontSize: 11,
                   fontFamily: 'monospace',
                 ),
               ),
@@ -342,9 +324,10 @@ class VoterFileCard extends StatelessWidget {
               child: Text(
                 v,
                 style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 11,
-                    fontFamily: 'monospace'),
+                  color: ProfileTokens.ink,
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                ),
               ),
             ),
           ],
@@ -356,6 +339,27 @@ class VoterFileCard extends StatelessWidget {
 // Private helpers
 // ──────────────────────────────────────────────────────────────────────
 
+/// A chip on a SOLID fill. [ink] is the label colour and must clear 4.5:1
+/// on [fill]; [edge] is the outline, white when the fill is unityBlue so
+/// the chip keeps an edge against the navy card, otherwise the fill
+/// itself.
+Widget _solidChip(
+  String text, {
+  required Color fill,
+  required Color ink,
+  required Color edge,
+}) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: fill,
+      borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
+      border: Border.all(color: edge),
+    ),
+    child: Text(text, style: ProfileText.chip.copyWith(color: ink)),
+  );
+}
+
 class _DefRow {
   final String label;
   final String? value;
@@ -366,6 +370,10 @@ class _DefRow {
             'Either value or valueWidget must be non-null');
 }
 
+/// Solid unityBlue block with a white outline (ProfileTokens.fill and
+/// ProfileTokens.border), so every label and value sits on a solid fill
+/// at 12.51:1 wherever the card is. Row rules are the decorative
+/// hairline; nothing is read against them.
 class _DefinitionList extends StatelessWidget {
   final List<_DefRow> rows;
   const _DefinitionList({required this.rows});
@@ -375,9 +383,9 @@ class _DefinitionList extends StatelessWidget {
     if (rows.isEmpty) return const SizedBox.shrink();
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        color: ProfileTokens.fill,
+        borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+        border: Border.all(color: ProfileTokens.border),
       ),
       child: Column(
         children: [
@@ -385,7 +393,7 @@ class _DefinitionList extends StatelessWidget {
             if (i > 0)
               Container(
                 height: 1,
-                color: Colors.white.withOpacity(0.04),
+                color: ProfileTokens.hairline,
               ),
             _DefRowView(row: rows[i]),
           ],
@@ -407,28 +415,16 @@ class _DefRowView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 110,
-            child: Text(
-              row.label,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.55),
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.3,
-              ),
+            width: 124,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text(row.label.toUpperCase(), style: ProfileText.label),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: row.valueWidget ??
-                Text(
-                  row.value ?? '—',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                Text(row.value ?? 'n/a', style: ProfileText.value),
           ),
         ],
       ),

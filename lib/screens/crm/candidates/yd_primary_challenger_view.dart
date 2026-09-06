@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/models/crm/primary_challenge_pair.dart';
 import 'package:bluebubbles/services/crm/candidate_primary_detector.dart';
@@ -413,9 +414,6 @@ class _Side extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = candidate?.initials ??
-        (name.isNotEmpty ? name.substring(0, 1) : '?');
-
     // Office summary — only surfaced in the mobile full-width layout.
     String? officeLine;
     if (fullWidth && candidate != null) {
@@ -455,21 +453,12 @@ class _Side extends StatelessWidget {
               SizedBox(height: fullWidth ? 10 : 8),
               Row(
                 children: [
-                  CircleAvatar(
-                    // Bigger photo on mobile — dedicated space should
+                  CorsAwareAvatar(
+                    // Bigger photo on mobile: dedicated space should
                     // translate into a more confident visual hierarchy.
+                    imageUrl: candidate?.effectivePhotoUrl,
+                    fallbackText: name,
                     radius: fullWidth ? 28 : 20,
-                    backgroundColor: accent.withOpacity(0.3),
-                    backgroundImage: (candidate?.avatarUrl != null)
-                        ? NetworkImage(candidate!.avatarUrl!)
-                        : null,
-                    child: (candidate?.avatarUrl == null)
-                        ? Text(initials,
-                            style: TextStyle(
-                                color: accent,
-                                fontWeight: FontWeight.w700,
-                                fontSize: fullWidth ? 18 : 14))
-                        : null,
                   ),
                   SizedBox(width: fullWidth ? 14 : 10),
                   Expanded(
@@ -555,18 +544,10 @@ class _YdListRow extends StatelessWidget {
           ),
           child: Row(
             children: [
-              CircleAvatar(
+              CorsAwareAvatar(
+                imageUrl: c.effectivePhotoUrl,
+                fallbackText: c.name,
                 radius: 18,
-                backgroundColor: BrandColors.sunriseGold.withOpacity(0.25),
-                backgroundImage: (c.avatarUrl != null)
-                    ? NetworkImage(c.avatarUrl!)
-                    : null,
-                child: (c.avatarUrl == null)
-                    ? Text(c.initials,
-                        style: const TextStyle(
-                            color: BrandColors.sunriseGold,
-                            fontWeight: FontWeight.bold))
-                    : null,
               ),
               const SizedBox(width: 10),
               Expanded(

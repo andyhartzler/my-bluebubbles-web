@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 
 typedef CandidateTap = void Function(Candidate c);
@@ -124,18 +125,10 @@ class _GridCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
+                  CorsAwareAvatar(
+                    imageUrl: c.effectivePhotoUrl,
+                    fallbackText: c.name,
                     radius: 26,
-                    backgroundColor: partyColor.withOpacity(0.25),
-                    backgroundImage: (c.avatarUrl != null)
-                        ? NetworkImage(c.avatarUrl!)
-                        : null,
-                    child: (c.avatarUrl == null)
-                        ? Text(c.initials,
-                            style: TextStyle(
-                                color: partyColor,
-                                fontWeight: FontWeight.bold))
-                        : null,
                   ),
                   const Spacer(),
                   if (c.isYoungDem)

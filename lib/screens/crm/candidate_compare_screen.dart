@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 
@@ -381,22 +382,10 @@ class _CandidateCompareScreenState extends State<CandidateCompareScreen>
       ),
       child: Column(
         children: [
-          CircleAvatar(
+          CorsAwareAvatar(
+            imageUrl: c.effectivePhotoUrl,
+            fallbackText: c.name,
             radius: 28,
-            backgroundColor: partyColor.withOpacity(0.2),
-            backgroundImage: c.avatarUrl != null
-                ? NetworkImage(c.avatarUrl!)
-                : null,
-            child: c.avatarUrl == null
-                ? Text(
-                    c.initials,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                    ),
-                  )
-                : null,
           ),
           const SizedBox(height: 8),
           Text(

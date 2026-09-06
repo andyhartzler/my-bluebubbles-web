@@ -813,7 +813,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
           .replaceAll('cochair', 'co chair')
           .replaceAll('representatives', 'representative')
           .replaceAll('chairs', 'chair')
-          .replaceAll(RegExp(r'[\-–—/]'), ' ')
+          .replaceAll(RegExp('[-\u2013\u2014/]'), ' ')
           .replaceAll('&', ' and ')
           .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
           .replaceAll(RegExp(r'\s+'), ' ')

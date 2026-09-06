@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/intelligence_profile_section.dart';
@@ -510,14 +511,10 @@ class _MECCommitteeScreenState extends State<MECCommitteeScreen> {
             border: Border.all(color: partyColor.withOpacity(0.35)),
           ),
           child: Row(children: [
-            CircleAvatar(
+            CorsAwareAvatar(
+              imageUrl: photoUrl,
+              fallbackText: name,
               radius: 22,
-              backgroundColor: partyColor.withOpacity(0.25),
-              backgroundImage: photoUrl != null && photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-              child: (photoUrl == null || photoUrl.isEmpty)
-                  ? Text(name.isNotEmpty ? name[0] : '?',
-                      style: TextStyle(color: partyColor, fontSize: 18, fontWeight: FontWeight.bold))
-                  : null,
             ),
             const SizedBox(width: 12),
             Expanded(

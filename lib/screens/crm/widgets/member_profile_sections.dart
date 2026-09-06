@@ -950,15 +950,19 @@ class ProfileActionPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onPressed != null && !busy;
-    final ink = enabled ? ProfileTokens.onEmphasis : ProfileTokens.disabledInk;
-    final fill = enabled ? ProfileTokens.emphasisFill : ProfileTokens.disabledFill;
+    // A pill that is busy is doing the thing you asked, so it keeps the
+    // emphasis pair and its spinner reads at 7.17:1. Only a pill with nothing
+    // to do reads as disabled. Tapping is blocked either way.
+    final active = onPressed != null || busy;
+    final tappable = onPressed != null && !busy;
+    final ink = active ? ProfileTokens.onEmphasis : ProfileTokens.disabledInk;
+    final fill = active ? ProfileTokens.emphasisFill : ProfileTokens.disabledFill;
 
     final pill = Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
-        onTap: enabled ? onPressed : null,
+        onTap: tappable ? onPressed : null,
         child: Container(
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -975,9 +979,7 @@ class ProfileActionPill extends StatelessWidget {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      onPressed != null ? ProfileTokens.onEmphasis : Colors.white,
-                    ),
+                    valueColor: AlwaysStoppedAnimation<Color>(ink),
                   ),
                 )
               else
@@ -990,7 +992,7 @@ class ProfileActionPill extends StatelessWidget {
       ),
     );
 
-    if (!enabled && disabledReason != null) {
+    if (!active && disabledReason != null) {
       return Tooltip(message: disabledReason!, child: pill);
     }
     return pill;

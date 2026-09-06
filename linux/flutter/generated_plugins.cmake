@@ -19,6 +19,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   pasteboard
   printing
   record_linux
+  sentry_flutter
   super_native_extensions
   url_launcher_linux
   window_to_front

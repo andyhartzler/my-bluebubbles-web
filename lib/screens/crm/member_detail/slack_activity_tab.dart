@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
@@ -10,6 +11,7 @@ import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/slack_activity.dart';
 import 'package:bluebubbles/screens/crm/member_detail/slack_user_search_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/widgets/member_profile_sections.dart';
 import 'package:bluebubbles/services/crm/slack_activity_service.dart';
 import 'package:bluebubbles/utils/slack_message_formatter.dart';
 
@@ -131,32 +133,46 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      // White spinner on the gradient card: 12.51:1 at the dark end and
+      // 4.59:1 at the light end, so it clears 3:1 wherever it sits.
+      return const _SlackActivityPage(
+        child: ProfileSectionCard(
+          title: 'Slack Activity',
+          icon: Icons.chat_bubble_outline,
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
+      return _SlackActivityPage(
+        child: ProfileSectionCard(
+          title: 'Slack Activity',
+          icon: Icons.chat_bubble_outline,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
-              const SizedBox(height: 16),
-              const Text('Unable to load Slack activity'),
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: Theme.of(context).colorScheme.error),
+              profileErrorBanner(
+                title: 'Unable to load Slack activity',
+                message: _error!,
               ),
               const SizedBox(height: 16),
-              ElevatedButton(
+              ProfileActionPill(
+                icon: Icons.refresh,
+                label: 'Retry',
                 onPressed: _loadInitial,
-                child: const Text('Retry'),
               ),
             ],
           ),
@@ -166,114 +182,102 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
 
     return RefreshIndicator(
       onRefresh: _refresh,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildProfileCard(context),
-          const SizedBox(height: 16),
-          _buildStatisticsCard(context),
-          const SizedBox(height: 16),
-          Text(
-            'Recent Slack Messages',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          if (_messages.isEmpty)
-            _buildEmptyState(context)
-          else
-            ...[
-              for (final message in _messages) ...[
-                _buildMessageCard(context, message),
-                const SizedBox(height: 8),
-              ],
-            ],
-          if (_hasMore)
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: Align(
-                alignment: Alignment.center,
-                child: OutlinedButton.icon(
-                  onPressed: _isLoadingMore ? null : _loadMore,
-                  icon: _isLoadingMore
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.expand_more),
-                  label: Text(_isLoadingMore ? 'Loading…' : 'Load more'),
+      color: BrandColors.unityBlue,
+      backgroundColor: Colors.white,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: _pagePadding(constraints),
+            children: [
+              _sheetWidth(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildProfileCard(context),
+                    const SizedBox(height: ProfileTokens.cardGap),
+                    _buildStatisticsCard(context),
+                    const SizedBox(height: ProfileTokens.cardGap),
+                    _buildMessagesCard(context),
+                  ],
                 ),
               ),
-            ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
 
+  /// The Slack profile as its own section card. Every line is full white; the
+  /// link control is the emphasis pill, unityBlue on sunriseGold (7.17:1).
   Widget _buildProfileCard(BuildContext context) {
     final profile = _profile;
-    final theme = Theme.of(context);
     final shouldShowLinkButton = widget.member.slackUserId == null;
 
     // Prioritize member's main profile photo, fall back to Slack avatar
     final avatarUrl = widget.member.effectiveAvatarUrl ?? profile?.avatarUrl;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            CorsAwareAvatar(
+    return ProfileSectionCard(
+      title: 'Slack Profile',
+      icon: Icons.chat_bubble_outline,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 3 px sunriseGold ring, a mark rather than text; the initials
+          // fallback is white on solid unityBlue, 12.51:1.
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: BrandColors.sunriseGold,
+            ),
+            child: CorsAwareAvatar(
               imageUrl: avatarUrl,
               radius: 28,
+              backgroundColor: ProfileTokens.fill,
               fallbackText: widget.member.name,
               fallbackIcon: Icons.chat_bubble_outline,
+              fallbackTextColor: Colors.white,
+              fallbackIconColor: Colors.white,
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    profile?.realName ?? profile?.displayName ?? 'Slack not linked',
-                    style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  profile?.realName ?? profile?.displayName ?? 'Slack not linked',
+                  style: ProfileText.value,
+                ),
+                const SizedBox(height: 4),
+                if (profile?.displayName != null)
+                  Text('@${profile!.displayName}', style: ProfileText.caption),
+                if (profile?.email != null)
+                  Text(profile!.email!, style: ProfileText.caption),
+                if (profile == null || !(profile.isLinked))
+                  const Text(
+                    'No Slack profile is linked to this member yet.',
+                    style: ProfileText.caption,
                   ),
-                  const SizedBox(height: 4),
-                  if (profile?.displayName != null)
-                    Text('@${profile!.displayName}', style: theme.textTheme.bodyMedium),
-                  if (profile?.email != null)
-                    Text(profile!.email!, style: theme.textTheme.bodySmall),
-                  if (profile == null || !(profile.isLinked))
-                    Text(
-                      'No Slack profile is linked to this member yet.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-                    ),
-                  if (shouldShowLinkButton)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12.0),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: OutlinedButton.icon(
-                          onPressed: _linkingSlackAccount ? null : _openSlackLinker,
-                          icon: _linkingSlackAccount
-                              ? const SizedBox(
-                                  height: 16,
-                                  width: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.link),
-                          label: Text(
-                            _linkingSlackAccount ? 'Opening…' : 'Link Slack Account',
-                          ),
-                        ),
+                if (shouldShowLinkButton)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12.0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: ProfileActionPill(
+                        icon: Icons.link,
+                        label: _linkingSlackAccount ? 'Opening…' : 'Link Slack Account',
+                        onPressed: _linkingSlackAccount ? null : _openSlackLinker,
+                        busy: _linkingSlackAccount,
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -301,58 +305,65 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
     }
   }
 
+  /// The activity summary as a section card: two stat tiles and the first and
+  /// last archived dates as label over value facts, all full white.
   Widget _buildStatisticsCard(BuildContext context) {
     final stats = _statistics;
 
     if (stats == null) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            'No Slack activity has been archived for this member yet.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+      return const ProfileSectionCard(
+        title: 'Slack Activity Summary',
+        icon: Icons.insights_outlined,
+        child: Text(
+          'No Slack activity has been archived for this member yet.',
+          style: ProfileText.caption,
         ),
       );
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Slack Activity Summary',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+    return ProfileSectionCard(
+      title: 'Slack Activity Summary',
+      icon: Icons.insights_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatisticTile(
+                context,
+                icon: Icons.message_outlined,
+                label: 'Messages',
+                value: stats.totalMessages.toString(),
+              ),
+              _buildStatisticTile(
+                context,
+                icon: Icons.forum_outlined,
+                label: 'Channels',
+                value: stats.channelsActiveIn.toString(),
+              ),
+            ],
+          ),
+          if (stats.latestMessage != null || stats.earliestMessage != null) ...[
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 32,
+              runSpacing: 16,
               children: [
-                _buildStatisticTile(
-                  context,
-                  icon: Icons.message_outlined,
-                  label: 'Messages',
-                  value: stats.totalMessages.toString(),
-                ),
-                _buildStatisticTile(
-                  context,
-                  icon: Icons.forum_outlined,
-                  label: 'Channels',
-                  value: stats.channelsActiveIn.toString(),
-                ),
+                if (stats.latestMessage != null)
+                  profileFact('Last activity', _formatTimestamp(stats.latestMessage!)),
+                if (stats.earliestMessage != null)
+                  profileFact('First archived message', _formatTimestamp(stats.earliestMessage!)),
               ],
             ),
-            const SizedBox(height: 12),
-            if (stats.latestMessage != null)
-              Text('Last activity: ${_formatTimestamp(stats.latestMessage!)}'),
-            if (stats.earliestMessage != null)
-              Text('First archived message: ${_formatTimestamp(stats.earliestMessage!)}'),
           ],
-        ),
+        ],
       ),
     );
   }
 
+  /// One stat: the icon on a solid unityBlue tile (white glyph, 12.51:1), the
+  /// big white number, and the 11 w700 white label.
   Widget _buildStatisticTile(
     BuildContext context, {
     required IconData icon,
@@ -360,44 +371,117 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
     required String value,
   }) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 28, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(height: 4),
-        Text(value, style: Theme.of(context).textTheme.titleLarge),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        profileIconTile(icon, size: 48, iconSize: 26),
+        const SizedBox(height: 10),
+        Text(value, style: ProfileText.statValue),
+        const SizedBox(height: 2),
+        Text(label.toUpperCase(), style: ProfileText.label),
       ],
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            Icon(Icons.inbox_outlined, size: 48, color: Theme.of(context).hintColor),
-            const SizedBox(height: 12),
-            const Text('No Slack messages have been archived for this member.'),
-            const SizedBox(height: 8),
-            Text(
-              'Once the Slack archiver captures their activity, it will appear here automatically.',
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
+  /// The message feed as one section card: each message is a solid unityBlue
+  /// row block with a white outline, and the empty state and the load more
+  /// control sit inside the same card.
+  Widget _buildMessagesCard(BuildContext context) {
+    return ProfileSectionCard(
+      title: 'Recent Slack Messages',
+      icon: Icons.forum_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_messages.isEmpty)
+            _buildEmptyState(context)
+          else
+            ...[
+              for (var i = 0; i < _messages.length; i++) ...[
+                if (i > 0) const SizedBox(height: 12),
+                _buildMessageCard(context, _messages[i]),
+              ],
+            ],
+          if (_hasMore)
+            Padding(
+              padding: const EdgeInsets.only(top: 16.0),
+              child: Align(
+                alignment: Alignment.center,
+                child: _buildLoadMoreControl(),
+              ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
 
+  /// White outline button while idle; a white spinner and caption while the
+  /// next page loads (white on the card, 12.51:1 to 4.59:1).
+  Widget _buildLoadMoreControl() {
+    if (_isLoadingMore) {
+      return const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+          SizedBox(width: 10),
+          Text('Loading…', style: ProfileText.caption),
+        ],
+      );
+    }
+    return profileOutlineButton(
+      label: 'Load more',
+      icon: Icons.expand_more,
+      onPressed: _isLoadingMore ? null : _loadMore,
+    );
+  }
+
+  /// Empty state inside the card: a solid unityBlue icon tile over the 17 and
+  /// 15 white lines, centred.
+  Widget _buildEmptyState(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Column(
+        children: [
+          profileIconTile(Icons.inbox_outlined, size: 64, iconSize: 32),
+          const SizedBox(height: 16),
+          const Text(
+            'No Slack messages have been archived for this member.',
+            style: ProfileText.value,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Once the Slack archiver captures their activity, it will appear here automatically.',
+            style: ProfileText.caption,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// One message as a tappable row block: solid unityBlue with a white outline
+  /// (white on it 12.51:1; the outline keeps the block's edge at the card's
+  /// dark corner). Text is 15 white, meta lines 15 white, links white and
+  /// underlined, reactions solid outlined chips.
   Widget _buildMessageCard(BuildContext context, SlackMessage message) {
-    final theme = Theme.of(context);
     final channelLabel = message.channelInfo?.committeeName?.isNotEmpty == true
         ? message.channelInfo!.committeeName!
         : message.channelInfo?.channelName ?? 'Unknown channel';
     final hasChannelId = message.slackChannelId != null && message.slackChannelId!.isNotEmpty;
 
-    return Card(
+    return Material(
+      color: ProfileTokens.fill,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+        side: const BorderSide(color: ProfileTokens.border),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: hasChannelId
@@ -408,26 +492,21 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildFormattedMessageText(context, message.text, theme),
-              const SizedBox(height: 8),
+              _buildFormattedMessageText(context, message.text),
+              const SizedBox(height: 10),
               Wrap(
                 spacing: 12,
-                runSpacing: 4,
+                runSpacing: 6,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.forum_outlined, size: 16),
+                      const Icon(Icons.forum_outlined, size: 16, color: Colors.white),
                       const SizedBox(width: 4),
                       Text(
                         channelLabel,
-                        style: hasChannelId
-                            ? TextStyle(
-                                color: theme.colorScheme.primary,
-                                decoration: TextDecoration.underline,
-                              )
-                            : null,
+                        style: hasChannelId ? ProfileText.link : ProfileText.caption,
                       ),
                     ],
                   ),
@@ -435,42 +514,36 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.schedule, size: 16),
+                        const Icon(Icons.schedule, size: 16, color: Colors.white),
                         const SizedBox(width: 4),
-                        Text(_formatTimestamp(message.postedAt!)),
+                        Text(_formatTimestamp(message.postedAt!), style: ProfileText.caption),
                       ],
                     ),
                   if (message.isThreadReply)
                     const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.reply, size: 16),
+                        Icon(Icons.reply, size: 16, color: Colors.white),
                         SizedBox(width: 4),
-                        Text('Thread reply'),
+                        Text('Thread reply', style: ProfileText.caption),
                       ],
                     ),
                   if (message.hasFiles)
                     const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.attach_file, size: 16),
+                        Icon(Icons.attach_file, size: 16, color: Colors.white),
                         SizedBox(width: 4),
-                        Text('Includes files'),
+                        Text('Includes files', style: ProfileText.caption),
                       ],
                     ),
                   if (hasChannelId)
-                    Row(
+                    const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.open_in_new, size: 14, color: theme.colorScheme.primary),
-                        const SizedBox(width: 4),
-                        Text(
-                          'View in channel',
-                          style: TextStyle(
-                            color: theme.colorScheme.primary,
-                            fontSize: 12,
-                          ),
-                        ),
+                        Icon(Icons.open_in_new, size: 14, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text('View in channel', style: ProfileText.link),
                       ],
                     ),
                 ],
@@ -496,23 +569,22 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
     );
   }
 
-  Widget _buildFormattedMessageText(BuildContext context, String? text, ThemeData theme) {
+  Widget _buildFormattedMessageText(BuildContext context, String? text) {
     if (text == null || text.trim().isEmpty) {
       return Text(
         'No message text provided',
-        style: theme.textTheme.bodyLarge?.copyWith(
-          fontStyle: FontStyle.italic,
-          color: theme.textTheme.bodyLarge?.color?.withOpacity(0.6),
-        ),
+        style: ProfileText.longText.copyWith(fontStyle: FontStyle.italic),
       );
     }
 
-    // Use SlackMessageFormatter to parse the message
+    // Use SlackMessageFormatter to parse the message. Links and mentions are
+    // white on the solid unityBlue row (12.51:1); the formatter's mention
+    // highlight is white 0.10 over that fill, still 9.23:1 under white.
     final spans = SlackMessageFormatter.parse(
       text,
-      baseStyle: theme.textTheme.bodyLarge ?? const TextStyle(),
-      linkColor: theme.colorScheme.primary,
-      mentionColor: theme.colorScheme.primary,
+      baseStyle: ProfileText.longText,
+      linkColor: Colors.white,
+      mentionColor: Colors.white,
       userMappings: _userMappings,
       onMentionTap: (userId, memberId) {
         if (memberId != null && memberId.isNotEmpty) {
@@ -522,48 +594,21 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
     );
 
     if (spans.isEmpty) {
-      return Text(text, style: theme.textTheme.bodyLarge);
+      return Text(text, style: ProfileText.longText);
     }
 
     return RichText(text: TextSpan(children: spans));
   }
 
   Widget _buildReactions(BuildContext context, List<SlackReaction> reactions) {
-    final theme = Theme.of(context);
-
     return Wrap(
       spacing: 8,
-      runSpacing: 4,
+      runSpacing: 8,
       children: reactions.map((reaction) {
         // Convert emoji shortcode to Unicode
         final emojiOrName = _getEmojiDisplay(reaction.name);
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: theme.colorScheme.outline.withOpacity(0.3),
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                emojiOrName,
-                style: const TextStyle(fontSize: 14),
-              ),
-              if (reaction.count > 1) ...[
-                const SizedBox(width: 4),
-                Text(
-                  '${reaction.count}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ],
-          ),
+        return profileChip(
+          reaction.count > 1 ? '$emojiOrName ${reaction.count}' : emojiOrName,
         );
       }).toList(),
     );
@@ -631,5 +676,45 @@ class _SlackActivityTabState extends State<SlackActivityTab> {
 
   String _formatTimestamp(DateTime dateTime) {
     return _timestampFormat.format(dateTime.toLocal());
+  }
+}
+
+/// The tab's list padding, matching the Meetings tab: 16 under 768 and 32 by
+/// 24 above it.
+EdgeInsets _pagePadding(BoxConstraints constraints) {
+  final wide = constraints.maxWidth >= 768;
+  return wide
+      ? const EdgeInsets.symmetric(horizontal: 32, vertical: 24)
+      : const EdgeInsets.all(16);
+}
+
+/// Centres the tab's content at the profile's 1200 sheet width.
+Widget _sheetWidth(Widget child) {
+  return Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: ProfileTokens.maxSheetWidth),
+      child: child,
+    ),
+  );
+}
+
+/// The tab's scroll frame for a single card: always scrollable so the frame
+/// matches the loaded page even when the card is short.
+class _SlackActivityPage extends StatelessWidget {
+  const _SlackActivityPage({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: _pagePadding(constraints),
+          children: [_sheetWidth(child)],
+        );
+      },
+    );
   }
 }

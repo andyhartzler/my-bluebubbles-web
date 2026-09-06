@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/screens/crm/candidate_ui_helpers.dart';
 import 'package:bluebubbles/services/crm/candidate_repository.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -213,14 +214,10 @@ class _HistoricalCandidateScreenState extends State<HistoricalCandidateScreen> {
       ],
     );
 
-    final avatar = CircleAvatar(
+    final avatar = CorsAwareAvatar(
+      imageUrl: photo,
+      fallbackText: widget.candidateName,
       radius: isMobile ? 44 : 36,
-      backgroundColor: partyColor.withOpacity(0.3),
-      backgroundImage: photo != null && photo.isNotEmpty ? NetworkImage(photo) : null,
-      child: photo == null || photo.isEmpty
-          ? Text(widget.candidateName.isNotEmpty ? widget.candidateName[0] : '?',
-              style: TextStyle(color: partyColor, fontSize: isMobile ? 32 : 28, fontWeight: FontWeight.bold))
-          : null,
     );
 
     return ListView(

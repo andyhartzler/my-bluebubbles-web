@@ -368,7 +368,7 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final avatarUrl = candidate.avatarUrl;
+    final avatarUrl = candidate.effectivePhotoUrl;
     final hasPhoto = avatarUrl != null && avatarUrl.isNotEmpty;
     return Container(
       width: 52,

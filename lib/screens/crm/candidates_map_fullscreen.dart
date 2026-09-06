@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
 import 'package:bluebubbles/widgets/crm/missouri_map_widget.dart';
@@ -244,13 +245,10 @@ class _CandidatesMapFullscreenState extends State<CandidatesMapFullscreen> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
             children: [
-              CircleAvatar(
+              CorsAwareAvatar(
+                imageUrl: c.effectivePhotoUrl,
+                fallbackText: c.name,
                 radius: 16,
-                backgroundColor: BrandColors.navyBlue,
-                backgroundImage: (c.avatarUrl != null) ? NetworkImage(c.avatarUrl!) : null,
-                child: (c.avatarUrl == null)
-                    ? Text(c.initials, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700))
-                    : null,
               ),
               const SizedBox(width: 10),
               Expanded(

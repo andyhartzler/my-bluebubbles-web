@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 
 // ═══════════════════════════════════════════════════════════════
@@ -230,23 +231,16 @@ class _SpotlightCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: CircleAvatar(
+                      // Opaque unityBlue disc, so white initials read at
+                      // 12.51:1 wherever the carousel card sits. The old
+                      // white 12 percent fill was translucent and could not
+                      // hold a ratio. photoUrl skipped the endorsement
+                      // headshot, the legislator photo and the linked member
+                      // photo, so effectivePhotoUrl is the correct source.
+                      child: CorsAwareAvatar(
+                        imageUrl: c.effectivePhotoUrl,
+                        fallbackText: c.name,
                         radius: 24,
-                        backgroundColor: Colors.white.withOpacity(0.12),
-                        backgroundImage:
-                            c.photoUrl != null && c.photoUrl!.isNotEmpty
-                                ? NetworkImage(c.photoUrl!)
-                                : null,
-                        child: c.photoUrl == null || c.photoUrl!.isEmpty
-                            ? Text(
-                                c.initials,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
-                              )
-                            : null,
                       ),
                     ),
                   ),

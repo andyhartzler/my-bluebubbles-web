@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/candidate.dart';
 import 'package:bluebubbles/models/crm/voter_file_record.dart';
 import 'package:bluebubbles/widgets/crm/candidate_rubric_card.dart';
@@ -1322,22 +1323,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                   onTap: _pickAndUploadPhoto,
                   child: Stack(
                     children: [
-                      CircleAvatar(
+                      CorsAwareAvatar(
+                        imageUrl: c.effectivePhotoUrl,
+                        fallbackText: c.name,
                         radius: 34,
-                        backgroundColor: BrandColors.navyBlue,
-                        backgroundImage: c.avatarUrl != null
-                            ? NetworkImage(c.avatarUrl!)
-                            : null,
-                        child: c.avatarUrl == null
-                            ? Text(
-                                c.initials,
-                                style: TextStyle(
-                                  color: partyColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 22,
-                                ),
-                              )
-                            : null,
                       ),
                       // Camera badge overlay — signals "tap to change photo"
                       Positioned(
@@ -5716,21 +5705,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         children: [
           Stack(
             children: [
-              CircleAvatar(
+              CorsAwareAvatar(
+                imageUrl: matched?.effectivePhotoUrl,
+                fallbackText: r.candidateName,
                 radius: 22,
-                backgroundColor: partyColor.withOpacity(0.15),
-                backgroundImage: matched?.avatarUrl != null
-                    ? NetworkImage(matched!.avatarUrl!)
-                    : null,
-                child: matched?.avatarUrl == null
-                    ? Text(
-                        _initialsFor(r.candidateName),
-                        style: TextStyle(
-                            color: partyColor,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold),
-                      )
-                    : null,
               ),
               Positioned(
                 bottom: 0,
@@ -5910,17 +5888,6 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     );
   }
 
-  String _initialsFor(String name) {
-    final parts =
-        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) {
-      return parts.first.substring(0, 1).toUpperCase();
-    }
-    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
-        .toUpperCase();
-  }
-
   Widget _buildRaceCandidatesFlat() {
     final opponents = _districtCandidates.where((cand) => cand.id != c.id).toList();
 
@@ -5991,15 +5958,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
             // Photo + party overlay
             Stack(
               children: [
-                CircleAvatar(
+                CorsAwareAvatar(
+                  imageUrl: cand.effectivePhotoUrl,
+                  fallbackText: cand.name,
                   radius: 22,
-                  backgroundColor: partyColor.withOpacity(0.15),
-                  backgroundImage: cand.avatarUrl != null
-                      ? NetworkImage(cand.avatarUrl!)
-                      : null,
-                  child: cand.avatarUrl == null
-                      ? Text(cand.initials, style: TextStyle(color: partyColor, fontSize: 14, fontWeight: FontWeight.bold))
-                      : null,
                 ),
                 Positioned(
                   bottom: 0,
@@ -6548,13 +6510,10 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
               child: Row(
                 children: [
                   // Photo
-                  CircleAvatar(
+                  CorsAwareAvatar(
+                    imageUrl: photo,
+                    fallbackText: name,
                     radius: 20,
-                    backgroundColor: partyColor.withOpacity(0.2),
-                    backgroundImage: photo != null && photo.isNotEmpty ? NetworkImage(photo) : null,
-                    child: photo == null || photo.isEmpty
-                        ? Text(name.isNotEmpty ? name[0] : '?', style: TextStyle(color: partyColor, fontWeight: FontWeight.bold))
-                        : null,
                   ),
                   const SizedBox(width: 10),
                   // Name + party + years

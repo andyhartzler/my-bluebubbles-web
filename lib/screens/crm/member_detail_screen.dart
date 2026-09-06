@@ -780,20 +780,13 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete report'),
-        content: const Text('This will remove the report and any attachments from storage.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
+      builder: (dialogContext) => _profileDialog(
+        dialogContext,
+        title: 'Delete report',
+        body: 'This will remove the report and any attachments from storage.',
+        cancelLabel: 'Cancel',
+        confirmLabel: 'Delete',
+        destructive: true,
       ),
     );
 
@@ -2305,18 +2298,30 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
     return Scaffold(
       appBar: AppBar(
-        title: Text(_member.name),
+        title: Text(
+          _member.name,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: BrandColors.tileGradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
             icon: _refreshingMember
-                ? SizedBox(
+                ? const SizedBox(
                     height: 20,
                     width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Theme.of(context).colorScheme.onSurface,
-                      ),
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
                 : const Icon(Icons.refresh),
@@ -2330,14 +2335,12 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           ),
           IconButton(
             icon: _sendingEmail
-                ? SizedBox(
+                ? const SizedBox(
                     height: 20,
                     width: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Theme.of(context).colorScheme.onSurface,
-                      ),
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
                 : const Icon(Icons.email_outlined),
@@ -2378,7 +2381,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                     ),
                     child: TabBar(
                       labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white70,
+                      unselectedLabelColor: Colors.white,
                       indicatorColor: BrandColors.sunriseGold,
                       indicatorWeight: 3,
                       labelStyle: const TextStyle(
@@ -5494,45 +5497,63 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
   }
 
+  /// Solid unityBlue sheet with white content (12.51:1), rounded at the top
+  /// to ProfileTokens.sheetRadius. The default paper surface is painted over
+  /// by making the modal transparent and drawing the fill here. The date line
+  /// is full white at the caption scale; size carries the de-emphasis.
   void _showMeetingAttendanceSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) => FractionallySizedBox(
         heightFactor: 0.7,
-        child: SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 16),
-              Text('Meeting Attendance', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 8),
-              Expanded(
-                child: _meetingAttendance.isEmpty
-                    ? const Center(child: Text('No meetings recorded yet.'))
-                    : ListView.separated(
-                        itemCount: _meetingAttendance.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final attendance = _meetingAttendance[index];
-                          final dateLabel = attendance.formattedMeetingDate ?? 'Date unavailable';
-                          final details = <String>[
-                            dateLabel,
-                            attendance.durationSummary,
-                            if (attendance.joinWindow != null) attendance.joinWindow!,
-                          ].join(' • ');
-                          return ListTile(
-                            title: Text(attendance.meetingLabel),
-                            subtitle: Text(details),
-                            trailing: const Icon(Icons.open_in_new),
-                            onTap: () {
-                              Navigator.of(sheetContext).pop();
-                              _navigateToMeeting(attendance);
-                            },
-                          );
-                        },
-                      ),
-              ),
-            ],
+        child: Container(
+          decoration: const BoxDecoration(
+            color: ProfileTokens.band,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(ProfileTokens.sheetRadius),
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
+                const Text('Meeting Attendance', style: ProfileText.sectionTitle),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: _meetingAttendance.isEmpty
+                      ? const Center(
+                          child: Text('No meetings recorded yet.', style: ProfileText.caption),
+                        )
+                      : ListView.separated(
+                          itemCount: _meetingAttendance.length,
+                          separatorBuilder: (_, __) =>
+                              Divider(height: 1, color: ProfileTokens.hairline),
+                          itemBuilder: (context, index) {
+                            final attendance = _meetingAttendance[index];
+                            final dateLabel =
+                                attendance.formattedMeetingDate ?? 'Date unavailable';
+                            final details = <String>[
+                              dateLabel,
+                              attendance.durationSummary,
+                              if (attendance.joinWindow != null) attendance.joinWindow!,
+                            ].join(' • ');
+                            return ListTile(
+                              title: Text(attendance.meetingLabel, style: ProfileText.value),
+                              subtitle: Text(details, style: ProfileText.caption),
+                              trailing: const Icon(Icons.open_in_new, color: Colors.white),
+                              onTap: () {
+                                Navigator.of(sheetContext).pop();
+                                _navigateToMeeting(attendance);
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

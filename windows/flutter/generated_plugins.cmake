@@ -23,6 +23,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   printing
   record_windows
   secure_application
+  sentry_flutter
   share_plus
   super_native_extensions
   url_launcher_windows

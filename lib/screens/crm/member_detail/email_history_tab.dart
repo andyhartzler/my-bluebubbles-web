@@ -1,5 +1,7 @@
+import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/models/crm/email_thread.dart';
 import 'package:bluebubbles/screens/crm/member_detail/email_history_provider.dart';
+import 'package:bluebubbles/screens/crm/widgets/member_profile_sections.dart';
 import 'package:bluebubbles/services/crm/crm_email_service.dart';
 import 'package:bluebubbles/widgets/email_detail_screen.dart';
 import 'package:bluebubbles/widgets/email_reply_dialog.dart';
@@ -237,7 +239,25 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
         final state = provider.stateForMember(widget.memberId);
 
         if (state.isLoading && !state.hasLoaded) {
-          return const Center(child: CircularProgressIndicator());
+          // White spinner on the gradient card: 12.51:1 at the dark end and
+          // 4.59:1 at the light end, so it clears 3:1 wherever it sits.
+          return const _EmailHistoryPage(
+            child: _EmailHistoryCard(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
         }
 
         if (state.error != null && state.entries.isEmpty) {
@@ -250,30 +270,31 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
         if (state.entries.isEmpty) {
           return RefreshIndicator(
             onRefresh: () => provider.refresh(widget.memberId),
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(24),
-              children: [
-                Icon(
-                  Icons.mark_email_unread_outlined,
-                  size: 48,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No emails found',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Emails sent to ${widget.memberName} will appear here once delivered through the CRM relay.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
+            color: BrandColors.unityBlue,
+            backgroundColor: Colors.white,
+            child: _EmailHistoryPage(
+              child: _EmailHistoryCard(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Column(
+                    children: [
+                      profileIconTile(Icons.mark_email_unread_outlined, size: 64, iconSize: 32),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No emails found',
+                        textAlign: TextAlign.center,
+                        style: ProfileText.value,
                       ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Emails sent to ${widget.memberName} will appear here once delivered through the CRM relay.',
+                        textAlign: TextAlign.center,
+                        style: ProfileText.caption,
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
           );
         }
@@ -283,34 +304,44 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
 
         return RefreshIndicator(
           onRefresh: () => provider.refresh(widget.memberId),
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-            physics: const AlwaysScrollableScrollPhysics(),
-            itemCount: itemCount,
-            separatorBuilder: (_, index) {
-              if (showWarning && index == 0) {
-                return const SizedBox(height: 16);
-              }
-              return const SizedBox(height: 12);
-            },
-            itemBuilder: (context, index) {
-              if (showWarning) {
-                if (index == 0) {
-                  return _SyncWarningBanner(message: state.error!);
-                }
-                final entry = state.entries[index - 1];
-                return _EmailHistoryTile(
-                  entry: entry,
-                  formatTimestamp: _timestampFormat,
-                  onTap: () => _openThread(entry),
-                );
-              }
+          color: BrandColors.unityBlue,
+          backgroundColor: Colors.white,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return ListView.separated(
+                padding: _pagePadding(constraints),
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: itemCount,
+                separatorBuilder: (_, index) {
+                  if (showWarning && index == 0) {
+                    return const SizedBox(height: 16);
+                  }
+                  return const SizedBox(height: 12);
+                },
+                itemBuilder: (context, index) {
+                  if (showWarning) {
+                    if (index == 0) {
+                      return _sheetWidth(_SyncWarningBanner(message: state.error!));
+                    }
+                    final entry = state.entries[index - 1];
+                    return _sheetWidth(
+                      _EmailHistoryTile(
+                        entry: entry,
+                        formatTimestamp: _timestampFormat,
+                        onTap: () => _openThread(entry),
+                      ),
+                    );
+                  }
 
-              final entry = state.entries[index];
-              return _EmailHistoryTile(
-                entry: entry,
-                formatTimestamp: _timestampFormat,
-                onTap: () => _openThread(entry),
+                  final entry = state.entries[index];
+                  return _sheetWidth(
+                    _EmailHistoryTile(
+                      entry: entry,
+                      formatTimestamp: _timestampFormat,
+                      onTap: () => _openThread(entry),
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -320,6 +351,66 @@ class _EmailHistoryTabState extends State<EmailHistoryTab> {
   }
 }
 
+/// The tab's list padding, matching the Meetings tab: 16 under 768 and 32 by
+/// 24 above it.
+EdgeInsets _pagePadding(BoxConstraints constraints) {
+  final wide = constraints.maxWidth >= 768;
+  return wide
+      ? const EdgeInsets.symmetric(horizontal: 32, vertical: 24)
+      : const EdgeInsets.all(16);
+}
+
+/// Centres one list item at the profile's 1200 sheet width.
+Widget _sheetWidth(Widget child) {
+  return Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: ProfileTokens.maxSheetWidth),
+      child: child,
+    ),
+  );
+}
+
+/// The tab's scroll frame for a single card: always scrollable so pull to
+/// refresh works even when the card is short.
+class _EmailHistoryPage extends StatelessWidget {
+  const _EmailHistoryPage({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: _pagePadding(constraints),
+          children: [_sheetWidth(child)],
+        );
+      },
+    );
+  }
+}
+
+/// The one gradient card the tab's loading, empty, error and unavailable
+/// states sit on, in the section header idiom with the tab's own icon.
+class _EmailHistoryCard extends StatelessWidget {
+  const _EmailHistoryCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ProfileSectionCard(
+      title: 'Email History',
+      icon: Icons.email_outlined,
+      child: child,
+    );
+  }
+}
+
+/// One email as its own tappable gradient card. Every readable line is full
+/// white (12.51:1 to 4.59:1 across the card); the status is a solid pill, the
+/// delivery error a solid #B91C1C block under white (6.47:1).
 class _EmailHistoryTile extends StatelessWidget {
   const _EmailHistoryTile({
     required this.entry,
@@ -333,31 +424,36 @@ class _EmailHistoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final sentAt = entry.sentAt;
     final subtitle = <Widget>[];
     final preview = _sanitizeEmailPreview(entry.previewText);
 
     subtitle.add(
-      Row(
+      Wrap(
+        spacing: 10,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           _StatusChip(status: entry.status),
-          if (sentAt != null) ...[
-            const SizedBox(width: 8),
-            Icon(Icons.schedule, size: 16, color: theme.textTheme.bodySmall?.color?.withOpacity(0.7)),
-            const SizedBox(width: 4),
-            Text(
-              formatTimestamp.format(sentAt),
-              style: theme.textTheme.bodySmall,
+          if (sentAt != null)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.schedule, size: 16, color: Colors.white),
+                const SizedBox(width: 6),
+                Text(
+                  formatTimestamp.format(sentAt),
+                  style: ProfileText.caption,
+                ),
+              ],
             ),
-          ],
         ],
       ),
     );
 
     final recipients = _buildRecipientLine(context, 'To', entry.to);
     if (recipients != null) {
-      subtitle.add(const SizedBox(height: 6));
+      subtitle.add(const SizedBox(height: 10));
       subtitle.add(recipients);
     }
 
@@ -374,33 +470,34 @@ class _EmailHistoryTile extends StatelessWidget {
     }
 
     if (preview != null && preview.isNotEmpty) {
-      subtitle.add(const SizedBox(height: 8));
+      subtitle.add(const SizedBox(height: 10));
       subtitle.add(Text(
         preview,
-        style: theme.textTheme.bodyMedium,
+        style: ProfileText.caption,
         maxLines: 3,
         overflow: TextOverflow.ellipsis,
       ));
     }
 
     if (entry.errorMessage != null && entry.errorMessage!.trim().isNotEmpty) {
-      subtitle.add(const SizedBox(height: 8));
+      subtitle.add(const SizedBox(height: 12));
       subtitle.add(
         Container(
           decoration: BoxDecoration(
-            color: theme.colorScheme.error.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
+            color: ProfileTokens.danger,
+            borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+            border: Border.all(color: ProfileTokens.hairline),
           ),
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.error_outline, size: 18, color: theme.colorScheme.error),
-              const SizedBox(width: 6),
+              const Icon(Icons.error_outline, size: 18, color: Colors.white),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   entry.errorMessage!,
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                  style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
                 ),
               ),
             ],
@@ -409,23 +506,27 @@ class _EmailHistoryTile extends StatelessWidget {
       );
     }
 
-    return Card(
-      elevation: 1,
+    // Material(transparent) carrying the elevation, Ink carrying the gradient,
+    // so the ripple draws above the card rather than being lost under it.
+    return Material(
+      color: Colors.transparent,
+      elevation: 4,
+      borderRadius: BorderRadius.circular(ProfileTokens.sheetRadius),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                entry.subject,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              ...subtitle,
-            ],
+      child: Ink(
+        decoration: profileCardDecoration(),
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(ProfileTokens.cardPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(entry.subject, style: ProfileText.fact),
+                const SizedBox(height: 12),
+                ...subtitle,
+              ],
+            ),
           ),
         ),
       ),
@@ -434,15 +535,13 @@ class _EmailHistoryTile extends StatelessWidget {
 
   Widget? _buildRecipientLine(BuildContext context, String label, List<String> recipients) {
     if (recipients.isEmpty) return null;
-    final theme = Theme.of(context);
-    final baseStyle = theme.textTheme.bodyMedium;
     return Text.rich(
       TextSpan(
-        style: baseStyle,
+        style: ProfileText.caption,
         children: [
           TextSpan(
             text: '$label: ',
-            style: baseStyle?.copyWith(fontWeight: FontWeight.w600),
+            style: ProfileText.caption.copyWith(fontWeight: FontWeight.w700),
           ),
           TextSpan(text: recipients.join(', ')),
         ],
@@ -453,6 +552,9 @@ class _EmailHistoryTile extends StatelessWidget {
   }
 }
 
+/// Delivery status as a solid pill: failures on #B91C1C under white (6.47:1),
+/// queued or pending on sunriseGold under unityBlue (7.17:1), everything else
+/// on unityBlue under white with a white outline (12.51:1).
 class _StatusChip extends StatelessWidget {
   const _StatusChip({required this.status});
 
@@ -461,35 +563,17 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = status.toLowerCase();
-    final colorScheme = Theme.of(context).colorScheme;
 
-    Color background;
-    Color foreground;
+    final ProfilePillStyle style;
     if (normalized.contains('fail') || normalized.contains('error')) {
-      background = colorScheme.error.withOpacity(0.12);
-      foreground = colorScheme.error;
+      style = ProfilePillStyle.danger;
     } else if (normalized.contains('queue') || normalized.contains('pending')) {
-      background = colorScheme.tertiaryContainer.withOpacity(0.4);
-      foreground = colorScheme.tertiary;
+      style = ProfilePillStyle.emphasis;
     } else {
-      background = colorScheme.primary.withOpacity(0.12);
-      foreground = colorScheme.primary;
+      style = ProfilePillStyle.soft;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        status.toUpperCase(),
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: foreground,
-            ),
-      ),
-    );
+    return ProfilePill(label: status, style: style);
   }
 }
 
@@ -504,30 +588,20 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
+    return _EmailHistoryPage(
+      child: _EmailHistoryCard(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.error_outline, size: 40, color: Theme.of(context).colorScheme.error),
-            const SizedBox(height: 16),
-            Text(
-              'Unable to load email history',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
+            profileErrorBanner(
+              title: 'Unable to load email history',
+              message: message,
             ),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
+            ProfileActionPill(
+              icon: Icons.refresh,
+              label: 'Try Again',
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
             ),
           ],
         ),
@@ -536,6 +610,8 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
+/// The partial sync warning above a list that still has entries: a solid
+/// sunriseGold block under unityBlue ink (7.17:1) on its own gradient card.
 class _SyncWarningBanner extends StatelessWidget {
   const _SyncWarningBanner({required this.message});
 
@@ -543,44 +619,51 @@ class _SyncWarningBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: colorScheme.tertiaryContainer.withOpacity(0.6),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.tertiary.withOpacity(0.5)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.info_outline, color: colorScheme.tertiary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+    return ProfileSheet(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(ProfileTokens.cardPadding),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: ProfileTokens.emphasisFill,
+              borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+            ),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Email sync is experiencing issues',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: colorScheme.tertiary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  message,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.textTheme.bodyMedium?.color?.withOpacity(0.85),
+                const Icon(Icons.info_outline, size: 20, color: ProfileTokens.onEmphasis),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Email sync is experiencing issues',
+                        style: TextStyle(
+                          color: ProfileTokens.onEmphasis,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        message,
+                        style: const TextStyle(
+                          color: ProfileTokens.onEmphasis,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -590,27 +673,27 @@ class _MissingProviderView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textColor = theme.textTheme.bodyMedium?.color?.withOpacity(0.75);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.info_outline, size: 40, color: theme.colorScheme.primary),
-            const SizedBox(height: 16),
-            Text(
-              'Email history unavailable',
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Email history requires an EmailHistoryProvider above this screen. Please ensure the CRM providers are configured.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(color: textColor),
-            ),
-          ],
+    return _EmailHistoryPage(
+      child: _EmailHistoryCard(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Column(
+            children: [
+              profileIconTile(Icons.info_outline, size: 64, iconSize: 32),
+              const SizedBox(height: 16),
+              const Text(
+                'Email history unavailable',
+                textAlign: TextAlign.center,
+                style: ProfileText.value,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Email history requires an EmailHistoryProvider above this screen. Please ensure the CRM providers are configured.',
+                textAlign: TextAlign.center,
+                style: ProfileText.caption,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -672,9 +755,9 @@ String _decodeHtmlEntities(String input) {
         case 'rdquo':
           return '"';
         case 'ndash':
-          return '–';
+          return '\u2013';
         case 'mdash':
-          return '—';
+          return '\u2014';
       }
 
       if (value.startsWith('#x') || value.startsWith('#X')) {
