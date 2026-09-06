@@ -62,6 +62,54 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
   String? _phoneForCode; // E.164 number the SMS code was sent to
   bool _phoneCodeFlow = false; // the pending code is an SMS code, not an email one
 
+  /// Seconds left before the EMAIL code can be requested again.
+  ///
+  /// Deliberately a SEPARATE timer from `_resendCooldown` above, which is the
+  /// Twilio throttle. One shared timer would let an SMS cooldown block the
+  /// email send, and "use Sign in with email instead" is exactly what
+  /// _sendPhoneCode tells an exec to do when their text does not arrive. That
+  /// would turn the throttle into the lockout it exists to prevent.
+  ///
+  /// Started after every successful send, exactly like the SMS one, and then
+  /// corrected to GoTrue's own number whenever GoTrue does answer 429. A purely
+  /// reactive cooldown would not fix the mechanism: the very first Back-then-
+  /// resend inside GoTrue's window still puts a 429 on the wire, and
+  /// SentryHttpClient reports every 4xx, so the issue would keep firing at a
+  /// lower rate. Refusing locally BEFORE asking is what actually stops it.
+  int _emailResendCooldown = 0;
+  Timer? _emailResendTimer;
+
+  /// The address the running cooldown belongs to, lowercased.
+  ///
+  /// Distinct from _lastEmailCodeSentTo, which answers a different question.
+  /// That one means "a code reached this mailbox"; this one means "the server
+  /// is holding a window against this mailbox". They diverge exactly when
+  /// GoTrue refuses an address we never got a code to, which happens on an
+  /// IP-scoped or project-wide limit, or when the window was opened from
+  /// another device. Keying the hold on _lastEmailCodeSentTo would leave the
+  /// button live in that case and let the user retry straight into another
+  /// 429, which is the loop this whole change exists to stop.
+  String? _emailCooldownFor;
+
+  /// Seconds to hold the email send for after a successful one.
+  ///
+  /// GoTrue's per-address OTP interval defaults to 60s, and its refusal reads
+  /// "you can only request this after N seconds" counting down from there.
+  /// This is the client matching that default rather than discovering it by
+  /// being refused. If the server is configured differently the reactive arm
+  /// corrects it: a real 429 restarts this timer with GoTrue's own number.
+  static const int _emailSendIntervalSeconds = 60;
+
+  /// The address the last email code was actually sent to, remembered across
+  /// "← Back to email entry".
+  ///
+  /// `_emailForCode` cannot answer this question, because Back nulls it on the
+  /// way out. Back is the ONLY route from the code screen to the send button,
+  /// so by the time a resend is refused we have already forgotten that the
+  /// user is holding a perfectly good code. This is the one piece of state
+  /// that lets the 429 arm put the entry box back instead of stranding them.
+  String? _lastEmailCodeSentTo;
+
   @override
   void initState() {
     super.initState();
@@ -140,6 +188,10 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
               _showCodeInput = false;
               _codeController.clear();
               _emailForCode = null;
+              // The code that got them in here is spent. Forgetting it stops
+              // a later 429 from offering the code screen back with "the code
+              // we already emailed you is still good" for a consumed one.
+              _lastEmailCodeSentTo = null;
             });
           }
           break;
@@ -250,6 +302,7 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
     _authSubscription?.cancel();
     _visibilitySubscription?.cancel();
     _resendTimer?.cancel();
+    _emailResendTimer?.cancel();
     _emailController.dispose();
     _phoneController.dispose();
     _codeController.dispose();
@@ -265,6 +318,23 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
       setState(() {
         _errorMessage = 'Authentication service is unavailable. Please try again later.';
       });
+      return;
+    }
+
+    // Re-entrancy guard. The disabled send button is NOT the only way in here:
+    // the email field's onSubmitted fires this directly and stays enabled for
+    // the whole request, because `enabled: !_showCodeInput` only flips after
+    // the await returns. Two Enter presses a second apart therefore put two
+    // concurrent signInWithOtp POSTs on the wire, and the second one is what
+    // GoTrue answers 429 to.
+    if (_isSending) return;
+
+    // THE THROTTLE GOES ON THE SEND, not on the button, for the same reason
+    // spelled out in _sendPhoneCode: every path has to pass through it. In
+    // email mode the only route to a second code is "← Back to email entry"
+    // and then the send button again, which is not throttled anywhere else.
+    if (_emailSendHeld) {
+      _refuseEmailResend(_emailResendCooldown);
       return;
     }
 
@@ -338,8 +408,10 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
         _successMessage = 'Check your email';
         _showCodeInput = true;
         _emailForCode = email;
+        _lastEmailCodeSentTo = email.toLowerCase();
         _codeController.clear();
       });
+      _startEmailResendCooldown(_emailSendIntervalSeconds, email.toLowerCase());
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _showCodeInput) {
           _codeFocusNode.requestFocus();
@@ -347,6 +419,29 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
       });
     } on AuthException catch (error) {
       if (!mounted) return;
+
+      // GoTrue rate limit. Handled FIRST and separately, because the generic
+      // branches below tear the code screen down, which is the dead end this
+      // arm exists to stop: an exec whose code was rejected taps send again,
+      // gets 429, and loses the entry box for the code still sitting in their
+      // inbox. That is the same failure _sendPhoneCode already guards against
+      // for SMS.
+      //
+      // gotrue 2.20.0 maps any non-2xx under 500 with a JSON body to
+      // AuthApiException, which extends AuthException, carrying statusCode as
+      // the string form of the HTTP status and code as GoTrue's error_code.
+      if (_isRateLimit(error)) {
+        // GoTrue's own number wins over our default: restart the timer with
+        // what it actually asked for, then refuse identically to the local
+        // gate above so the user sees one behaviour either way.
+        final waitSeconds = _rateLimitSeconds(error.message);
+        // Held against the address we just tried, not against the one we last
+        // got a code to. GoTrue may be refusing an address this device has
+        // never had a code for at all.
+        _startEmailResendCooldown(waitSeconds, email.toLowerCase());
+        _refuseEmailResend(waitSeconds);
+        return;
+      }
 
       String errorMessage;
 
@@ -570,6 +665,16 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
       return;
     }
 
+    // Re-entrancy guard, the same one _sendMagicLink needs and for the same
+    // reason: the phone field's onSubmitted calls this directly and the field
+    // stays enabled for the whole request, so holding Enter fires several
+    // concurrent verify-phone invocations. The cooldown below cannot catch
+    // them, because it is still 0 until the first send returns. Each one is a
+    // real Twilio send against a 5-send cap, so an impatient exec can burn the
+    // verification and be locked out for its full 10 minute TTL, on the
+    // default sign-in method, on the night of the vote.
+    if (_isSending) return;
+
     // THE THROTTLE IS NOT JUST A DISABLED BUTTON.
     //
     // Twilio Verify caps a single verification at 5 sends (error 60203) and
@@ -723,6 +828,108 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
     } finally {
       if (mounted) setState(() => _isVerifyingCode = false);
     }
+  }
+
+  /// True when the address currently typed is the one the cooldown belongs to.
+  ///
+  /// GoTrue's OTP interval is per mailbox, not per device, so this is matched
+  /// on the address rather than just on the timer running. On a shared laptop
+  /// at the vote, one exec requesting a code must not disable the send button
+  /// for the next person who types their own address into it.
+  bool get _emailSendHeld =>
+      _emailResendCooldown > 0 &&
+      _emailCooldownFor != null &&
+      _emailCooldownFor == _emailController.text.trim().toLowerCase();
+
+  /// Refuse another email code for [waitSeconds], and when we know one is
+  /// already in their inbox, put the entry box back for it.
+  ///
+  /// Both refusal paths go through here: the local gate that declines before
+  /// asking, and the 429 arm for when GoTrue declines anyway. The restore is
+  /// the whole point. "← Back to email entry" is the only route from the code
+  /// screen to the send button and it clears _showCodeInput and _emailForCode
+  /// on the way out, so without this the exec is left on the entry screen
+  /// being told their existing code is fine while the only field that accepts
+  /// it is hidden. _lastEmailCodeSentTo survives Back precisely so this can
+  /// undo it.
+  ///
+  /// Matched on the address, and case-insensitively, because GoTrue lowercases
+  /// it: a typo corrected after Back must NOT restore a screen for a code that
+  /// was never sent to what is on screen now, but a change of capitalisation
+  /// is the same mailbox and the same rate-limit window.
+  void _refuseEmailResend(int waitSeconds) {
+    final typed = _emailController.text.trim().toLowerCase();
+    final holdsCode = _lastEmailCodeSentTo != null && _lastEmailCodeSentTo == typed;
+    setState(() {
+      _successMessage = null;
+      _errorMessage = holdsCode
+          ? 'Wait ${waitSeconds}s before asking for another code. If the one '
+              'we already emailed you has not expired it still works, so try '
+              'it below first.'
+          : 'Wait ${waitSeconds}s before requesting another sign-in code.';
+      if (holdsCode) {
+        _showCodeInput = true;
+        _emailForCode = _lastEmailCodeSentTo;
+        _phoneCodeFlow = false;
+      } else {
+        _showCodeInput = false;
+        _emailForCode = null;
+      }
+    });
+    if (holdsCode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _showCodeInput) _codeFocusNode.requestFocus();
+      });
+    }
+  }
+
+  /// True when GoTrue refused the send because of a rate limit.
+  ///
+  /// Both signals are checked because they fail independently. statusCode is
+  /// absent on AuthRetryableFetchException raised before a response arrives,
+  /// and code is null on responses from an API version older than 2024-01-01
+  /// that carry no error_code at all.
+  bool _isRateLimit(AuthException error) {
+    return error.statusCode == '429' ||
+        error.code == 'over_email_send_rate_limit' ||
+        error.code == 'over_request_rate_limit';
+  }
+
+  /// How long GoTrue says to wait, read out of its own message.
+  ///
+  /// The per-address interval reads "For security purposes, you can only
+  /// request this after 51 seconds." The hourly cap reads "email rate limit
+  /// exceeded" with no number, hence the fallback. Clamped so a malformed or
+  /// unexpected message can never lock the send button out for long.
+  int _rateLimitSeconds(String message) {
+    final match = RegExp(r'after (\d+) second').firstMatch(message.toLowerCase());
+    final parsed = match == null ? null : int.tryParse(match.group(1)!);
+    final seconds = parsed ?? 60;
+    if (seconds < 1) return 1;
+    if (seconds > 300) return 300;
+    return seconds;
+  }
+
+  /// Start the email send cooldown for [seconds].
+  ///
+  /// Kept apart from _startResendCooldown so the Twilio timer is untouched.
+  /// Like that one it survives _switchMode and "← Back", because neither
+  /// resets it: the limit belongs to GoTrue and the email address, not to
+  /// which form happens to be on screen.
+  void _startEmailResendCooldown(int seconds, String forEmail) {
+    _emailResendTimer?.cancel();
+    setState(() {
+      _emailResendCooldown = seconds;
+      _emailCooldownFor = forEmail;
+    });
+    _emailResendTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() => _emailResendCooldown--);
+      if (_emailResendCooldown <= 0) t.cancel();
+    });
   }
 
   void _startResendCooldown() {
@@ -1065,11 +1272,16 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
                                       enabled: !_showCodeInput,
                                       onSubmitted: (_) => _sendMagicLink(),
                                       onChanged: (_) {
-                                        if (_errorMessage != null) {
-                                          setState(() {
-                                            _errorMessage = null;
-                                          });
-                                        }
+                                        // Rebuilds on every keystroke, not
+                                        // only when clearing an error, so the
+                                        // send button tracks _emailSendHeld
+                                        // for the address actually typed.
+                                        // Without this the button would keep
+                                        // showing a countdown belonging to
+                                        // someone else's address.
+                                        setState(() {
+                                          _errorMessage = null;
+                                        });
                                       },
                                     ),
                                   if (_showCodeInput) ..._buildCodeEntrySection(theme),
@@ -1128,7 +1340,9 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
                                       // nothing is worse than a disabled one
                                       // that says how long is left.
                                       onPressed: (_isSending ||
-                                              (_phoneMode && _resendCooldown > 0))
+                                              (_phoneMode
+                                                  ? _resendCooldown > 0
+                                                  : _emailSendHeld))
                                           ? null
                                           : () {
                                               FocusScope.of(context).unfocus();
@@ -1151,7 +1365,9 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
                                               ? (_resendCooldown > 0
                                                   ? 'Text me a code in ${_resendCooldown}s'
                                                   : 'Text me a code')
-                                              : 'Send magic link')),
+                                              : (_emailSendHeld
+                                                  ? 'Send magic link in ${_emailResendCooldown}s'
+                                                  : 'Send magic link'))),
                                       style: FilledButton.styleFrom(
                                         backgroundColor: const Color(0xFF32A6DE),
                                         padding: const EdgeInsets.symmetric(vertical: 16),
