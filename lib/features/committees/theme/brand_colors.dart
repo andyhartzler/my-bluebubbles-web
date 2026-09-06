@@ -50,11 +50,24 @@ class BrandColors {
 
   // ==================== GRADIENTS ====================
 
-  /// Primary gradient for tiles and cards (navy to light blue)
-  static const List<Color> tileGradient = [unityBlue, momentumBlue];
+  /// The light end of the tile gradient. NOT momentumBlue, on purpose.
+  ///
+  /// White text on momentumBlue (#32A6DE) measures 2.75:1, failing the 4.5:1
+  /// normal-text floor and the 3:1 large-text floor, so every card that ran the
+  /// gradient all the way to momentumBlue had unreadable white text across its
+  /// last third. This is the same hue and saturation walked down in lightness to
+  /// the first value where white clears 4.5:1: white on #1C7DAB is 4.59:1, and
+  /// at the gradient midpoint 7.59:1. It is the smallest visual change that
+  /// makes white legible everywhere on the card. momentumBlue itself is kept for
+  /// non-text uses (rules, rings, strokes, spinners).
+  static const Color tileGradientEnd = Color(0xFF1C7DAB);
+
+  /// Primary gradient for tiles and cards (navy to blue). White text is legible
+  /// at every point on it; see [tileGradientEnd].
+  static const List<Color> tileGradient = [unityBlue, tileGradientEnd];
 
   /// Reversed gradient
-  static const List<Color> tileGradientReversed = [momentumBlue, unityBlue];
+  static const List<Color> tileGradientReversed = [tileGradientEnd, unityBlue];
 
   /// Background gradient (light to dark)
   static const List<Color> backgroundGradient = [momentumBlue, unityBlue];

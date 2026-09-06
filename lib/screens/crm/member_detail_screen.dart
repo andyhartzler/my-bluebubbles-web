@@ -155,6 +155,7 @@ class _ProfileSection {
   const _ProfileSection({
     required this.id,
     required this.title,
+    required this.icon,
     required this.fields,
     this.caption,
     this.cascade = const [],
@@ -162,6 +163,9 @@ class _ProfileSection {
 
   final String id;
   final String title;
+
+  /// The icon in the card header's tile.
+  final IconData icon;
   final List<_ProfileField> fields;
 
   /// One line under the header in read mode.
@@ -181,6 +185,7 @@ const String _districtsCaption = 'Districts are computed from the address.';
 const List<_ProfileSection> _profileSections = [
   _ProfileSection(
     id: 'about',
+    icon: Icons.person_outline,
     title: 'About',
     // date_of_birth drives update_membership_eligible, which is what gates
     // texting from the CRM.
@@ -195,6 +200,7 @@ const List<_ProfileSection> _profileSections = [
   ),
   _ProfileSection(
     id: 'contact',
+    icon: Icons.contact_mail_outlined,
     title: 'Contact',
     // phone_e164 is the messaging key, and an address write recomputes county
     // and all three districts. email is class C and gets its own dialog.
@@ -211,6 +217,7 @@ const List<_ProfileSection> _profileSections = [
   ),
   _ProfileSection(
     id: 'districts',
+    icon: Icons.map_outlined,
     title: 'Districts',
     caption: _districtsCaption,
     fields: [
@@ -228,6 +235,7 @@ const List<_ProfileSection> _profileSections = [
   ),
   _ProfileSection(
     id: 'school_work',
+    icon: Icons.school_outlined,
     title: 'School and work',
     fields: [
       _ProfileField('in_school', 'In school'),
@@ -242,6 +250,7 @@ const List<_ProfileSection> _profileSections = [
   ),
   _ProfileSection(
     id: 'chapter',
+    icon: Icons.groups_outlined,
     title: 'Chapter',
     cascade: [
       'Committees set Slack channel membership. Executive Committee is not changed here.',
@@ -257,6 +266,7 @@ const List<_ProfileSection> _profileSections = [
   ),
   _ProfileSection(
     id: 'involvement',
+    icon: Icons.volunteer_activism_outlined,
     title: 'Involvement and interests',
     fields: [
       _ProfileField('why_join', 'Why join', kind: _FieldKind.longText),
@@ -276,6 +286,7 @@ const List<_ProfileSection> _profileSections = [
   ),
   _ProfileSection(
     id: 'social',
+    icon: Icons.alternate_email,
     title: 'Social',
     fields: [
       _ProfileField('instagram', 'Instagram', kind: _FieldKind.social, platform: _SocialPlatform.instagram),
@@ -287,6 +298,7 @@ const List<_ProfileSection> _profileSections = [
   // to make a call.
   _ProfileSection(
     id: 'background',
+    icon: Icons.badge_outlined,
     title: 'Background',
     caption: 'Self reported on the membership form.',
     fields: [
@@ -2423,11 +2435,12 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
   }
 
-  // ── Sheet 2, R5: activity ────────────────────────────────────
+  // ── Activity card ────────────────────────────────────────────
 
   /// Forms submitted, votes cast and job applications. Null while loading and
-  /// null when there is nothing to show: Sheet 2 never carries a spinner card
-  /// or an empty placeholder for this block.
+  /// null when there is nothing to show: the grid never carries a spinner
+  /// card or an empty placeholder for this block. [first] is kept for the
+  /// caller and ignored; the card is its own surface.
   Widget? _buildMemberActivityBlock({required bool first}) {
     if (_loadingMemberActivity) return null;
 
@@ -2514,34 +2527,22 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        profileSectionHeader(title: 'Activity', first: first),
-        profileSectionBody(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: subsections,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Small unityBlue-on-chip-fill tag (11.27:1, computed) for a status word.
-  Widget _profileTag(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: ProfileTokens.fill,
-        borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
+    return ProfileSectionCard(
+      title: 'Activity',
+      icon: Icons.timeline_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: subsections,
       ),
-      child: Text(text, style: ProfileText.chip),
     );
   }
 
-  /// One tappable row inside an activity subsection. Built by hand rather than
-  /// as a ListTile so no Theme colour reaches the sheet.
+  /// A status word as a solid unityBlue chip with a white outline, 12.51:1.
+  Widget _profileTag(String text) => profileChip(text);
+
+  /// One tappable row inside an activity subsection, on a solid unityBlue
+  /// block with a hairline outline. Built by hand rather than as a ListTile so
+  /// no Theme colour reaches the card.
   Widget _activityRow({
     required IconData icon,
     required String title,
@@ -2549,13 +2550,19 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     Widget? trailing,
     VoidCallback? onTap,
   }) {
-    final row = Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+    final row = Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+      decoration: BoxDecoration(
+        color: ProfileTokens.fill,
+        borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+        border: Border.all(color: ProfileTokens.hairline),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 20, color: ProfileTokens.inkMuted),
-          const SizedBox(width: 12),
+          Icon(icon, size: 22, color: Colors.white),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2573,7 +2580,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           if (trailing != null) ...[const SizedBox(width: 8), trailing],
           if (onTap != null) ...[
             const SizedBox(width: 4),
-            Icon(Icons.chevron_right, size: 20, color: ProfileTokens.inkMuted),
+            const Icon(Icons.chevron_right, size: 22, color: Colors.white),
           ],
         ],
       ),
@@ -2596,23 +2603,23 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     required List<Widget> children,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: ProfileTokens.inkMuted),
+              Icon(icon, size: 18, color: Colors.white),
               const SizedBox(width: 8),
               Expanded(child: Text(title.toUpperCase(), style: ProfileText.label)),
               _profileTag('$count'),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 10),
           ...children,
           if (count > 3)
             Padding(
-              padding: const EdgeInsets.only(top: 4, left: 4),
+              padding: const EdgeInsets.only(top: 2, left: 4),
               child: Text('+${count - 3} more', style: ProfileText.caption),
             ),
         ],
@@ -2646,6 +2653,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             : MemberSubmissionScreen(
                 formId: submission.formId,
                 submissionId: submission.id,
+                avatarUrl: _member.effectiveAvatarUrl,
               ),
       ),
     );
@@ -2670,18 +2678,26 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
   // ── Overview tab ─────────────────────────────────────────────
 
-  /// Two white sheets on the branded ground, one column, centred at 1120.
-  /// Sheet 1 is the profile in the order the member filled it in; Sheet 2 is
-  /// what the CRM knows. Every piece of content sits on one of them, because
-  /// BrandedBackground is not light and no single ink passes at both of its
-  /// ends (see ProfileTokens).
+  /// Gradient cards on the branded ground, centred at 1200, in the Slack
+  /// management page's idiom: the hero card, a strip of stat cards, then
+  /// every section as its own card, two columns from 1100 wide and one column
+  /// below. Every piece of content sits on a card, because BrandedBackground
+  /// is not light and no single ink passes at both of its ends (see
+  /// ProfileTokens).
   Widget _buildOverviewTab(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 768;
+        final twoColumns = constraints.maxWidth >= ProfileTokens.gridMinWidth;
         final listPadding = wide
             ? const EdgeInsets.symmetric(horizontal: 32, vertical: 24)
             : const EdgeInsets.all(16);
+
+        final sections = _buildSectionCards();
+        final cards = <Widget>[...sections.cards, ..._buildRecordCards()];
+        if (sections.omitted.isNotEmpty && _editingSection == null) {
+          cards.add(_buildAddSectionsCard(sections.omitted));
+        }
 
         return MobileAwareSelectionArea(
           child: ListView(
@@ -2693,9 +2709,10 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _buildProfileSheet(wide: wide),
-                      const SizedBox(height: 24),
-                      _buildRecordSheet(),
+                      _buildHeroCard(wide: wide),
+                      const SizedBox(height: ProfileTokens.cardGap),
+                      ..._buildStatStrip(wide: wide),
+                      _buildCardGrid(cards, twoColumns: twoColumns),
                       const SizedBox(height: 32),
                     ],
                   ),
@@ -2708,72 +2725,122 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
   }
 
-  // ── Sheet 1: the profile ─────────────────────────────────────
-
-  Widget _buildProfileSheet({required bool wide}) {
-    final sectionWidgets = <Widget>[];
-    final omitted = <_ProfileSection>[];
-    for (final section in _profileSections) {
-      final built = _buildProfileSection(section, first: sectionWidgets.isEmpty);
-      if (built == null) {
-        omitted.add(section);
-      } else {
-        sectionWidgets.add(built);
-      }
-    }
-
-    final children = <Widget>[_buildHeaderBand(wide: wide)];
-
-    if (sectionWidgets.isEmpty) {
-      // The sheet never disappears, so the page never reads as broken.
-      final firstName = _member.name.trim().split(RegExp(r'\s+')).first;
-      children.add(profileSectionHeader(title: 'Profile', first: true));
-      children.add(
-        profileSectionBody(
-          child: Text(
-            'Only a name is on file for $firstName.',
-            style: ProfileText.value,
-          ),
-        ),
-      );
-    } else {
-      children.addAll(sectionWidgets);
-    }
-
-    if (omitted.isNotEmpty && _editingSection == null) {
-      // One chip per omitted section. This is how a hidden field becomes
-      // editable without showing empty rows in read mode.
-      children.add(
-        Container(
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: ProfileTokens.hairline)),
-          ),
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final section in omitted)
-                profileAddChip(
-                  title: section.title,
-                  onTap: () => _beginEdit(section.id),
-                ),
+  /// Two columns of cards filled by alternating, 24 between cards in both
+  /// directions; one column below 1100.
+  Widget _buildCardGrid(List<Widget> cards, {required bool twoColumns}) {
+    Widget column(List<Widget> items) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              if (i > 0) const SizedBox(height: ProfileTokens.cardGap),
+              items[i],
             ],
-          ),
-        ),
-      );
-    }
+          ],
+        );
 
-    return ProfileSheet(children: children);
+    if (!twoColumns) return column(cards);
+
+    final left = <Widget>[];
+    final right = <Widget>[];
+    for (var i = 0; i < cards.length; i++) {
+      (i.isEven ? left : right).add(cards[i]);
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: column(left)),
+        const SizedBox(width: ProfileTokens.cardGap),
+        Expanded(child: column(right)),
+      ],
+    );
   }
 
-  /// Solid unityBlue band fused to the top of Sheet 1. White on it is 12.51:1
-  /// and white70 is 7.03:1 (both documented in volunteers_theme.dart).
-  Widget _buildHeaderBand({required bool wide}) {
+  // ── The stat strip ───────────────────────────────────────────
+
+  /// BrandedStatCards for what the data genuinely supports. Nothing is
+  /// invented: a card renders only when its value is known, and a count
+  /// renders only once its load has finished. No subtitle is passed, because
+  /// BrandedStatCard draws its subtitle at white 0.90, which is 4.04:1 on the
+  /// card's light end and fails.
+  List<Widget> _buildStatStrip({required bool wide}) {
+    final stats = <Widget>[
+      if (_member.registeredVoter != null)
+        BrandedStatCard(
+          title: 'Registered voter',
+          value: _member.registeredVoter! ? 'Yes' : 'No',
+          icon: Icons.how_to_vote_outlined,
+        ),
+      BrandedStatCard(
+        title: 'Textable',
+        value: _member.canContact ? 'Yes' : 'No',
+        icon: Icons.sms_outlined,
+      ),
+      if (_crmReady && !_loadingAttendance && _attendanceError == null)
+        BrandedStatCard(
+          title: 'Meetings attended',
+          value: '${_meetingAttendance.length}',
+          icon: Icons.video_camera_front_outlined,
+        ),
+      if (_crmReady && !_loadingMemberActivity && _formSubmissions.isNotEmpty)
+        BrandedStatCard(
+          title: 'Forms submitted',
+          value: '${_formSubmissions.length}',
+          icon: Icons.assignment_outlined,
+        ),
+      if (_donorProfile != null && !_loadingDonorProfile)
+        BrandedStatCard(
+          title: 'Donated',
+          value: _formatCurrency(_donorProfile!.totalDonated ?? 0),
+          icon: Icons.volunteer_activism_outlined,
+        ),
+    ];
+    if (stats.isEmpty) return const [];
+
+    final Widget strip;
+    if (wide) {
+      strip = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < stats.length; i++) ...[
+            if (i > 0) const SizedBox(width: 16),
+            Expanded(child: stats[i]),
+          ],
+        ],
+      );
+    } else {
+      strip = LayoutBuilder(
+        builder: (context, constraints) {
+          final half = (constraints.maxWidth - 16) / 2;
+          return Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: [for (final stat in stats) SizedBox(width: half, child: stat)],
+          );
+        },
+      );
+    }
+    return [strip, const SizedBox(height: ProfileTokens.cardGap)];
+  }
+
+  // ── The hero card ────────────────────────────────────────────
+
+  /// The person is the headline: a 96 px photo in a 3 px sunriseGold ring,
+  /// the name at 34, one meta line, the status pills, the district pills as
+  /// solid unityBlue chips, then the action pills in the emphasis pair.
+  Widget _buildHeroCard({required bool wide}) {
     final isExecutive = _member.executiveCommittee;
     final executiveTitle = _cleanText(_member.executiveTitle) ?? 'Executive Committee';
     final executiveRole = _cleanText(_member.executiveRoleDisplay);
     final chapterName = _cleanText(_member.chapterName);
+    final county = _cleanText(_member.county);
+
+    final meta = <String>[
+      if (isExecutive)
+        executiveRole == null ? executiveTitle : '$executiveTitle, $executiveRole',
+      if (_member.dateJoined != null) 'Joined ${_formatDateOnly(_member.dateJoined!)}',
+      if (county != null)
+        county.toLowerCase().endsWith('county') ? county : '$county County',
+    ];
 
     final pills = <Widget>[
       if (isExecutive)
@@ -2785,6 +2852,16 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         ProfilePill(label: 'Chapter $chapterName', style: ProfilePillStyle.soft),
     ];
 
+    final congressional = _cleanText(_member.congressionalDistrict);
+    final house = _cleanText(_member.houseDistrict);
+    final senate = _cleanText(_member.senateDistrict);
+    final districtChips = <Widget>[
+      if (congressional != null)
+        profileChip(_formatDistrict(congressional) ?? congressional, icon: Icons.map_outlined),
+      if (house != null) profileChip('House $house'),
+      if (senate != null) profileChip('Senate $senate'),
+    ];
+
     final blocker = _member.contactBlocker;
     final contactReason = switch (blocker) {
       ContactBlocker.optedOut => 'Opted out',
@@ -2794,9 +2871,9 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     };
 
     final actions = Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      alignment: wide ? WrapAlignment.end : WrapAlignment.center,
+      spacing: 12,
+      runSpacing: 12,
+      alignment: wide ? WrapAlignment.start : WrapAlignment.center,
       children: [
         ProfileActionPill(
           icon: Icons.message_outlined,
@@ -2829,27 +2906,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       ],
     );
 
-    final photo = _buildHeaderPhoto(radius: wide ? 48 : 40);
-
-    final executiveLine = isExecutive
-        ? Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  executiveRole == null ? executiveTitle : '$executiveTitle · $executiveRole',
-                  style: ProfileText.headerLine,
-                  textAlign: wide ? TextAlign.start : TextAlign.center,
-                ),
-              ),
-              const SizedBox(width: 4),
-              _headerEditButton(),
-            ],
-          )
-        : Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [_headerEditButton()],
-          );
+    final photo = _buildHeaderPhoto(radius: 48);
 
     final textColumn = Column(
       crossAxisAlignment: wide ? CrossAxisAlignment.start : CrossAxisAlignment.center,
@@ -2859,10 +2916,16 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           style: ProfileText.headerName,
           textAlign: wide ? TextAlign.start : TextAlign.center,
         ),
-        const SizedBox(height: 4),
-        executiveLine,
+        if (meta.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            meta.join(' · '),
+            style: ProfileText.headerLine,
+            textAlign: wide ? TextAlign.start : TextAlign.center,
+          ),
+        ],
         if (pills.isNotEmpty) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -2870,49 +2933,66 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             children: pills,
           ),
         ],
+        if (districtChips.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: wide ? WrapAlignment.start : WrapAlignment.center,
+            children: districtChips,
+          ),
+        ],
       ],
     );
 
     Widget content;
     if (wide) {
-      content = Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          photo,
-          const SizedBox(width: 20),
-          Expanded(child: textColumn),
-          const SizedBox(width: 16),
-          Flexible(child: actions),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              photo,
+              const SizedBox(width: 24),
+              Expanded(child: textColumn),
+              const SizedBox(width: 16),
+              _headerEditButton(),
+            ],
+          ),
+          const SizedBox(height: 24),
+          actions,
         ],
       );
     } else {
       content = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [_headerEditButton()]),
           Center(child: photo),
-          const SizedBox(height: 12),
-          textColumn,
           const SizedBox(height: 16),
+          textColumn,
+          const SizedBox(height: 20),
           actions,
         ],
       );
     }
 
-    return Container(
-      color: ProfileTokens.band,
-      padding: EdgeInsets.all(wide ? 24 : 20),
-      child: content,
+    return ProfileSheet(
+      children: [
+        Padding(
+          padding: EdgeInsets.all(wide ? 28 : 20),
+          child: content,
+        ),
+      ],
     );
   }
 
-  /// White70 pencil on the band, 7.03:1 (documented). Opens About plus the two
-  /// executive title fields as one group.
+  /// The gold pencil pill on the hero card. Opens About plus the two executive
+  /// title fields as one group.
   Widget _headerEditButton() {
-    return IconButton(
-      tooltip: 'Edit About and title',
-      icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.white70),
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+    return profileEditButton(
+      section: 'About and title',
       onPressed: _crmReady ? () => _beginEdit(_aboutTitleGroup) : null,
     );
   }
@@ -2921,12 +3001,13 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   /// falls through profile_pictures via MemberProfilePhoto.publicUrl; every
   /// executive has profile_pictures and none has avatar_url, so a raw
   /// avatar_url read is exactly why everyone showed initials before. The
-  /// sunriseGold ring is a mark, not text. Tap to update.
+  /// 3 px sunriseGold ring is a mark, not text; the initials fallback is white
+  /// on solid unityBlue, 12.51:1. Tap to update.
   Widget _buildHeaderPhoto({required double radius}) {
     final avatar = CorsAwareAvatar(
       imageUrl: _member.effectiveAvatarUrl,
       radius: radius,
-      backgroundColor: Colors.white.withValues(alpha: 0.2),
+      backgroundColor: ProfileTokens.fill,
       fallbackText: _member.name,
       fallbackTextColor: Colors.white,
       fallbackIconColor: Colors.white,
@@ -2941,10 +3022,10 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             ? _selectProfilePhoto
             : null,
         child: Container(
-          padding: const EdgeInsets.all(2),
+          padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: BrandColors.sunriseGold, width: 2),
+            border: Border.all(color: BrandColors.sunriseGold, width: 3),
           ),
           child: _uploadingPhoto
               ? SizedBox(
@@ -2963,7 +3044,57 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
   }
 
-  // ── Sheet 1: sections in read mode and edit mode ─────────────
+  // ── The section cards, read mode and edit mode ───────────────
+
+  /// One card per section that has something to show or is being edited, in
+  /// the order the member filled the form in, plus the sections omitted for
+  /// having nothing to show. The list never comes back empty, so the page
+  /// never reads as broken.
+  ({List<Widget> cards, List<_ProfileSection> omitted}) _buildSectionCards() {
+    final cards = <Widget>[];
+    final omitted = <_ProfileSection>[];
+    for (final section in _profileSections) {
+      final built = _buildProfileSection(section, first: cards.isEmpty);
+      if (built == null) {
+        omitted.add(section);
+      } else {
+        cards.add(built);
+      }
+    }
+    if (cards.isEmpty) {
+      final firstName = _member.name.trim().split(RegExp(r'\s+')).first;
+      cards.add(
+        ProfileSectionCard(
+          title: 'Profile',
+          icon: Icons.person_outline,
+          child: Text('Only a name is on file for $firstName.', style: ProfileText.value),
+        ),
+      );
+    }
+    return (cards: cards, omitted: omitted);
+  }
+
+  /// One "+ Section" chip per omitted section, on the last card of the grid.
+  /// This is how a hidden field becomes editable without showing empty rows in
+  /// read mode.
+  Widget _buildAddSectionsCard(List<_ProfileSection> omitted) {
+    return ProfileSectionCard(
+      title: 'Add to profile',
+      icon: Icons.add_circle_outline,
+      caption: 'These sections have nothing on file yet.',
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          for (final section in omitted)
+            profileAddChip(
+              title: section.title,
+              onTap: () => _beginEdit(section.id),
+            ),
+        ],
+      ),
+    );
+  }
 
   /// Returns null when the section has nothing to show and is not being
   /// edited. In edit mode every field of the section renders as an input,
@@ -2976,12 +3107,10 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     if (editing) {
       final title = editingGroup ? 'About and title' : section.title;
       final fields = _fieldsForEdit(_editingSection!);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          profileSectionHeader(title: title, first: first),
-          profileSectionBody(child: _buildSectionEditor(section, title, fields)),
-        ],
+      return ProfileSectionCard(
+        title: title,
+        icon: section.icon,
+        child: _buildSectionEditor(section, title, fields),
       );
     }
 
@@ -3005,31 +3134,15 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       caption = 'Updating from the new address';
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        profileSectionHeader(
-          title: section.title,
-          first: first,
-          trailing: profileEditButton(
-            section: section.title,
-            onPressed: _crmReady ? () => _beginEdit(section.id) : null,
-          ),
-        ),
-        profileSectionBody(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (caption != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(caption, style: ProfileText.caption),
-                ),
-              ProfileFieldFlow(items: items),
-            ],
-          ),
-        ),
-      ],
+    return ProfileSectionCard(
+      title: section.title,
+      icon: section.icon,
+      caption: caption,
+      trailing: profileEditButton(
+        section: section.title,
+        onPressed: _crmReady ? () => _beginEdit(section.id) : null,
+      ),
+      child: ProfileFieldFlow(items: items),
     );
   }
 
@@ -3219,7 +3332,6 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           body: 'The edits you made to $openTitle have not been saved.',
           cancelLabel: 'Keep editing',
           confirmLabel: 'Discard',
-          confirmColor: ProfileTokens.ink,
         ),
       );
       if (discard != true || !mounted) return;
@@ -3757,20 +3869,27 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                   }
                 })
             : null,
-        // Selected: unityBlue fill, white label, 12.51:1. Unselected: chip
-        // fill with unityBlue label, 11.27:1, and a unityBlue 0.60 border,
-        // 3.70:1. Disabled keeps the same inks so the locked chip stays
-        // legible.
-        selectedColor: ProfileTokens.ink,
+        // Selected: the emphasis pair, sunriseGold under unityBlue, 7.17:1.
+        // Unselected: solid unityBlue under white, 12.51:1, with a solid white
+        // outline so the chip keeps an edge at the card's dark end. Disabled
+        // keeps the same pair so the locked chip stays legible.
+        selectedColor: ProfileTokens.emphasisFill,
         backgroundColor: ProfileTokens.fill,
-        disabledColor: selected ? ProfileTokens.ink : ProfileTokens.fill,
-        labelStyle: ProfileText.chip.copyWith(color: selected ? Colors.white : ProfileTokens.ink),
-        iconTheme: IconThemeData(color: selected ? Colors.white : ProfileTokens.ink, size: 14),
-        side: BorderSide(color: selected ? ProfileTokens.ink : ProfileTokens.border),
+        disabledColor: selected ? ProfileTokens.emphasisFill : ProfileTokens.fill,
+        labelStyle: ProfileText.chip.copyWith(
+          color: selected ? ProfileTokens.onEmphasis : Colors.white,
+        ),
+        iconTheme: IconThemeData(
+          color: selected ? ProfileTokens.onEmphasis : Colors.white,
+          size: 14,
+        ),
+        side: BorderSide(
+          color: selected ? ProfileTokens.emphasisFill : ProfileTokens.border,
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       );
     }
 
@@ -3811,15 +3930,9 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                   selected: _editCommittees.contains(option),
                   enabled: true,
                 ),
-              ActionChip(
-                label: const Text('+ Add'),
-                labelStyle: ProfileText.chip,
-                backgroundColor: Colors.white,
-                side: BorderSide(color: ProfileTokens.border),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
-                ),
-                onPressed: () => setState(() => _showCommitteeInput = true),
+              profileAddChip(
+                title: 'Add',
+                onTap: () => setState(() => _showCommitteeInput = true),
               ),
             ],
           ),
@@ -3855,56 +3968,60 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
   }
 
-  /// White dialog, radius 16, max width 440, padding 24, unityBlue ink. The
-  /// confirm button takes the caller's colour: unityBlue for an ordinary
-  /// choice, #B91C1C for the one write on this page that touches auth.
+  /// Solid unityBlue dialog, radius 16, max width 480, padding 24, white ink
+  /// (12.51:1). The confirm button is the emphasis pair for an ordinary choice
+  /// (sunriseGold under unityBlue, 7.17:1) and solid #B91C1C under white
+  /// (6.47:1) for the one write on this page that touches auth. The dialog is
+  /// a flat navy ground rather than a gradient so its edge reads against the
+  /// barrier and no button sits on a changing fill.
   Widget _profileDialog(
     BuildContext dialogContext, {
     required String title,
     required String body,
     required String cancelLabel,
     required String confirmLabel,
-    required Color confirmColor,
+    bool destructive = false,
   }) {
+    final confirmFill = destructive ? ProfileTokens.danger : ProfileTokens.emphasisFill;
+    final confirmInk = destructive ? Colors.white : ProfileTokens.onEmphasis;
     return Dialog(
-      backgroundColor: Colors.white,
+      backgroundColor: ProfileTokens.band,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(ProfileTokens.sheetRadius)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 440),
+        constraints: const BoxConstraints(maxWidth: 480),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: ProfileTokens.ink,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                body,
-                style: const TextStyle(color: ProfileTokens.ink, fontSize: 14, height: 1.45),
-              ),
-              const SizedBox(height: 20),
+              Text(title, style: ProfileText.sectionTitle),
+              const SizedBox(height: 14),
+              Text(body, style: ProfileText.caption),
+              const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(dialogContext).pop(false),
-                    style: TextButton.styleFrom(foregroundColor: ProfileTokens.ink),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      textStyle: ProfileText.button,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
                     child: Text(cancelLabel),
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
                     onPressed: () => Navigator.of(dialogContext).pop(true),
                     style: FilledButton.styleFrom(
-                      backgroundColor: confirmColor,
-                      foregroundColor: Colors.white,
+                      backgroundColor: confirmFill,
+                      foregroundColor: confirmInk,
+                      textStyle: ProfileText.button,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+                      ),
                     ),
                     child: Text(confirmLabel),
                   ),
@@ -3950,7 +4067,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         body: body,
         cancelLabel: 'Cancel',
         confirmLabel: 'Change email',
-        confirmColor: ProfileTokens.danger,
+        destructive: true,
       ),
     );
     return confirmed == true;
@@ -4165,12 +4282,14 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     setState(() => _districtsRefreshing = false);
   }
 
-  // ── Sheet 2: the record ──────────────────────────────────────
+  // ── The record cards: what the CRM knows ─────────────────────
 
-  Widget _buildRecordSheet() {
-    final blocks = <Widget>[];
-    void add(Widget? block) {
-      if (block != null) blocks.add(block);
+  /// Every record card that has something to show, in order. Each is its own
+  /// gradient card and joins the section cards in the grid.
+  List<Widget> _buildRecordCards() {
+    final cards = <Widget>[];
+    void add(Widget? card) {
+      if (card != null) cards.add(card);
     }
 
     add(_buildStatusStrip(first: true));
@@ -4182,39 +4301,29 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     add(_buildWalletBlock());
     if (_voterRecord != null) {
       add(
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            profileSectionHeader(title: 'Voter file'),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-              child: VoterCrossRefCard(
-                record: _voterRecord!,
-                memberDateOfBirth: _member.dateOfBirth,
-              ),
-            ),
-          ],
+        ProfileSectionCard(
+          title: 'Voter file',
+          icon: Icons.how_to_reg_outlined,
+          child: VoterCrossRefCard(
+            record: _voterRecord!,
+            memberDateOfBirth: _member.dateOfBirth,
+          ),
         ),
       );
     }
     add(
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          profileSectionHeader(title: 'Outreach'),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-            child: MemberOutreachSection(member: _member),
-          ),
-        ],
+      ProfileSectionCard(
+        title: 'Outreach',
+        icon: Icons.campaign_outlined,
+        child: MemberOutreachSection(member: _member),
       ),
     );
-
-    return ProfileSheet(children: blocks);
+    return cards;
   }
 
-  /// R1: one line of status facts, each rendered only when set, with the
-  /// opt-out toggle at the right end. Always renders.
+  /// Membership status: the facts, each rendered only when set, with the
+  /// opt-out control at the trailing edge. Always renders. [first] is kept for
+  /// the caller and ignored.
   Widget _buildStatusStrip({required bool first}) {
     final facts = <Widget>[
       if (_member.dateJoined != null) profileFact('Joined', _formatDateOnly(_member.dateJoined!)),
@@ -4237,41 +4346,22 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       if (_cleanText(_member.moVoterFileId) != null) profileFact('Voter file', 'Linked'),
     ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        profileSectionHeader(title: 'Membership status', first: first),
-        profileSectionBody(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: facts.isEmpty
-                    ? Text('No status dates on file.', style: ProfileText.caption)
-                    : Wrap(spacing: 16, runSpacing: 8, children: facts),
-              ),
-              const SizedBox(width: 16),
-              OutlinedButton(
-                onPressed: _crmReady && !_togglingOptOut ? _toggleOptOut : null,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: ProfileTokens.ink,
-                  side: const BorderSide(color: ProfileTokens.ink, width: 1.5),
-                  textStyle: ProfileText.button,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
-                  ),
-                ),
-                child: Text(_member.optOut ? 'Opt in' : 'Opt out'),
-              ),
-            ],
-          ),
-        ),
-      ],
+    return ProfileSectionCard(
+      title: 'Membership status',
+      icon: Icons.verified_outlined,
+      trailing: profileOutlineButton(
+        label: _member.optOut ? 'Opt in' : 'Opt out',
+        icon: _member.optOut ? Icons.check_circle_outline : Icons.block_outlined,
+        onPressed: _crmReady && !_togglingOptOut ? _toggleOptOut : null,
+      ),
+      child: facts.isEmpty
+          ? Text('No status dates on file.', style: ProfileText.caption)
+          : Wrap(spacing: 28, runSpacing: 16, children: facts),
     );
   }
 
-  /// R2: the notes editor. Read state is the quote block with an Edit link;
-  /// edit state is a TextField, then Cancel and Save. Always renders.
+  /// The notes editor. Read state is the quote block with the gold pencil in
+  /// the header; edit state is an input, then Cancel and Save. Always renders.
   Widget _buildNotesBlock() {
     final notesValue = _cleanText(_member.notes);
 
@@ -4283,7 +4373,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           TextField(
             controller: _notesController,
             style: profileInputText,
-            cursorColor: ProfileTokens.ink,
+            cursorColor: Colors.white,
             minLines: 3,
             maxLines: 8,
             decoration: profileInput('Notes'),
@@ -4304,31 +4394,22 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       body = Text('No notes yet.', style: ProfileText.caption);
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        profileSectionHeader(
-          title: 'Notes',
-          trailing: _editingNotes
-              ? null
-              : TextButton(
-                  onPressed: _crmReady ? () => setState(() => _editingNotes = true) : null,
-                  style: TextButton.styleFrom(
-                    foregroundColor: ProfileTokens.ink,
-                    textStyle: ProfileText.link,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  child: Text(notesValue == null ? 'Add notes' : 'Edit'),
-                ),
-        ),
-        profileSectionBody(child: body),
-      ],
+    return ProfileSectionCard(
+      title: 'Notes',
+      icon: Icons.sticky_note_2_outlined,
+      trailing: _editingNotes
+          ? null
+          : profileEditButton(
+              section: 'notes',
+              onPressed: _crmReady ? () => setState(() => _editingNotes = true) : null,
+            ),
+      child: body,
     );
   }
 
-  /// R4: the latest meeting and the attendance button. Renders only when there
-  /// is attendance to show, it is still loading, or the load failed; the
-  /// Meetings tab already carries the empty state.
+  /// The latest meeting and the attendance button. Renders only when there is
+  /// attendance to show, it is still loading, or the load failed; the Meetings
+  /// tab already carries the empty state.
   Widget? _buildMeetingsBlock() {
     if (!_crmReady) return null;
     if (!_loadingAttendance && _attendanceError == null && _meetingAttendance.isEmpty) {
@@ -4345,7 +4426,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             height: 22,
             child: CircularProgressIndicator(
               strokeWidth: 2.4,
-              valueColor: AlwaysStoppedAnimation<Color>(BrandColors.momentumBlue),
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
             ),
           ),
         ),
@@ -4358,11 +4439,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             title: 'Could not load meeting attendance',
             message: _attendanceError!,
           ),
-          TextButton.icon(
+          const SizedBox(height: 12),
+          profileOutlineButton(
+            label: 'Try again',
+            icon: Icons.refresh,
             onPressed: _loadMeetingAttendance,
-            style: TextButton.styleFrom(foregroundColor: ProfileTokens.ink),
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text('Try again'),
           ),
         ],
       );
@@ -4372,37 +4453,27 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildMeetingSummaryRow(latest),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Align(
             alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.event_note, size: 18),
-              label: Text('Meeting attendance (${_meetingAttendance.length})'),
+            child: profileOutlineButton(
+              label: 'Meeting attendance (${_meetingAttendance.length})',
+              icon: Icons.event_note,
               onPressed: _showMeetingAttendanceSheet,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: ProfileTokens.ink,
-                side: const BorderSide(color: ProfileTokens.ink, width: 1.5),
-                textStyle: ProfileText.button,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
-                ),
-              ),
             ),
           ),
         ],
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        profileSectionHeader(title: 'Meetings'),
-        profileSectionBody(child: body),
-      ],
+    return ProfileSectionCard(
+      title: 'Meetings',
+      icon: Icons.video_camera_front_outlined,
+      child: body,
     );
   }
 
-  // ── Sheet 2, R6: donor activity ──────────────────────────────
+  // ── Donor activity ───────────────────────────────────────────
 
   /// Renders only on data or on error, never a loading card of its own.
   Widget? _buildDonorBlock() {
@@ -4417,11 +4488,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             title: 'Could not load donor details',
             message: _donorError!,
           ),
-          TextButton.icon(
+          const SizedBox(height: 12),
+          profileOutlineButton(
+            label: 'Try again',
+            icon: Icons.refresh,
             onPressed: _loadDonorProfile,
-            style: TextButton.styleFrom(foregroundColor: ProfileTokens.ink),
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text('Try again'),
           ),
         ],
       );
@@ -4452,45 +4523,33 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           ),
           if (donor.isRecurringDonor)
             Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Row(
-                children: [
-                  Icon(Icons.autorenew, size: 16, color: ProfileTokens.inkMuted),
-                  const SizedBox(width: 6),
-                  _profileTag('Recurring donor'),
-                ],
-              ),
+              padding: const EdgeInsets.only(top: 14),
+              child: profileChip('Recurring donor', emphasis: true, icon: Icons.autorenew),
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 18),
           if (recentDonations.isNotEmpty) ...[
             Text('RECENT DONATIONS', style: ProfileText.label),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             for (final donation in recentDonations) _buildDonationTile(donation),
           ] else
             Text('No donation history on file.', style: ProfileText.caption),
           if (profileUrl != null)
             Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: TextButton.icon(
+              padding: const EdgeInsets.only(top: 12),
+              child: profileOutlineButton(
+                label: 'View full donor profile',
+                icon: Icons.open_in_new,
                 onPressed: () => _openLink(profileUrl),
-                style: TextButton.styleFrom(
-                  foregroundColor: ProfileTokens.ink,
-                  textStyle: ProfileText.link,
-                ),
-                icon: const Icon(Icons.open_in_new, size: 16),
-                label: const Text('View full donor profile'),
               ),
             ),
         ],
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        profileSectionHeader(title: 'Donor activity'),
-        profileSectionBody(child: body),
-      ],
+    return ProfileSectionCard(
+      title: 'Donor activity',
+      icon: Icons.volunteer_activism_outlined,
+      child: body,
     );
   }
 
@@ -4498,11 +4557,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     final amountLabel =
         donation.amount != null ? _formatCurrency(donation.amount!) : 'Unknown amount';
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(Icons.volunteer_activism_outlined, size: 18, color: ProfileTokens.inkMuted),
-          const SizedBox(width: 12),
+          const Icon(Icons.volunteer_activism_outlined, size: 20, color: Colors.white),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -4517,28 +4576,29 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
   }
 
-  /// Chip fill under a unityBlue 22 w800 value (11.27:1, computed) and a
-  /// muted label.
+  /// Stat tile inside a card: solid unityBlue with a hairline outline, the
+  /// value at 32 bold white (12.51:1) over an 11 w700 label.
   Widget _buildDonorStatTile({required String label, required String value}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: ProfileTokens.fill,
         borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+        border: Border.all(color: ProfileTokens.hairline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(value, style: ProfileText.statValue),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(label.toUpperCase(), style: ProfileText.label),
         ],
       ),
     );
   }
 
-  // ── Sheet 2, R7: wallet pass ─────────────────────────────────
+  // ── Wallet pass ──────────────────────────────────────────────
 
   Widget? _buildWalletBlock() {
     if (!_walletService.isReady) return null;
@@ -4553,7 +4613,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             width: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2.4,
-              valueColor: AlwaysStoppedAnimation<Color>(BrandColors.momentumBlue),
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
             ),
           ),
           const SizedBox(width: 12),
@@ -4568,11 +4628,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             title: 'Could not load wallet pass info',
             message: _walletPassError!,
           ),
-          TextButton.icon(
+          const SizedBox(height: 12),
+          profileOutlineButton(
+            label: 'Try again',
+            icon: Icons.refresh,
             onPressed: _loadWalletPassInfo,
-            style: TextButton.styleFrom(foregroundColor: ProfileTokens.ink),
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text('Try again'),
           ),
         ],
       );
@@ -4590,7 +4650,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('$summary $registrationSummary', style: ProfileText.value),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -4600,7 +4660,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               _buildWalletStatusChip('Push registered', pass.isRegistered),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           if ((pass.passSerial ?? '').isNotEmpty)
             Text('Pass serial: ${pass.passSerial}', style: ProfileText.caption),
           if (pass.passGeneratedAt != null)
@@ -4613,109 +4673,75 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     final canSendPush =
         pass != null && pass.hasPass && !_loadingWalletPass && _walletPassError == null;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        profileSectionHeader(
-          title: 'Wallet pass',
-          trailing: IconButton(
-            tooltip: 'Refresh wallet pass data',
-            onPressed: _loadingWalletPass ? null : _loadWalletPassInfo,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            icon: Icon(Icons.refresh, size: 20, color: ProfileTokens.inkMuted),
+    return ProfileSectionCard(
+      title: 'Wallet pass',
+      icon: Icons.wallet_outlined,
+      trailing: Tooltip(
+        message: 'Refresh wallet pass data',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+            onTap: _loadingWalletPass ? null : _loadWalletPassInfo,
+            child: const SizedBox(
+              width: 40,
+              height: 40,
+              child: Center(child: Icon(Icons.refresh, size: 22, color: Colors.white)),
+            ),
           ),
         ),
-        profileSectionBody(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              body,
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: ProfileTokens.ink,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: ProfileTokens.fill,
-                    disabledForegroundColor: ProfileTokens.inkMuted,
-                    textStyle: ProfileText.button,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
-                    ),
-                  ),
-                  onPressed:
-                      canSendPush && !_sendingWalletPush ? _sendWalletPushToMember : null,
-                  icon: _sendingWalletPush
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Icon(Icons.notifications_active_outlined, size: 18),
-                  label: Text(_sendingWalletPush ? 'Sending…' : 'Send push notification'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Active is the emphasis pair, sunriseGold under unityBlue (7.17:1,
-  /// documented); inactive is the chip fill under unityBlue (11.27:1).
-  Widget _buildWalletStatusChip(String label, bool isActive) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: isActive ? ProfileTokens.emphasisFill : ProfileTokens.fill,
-        borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(
-            isActive ? Icons.check_circle : Icons.radio_button_unchecked,
-            size: 14,
-            color: ProfileTokens.ink,
+          body,
+          const SizedBox(height: 20),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ProfileActionPill(
+              icon: Icons.notifications_active_outlined,
+              label: _sendingWalletPush ? 'Sending…' : 'Send push notification',
+              onPressed: canSendPush && !_sendingWalletPush ? _sendWalletPushToMember : null,
+              disabledReason: canSendPush ? null : 'No pass to notify',
+              busy: _sendingWalletPush,
+            ),
           ),
-          const SizedBox(width: 6),
-          Text(label, style: ProfileText.chip),
         ],
       ),
     );
   }
 
-  // ── Sheet 2, R3: internal reports ────────────────────────────
+  /// Active is the emphasis pair, sunriseGold under unityBlue (7.17:1);
+  /// inactive is solid unityBlue under white with a white outline (12.51:1).
+  Widget _buildWalletStatusChip(String label, bool isActive) {
+    return profileChip(
+      label,
+      emphasis: isActive,
+      icon: isActive ? Icons.check_circle : Icons.radio_button_unchecked,
+    );
+  }
+
+  // ── Internal reports ─────────────────────────────────────────
 
   Widget _buildInternalReportsBlock() {
     final reports = _member.internalInfo.reports;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        profileSectionHeader(title: 'Internal reports'),
-        profileSectionBody(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildReportComposer(),
-              const SizedBox(height: 12),
-              if (reports.isEmpty)
-                Text(
-                  'No internal reports yet. Add a note or upload supporting documents.',
-                  style: ProfileText.caption,
-                )
-              else
-                for (final entry in reports) _buildReportEntryTile(entry),
-            ],
-          ),
-        ),
-      ],
+    return ProfileSectionCard(
+      title: 'Internal reports',
+      icon: Icons.folder_shared_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildReportComposer(),
+          const SizedBox(height: 16),
+          if (reports.isEmpty)
+            Text(
+              'No internal reports yet. Add a note or upload supporting documents.',
+              style: ProfileText.caption,
+            )
+          else
+            for (final entry in reports) _buildReportEntryTile(entry),
+        ],
+      ),
     );
   }
 
@@ -4726,15 +4752,15 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         TextField(
           controller: _reportNotesController,
           style: profileInputText,
-          cursorColor: ProfileTokens.ink,
+          cursorColor: Colors.white,
           minLines: 3,
           maxLines: 6,
           decoration: profileInput('Internal notes about this member'),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         if (_pendingReportFiles.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
+            padding: const EdgeInsets.only(bottom: 12),
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -4743,8 +4769,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                     (file) => InputChip(
                       label: Text(file.name, style: ProfileText.chip),
                       backgroundColor: ProfileTokens.fill,
-                      deleteIconColor: ProfileTokens.inkMuted,
-                      side: BorderSide.none,
+                      deleteIconColor: Colors.white,
+                      side: const BorderSide(color: ProfileTokens.border),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
                       ),
@@ -4758,39 +4784,17 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            TextButton.icon(
+            profileOutlineButton(
+              label: 'Add files',
+              icon: Icons.attach_file,
               onPressed: _savingReportEntry ? null : _pickReportFiles,
-              style: TextButton.styleFrom(
-                foregroundColor: ProfileTokens.ink,
-                textStyle: ProfileText.button,
-              ),
-              icon: const Icon(Icons.attach_file, size: 18),
-              label: const Text('Add files'),
             ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
+            const SizedBox(width: 12),
+            ProfileActionPill(
+              icon: Icons.save_outlined,
+              label: _savingReportEntry ? 'Saving...' : 'Save report',
               onPressed: _savingReportEntry ? null : _saveReportEntry,
-              style: FilledButton.styleFrom(
-                backgroundColor: ProfileTokens.ink,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: ProfileTokens.fill,
-                disabledForegroundColor: ProfileTokens.inkMuted,
-                textStyle: ProfileText.button,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
-                ),
-              ),
-              icon: _savingReportEntry
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Icon(Icons.save_outlined, size: 18),
-              label: Text(_savingReportEntry ? 'Saving...' : 'Save report'),
+              busy: _savingReportEntry,
             ),
           ],
         ),
@@ -4800,6 +4804,9 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     );
   }
 
+  /// One report on a solid unityBlue block with a hairline outline, white
+  /// throughout; the edit and delete glyphs are white, and the pending bar is
+  /// gold on the hairline.
   Widget _buildReportEntryTile(MemberInternalReportEntry entry) {
     final attachments = entry.attachments;
     final timestamp = entry.updatedAt ?? entry.createdAt;
@@ -4807,12 +4814,35 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     final isUpdating = _updatingReportIds.contains(entry.id) || entry.isPending;
     final isDeleting = _deletingReportIds.contains(entry.id);
 
+    Widget glyphButton({
+      required IconData icon,
+      required String tooltip,
+      required bool busy,
+      required VoidCallback? onPressed,
+    }) {
+      return IconButton(
+        icon: busy
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : Icon(icon, size: 22, color: Colors.white),
+        tooltip: tooltip,
+        onPressed: onPressed,
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: ProfileTokens.fill,
         borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+        border: Border.all(color: ProfileTokens.hairline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4830,72 +4860,48 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                   ],
                 ),
               ),
-              IconButton(
-                icon: isUpdating
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(ProfileTokens.ink),
-                        ),
-                      )
-                    : Icon(Icons.edit_outlined, size: 20, color: ProfileTokens.inkMuted),
+              glyphButton(
+                icon: Icons.edit_outlined,
                 tooltip: 'Edit report notes',
+                busy: isUpdating,
                 onPressed: (isUpdating || isDeleting) ? null : () => _editReportEntry(entry),
               ),
-              IconButton(
-                icon: isDeleting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(ProfileTokens.ink),
-                        ),
-                      )
-                    : Icon(Icons.delete_outline, size: 20, color: ProfileTokens.inkMuted),
+              glyphButton(
+                icon: Icons.delete_outline,
                 tooltip: 'Delete report',
+                busy: isDeleting,
                 onPressed: (isDeleting || isUpdating) ? null : () => _deleteReportEntry(entry),
               ),
             ],
           ),
           if ((entry.description ?? '').isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             SelectableText(entry.description!, style: ProfileText.longText),
           ],
           if (attachments.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: attachments
                   .map(
-                    (attachment) => OutlinedButton.icon(
+                    (attachment) => profileOutlineButton(
+                      label: attachment.filename ?? attachment.path.split('/').last,
+                      icon: _attachmentIcon(attachment),
                       onPressed: attachment.isLocalPlaceholder
                           ? null
                           : () => _openAttachment(attachment),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: ProfileTokens.ink,
-                        side: BorderSide(color: ProfileTokens.border),
-                        textStyle: ProfileText.chip,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
-                        ),
-                      ),
-                      icon: Icon(_attachmentIcon(attachment), size: 16),
-                      label: Text(attachment.filename ?? attachment.path.split('/').last),
                     ),
                   )
                   .toList(),
             ),
           ],
           if (entry.isPending) ...[
-            const SizedBox(height: 12),
-            const LinearProgressIndicator(
-              minHeight: 2,
-              color: BrandColors.momentumBlue,
-              backgroundColor: Colors.white,
+            const SizedBox(height: 14),
+            LinearProgressIndicator(
+              minHeight: 3,
+              color: BrandColors.sunriseGold,
+              backgroundColor: ProfileTokens.hairline,
             ),
           ],
         ],
@@ -5201,7 +5207,17 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     return sorted.firstOrNull;
   }
 
-  /// Build the Meetings tab showing all meetings the member attended
+  /// The Meetings tab in the Overview's idiom: one gradient section card,
+  /// centred at 1200, on BrandedBackground. Every state (loading, error, empty
+  /// and the list) sits inside that card, because BrandedBackground runs a
+  /// horizontal gradient and no single ink passes at both of its ends (see
+  /// ProfileTokens). Every pairing is the shared surface's, computed against
+  /// the fill it actually sits on: white ink 12.51:1 on unityBlue and 4.59:1
+  /// at the card's light end; solid unityBlue rows and chips under white
+  /// (12.51:1) with a white outline (12.51:1 against the fill it encloses);
+  /// the sunriseGold refresh tile and Retry pill under unityBlue (7.17:1); the
+  /// error banner solid #B91C1C under white (6.47:1). The loading spinner is a
+  /// white stroke, a graphic, 4.59:1 at worst. Nothing rests on the bare ground.
   Widget _buildMeetingsTab(BuildContext context) {
     // Load attendance if not already loaded
     if (!_hasLoadedAttendance && !_loadingAttendance) {
@@ -5211,32 +5227,41 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     }
 
     if (_loadingAttendance) {
-      return const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(BrandColors.momentumBlue),
+      return _buildMeetingsPage(
+        child: _buildMeetingsCard(
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ),
+          ),
         ),
       );
     }
 
     if (_attendanceError != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+      return _buildMeetingsPage(
+        child: _buildMeetingsCard(
+          trailing: _buildMeetingsRefreshButton(),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
-              const SizedBox(height: 16),
-              Text(
-                _attendanceError!,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey[600]),
+              profileErrorBanner(
+                title: 'Meeting attendance did not load',
+                message: _attendanceError!,
               ),
               const SizedBox(height: 16),
-              ElevatedButton.icon(
+              ProfileActionPill(
+                icon: Icons.refresh,
+                label: 'Retry',
                 onPressed: _loadMeetingAttendance,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
               ),
             ],
           ),
@@ -5255,218 +5280,177 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         return bDate.compareTo(aDate);
       });
 
+    final count = sortedAttendance.length;
+    final caption = count == 0
+        ? 'No meetings attended yet'
+        : '$count meeting${count == 1 ? '' : 's'} attended';
+
     return RefreshIndicator(
       onRefresh: _loadMeetingAttendance,
       color: BrandColors.momentumBlue,
-      child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          // Header
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-              child: Row(
-                children: [
-                  Container(
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: BrandColors.momentumBlue,
-                    ),
-                    padding: const EdgeInsets.all(10),
-                    child: const Icon(Icons.video_camera_front_outlined, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Meeting Attendance',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: BrandColors.unityBlue,
-                          ),
-                        ),
-                        Text(
-                          sortedAttendance.isEmpty
-                              ? 'No meetings attended yet'
-                              : '${sortedAttendance.length} meeting${sortedAttendance.length == 1 ? '' : 's'} attended',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Refresh',
-                    icon: const Icon(Icons.refresh, color: BrandColors.unityBlue),
-                    onPressed: _loadMeetingAttendance,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Meeting list
-          if (sortedAttendance.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+      child: _buildMeetingsPage(
+        child: _buildMeetingsCard(
+          caption: caption,
+          trailing: _buildMeetingsRefreshButton(),
+          child: sortedAttendance.isEmpty
+              ? _buildMeetingsEmptyState()
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No meetings recorded',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Meetings will appear here once ${_member.name.split(' ').first} attends one.',
-                      style: TextStyle(color: Colors.grey[500]),
-                      textAlign: TextAlign.center,
-                    ),
+                    for (var i = 0; i < sortedAttendance.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 12),
+                      _buildMeetingRow(sortedAttendance[i]),
+                    ],
                   ],
                 ),
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final attendance = sortedAttendance[index];
-                    return _buildMeetingAttendanceCard(attendance);
-                  },
-                  childCount: sortedAttendance.length,
-                ),
+        ),
+      ),
+    );
+  }
+
+  /// The tab's scroll frame: the Overview's padding and 1200 centring, always
+  /// scrollable so pull to refresh works even when the card is short.
+  Widget _buildMeetingsPage({required Widget child}) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 768;
+        final listPadding = wide
+            ? const EdgeInsets.symmetric(horizontal: 32, vertical: 24)
+            : const EdgeInsets.all(16);
+        return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: listPadding,
+          children: [
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: ProfileTokens.maxSheetWidth),
+                child: child,
               ),
             ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// The one Meetings card: the section header idiom with the tab's icon, the
+  /// count line as the caption, and the refresh control at the trailing edge.
+  Widget _buildMeetingsCard({required Widget child, String? caption, Widget? trailing}) {
+    return ProfileSectionCard(
+      title: 'Meeting Attendance',
+      icon: Icons.video_camera_front_outlined,
+      caption: caption,
+      trailing: trailing,
+      child: child,
+    );
+  }
+
+  /// Refresh as the header's trailing control, in the edit pencil's geometry:
+  /// a 40 px sunriseGold tile carrying a unityBlue glyph, 7.17:1.
+  Widget _buildMeetingsRefreshButton() {
+    return Tooltip(
+      message: 'Refresh',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+          onTap: _loadMeetingAttendance,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: ProfileTokens.emphasisFill,
+              borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(Icons.refresh, size: 20, color: ProfileTokens.onEmphasis),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Empty state inside the card: a solid unityBlue icon tile (white glyph on
+  /// it, 12.51:1) over the 17 and 15 white lines, centred.
+  Widget _buildMeetingsEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Column(
+        children: [
+          profileIconTile(Icons.event_busy, size: 64, iconSize: 32),
+          const SizedBox(height: 16),
+          const Text(
+            'No meetings recorded',
+            style: ProfileText.value,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Meetings will appear here once ${_member.name.split(' ').first} attends one.',
+            style: ProfileText.caption,
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
   }
 
-  /// Build a card for a single meeting attendance record
-  Widget _buildMeetingAttendanceCard(MeetingAttendance attendance) {
+  /// One attended meeting as a tappable row block: solid unityBlue with a
+  /// white outline (white on it 12.51:1; the outline keeps the block's edge at
+  /// the card's dark corner). The label is 17 w500, the date 15, and the facts
+  /// are solid outlined chips, white on unityBlue, 12.51:1. The whole block
+  /// opens the meeting.
+  Widget _buildMeetingRow(MeetingAttendance attendance) {
     final dateLabel = attendance.formattedMeetingDate ?? 'Date unavailable';
     final meeting = attendance.meeting;
     final hostName = meeting?.host?.name ?? 'Unknown host';
     final chapterName = meeting?.host?.chapterName;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            colors: BrandColors.tileGradient,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return Material(
+      color: ProfileTokens.fill,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+        side: const BorderSide(color: ProfileTokens.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _navigateToMeeting(attendance),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.event_available, size: 22, color: Colors.white),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(attendance.meetingLabel, style: ProfileText.value),
+                        Text(dateLabel, style: ProfileText.caption),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, size: 22, color: Colors.white),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  profileChip(attendance.durationSummary, icon: Icons.schedule),
+                  if (attendance.joinWindow != null)
+                    profileChip(attendance.joinWindow!, icon: Icons.login),
+                  profileChip(hostName, icon: Icons.person),
+                  if (chapterName != null) profileChip(chapterName, icon: Icons.group),
+                ],
+              ),
+            ],
           ),
         ),
-        child: InkWell(
-          onTap: () => _navigateToMeeting(attendance),
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.event_available,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            attendance.meetingLabel,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            dateLabel,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_right,
-                      color: Colors.white.withValues(alpha: 0.7),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildMeetingChip(Icons.schedule, attendance.durationSummary),
-                    if (attendance.joinWindow != null)
-                      _buildMeetingChip(Icons.login, attendance.joinWindow!),
-                    _buildMeetingChip(Icons.person, hostName),
-                    if (chapterName != null)
-                      _buildMeetingChip(Icons.group, chapterName),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMeetingChip(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -5480,15 +5464,16 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
         onTap: () => _navigateToMeeting(attendance),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             color: ProfileTokens.fill,
             borderRadius: BorderRadius.circular(ProfileTokens.blockRadius),
+            border: Border.all(color: ProfileTokens.hairline),
           ),
           child: Row(
             children: [
-              Icon(Icons.event_available, size: 20, color: ProfileTokens.inkMuted),
-              const SizedBox(width: 12),
+              const Icon(Icons.event_available, size: 22, color: Colors.white),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -5501,7 +5486,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                   ],
                 ),
               ),
-              Icon(Icons.open_in_new, size: 18, color: ProfileTokens.inkMuted),
+              const Icon(Icons.open_in_new, size: 20, color: Colors.white),
             ],
           ),
         ),

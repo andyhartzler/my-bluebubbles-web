@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/forms/models/form_schema.dart';
 import 'package:bluebubbles/features/forms/models/form_submission.dart';
 import 'package:bluebubbles/features/forms/models/submission_review_model.dart';
@@ -17,40 +18,50 @@ import 'package:bluebubbles/screens/crm/widgets/member_profile_sections.dart';
 //  callers: it carries the Gemini verdict, the exec ballots and the title
 //  "Candidate Review". None of that belongs on a member's own membership form,
 //  which is never scored, and a member profile that pushed that screen showed
-//  an exec "Not scored yet" placeholder over a member's answers.
+//  an exec "Not scored yet" placeholder over a member's answers. Nothing from
+//  that review appears here: no verdict block, no score, no ballots.
 //
 //  What IS reused is the parsing. SubmissionReviewModel.from turns a schema
 //  and a submission into ordered sections of answered questions, which is the
 //  "formatted like the way they filled it out" reading, and it is pure model
-//  code with no colour and no scoring in it. The RENDERING is the profile's:
-//  ProfileSheet, profileSectionHeader, ProfileField, ProfileLongText,
-//  profileChips and ProfileFieldFlow, so this screen and the member profile
-//  read as one product rather than two.
+//  code with no colour and no scoring in it. The RENDERING is the profile's,
+//  built in the Slack management page's idiom that member_profile_sections.dart
+//  now carries: gradient cards on BrandedBackground, a hero card with the
+//  submitter as the headline, a strip of BrandedStatCards, then every section
+//  as its own gradient card in a two column grid from 1100 wide. This screen
+//  and the member profile read as one product rather than two.
 //
 //  THE EMPTY RULE. A question the member did not answer is omitted, and a
 //  section whose answers are all empty is omitted entirely. That is enforced
 //  in the model rather than here: SubmissionReviewModel.from filters each
 //  section's fields on `!_isEmptyValue(data[f.id])` and then appends the
 //  section only `if (!section.isEmpty)`. So this screen renders what it is
-//  given and adds no empty-state rows of its own.
+//  given and adds no empty-state rows of its own. A section the model
+//  classified as a policy grid still carries real answers, in policyPositions
+//  rather than answers, and they render here as ordinary fields, never
+//  dropped.
+//
+//  THE ONE TEXT RULE. Every piece of text that must be read on a gradient
+//  card is FULL WHITE, with hierarchy carried by size, weight and letter
+//  spacing. Alpha touches only the hairline rules between field rows.
 //
 //  CONTRAST. Every pair on this screen is a pair member_profile_sections.dart
-//  already measures; this file introduces no new colour of its own and never
-//  reads a colour from Theme.
+//  and brand_colors.dart already measure; this file introduces no colour of
+//  its own and never reads a colour from Theme. Recomputed here with the WCAG
+//  2.1 relative luminance formula, alpha fills composited over the real
+//  parent fill before measuring:
 //
-//    white on unityBlue (app bar, header name) ......... 12.51:1 (documented)
-//    white70 on unityBlue (submitted line) ............. 7.03:1  (documented)
-//    white on white 0.15 over unityBlue (#47526B) ...... 7.81:1  (computed,
-//        member_profile_sections.dart) for the status pill
-//    unityBlue on white (values, links, spinner) ....... 12.51:1 (computed)
-//    unityBlue 0.70 on white (#687085) labels/captions .. 4.95:1 (documented)
-//    unityBlue on unityBlue 0.06 over white (#F2F3F5) ... 11.27:1 (computed)
-//        for the quote block and the chip fill
-//    white on unityBlue (Retry button) ................. 12.51:1 (documented)
+//    white on unityBlue #273351 (app bar dark end, chips, icon tiles,
+//        avatar initials, snackbar) ......................... 12.51:1
+//    white on gradient midpoint #22587E ...................... 7.59:1
+//    white on tileGradientEnd #1C7DAB (card light end) ....... 4.59:1
+//    unityBlue on sunriseGold (action pills, Retry) .......... 7.17:1
+//    white on #B91C1C (error banner) ......................... 6.47:1
+//    white 0.15 over the card, hairline rules only ........... 1.29:1 to
+//        1.60:1, decorative, nothing is read against it
 //
-//  sunriseGold appears only as a MARK, the 4 by 20 section rule and the 3 px
-//  quote border, never under text. momentumBlue carries no text anywhere here:
-//  white on it is 2.75:1 and fails even the 3:1 large-text floor.
+//  sunriseGold is a fill under unityBlue ink or the 3 px avatar ring, never
+//  text on the card: gold against the light end is 2.63:1.
 // ═════════════════════════════════════════════════════════════
 
 /// Read-only view of ONE form submission by ONE member, reached from the
@@ -60,10 +71,17 @@ class MemberSubmissionScreen extends StatefulWidget {
     super.key,
     required this.formId,
     required this.submissionId,
+    this.avatarUrl,
   });
 
   final String formId;
   final String submissionId;
+
+  /// The submitter's photo for the hero, when the caller has one. The member
+  /// profile owns the photo rule (Member.effectiveAvatarUrl is the only
+  /// source), so this screen never derives a photo from the submission
+  /// itself; without a URL the hero shows initials, white on unityBlue.
+  final String? avatarUrl;
 
   @override
   State<MemberSubmissionScreen> createState() => _MemberSubmissionScreenState();
@@ -77,9 +95,12 @@ class _MemberSubmissionScreenState extends State<MemberSubmissionScreen> {
   bool _loading = true;
   String? _loadError;
 
-  /// Readable measure on a wide monitor. Wide enough that ProfileFieldFlow's
-  /// 560 px two-up threshold engages inside the sheet.
-  static const double _maxContentWidth = 960;
+  /// The page and the profile share one measure so the two read as one
+  /// product; the two column section grid needs 1100 to open.
+  static const double _maxContentWidth = ProfileTokens.maxSheetWidth;
+
+  /// Below this the hero stacks and centres, as the profile's does.
+  static const double _wideBreakpoint = 768;
 
   @override
   void initState() {
@@ -204,6 +225,17 @@ class _MemberSubmissionScreenState extends State<MemberSubmissionScreen> {
     return parsed;
   }
 
+  /// Every answer the member gave, across the ordinary fields and the policy
+  /// grid rows, for the stat strip. Companions and explanations ride on their
+  /// parent answer and are not counted twice.
+  int _answerCount(SubmissionReviewModel model) {
+    var count = 0;
+    for (final section in model.sections) {
+      count += section.answers.length + section.policyPositions.length;
+    }
+    return count;
+  }
+
   // ── actions ───────────────────────────────────────────────────────────────
 
   Future<void> _openLink(Uri url) async {
@@ -228,7 +260,7 @@ class _MemberSubmissionScreenState extends State<MemberSubmissionScreen> {
   void _toast(ScaffoldMessengerState messenger, String message) {
     messenger.showSnackBar(
       SnackBar(
-        backgroundColor: ProfileTokens.ink,
+        backgroundColor: ProfileTokens.band,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
         content: Text(
@@ -285,6 +317,10 @@ class _MemberSubmissionScreenState extends State<MemberSubmissionScreen> {
 
     Clipboard.setData(ClipboardData(text: buffer.toString().trimRight()));
     _toast(ScaffoldMessenger.of(context), 'Submission copied');
+  }
+
+  Future<void> _emailSubmitter(String email) {
+    return _openLink(Uri(scheme: 'mailto', path: email.trim()));
   }
 
   // ── documents ─────────────────────────────────────────────────────────────
@@ -354,10 +390,21 @@ class _MemberSubmissionScreenState extends State<MemberSubmissionScreen> {
       );
     }
 
+    // The Slack management page's app bar: the tile gradient as the bar, white
+    // 18 w700 title, white icons. White is 12.51:1 at the bar's dark end and
+    // 4.59:1 at its light end.
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: ProfileTokens.band,
         elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: BrandColors.tileGradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
           form?.title ?? 'Submission',
@@ -373,13 +420,7 @@ class _MemberSubmissionScreenState extends State<MemberSubmissionScreen> {
       ),
       body: BrandedBackground(
         child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints:
-                  const BoxConstraints(maxWidth: _maxContentWidth),
-              child: _buildBody(model, submission, form),
-            ),
-          ),
+          child: _buildBody(model, submission, form),
         ),
       ),
     );
@@ -388,13 +429,13 @@ class _MemberSubmissionScreenState extends State<MemberSubmissionScreen> {
   Widget _buildBody(SubmissionReviewModel? model, FormSubmission? submission,
       FormSchema? form) {
     if (_loading) {
-      return _centeredSheet(
+      return _centeredCard(
         const SizedBox(
-          width: 28,
-          height: 28,
+          width: 32,
+          height: 32,
           child: CircularProgressIndicator(
             strokeWidth: 3,
-            valueColor: AlwaysStoppedAnimation<Color>(ProfileTokens.ink),
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
           ),
         ),
       );
@@ -402,117 +443,331 @@ class _MemberSubmissionScreenState extends State<MemberSubmissionScreen> {
 
     final error = _loadError;
     if (error != null) {
-      return _centeredSheet(
+      return _centeredCard(
         Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Could not load', style: ProfileText.value),
-            const SizedBox(height: 6),
-            SelectableText(error, style: ProfileText.longText),
-            const SizedBox(height: 14),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton(
-                onPressed: _load,
-                style: FilledButton.styleFrom(
-                  backgroundColor: ProfileTokens.ink,
-                  foregroundColor: Colors.white,
-                  textStyle: ProfileText.button,
-                  shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(ProfileTokens.blockRadius),
+            profileSectionHeader(
+              title: 'Could not load',
+              icon: Icons.error_outline,
+            ),
+            profileSectionBody(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  profileErrorBanner(
+                    title: 'This submission did not load',
+                    message: error,
                   ),
-                ),
-                child: const Text('Retry'),
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ProfileActionPill(
+                      icon: Icons.refresh,
+                      label: 'Retry',
+                      onPressed: _load,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
+        padded: false,
       );
     }
 
     if (model == null || submission == null || form == null) {
-      return _centeredSheet(
+      return _centeredCard(
         const Text('No submission data available.', style: ProfileText.value),
       );
     }
 
     final documents = _documentRows(model);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-      child: ProfileSheet(
-        children: [
-          _headerBand(model, submission, form),
-          for (int i = 0; i < model.sections.length; i++) ...[
-            profileSectionHeader(
-              title: _sectionTitle(model.sections[i]),
-              // The navy band already separates the first section; a hairline
-              // directly under it would be a second divider on one seam.
-              first: i == 0,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= _wideBreakpoint;
+        final twoColumns = constraints.maxWidth >= ProfileTokens.gridMinWidth;
+        final listPadding = wide
+            ? const EdgeInsets.symmetric(horizontal: 32, vertical: 24)
+            : const EdgeInsets.all(16);
+
+        final cards = <Widget>[
+          for (final section in model.sections)
+            ProfileSectionCard(
+              title: _sectionTitle(section),
+              icon: section.isPolicyGrid
+                  ? Icons.checklist_rtl_outlined
+                  : Icons.article_outlined,
+              child: _sectionBody(section),
             ),
-            profileSectionBody(child: _sectionBody(model.sections[i])),
+          if (documents.isNotEmpty)
+            ProfileSectionCard(
+              title: 'Attachments',
+              icon: Icons.attach_file_outlined,
+              child: _documentsBody(documents),
+            ),
+        ];
+
+        return ListView(
+          padding: listPadding,
+          children: [
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: _maxContentWidth),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _heroCard(model, submission, form, wide: wide),
+                    const SizedBox(height: ProfileTokens.cardGap),
+                    ..._statStrip(model, documents, wide: wide),
+                    _cardGrid(cards, twoColumns: twoColumns),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ),
           ],
-          if (documents.isNotEmpty) ...[
-            profileSectionHeader(title: 'Attachments'),
-            profileSectionBody(child: _documentsBody(documents)),
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 
-  /// White sheet holding a single centred block, so nothing sits directly on
-  /// BrandedBackground, which carries no ink that passes at both of its ends.
-  Widget _centeredSheet(Widget child) {
+  /// One gradient card holding a single centred block, so nothing sits
+  /// directly on BrandedBackground, which carries no ink that passes at both
+  /// of its ends.
+  Widget _centeredCard(Widget child, {bool padded = true}) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ProfileSheet(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: child,
-            ),
-          ],
+        padding: const EdgeInsets.all(ProfileTokens.cardPadding),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: ProfileSheet(
+            children: [
+              if (padded)
+                Padding(
+                  padding: const EdgeInsets.all(ProfileTokens.cardPadding),
+                  child: child,
+                )
+              else
+                child,
+            ],
+          ),
         ),
       ),
     );
   }
 
-  /// Solid unityBlue band fused to the top of the sheet: who filled it in,
-  /// when, and the submission's status.
-  Widget _headerBand(SubmissionReviewModel model, FormSubmission submission,
-      FormSchema form) {
-    return Container(
-      width: double.infinity,
-      color: ProfileTokens.band,
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-      child: Column(
+  // ── the hero card ─────────────────────────────────────────────────────────
+
+  /// The person is the headline: a 96 px avatar in a 3 px sunriseGold ring,
+  /// the name at 34, one meta line naming the form and when it was submitted,
+  /// the status pill, then the action pills in the emphasis pair.
+  Widget _heroCard(SubmissionReviewModel model, FormSubmission submission,
+      FormSchema form,
+      {required bool wide}) {
+    final name = _submitterName(model, submission, form);
+    final meta = '${form.title} · Submitted ${_formatDateTime(submission.createdAt)}';
+    final status = _prettyStatus(submission.status);
+    final emailRaw = (model.email ?? submission.submitterEmail)?.trim();
+    final String? email = (emailRaw == null || emailRaw.isEmpty) ? null : emailRaw;
+    // A final local promotes inside the closure; a separate bool would not.
+    final VoidCallback? emailAction =
+        email == null ? null : () => _emailSubmitter(email);
+
+    final avatar = Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: BrandColors.sunriseGold, width: 3),
+      ),
+      child: CorsAwareAvatar(
+        imageUrl: widget.avatarUrl,
+        radius: 48,
+        backgroundColor: ProfileTokens.fill,
+        fallbackText: name,
+        fallbackTextColor: Colors.white,
+        fallbackIconColor: Colors.white,
+      ),
+    );
+
+    final textColumn = Column(
+      crossAxisAlignment: wide ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+      children: [
+        Text(
+          name,
+          style: ProfileText.headerName,
+          textAlign: wide ? TextAlign.start : TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          meta,
+          style: ProfileText.headerLine,
+          textAlign: wide ? TextAlign.start : TextAlign.center,
+        ),
+        if (status.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: wide ? WrapAlignment.start : WrapAlignment.center,
+            children: [
+              ProfilePill(label: status, style: ProfilePillStyle.soft),
+            ],
+          ),
+        ],
+      ],
+    );
+
+    final actions = Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      alignment: wide ? WrapAlignment.start : WrapAlignment.center,
+      children: [
+        ProfileActionPill(
+          icon: Icons.content_copy,
+          label: 'Copy all',
+          onPressed: () => _copyAll(model, submission, form),
+        ),
+        ProfileActionPill(
+          icon: Icons.email_outlined,
+          label: 'Email',
+          onPressed: emailAction,
+          disabledReason: emailAction == null ? 'No email on this submission' : null,
+        ),
+      ],
+    );
+
+    Widget content;
+    if (wide) {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              avatar,
+              const SizedBox(width: 24),
+              Expanded(child: textColumn),
+            ],
+          ),
+          const SizedBox(height: 24),
+          actions,
+        ],
+      );
+    } else {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(child: avatar),
+          const SizedBox(height: 16),
+          textColumn,
+          const SizedBox(height: 20),
+          actions,
+        ],
+      );
+    }
+
+    return ProfileSheet(
+      children: [
+        Padding(
+          padding: EdgeInsets.all(wide ? 28 : 20),
+          child: content,
+        ),
+      ],
+    );
+  }
+
+  // ── the stat strip ────────────────────────────────────────────────────────
+
+  /// BrandedStatCards for what the submission genuinely carries: how many
+  /// questions were answered, how many sections that spans, and how many
+  /// files came with it. Nothing is invented and no card renders a zero it
+  /// would have to explain. No subtitle is passed, because BrandedStatCard
+  /// draws its subtitle at white 0.90, which is 4.04:1 on the card's light
+  /// end and fails.
+  List<Widget> _statStrip(SubmissionReviewModel model, List<_DocumentRow> documents,
+      {required bool wide}) {
+    final answers = _answerCount(model);
+    final stats = <Widget>[
+      if (answers > 0)
+        BrandedStatCard(
+          title: 'Answers',
+          value: '$answers',
+          icon: Icons.question_answer_outlined,
+        ),
+      if (model.sections.isNotEmpty)
+        BrandedStatCard(
+          title: 'Sections',
+          value: '${model.sections.length}',
+          icon: Icons.view_agenda_outlined,
+        ),
+      if (documents.isNotEmpty)
+        BrandedStatCard(
+          title: 'Attachments',
+          value: '${documents.length}',
+          icon: Icons.attach_file_outlined,
+        ),
+    ];
+    if (stats.isEmpty) return const [];
+
+    final Widget strip;
+    if (wide) {
+      strip = Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _submitterName(model, submission, form),
-            style: ProfileText.headerName,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Submitted ${_formatDateTime(submission.createdAt)}',
-            style: ProfileText.headerLine,
-          ),
-          if (submission.status.trim().isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: ProfilePill(
-                label: _prettyStatus(submission.status),
-                style: ProfilePillStyle.soft,
-              ),
-            ),
+          for (var i = 0; i < stats.length; i++) ...[
+            if (i > 0) const SizedBox(width: 16),
+            Expanded(child: stats[i]),
           ],
         ],
-      ),
+      );
+    } else {
+      strip = LayoutBuilder(
+        builder: (context, constraints) {
+          final half = (constraints.maxWidth - 16) / 2;
+          return Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: [for (final stat in stats) SizedBox(width: half, child: stat)],
+          );
+        },
+      );
+    }
+    return [strip, const SizedBox(height: ProfileTokens.cardGap)];
+  }
+
+  // ── the section grid ──────────────────────────────────────────────────────
+
+  /// Two columns of cards filled by alternating, 24 between cards in both
+  /// directions; one column below 1100. The same shape the profile uses.
+  Widget _cardGrid(List<Widget> cards, {required bool twoColumns}) {
+    Widget column(List<Widget> items) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              if (i > 0) const SizedBox(height: ProfileTokens.cardGap),
+              items[i],
+            ],
+          ],
+        );
+
+    if (!twoColumns) return column(cards);
+
+    final left = <Widget>[];
+    final right = <Widget>[];
+    for (var i = 0; i < cards.length; i++) {
+      (i.isEven ? left : right).add(cards[i]);
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: column(left)),
+        const SizedBox(width: ProfileTokens.cardGap),
+        Expanded(child: column(right)),
+      ],
     );
   }
 
@@ -522,8 +777,8 @@ class _MemberSubmissionScreenState extends State<MemberSubmissionScreen> {
     // A section the model classified as a policy grid still holds real
     // answers, they just live in policyPositions rather than in answers. They
     // are rendered here as ordinary question-and-answer fields: the stance
-    // pills and the grid are endorsement review furniture and their colours
-    // are not measured for this surface.
+    // pills and the grid are endorsement review furniture and have no place
+    // on a member's page.
     for (final p in section.policyPositions) {
       items.add(ProfileFlowItem(
         ProfileField(label: p.question, value: p.answerLabel),
@@ -595,61 +850,26 @@ class _MemberSubmissionScreenState extends State<MemberSubmissionScreen> {
     );
   }
 
+  /// Attachments as field rows: label over the file name, white underlined
+  /// when it opens, copyable when the stored value is not a URL. Rows are
+  /// separated by ProfileFieldFlow's hairline, never by a Divider.
   Widget _documentsBody(List<_DocumentRow> documents) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final doc in documents)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(doc.label.toUpperCase(), style: ProfileText.label),
-                const SizedBox(height: 4),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius:
-                        BorderRadius.circular(ProfileTokens.pillRadius),
-                    onTap: () {
-                      final uri = Uri.tryParse(doc.url);
-                      if (uri != null && uri.hasScheme) {
-                        _openLink(uri);
-                      } else {
-                        _copyValue(doc.label, doc.url);
-                      }
-                    },
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            doc.name,
-                            style: ProfileText.value.copyWith(
-                              decoration: TextDecoration.underline,
-                              decorationColor: ProfileTokens.ink,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Icon(
-                            Icons.open_in_new,
-                            size: 16,
-                            color: ProfileTokens.inkMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
+    final items = <ProfileFlowItem>[];
+    for (final doc in documents) {
+      final uri = Uri.tryParse(doc.url);
+      final opens = uri != null && uri.hasScheme;
+      items.add(ProfileFlowItem(
+        ProfileField(
+          label: doc.label,
+          value: doc.name,
+          link: opens ? uri : null,
+          onOpenLink: opens ? _openLink : null,
+          onCopy: opens ? null : () => _copyValue(doc.label, doc.url),
+        ),
+        isLong: true,
+      ));
+    }
+    return ProfileFieldFlow(items: items);
   }
 }
 

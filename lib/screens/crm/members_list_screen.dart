@@ -3,7 +3,6 @@ import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -155,8 +154,32 @@ class _MembersListScreenState extends State<MembersListScreen> {
   bool get _shouldUsePaging => !_hasActiveFilters;
 
   static const List<Color> _memberCardGradient = BrandColors.tileGradient;
-  static const List<Color> _ineligibleMemberCardGradient = [Color(0xFFB71C1C), Color(0xFFE53935)];
-  static const Color _executiveAccentColor = Color(0xFFFDB813);
+
+  /// Ineligible cards run red instead of blue. The light end is Material red
+  /// 700 rather than the red 600 (#E53935) it used to be: white on #E53935
+  /// measures 4.23:1 and fails the 4.5:1 normal-text floor. White on #D32F2F
+  /// is 4.98:1, on the midpoint (#C52626) 5.71:1, on #B71C1C 6.57:1. All
+  /// three computed from WCAG relative luminance.
+  static const List<Color> _ineligibleMemberCardGradient = [Color(0xFFB71C1C), Color(0xFFD32F2F)];
+
+  /// Text on the light end of the branded card gradient. White is the ONLY
+  /// readable ink on these cards: white on tileGradientEnd (#1C7DAB) is
+  /// 4.59:1, on the midpoint 7.59:1, on unityBlue 12.51:1. White at 0.90
+  /// alpha on the light end is 4.04:1 and fails, at 0.70 it is 3.08:1, so
+  /// hierarchy on a card is size, weight and letter spacing, never alpha.
+  static const Color _ink = Colors.white;
+
+  /// Decorative rules and chip borders. Alpha is allowed here because a rule
+  /// carries no text. White at 0.35 over unityBlue composites to #737A8E and
+  /// at 0.15 over tileGradientEnd to #3E90B8; neither is read as text.
+  static final Color _rule = Colors.white.withValues(alpha: 0.35);
+  static final Color _rowDivider = Colors.white.withValues(alpha: 0.15);
+
+  /// Solid hint ink for the white search band. channels_tab uses unityBlue
+  /// at 0.5 alpha, which composites to #9399A8 and is only 2.85:1 on white.
+  /// This is unityBlue at 0.75 composited over white, #5D667C, 5.74:1.
+  static const Color _searchHintInk = Color(0xFF5D667C);
+
   static const int _minAllowedAge = 14;
   static const int _maxAllowedAge = 36;
 
@@ -1296,7 +1319,13 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final body = _buildContent(context);
+    // BrandedBackground on BOTH paths. The embedded members view used to
+    // return the bare body and inherit the host shell's black scaffold, which
+    // is the black Andrew asked to lose. Nothing readable sits directly on
+    // this background: white on the fallback gradient's light end with the
+    // 18% overlay (#57B6E4) is only 2.28:1, so every text run below lives on
+    // a gradient card or band.
+    final body = BrandedBackground(child: _buildContent(context));
 
     if (widget.embed) {
       return body;
@@ -1304,16 +1333,30 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Members'),
+        title: const Text(
+          'Members',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: BrandColors.tileGradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: _crmReady ? () => _refreshAll() : null,
             tooltip: 'Refresh',
           ),
           if (CRMConfig.bulkMessagingEnabled)
             IconButton(
-              icon: const Icon(Icons.email_outlined),
+              icon: const Icon(Icons.email_outlined, color: Colors.white),
               onPressed: _crmReady
                   ? () {
                       final filter = _buildCurrentMessageFilter();
@@ -1329,7 +1372,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
             ),
           if (CRMConfig.bulkMessagingEnabled)
             IconButton(
-              icon: const Icon(Icons.message),
+              icon: const Icon(Icons.message, color: Colors.white),
               onPressed: _crmReady
                   ? () {
                       // Carry the active filters through, exactly as the email
@@ -1350,30 +1393,38 @@ class _MembersListScreenState extends State<MembersListScreen> {
             ),
         ],
       ),
-      body: BrandedBackground(
-        child: body,
-      ),
+      body: body,
     );
   }
 
   Widget _buildContent(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
     }
 
     if (!_crmReady) {
-      return const Center(
+      // A whole-screen notice on the branded background: white text on a
+      // gradient card, never on the background itself.
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(24.0),
-          child: Text(
-            'CRM Supabase is not configured. Please verify environment variables.',
-            textAlign: TextAlign.center,
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: BrandedCard(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'CRM Supabase is not configured. Please verify environment variables.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w500, height: 1.4),
+              ),
+            ),
           ),
         ),
       );
     }
 
-    final theme = Theme.of(context);
     final showingChapters = _showingChapters;
 
     final visibleMembersCount = _filteredMembers.length;
@@ -1382,34 +1433,23 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final membersLabel = _totalAvailableMembers != null
         ? 'Showing $visibleMembersCount of $knownTotalMembers members'
         : 'Showing $visibleMembersCount members';
+    final countLabel = showingChapters
+        ? 'Showing ${_filteredChapters.length} of ${_chapters.length} chapters'
+        : membersLabel;
 
+    // The Slack page's header idiom: one white search band, then one gradient
+    // band carrying the controls. The count label rides in the gradient band
+    // so it is white on tileGradient rather than theme ink on the background.
     final slivers = <Widget>[
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        sliver: SliverToBoxAdapter(child: _buildSearchField()),
-      ),
-      if (!showingChapters)
-        SliverToBoxAdapter(
-          child: _buildFilterRow(),
-        ),
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-        sliver: SliverToBoxAdapter(
-          child: Text(
-            showingChapters
-                ? 'Showing ${_filteredChapters.length} of ${_chapters.length} chapters'
-                : membersLabel,
-            style: theme.textTheme.labelMedium,
-          ),
-        ),
-      ),
-      const SliverToBoxAdapter(child: SizedBox(height: 8)),
+      SliverToBoxAdapter(child: _buildSearchBand()),
+      SliverToBoxAdapter(child: _buildFilterBand(countLabel)),
+      const SliverToBoxAdapter(child: SizedBox(height: 24)),
     ];
 
     if (showingChapters) {
-      slivers.add(_buildChaptersSliver(theme));
+      slivers.add(_buildChaptersSliver());
     } else {
-      slivers.addAll(_buildMembersSlivers(theme));
+      slivers.addAll(_buildMembersSlivers());
     }
 
     return RefreshIndicator(
@@ -1425,27 +1465,48 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  Widget _buildSearchField() {
+  /// The one light surface on the page, matching channels_tab.dart's white
+  /// search band. Ink is unityBlue on solid white, 12.51:1. The band is
+  /// opaque white rather than channels_tab's 0.95 so the ratio does not
+  /// depend on what the background image happens to be behind it.
+  Widget _buildSearchBand() {
     final hint = _showingChapters
         ? 'Search chapters by name, contact, or status...'
         : 'Search by name, contact, chapter, or committee...';
+
+    OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: color, width: width),
+        );
+
     final searchField = TextField(
       controller: _searchController,
+      style: const TextStyle(color: BrandColors.unityBlue, fontSize: 15, fontWeight: FontWeight.w500),
+      cursorColor: BrandColors.unityBlue,
       decoration: InputDecoration(
         hintText: hint,
-        prefixIcon: const Icon(Icons.search),
+        // #5D667C on white is 5.74:1. See _searchHintInk.
+        hintStyle: const TextStyle(color: _searchHintInk, fontSize: 15, fontWeight: FontWeight.w400),
+        // tileGradientEnd on white is 4.59:1, clearing the 3:1 graphical
+        // floor; momentumBlue, which channels_tab uses here, is 2.75:1.
+        prefixIcon: const Icon(Icons.search, color: BrandColors.tileGradientEnd),
         suffixIcon: _searchQuery.isNotEmpty
             ? IconButton(
-                icon: const Icon(Icons.clear),
+                icon: const Icon(Icons.clear, color: BrandColors.unityBlue),
+                tooltip: 'Clear search',
                 onPressed: () {
                   _replaceSearchText('');
                   _updateFilters(() => _searchQuery = '');
                 },
               )
             : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        filled: true,
+        fillColor: Colors.white,
+        // Field strokes are decorative rules; alpha is fine on them.
+        border: border(BrandColors.tileGradientEnd.withValues(alpha: 0.35), 1),
+        enabledBorder: border(BrandColors.tileGradientEnd.withValues(alpha: 0.35), 1),
+        focusedBorder: border(BrandColors.tileGradientEnd, 2),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
 
@@ -1455,31 +1516,99 @@ class _MembersListScreenState extends State<MembersListScreen> {
       children: [
         searchField,
         if (_inlineSearchLoading) ...[
-          const SizedBox(height: 6),
-          const LinearProgressIndicator(minHeight: 3),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              minHeight: 3,
+              color: BrandColors.tileGradientEnd,
+              backgroundColor: BrandColors.tileGradientEnd.withValues(alpha: 0.15),
+            ),
+          ),
         ],
       ],
     );
 
-    if (!widget.embed) {
-      return searchContent;
-    }
+    final Widget row = widget.embed
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: searchContent),
+              const SizedBox(width: 8),
+              // Stays an IconButton with this tooltip: the embed test finds it
+              // by widgetWithIcon and reads onPressed and tooltip off it.
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                color: BrandColors.unityBlue,
+                onPressed: _crmReady ? () => _refreshAll() : null,
+                tooltip: 'Refresh',
+              ),
+            ],
+          )
+        : searchContent;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: searchContent),
-        const SizedBox(width: 8),
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          onPressed: _crmReady ? () => _refreshAll() : null,
-          tooltip: 'Refresh',
-        ),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: row,
     );
   }
 
-  Widget _buildFilterRow() {
+  /// The gradient control band under the search, in the Slack tab bar's
+  /// idiom: tileGradient, white labels, sunriseGold for the active state with
+  /// unityBlue ink (7.17:1). The count label sits here too, white 15 w600, so
+  /// it is never drawn on the background image.
+  Widget _buildFilterBand(String countLabel) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final countText = Text(
+      countLabel,
+      style: const TextStyle(
+        color: _ink,
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.2,
+      ),
+    );
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(isMobile ? 16 : 20, 16, isMobile ? 16 : 20, 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: BrandColors.unityBlue.withValues(alpha: 0.28),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!_showingChapters) ...[
+            _buildFilterRow(isMobile: isMobile),
+            const SizedBox(height: 14),
+          ],
+          countText,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterRow({required bool isMobile}) {
     if (_showingChapters) return const SizedBox.shrink();
     final hasFilters = _selectedCounty != null ||
         _selectedDistrict != null ||
@@ -1555,70 +1684,64 @@ class _MembersListScreenState extends State<MembersListScreen> {
       ),
     ];
 
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final clearControl = _buildFilterChip(
+      label: 'Clear',
+      selected: false,
+      onTap: _clearFilters,
+      icon: Icons.clear_all,
+    );
+
     if (isMobile) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => setState(() {
-                      _filtersExpandedOnMobile = !_filtersExpandedOnMobile;
-                    }),
-                    icon: Icon(_filtersExpandedOnMobile ? Icons.filter_alt_off : Icons.filter_alt),
-                    label: Text(
-                      _filtersExpandedOnMobile
-                          ? 'Hide Filters'
-                          : 'Show Filters${activeFilterCount > 0 ? ' ($activeFilterCount)' : ''}',
-                    ),
-                  ),
-                ),
-                if (hasFilters) ...[
-                  const SizedBox(width: 12),
-                  TextButton.icon(
-                    onPressed: _clearFilters,
-                    icon: const Icon(Icons.clear_all),
-                    label: const Text('Clear'),
-                  ),
-                ],
-              ],
-            ),
-            AnimatedCrossFade(
-              firstChild: const SizedBox.shrink(),
-              secondChild: Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: chips,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildFilterChip(
+                  label: _filtersExpandedOnMobile
+                      ? 'Hide Filters'
+                      : 'Show Filters${activeFilterCount > 0 ? ' ($activeFilterCount)' : ''}',
+                  selected: false,
+                  onTap: () => setState(() {
+                    _filtersExpandedOnMobile = !_filtersExpandedOnMobile;
+                  }),
+                  icon: _filtersExpandedOnMobile ? Icons.filter_alt_off : Icons.filter_alt,
+                  expand: true,
                 ),
               ),
-              crossFadeState:
-                  _filtersExpandedOnMobile ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-              duration: const Duration(milliseconds: 200),
+              if (hasFilters) ...[
+                const SizedBox(width: 12),
+                clearControl,
+              ],
+            ],
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: chips,
+              ),
             ),
-          ],
-        ),
+            crossFadeState:
+                _filtersExpandedOnMobile ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
+          ),
+        ],
       );
     }
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
           ..._interleaveChips(chips),
           if (hasFilters) ...[
             const SizedBox(width: 12),
-            TextButton.icon(
-              onPressed: _clearFilters,
-              icon: const Icon(Icons.clear_all),
-              label: const Text('Clear'),
-            ),
+            clearControl,
           ],
         ],
       ),
@@ -1650,7 +1773,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return result;
   }
 
-  List<Widget> _buildMembersSlivers(ThemeData theme) {
+  List<Widget> _buildMembersSlivers() {
     final hasAgedOutMembers = _agedOutMembers.isNotEmpty;
     final hasPrimaryMembers = _filteredMembers.isNotEmpty;
 
@@ -1659,14 +1782,14 @@ class _MembersListScreenState extends State<MembersListScreen> {
         SliverFillRemaining(
           hasScrollBody: false,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
             child: Align(
               alignment: Alignment.topCenter,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const SizedBox(height: 96),
-                  _buildEmptyMembersState(theme),
+                  const SizedBox(height: 48),
+                  _buildEmptyMembersState(),
                 ],
               ),
             ),
@@ -1678,13 +1801,13 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final slivers = <Widget>[];
 
     if (hasPrimaryMembers) {
-      final bottomPadding = hasAgedOutMembers ? 16.0 : 32.0;
+      final bottomPadding = hasAgedOutMembers ? 24.0 : 32.0;
       slivers.add(_buildMemberCollectionSliver(_filteredMembers, bottomPadding: bottomPadding));
     } else {
       slivers.add(
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          sliver: SliverToBoxAdapter(child: _buildEmptyMembersState(theme)),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          sliver: SliverToBoxAdapter(child: _buildEmptyMembersState()),
         ),
       );
     }
@@ -1692,8 +1815,8 @@ class _MembersListScreenState extends State<MembersListScreen> {
     if (hasAgedOutMembers) {
       slivers.add(
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-          sliver: SliverToBoxAdapter(child: _buildAgedOutMembersPanel(theme)),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+          sliver: SliverToBoxAdapter(child: _buildAgedOutMembersPanel()),
         ),
       );
     }
@@ -1704,16 +1827,18 @@ class _MembersListScreenState extends State<MembersListScreen> {
           const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: CircularProgressIndicator(color: Colors.white)),
             ),
           ),
         );
       } else if (!_hasMoreMembers && (_members.isNotEmpty || _agedOutMembers.isNotEmpty)) {
+        // A footer on the background image, so it gets a solid unityBlue
+        // pill: white on unityBlue is 12.51:1 wherever the pill lands.
         slivers.add(
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: Text('All members loaded')),
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: _buildSolidPill(Icons.check_circle_outline, 'All members loaded')),
             ),
           ),
         );
@@ -1723,6 +1848,30 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return slivers;
   }
 
+  /// A solid unityBlue pill with white ink for small labels that must sit on
+  /// the background image or on a gradient. White on unityBlue is 12.51:1.
+  Widget _buildSolidPill(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: BrandColors.unityBlue,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _rule, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: _ink),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(color: _ink, fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.2),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMemberCollectionSliver(List<Member> members, {double bottomPadding = 32}) {
     return SliverLayoutBuilder(
       builder: (context, constraints) {
@@ -1730,12 +1879,12 @@ class _MembersListScreenState extends State<MembersListScreen> {
         if (width < 600) {
           final itemCount = members.length * 2 - 1;
           return SliverPadding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
+            padding: EdgeInsets.fromLTRB(20, 0, 20, bottomPadding),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   if (index.isOdd) {
-                    return const SizedBox(height: 16);
+                    return const SizedBox(height: 20);
                   }
                   final itemIndex = index ~/ 2;
                   return _buildMemberCard(
@@ -1750,7 +1899,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
           );
         }
 
-        final horizontalPadding = width < 900 ? 16.0 : 24.0;
+        final horizontalPadding = width < 900 ? 20.0 : 24.0;
         return SliverPadding(
           padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, bottomPadding),
           sliver: SliverToBoxAdapter(
@@ -1808,13 +1957,30 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  Widget _buildAgedOutMembersPanel(ThemeData theme) {
-    return Card(
-      elevation: 1,
+  /// The ineligible drawer, restyled as a gradient card with the Slack header
+  /// idiom: icon tile, 18px title, 15px body, all full white. The row rule
+  /// under the header is a Border in white 0.15, never a Divider widget.
+  Widget _buildAgedOutMembersPanel() {
+    final radius = BorderRadius.circular(16);
+    return Container(
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Theme(
-        data: theme.copyWith(dividerColor: Colors.transparent),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: radius,
+        boxShadow: [
+          BoxShadow(
+            color: BrandColors.unityBlue.withValues(alpha: 0.28),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
         child: ExpansionTile(
           key: const PageStorageKey<String>('aged-out-members-tile'),
           initiallyExpanded: _showAgedOutMembers,
@@ -1823,18 +1989,33 @@ class _MembersListScreenState extends State<MembersListScreen> {
               _showAgedOutMembers = expanded;
             });
           },
+          // Border() on both shapes removes the theme divider lines the tile
+          // would otherwise paint; the rule below is drawn by hand instead.
+          shape: const Border(),
+          collapsedShape: const Border(),
+          iconColor: _ink,
+          collapsedIconColor: _ink,
+          textColor: _ink,
+          collapsedTextColor: _ink,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          leading: _buildIconTile(Icons.person_off_outlined),
           title: Text(
             'Ineligible Members (${_agedOutMembers.length})',
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: const TextStyle(color: _ink, fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: 0.2),
           ),
-          subtitle: Text(
-            'Members marked as ineligible are hidden from the main list.',
-            style: theme.textTheme.bodySmall,
+          subtitle: const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text(
+              'Members marked as ineligible are hidden from the main list.',
+              style: TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w400, height: 1.3),
+            ),
           ),
           children: [
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            Container(
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: _rowDivider, width: 1)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final width = constraints.maxWidth;
@@ -1842,7 +2023,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
                     return Column(
                       children: [
                         for (int i = 0; i < _agedOutMembers.length; i++) ...[
-                          if (i > 0) const SizedBox(height: 12),
+                          if (i > 0) const SizedBox(height: 20),
                           _buildMemberCard(_agedOutMembers[i], i, isMobile: true),
                         ],
                       ],
@@ -1858,19 +2039,36 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  Widget _buildChaptersSliver(ThemeData theme) {
+  /// The Slack page's signature square behind an icon. Solid unityBlue rather
+  /// than white-20% so the tile reads the same at every point on a gradient;
+  /// the white glyph on it is 12.51:1 and the glyph only needs 3:1.
+  Widget _buildIconTile(IconData icon, {double size = 40, double iconSize = 22}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: BrandColors.unityBlue,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _rule, width: 1),
+      ),
+      alignment: Alignment.center,
+      child: Icon(icon, color: _ink, size: iconSize),
+    );
+  }
+
+  Widget _buildChaptersSliver() {
     if (_filteredChapters.isEmpty) {
       return SliverFillRemaining(
         hasScrollBody: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           child: Align(
             alignment: Alignment.topCenter,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const SizedBox(height: 96),
-                _buildEmptyChaptersState(theme),
+                const SizedBox(height: 48),
+                _buildEmptyChaptersState(),
               ],
             ),
           ),
@@ -1880,12 +2078,12 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
     final itemCount = _filteredChapters.length * 2 - 1;
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) {
             if (index.isOdd) {
-              return const SizedBox(height: 16);
+              return const SizedBox(height: 24);
             }
             final itemIndex = index ~/ 2;
             return _buildChapterCard(_filteredChapters[itemIndex]);
@@ -1897,7 +2095,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   Widget _buildChapterCard(Chapter chapter) {
-    final theme = Theme.of(context);
     final chapterName = _cleanValue(chapter.chapterName) ?? 'Unnamed Chapter';
     final schoolName = _cleanValue(chapter.schoolName);
     final contactEmail = _cleanValue(chapter.contactEmail);
@@ -1918,117 +2115,142 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _buildMetaTag(Icons.calendar_month, 'Chartered ${_formatDate(chapter.charterDate!)}'),
     ];
 
-    final borderRadius = BorderRadius.circular(20);
+    final borderRadius = BorderRadius.circular(16);
 
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: borderRadius),
-      elevation: 1,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => _openChapter(chapter),
+    // Chapters share this screen with members, so they take the same gradient
+    // card rather than a themed Card that would be the one odd surface on the
+    // branded background.
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: BrandColors.tileGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: borderRadius,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                chapterName,
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              if (schoolName != null) ...[
-                const SizedBox(height: 4),
-                Text(schoolName, style: theme.textTheme.titleMedium),
-              ],
-              if (chips.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: chips,
+        boxShadow: [
+          BoxShadow(
+            color: BrandColors.unityBlue.withValues(alpha: 0.28),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openChapter(chapter),
+          borderRadius: borderRadius,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  chapterName,
+                  style: const TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.w800, height: 1.15),
                 ),
-              ],
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _buildStatTile(Icons.people_alt, '$memberCount members'),
-                  const SizedBox(width: 12),
-                  if (leaderCount > 0)
-                    _buildStatTile(Icons.emoji_events, '$leaderCount leaders'),
+                if (schoolName != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    schoolName,
+                    style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w500, height: 1.3),
+                  ),
                 ],
-              ),
-              if (contactEmail != null)
-                _buildChapterInfoRow(theme, Icons.email_outlined, contactEmail),
-              if (website != null) _buildChapterInfoRow(theme, Icons.link, website),
-            ],
+                if (chips.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: chips,
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    _buildStatTile(Icons.people_alt, '$memberCount members'),
+                    if (leaderCount > 0) _buildStatTile(Icons.emoji_events, '$leaderCount leaders'),
+                  ],
+                ),
+                if (contactEmail != null) _buildChapterInfoRow(Icons.email_outlined, contactEmail),
+                if (website != null) _buildChapterInfoRow(Icons.link, website),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  /// A count on a chapter card: solid unityBlue tile, white ink, 12.51:1.
   Widget _buildStatTile(IconData icon, String label) {
-    final theme = Theme.of(context);
-    final color = theme.colorScheme.primary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
+        color: BrandColors.unityBlue,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _rule, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 6),
+          Icon(icon, size: 18, color: _ink),
+          const SizedBox(width: 8),
           Text(
             label,
-            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w600),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildChapterInfoRow(ThemeData theme, IconData icon, String value) {
+  /// A contact line on a chapter card. Links are full white with an
+  /// underline for affordance; a tinted link colour would fail on the light
+  /// end of the gradient (sunriseGold on tileGradientEnd is 2.63:1).
+  Widget _buildChapterInfoRow(IconData icon, String value) {
     final uri = _parseChapterUri(value);
     final displayValue = uri != null && _isWebUrl(uri) ? _formatWebsiteLabel(uri) : value;
-    final textStyle = theme.textTheme.bodyMedium?.copyWith(
+    final textStyle = TextStyle(
+      color: _ink,
+      fontSize: 15,
+      fontWeight: FontWeight.w500,
+      height: 1.3,
       decoration: uri != null ? TextDecoration.underline : null,
-      color: uri != null ? theme.colorScheme.primary : null,
+      decorationColor: _ink,
     );
 
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: uri != null ? () => launchUrl(uri, mode: LaunchMode.externalApplication) : null,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 18, color: theme.colorScheme.primary),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                displayValue,
-                style: textStyle,
-              ),
+      padding: const EdgeInsets.only(top: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: uri != null ? () => launchUrl(uri, mode: LaunchMode.externalApplication) : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, size: 18, color: _ink),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    displayValue,
+                    style: textStyle,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildMetaTag(IconData icon, String label) {
-    final theme = Theme.of(context);
-    return Chip(
-      avatar: Icon(icon, size: 16, color: theme.colorScheme.primary),
-      label: Text(label),
-      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
-      labelStyle: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-    );
-  }
+  Widget _buildMetaTag(IconData icon, String label) => _buildInfoChip(icon, label);
 
   void _openChapter(Chapter chapter) {
     Navigator.push(
@@ -2059,77 +2281,121 @@ class _MembersListScreenState extends State<MembersListScreen> {
     return '$host$path$query$fragment';
   }
 
+  /// A filter control in the Slack tab bar's idiom rather than a themed
+  /// FilterChip. Inactive: white ink and a white decorative border over the
+  /// gradient band, 4.59:1 or better at every point on the band. Active: a
+  /// SOLID sunriseGold fill with unityBlue ink, 7.17:1, so the ratio is a
+  /// property of the chip and not of where it lands on the gradient. A
+  /// translucent white fill was rejected: white text on white-20% over the
+  /// light end composites to #4997BC and measures 3.26:1.
   Widget _buildFilterChip({
     required String label,
     required bool selected,
     VoidCallback? onTap,
     IconData? icon,
+    bool expand = false,
   }) {
-    return FilterChip(
-      avatar: icon != null ? Icon(icon, size: 18) : null,
-      label: Text(label),
-      selected: selected,
-      onSelected: onTap == null ? null : (_) => onTap(),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-    );
-  }
+    final enabled = onTap != null;
+    final Color ink = selected ? BrandColors.unityBlue : _ink;
+    final Color fill = selected ? BrandColors.sunriseGold : Colors.transparent;
+    // A disabled control is the one place alpha on ink is allowed.
+    final Color effectiveInk = enabled ? ink : ink.withValues(alpha: 0.5);
+    final radius = BorderRadius.circular(10);
 
-  Widget _buildEmptyMembersState(ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(48.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.people_outline, size: 76, color: theme.colorScheme.primary.withValues(alpha: 0.25)),
-            const SizedBox(height: 16),
-            Text(
-              'No members match your filters',
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your filters or refreshing to see everyone in your database.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+    final content = Row(
+      mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 18, color: effectiveInk),
+          const SizedBox(width: 8),
+        ],
+        Text(
+          label,
+          style: TextStyle(
+            color: effectiveInk,
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+            letterSpacing: 0.2,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: radius,
+            border: selected ? null : Border.all(color: _rule, width: 1.2),
+          ),
+          child: content,
         ),
       ),
     );
   }
 
-  Widget _buildEmptyChaptersState(ThemeData theme) {
+  Widget _buildEmptyMembersState() {
+    return _buildEmptyState(
+      icon: Icons.people_outline,
+      title: 'No members match your filters',
+      body: 'Try adjusting your filters or refreshing to see everyone in your database.',
+    );
+  }
+
+  Widget _buildEmptyChaptersState() {
+    return _buildEmptyState(
+      icon: Icons.account_tree_outlined,
+      title: 'No chapters found',
+      body: 'Try adjusting your search or refresh to pull the latest chapter roster.',
+    );
+  }
+
+  /// An empty state is a gradient card like everything else here, because
+  /// theme ink on the background image is not legible. Title 18 w700 white,
+  /// body 15 w400 white, hierarchy by size and weight only.
+  Widget _buildEmptyState({required IconData icon, required String title, required String body}) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(48.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.account_tree_outlined, size: 76, color: theme.colorScheme.primary.withValues(alpha: 0.25)),
-            const SizedBox(height: 16),
-            Text(
-              'No chapters found',
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your search or refresh to pull the latest chapter roster.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: BrandedCard(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildIconTile(icon, size: 64, iconSize: 34),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _ink, fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: 0.2),
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                body,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w400, height: 1.4),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
+  /// One member on the list. The Slack card idiom: tileGradient topLeft to
+  /// bottomRight, radius 16, every readable run FULL WHITE, hierarchy by size
+  /// and weight, chips as solid fills. The card is still the tap target that
+  /// opens MemberDetailScreen; nothing about what it opens changed.
   Widget _buildMemberCard(Member member, int index, {required bool isMobile}) {
-    final theme = Theme.of(context);
     final isIneligible = member.membershipEligible == false;
     final gradient = isIneligible ? _ineligibleMemberCardGradient : _memberCardGradient;
     final phoneDisplay = _formatMemberPhone(member);
@@ -2146,267 +2412,159 @@ class _MembersListScreenState extends State<MembersListScreen> {
     final chapterPosition = _cleanValue(member.chapterPosition);
     final chapterAffiliation = _formatChapterAffiliation(member);
 
+    // Chips are SOLID fills so their ratio is a property of the chip, not of
+    // where it lands on the gradient: unityBlue with white ink is 12.51:1,
+    // sunriseGold with unityBlue ink is 7.17:1 and is the emphasis pair.
     final metaChips = <Widget>[];
+    if (isExecutive) {
+      metaChips.add(_buildExecutiveBadge());
+    }
     if (isIneligible) {
-      metaChips.add(
-        _buildInfoChip(
-          Icons.block,
-          'INELIGIBLE',
-          backgroundColor: Colors.white.withValues(alpha: 0.25),
-        ),
-      );
+      metaChips.add(_buildInfoChip(Icons.block, 'INELIGIBLE', emphasis: true));
     }
     if (districtLabel != null) {
-      metaChips.add(
-        _buildInfoChip(
-          Icons.account_balance,
-          districtLabel,
-          backgroundColor: Colors.white.withValues(alpha: 0.18),
-        ),
-      );
+      metaChips.add(_buildInfoChip(Icons.account_balance, districtLabel));
     }
     if (age != null) {
-      metaChips.add(
-        _buildInfoChip(
-          Icons.cake_outlined,
-          '$age yrs',
-          backgroundColor: Colors.white.withValues(alpha: 0.18),
-        ),
-      );
+      metaChips.add(_buildInfoChip(Icons.cake_outlined, '$age yrs'));
     }
     if (zodiac != null) {
-      metaChips.add(
-        _buildInfoChip(
-          Icons.auto_awesome,
-          zodiac,
-          backgroundColor: Colors.white.withValues(alpha: 0.18),
-        ),
-      );
+      metaChips.add(_buildInfoChip(Icons.auto_awesome, zodiac));
     }
-    final borderRadius = BorderRadius.circular(isMobile ? 16 : 24);
-    const textColor = Colors.white;
-    final detailIconColor = Colors.white.withValues(alpha: 0.92);
-    final detailTextStyle = (isMobile ? theme.textTheme.bodyMedium : theme.textTheme.bodyLarge)
-            ?.copyWith(color: textColor, fontWeight: FontWeight.w600, height: 1.3) ??
-        TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: isMobile ? 13.5 : 14.5);
 
-    final executiveTitleStyle = (isMobile ? theme.textTheme.titleSmall : theme.textTheme.titleMedium)
-            ?.copyWith(
-              color: Colors.white.withValues(alpha: 0.95),
-              fontWeight: FontWeight.w600,
-              height: 1.25,
-            ) ??
-        TextStyle(
-          color: Colors.white.withValues(alpha: 0.95),
-          fontWeight: FontWeight.w600,
-          fontSize: isMobile ? 15 : 17,
-          height: 1.25,
-        );
-    final executiveRoleStyle = (isMobile ? theme.textTheme.bodySmall : theme.textTheme.bodyMedium)
-            ?.copyWith(
-              color: Colors.white.withValues(alpha: 0.82),
-              fontWeight: FontWeight.w500,
-              height: 1.2,
-            ) ??
-        TextStyle(
-          color: Colors.white.withValues(alpha: 0.82),
-          fontWeight: FontWeight.w500,
-          fontSize: isMobile ? 12 : 13,
-          height: 1.2,
-        );
-    final chapterPositionStyle = (isMobile ? theme.textTheme.titleSmall : theme.textTheme.titleMedium)
-            ?.copyWith(
-              color: Colors.white.withValues(alpha: 0.9),
-              fontWeight: FontWeight.w600,
-              height: 1.22,
-            ) ??
-        TextStyle(
-          color: Colors.white.withValues(alpha: 0.9),
-          fontWeight: FontWeight.w600,
-          fontSize: isMobile ? 14.5 : 16,
-          height: 1.22,
-        );
-    final chapterAffiliationStyle = (isMobile ? theme.textTheme.bodySmall : theme.textTheme.bodyMedium)
-            ?.copyWith(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontWeight: FontWeight.w500,
-              height: 1.18,
-            ) ??
-        TextStyle(
-          color: Colors.white.withValues(alpha: 0.8),
-          fontWeight: FontWeight.w500,
-          fontSize: isMobile ? 12.5 : 13.5,
-          height: 1.18,
-        );
+    final borderRadius = BorderRadius.circular(16);
+
+    // Type scale on the card. Name is the headline. Titles and roles are
+    // distinguished from each other by size and weight, never by alpha.
+    final nameStyle = TextStyle(
+      color: _ink,
+      fontSize: isMobile ? 22 : 24,
+      fontWeight: FontWeight.w800,
+      height: 1.15,
+      letterSpacing: -0.2,
+    );
+    const roleTitleStyle = TextStyle(
+      color: _ink,
+      fontSize: 15,
+      fontWeight: FontWeight.w700,
+      height: 1.3,
+      letterSpacing: 0.2,
+    );
+    const roleDetailStyle = TextStyle(
+      color: _ink,
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+      height: 1.3,
+    );
 
     final dialable = _dialableNumber(member);
     final detailLines = <Widget>[
+      _buildDetailLine(Icons.map_outlined, county ?? '-'),
       _buildDetailLine(
         Icons.phone,
         phoneDisplay ?? '-',
-        iconColor: detailIconColor,
-        textStyle: detailTextStyle,
         onTap: dialable == null ? null : () => _dialMember(member),
         semanticsLabel: dialable == null ? null : 'Call ${member.name} at ${phoneDisplay ?? dialable}',
       ),
-    ];
-    if (emailDisplay != null) {
-      detailLines.add(
-        _buildDetailLine(
-          Icons.email_outlined,
-          emailDisplay,
-          iconColor: detailIconColor,
-          textStyle: detailTextStyle,
-        ),
-      );
-    }
-    detailLines.insert(
-      0,
-      _buildDetailLine(
-        Icons.map_outlined,
-        county ?? '-',
-        iconColor: detailIconColor,
-        textStyle: detailTextStyle,
-      ),
-    );
-    detailLines.add(
+      if (emailDisplay != null) _buildDetailLine(Icons.email_outlined, emailDisplay),
       _buildDetailLine(
         Icons.calendar_month,
         'Joined ${joinedDate != null ? _formatDate(joinedDate) : '-'}',
-        iconColor: detailIconColor,
-        textStyle: detailTextStyle,
-      ),
-    );
-
-    final columnChildren = <Widget>[
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildProfileAvatar(member, isMobile: isMobile),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        member.name,
-                        style: (isMobile ? theme.textTheme.titleMedium : theme.textTheme.titleLarge)
-                                ?.copyWith(fontWeight: FontWeight.w700, color: textColor) ??
-                            TextStyle(fontWeight: FontWeight.w700, color: textColor, fontSize: isMobile ? 18 : 22),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        softWrap: false,
-                      ),
-                    ),
-                    if (member.optOut)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12, vertical: isMobile ? 4 : 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.28),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: const Text(
-                            'Opted Out',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                if (!isExecutive && chapterPosition != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    chapterPosition,
-                    style: chapterPositionStyle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (chapterAffiliation != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      chapterAffiliation,
-                      style: chapterAffiliationStyle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-                if (isExecutive) ...[
-                  const SizedBox(height: 6),
-                  if (executiveTitle != null)
-                    Text(
-                      executiveTitle,
-                      style: executiveTitleStyle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  if (rawExecutiveRole != null && rawExecutiveRole.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      rawExecutiveRole,
-                      style: executiveRoleStyle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ],
-            ),
-          ),
-        ],
       ),
     ];
 
-    if (metaChips.isNotEmpty) {
-      columnChildren.addAll([
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: metaChips,
+    final header = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildProfileAvatar(member),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      member.name,
+                      style: nameStyle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (member.optOut)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8, top: 2),
+                      child: _buildInfoChip(Icons.do_not_disturb_on_outlined, 'Opted Out'),
+                    ),
+                ],
+              ),
+              if (!isExecutive && chapterPosition != null) ...[
+                const SizedBox(height: 6),
+                Text(chapterPosition, style: roleTitleStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                if (chapterAffiliation != null) ...[
+                  const SizedBox(height: 2),
+                  Text(chapterAffiliation, style: roleDetailStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ],
+              if (isExecutive) ...[
+                const SizedBox(height: 6),
+                if (executiveTitle != null)
+                  Text(executiveTitle, style: roleTitleStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                if (rawExecutiveRole != null && rawExecutiveRole.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(rawExecutiveRole, style: roleDetailStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ],
+            ],
+          ),
         ),
-      ]);
-    }
-
-    if (detailLines.isNotEmpty) {
-      columnChildren.add(const SizedBox(height: 14));
-      columnChildren.addAll(detailLines);
-    }
-
-    final gradientBackground = LinearGradient(
-      colors: gradient,
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
+      ],
     );
 
+    final columnChildren = <Widget>[
+      header,
+      if (metaChips.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        Wrap(spacing: 8, runSpacing: 8, children: metaChips),
+      ],
+      const SizedBox(height: 16),
+      // Field rows separated by a hand drawn rule in white 0.15, never by
+      // translucent row fills and never by the Divider widget.
+      Container(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: _rowDivider, width: 1)),
+        ),
+        padding: const EdgeInsets.only(top: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: detailLines,
+        ),
+      ),
+    ];
+
+    // Executives get a solid sunriseGold edge. It is a decorative rule, not
+    // text, so it needs no ratio; the ring on the avatar is the same gold.
     final BoxBorder? accentBorder = isExecutive
-        ? Border.all(
-            color: _executiveAccentColor.withValues(alpha: 0.65),
-            width: isMobile ? 1.4 : 1.8,
-          )
+        ? Border.all(color: BrandColors.sunriseGold, width: isMobile ? 1.5 : 2)
         : null;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
-        gradient: gradientBackground,
+        gradient: LinearGradient(
+          colors: gradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: borderRadius,
         boxShadow: [
           BoxShadow(
-            color: gradient.last.withValues(alpha: 0.28),
+            color: gradient.first.withValues(alpha: 0.28),
             blurRadius: isMobile ? 16 : 24,
-            offset: const Offset(0, 12),
+            offset: const Offset(0, 10),
           ),
         ],
         border: accentBorder,
@@ -2417,10 +2575,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
           borderRadius: borderRadius,
           onTap: () => _openMember(member),
           child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 16 : 24,
-              vertical: isMobile ? 16 : 24,
-            ),
+            padding: EdgeInsets.all(isMobile ? 20 : 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2432,173 +2587,101 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  Widget _buildExecutiveBadge({required bool isMobile}) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 12, vertical: isMobile ? 4 : 6),
-      decoration: BoxDecoration(
-        color: _executiveAccentColor.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: _executiveAccentColor.withValues(alpha: 0.7), width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.workspace_premium_outlined, size: isMobile ? 14 : 16, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(
-            'Executive',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: isMobile ? 11 : 12.5,
-              letterSpacing: 0.2,
-            ),
-          ),
-        ],
-      ),
-    );
+  /// The emphasis pair: solid sunriseGold with unityBlue ink and glyph,
+  /// 7.17:1. Sits first in the chip row on an executive's card.
+  Widget _buildExecutiveBadge() {
+    return _buildInfoChip(Icons.workspace_premium_outlined, 'Executive', emphasis: true);
   }
 
-  Widget _buildProfileAvatar(Member member, {required bool isMobile}) {
-    final double size = isMobile ? 56 : 72;
-    // The one resolver: uploaded avatar first, then profile_pictures. The
-    // execs have no avatar_url at all, so anything narrower shows initials.
-    final String? photoUrl = member.effectiveAvatarUrl;
-    final borderColor = Colors.white.withValues(alpha: 0.35);
-
-    Widget buildFallback() {
-      // An opaque unityBlue disc keeps the initials at 12.51:1 wherever the
-      // card gradient happens to be behind it. The off-brand gradient this
-      // replaces bottomed out at 4.18:1 on its light end.
-      return Container(
-        width: size,
-        height: size,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: BrandColors.unityBlue,
-        ),
-        child: Center(
-          child: Text(
-            CorsAwareAvatar.initialsOf(member.name),
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: size * 0.38,
-            ),
-          ),
-        ),
-      );
-    }
-
-    Widget content;
-    if (photoUrl != null && photoUrl.isNotEmpty) {
-      final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
-      final cacheSize = math.max(1, (size * devicePixelRatio).round());
-
-      content = ClipOval(
-        child: CachedNetworkImage(
-          imageUrl: photoUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          memCacheWidth: cacheSize,
-          memCacheHeight: cacheSize,
-          fadeInDuration: const Duration(milliseconds: 200),
-          fadeOutDuration: const Duration(milliseconds: 200),
-          placeholder: (context, url) => Container(
-            width: size,
-            height: size,
-            color: Colors.black.withValues(alpha: 0.1),
-            child: Center(
-              child: SizedBox(
-                width: size * 0.4,
-                height: size * 0.4,
-                child: const CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
-                ),
-              ),
-            ),
-          ),
-          errorWidget: (context, url, error) => buildFallback(),
-        ),
-      );
-    } else {
-      content = buildFallback();
-    }
-
+  /// The member's photo through the one resolver, Member.effectiveAvatarUrl,
+  /// inside a 2px sunriseGold ring. CorsAwareAvatar owns the fallback: an
+  /// opaque unityBlue disc with white initials, 12.51:1 wherever the card
+  /// gradient happens to sit behind it. The ring is decorative, so gold on
+  /// the gradient needs no ratio.
+  Widget _buildProfileAvatar(Member member) {
+    const double radius = 32;
     return Container(
-      width: size,
-      height: size,
+      padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: borderColor, width: 2),
+        border: Border.all(color: BrandColors.sunriseGold, width: 2),
       ),
-      child: content,
+      child: CorsAwareAvatar(
+        imageUrl: member.effectiveAvatarUrl,
+        radius: radius,
+        backgroundColor: BrandColors.unityBlue,
+        fallbackText: member.name,
+      ),
     );
   }
 
-  Widget _buildInfoChip(IconData icon, String label,
-      {Color? backgroundColor, Color? iconColor, Color? textColor}) {
+  /// A pill carrying text on a gradient card. Default is a solid unityBlue
+  /// fill with white ink, 12.51:1; [emphasis] is a solid sunriseGold fill
+  /// with unityBlue ink, 7.17:1. The 1px white 0.35 edge is decorative and
+  /// keeps the unityBlue pill visible over the navy end of the gradient.
+  Widget _buildInfoChip(IconData icon, String label, {bool emphasis = false}) {
+    final Color fill = emphasis ? BrandColors.sunriseGold : BrandColors.unityBlue;
+    final Color ink = emphasis ? BrandColors.unityBlue : _ink;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
+        color: fill,
+        borderRadius: BorderRadius.circular(10),
+        border: emphasis ? null : Border.all(color: _rule, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: iconColor ?? Colors.white),
+          Icon(icon, size: 16, color: ink),
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(color: textColor ?? Colors.white, fontWeight: FontWeight.w500),
+            style: TextStyle(color: ink, fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 0.2),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDetailLine(IconData icon, String value,
-      {Color? iconColor, TextStyle? textStyle, VoidCallback? onTap, String? semanticsLabel}) {
+  /// One field line on a member card: white glyph, 15px w500 white value.
+  Widget _buildDetailLine(IconData icon, String value, {VoidCallback? onTap, String? semanticsLabel}) {
+    const valueStyle = TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w500, height: 1.3);
     final row = Row(
-      crossAxisAlignment: onTap == null ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Icon(icon, size: 18, color: iconColor ?? Colors.white),
-        const SizedBox(width: 8),
+        Icon(icon, size: 18, color: _ink),
+        const SizedBox(width: 10),
         Expanded(
           child: Text(
             value,
-            style: textStyle ??
-                const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            style: valueStyle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             softWrap: false,
           ),
         ),
-        if (onTap != null)
-          Icon(Icons.call, size: 16, color: iconColor ?? Colors.white),
+        if (onTap != null) const Icon(Icons.call, size: 16, color: _ink),
       ],
     );
 
     if (onTap == null) {
-      return Padding(padding: const EdgeInsets.only(bottom: 8), child: row);
+      return Padding(padding: const EdgeInsets.symmetric(vertical: 7), child: row);
     }
 
     // A tappable line inside a card that is ALSO tappable, so the InkWell has to
     // be here rather than on the text: without it the tap opens the profile.
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Semantics(
-        label: semanticsLabel,
-        button: true,
-        excludeSemantics: true,
+    return Semantics(
+      label: semanticsLabel,
+      button: true,
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
             constraints: const BoxConstraints(minHeight: 44),
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: row,
           ),
         ),
