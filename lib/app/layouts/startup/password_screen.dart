@@ -208,7 +208,20 @@ class _SupabaseAuthGateState extends State<SupabaseAuthGate> with WidgetsBinding
       final expired = await _sessionService.isSessionExpired();
       if (expired) {
         debugPrint('Session expired on bootstrap - signing out');
-        await client.auth.signOut();
+        // gotrue swallows 401, 403 and 404 from the logout POST, but it
+        // rethrows everything else: a network or CORS failure arrives as
+        // AuthRetryableFetchException with a null statusCode, and so does any
+        // 5xx. Letting that escape would skip every line below, including the
+        // one that clears _isCheckingSession, and pin this screen on its
+        // loading state for good. gotrue has already dropped the local session
+        // before it makes that call, so there is nothing left to salvage by
+        // failing here. The request itself is still reported by
+        // SentryHttpClient, which is where it belongs.
+        try {
+          await client.auth.signOut();
+        } catch (error) {
+          debugPrint('Sign-out on expired session failed, continuing: $error');
+        }
         await _sessionService.clearSession();
         hasSession = false;
         if (mounted) {
