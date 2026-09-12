@@ -198,6 +198,19 @@ async function fetchBill(openstatesBillId) {
 // present. A NULL in either column is distinct as far as a unique constraint is
 // concerned, so Postgres stores those rows happily and dropping them here would
 // silently lose data that the old code kept.
+// Open States sends "" for a date it does not have, not null. PostgREST feeds
+// the payload through json_to_record with these columns typed `date`, and
+// Postgres rejects an empty string with `invalid input syntax for type date: ""`.
+// The insert is thrown away whole, so a bill document with no date was not
+// saved with a null date, it was not saved at all. None of these writes check
+// their error, so it failed silently: 1184 rejections in fourteen days, several
+// a second, and nothing upstream noticed.
+function toDate(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const s = String(value).trim();
+  return s === "" ? null : s;
+}
+
 function dedupeSponsorRecords(records: any[]): any[] {
   const seen = new Set();
   const deduped = [];
@@ -267,13 +280,13 @@ async function syncSingleBill(trackedBill) {
         relation_type: rb.relation_type
       })) || [],
     // Timeline dates
-    first_action_date: bill.first_action_date,
-    latest_action_date: bill.latest_action_date,
+    first_action_date: toDate(bill.first_action_date),
+    latest_action_date: toDate(bill.latest_action_date),
     latest_action_description: bill.latest_action_description,
-    latest_passage_date: bill.latest_passage_date,
+    latest_passage_date: toDate(bill.latest_passage_date),
     // Open States timestamps
-    openstates_created_at: bill.created_at,
-    openstates_updated_at: bill.updated_at,
+    openstates_created_at: toDate(bill.created_at),
+    openstates_updated_at: toDate(bill.updated_at),
     // External links
     openstates_url: bill.openstates_url,
     sources: bill.sources || [],
@@ -491,12 +504,12 @@ async function syncSingleBill(trackedBill) {
     for (const version of bill.versions){
       const { data: existing } = await supabase.from("legislation_bill_documents").select("id").eq("bill_id", trackedBill.id).eq("document_type", "version").eq("note", version.note).maybeSingle();
       if (!existing) {
-        await supabase.from("legislation_bill_documents").insert({
+        const { error: versionInsertError } = await supabase.from("legislation_bill_documents").insert({
           bill_id: trackedBill.id,
           openstates_document_id: version.id,
           document_type: "version",
           note: version.note,
-          document_date: version.date,
+          document_date: toDate(version.date),
           classification: version.classification,
           links: version.links?.map((l)=>({
               url: l.url,
@@ -506,7 +519,11 @@ async function syncSingleBill(trackedBill) {
           primary_media_type: version.links?.[0]?.media_type || null,
           is_new: true
         });
-        newDocumentsCount++;
+        if (versionInsertError) {
+          console.error(`[openstates] version document insert failed for bill ${trackedBill.id}: ${versionInsertError.message}`);
+        } else {
+          newDocumentsCount++;
+        }
       }
     }
   }
@@ -514,12 +531,12 @@ async function syncSingleBill(trackedBill) {
     for (const doc of bill.documents){
       const { data: existing } = await supabase.from("legislation_bill_documents").select("id").eq("bill_id", trackedBill.id).eq("document_type", "document").eq("note", doc.note).maybeSingle();
       if (!existing) {
-        await supabase.from("legislation_bill_documents").insert({
+        const { error: docInsertError } = await supabase.from("legislation_bill_documents").insert({
           bill_id: trackedBill.id,
           openstates_document_id: doc.id,
           document_type: "document",
           note: doc.note,
-          document_date: doc.date,
+          document_date: toDate(doc.date),
           classification: doc.classification,
           links: doc.links?.map((l)=>({
               url: l.url,
@@ -529,7 +546,11 @@ async function syncSingleBill(trackedBill) {
           primary_media_type: doc.links?.[0]?.media_type || null,
           is_new: true
         });
-        newDocumentsCount++;
+        if (docInsertError) {
+          console.error(`[openstates] document insert failed for bill ${trackedBill.id}: ${docInsertError.message}`);
+        } else {
+          newDocumentsCount++;
+        }
       }
     }
   }
