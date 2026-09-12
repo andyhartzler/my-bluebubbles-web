@@ -114,9 +114,32 @@ async function plaidRequest(endpoint: string, body: Record<string, unknown>) {
   });
   const data = await resp.json();
   if (!resp.ok) {
-    throw new Error(`Plaid API error: ${data.error_message ?? data.error_code ?? resp.statusText}`);
+    // Keep Plaid's machine readable code on the error. Callers need to tell
+    // "this bank connection needs a human to log in again", which is permanent
+    // until someone acts, apart from a timeout, which is not.
+    const err = new Error(`Plaid API error: ${data.error_message ?? data.error_code ?? resp.statusText}`) as
+      Error & { plaidErrorCode?: string };
+    err.plaidErrorCode = data.error_code;
+    throw err;
   }
   return data;
+}
+
+// Best effort alert. A failed alert must never change the outcome of the thing
+// it reports on.
+async function alertTelegram(text: string): Promise<void> {
+  try {
+    const token = Deno.env.get("TELEGRAM_ALERT_BOT_TOKEN");
+    const chatId = Deno.env.get("TELEGRAM_ALERT_CHAT_ID");
+    if (!token || !chatId) return;
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    });
+  } catch (e) {
+    console.error("[plaid] telegram alert failed:", String((e as Error)?.message ?? e));
+  }
 }
 
 serve(async (req) => {
@@ -229,10 +252,14 @@ serve(async (req) => {
       // ── Sync Transactions ──
       case "sync_transactions": {
         // Get all active Plaid connections
+        // needs_reauth is included deliberately. The flag is set below when the
+        // bank asks for a fresh login, and the only thing that should clear it
+        // is a sync that actually works, so a repaired link heals itself on the
+        // next run rather than needing someone to remember to flip a column.
         const { data: connections } = await supabase
           .from("plaid_connections")
           .select("*")
-          .eq("status", "active");
+          .in("status", ["active", "needs_reauth"]);
 
         if (!connections?.length) {
           return new Response(
@@ -248,10 +275,13 @@ serve(async (req) => {
         let totalModified = 0;
         let totalRemoved = 0;
 
+        const failures: { institution: string; reason: string }[] = [];
+
         for (const conn of connections) {
           let hasMore = true;
           let cursor = conn.cursor ?? "";
 
+          try {
           while (hasMore) {
             const data = await plaidRequest("/transactions/sync", {
               access_token: conn.access_token,
@@ -333,23 +363,56 @@ serve(async (req) => {
             cursor = data.next_cursor;
           }
 
-          // Save cursor for next sync
+          // Save cursor for next sync. Reaching here means the bank answered,
+          // so this also clears a needs_reauth flag from a previous run.
           await supabase
             .from("plaid_connections")
             .update({
               cursor: cursor,
+              status: "active",
               last_synced_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             })
             .eq("id", conn.id);
+          } catch (e) {
+            // One dead bank link must not abort the others, and it must not
+            // leave the row claiming to be healthy. Before this, the throw went
+            // straight out of the handler: the whole run 500'd, the row kept
+            // saying "active", and the only trace was a Sentry event nobody was
+            // watching. UMB sat unsynced for 139 days that way.
+            const code = (e as { plaidErrorCode?: string }).plaidErrorCode;
+            const needsLogin = code === "ITEM_LOGIN_REQUIRED" || code === "ITEM_ERROR";
+            const reason = (e as Error).message;
+            console.error(`[plaid] sync failed for ${conn.institution_name}: ${code ?? "unknown"} ${reason}`);
+            failures.push({ institution: conn.institution_name, reason });
+
+            if (needsLogin) {
+              // Only a person can fix this, so say so rather than retrying
+              // silently every morning for months.
+              if (conn.status !== "needs_reauth") {
+                await alertTelegram(
+                  `Plaid: ${conn.institution_name} needs to be reconnected.\n` +
+                  `The bank is asking for a fresh login, so transactions have stopped importing. ` +
+                  `Reconnect it with Plaid Link update mode. Nothing else will fix it.`
+                );
+              }
+              await supabase
+                .from("plaid_connections")
+                .update({ status: "needs_reauth", updated_at: new Date().toISOString() })
+                .eq("id", conn.id);
+            }
+          }
         }
 
         return new Response(
           JSON.stringify({
-            success: true,
+            // A run that could not reach a bank is not a success, and the cron
+            // should be able to tell without reading a log.
+            success: failures.length === 0,
             added: totalAdded,
             modified: totalModified,
             removed: totalRemoved,
+            failures,
           }),
           {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
