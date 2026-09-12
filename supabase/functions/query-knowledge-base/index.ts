@@ -718,12 +718,20 @@ Return ONLY valid JSON. Return empty arrays if nothing notable to extract.`;
     // Store session memories
     if (sessionId && memories.session_memories?.length > 0) {
       for (const mem of memories.session_memories.slice(0, 3)){
-        await supabase.from('ai_session_memory').insert({
+        // The .catch() that used to hang off this insert defended nothing.
+        // A PostgrestBuilder is thenable, and it RESOLVES with { data, error }
+        // on a database failure rather than rejecting, so .catch() only ever
+        // saw a transport level rejection and every row level error was
+        // dropped on the floor. Read the returned error instead.
+        const { error: sessionMemError } = await supabase.from('ai_session_memory').insert({
           session_id: sessionId,
           memory_type: 'context',
           content: mem,
           expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-        }).catch((err)=>console.error('Session memory insert error:', err));
+        });
+        if (sessionMemError) {
+          console.error(`[query-knowledge-base] Session memory insert failed for session ${sessionId}:`, sessionMemError.message);
+        }
       }
     }
     // Store user memories
@@ -1791,8 +1799,21 @@ serve(async (req)=>{
     console.log(`Tokens: ${inputTokens} in / ${outputTokens} out`);
     // Step 10: Save session messages
     if (sessionId) {
+      // This whole block used to be try { await supabase... } catch. That catch
+      // could never fire, because supabase-js returns { data, error } and does
+      // not throw, so the transcript save looked defended and was not. Each
+      // call now reads its own returned error. Nothing here is rethrown: the
+      // user already has their answer, and losing the transcript must not turn
+      // a good response into a 500.
+      //
+      // The try arm is NOT decoration and must not be flattened back into a bare
+      // block. The per call { error } checks below cover database failures;
+      // supabase-js REJECTS on a transport failure, and this whole section sits
+      // inside the handler try whose catch returns HTTP 500. Without this arm a
+      // dropped connection while saving the transcript would throw away a fully
+      // generated answer the user had already paid for.
       try {
-        await supabase.from("knowledge_chat_messages").insert([
+        const { error: messagesError } = await supabase.from("knowledge_chat_messages").insert([
           {
             session_id: sessionId,
             role: "user",
@@ -1816,19 +1837,33 @@ serve(async (req)=>{
             }
           }
         ]);
-        const { count } = await supabase.from("knowledge_chat_messages").select("*", {
-          count: "exact",
-          head: true
-        }).eq("session_id", sessionId);
-        if (count === 2) {
-          const title = query.length > 50 ? query.slice(0, 47) + '...' : query;
-          await supabase.from("knowledge_chat_sessions").update({
-            title,
-            updated_at: new Date().toISOString()
-          }).eq("id", sessionId);
+        if (messagesError) {
+          console.error(`[query-knowledge-base] Failed to save chat messages for session ${sessionId}:`, messagesError.message);
+        } else {
+          const { count, error: countError } = await supabase.from("knowledge_chat_messages").select("*", {
+            count: "exact",
+            head: true
+          }).eq("session_id", sessionId);
+          if (countError) {
+            console.error(`[query-knowledge-base] Failed to count chat messages for session ${sessionId}:`, countError.message);
+          } else if (count === 2) {
+            const title = query.length > 50 ? query.slice(0, 47) + '...' : query;
+            // Filtered update, so the error alone is not enough. PostgREST
+            // treats a zero row match as a success, and a session that never
+            // gets its title stays labelled "New chat" in the sidebar forever.
+            const { error: titleError, count: titleCount } = await supabase.from("knowledge_chat_sessions").update({
+              title,
+              updated_at: new Date().toISOString()
+            }, {
+              count: "exact"
+            }).eq("id", sessionId);
+            if (titleError || titleCount !== 1) {
+              console.error(`[query-knowledge-base] Failed to set title on chat session ${sessionId} (rows matched: ${titleCount}):`, titleError?.message ?? "no row matched");
+            }
+          }
         }
       } catch (sessionError) {
-        console.error("Session save error:", sessionError);
+        console.error("[query-knowledge-base] Session save rejected:", sessionError);
       }
     }
     // Step 11: Extract and store memories (async)

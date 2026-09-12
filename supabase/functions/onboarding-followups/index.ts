@@ -70,6 +70,56 @@ interface TaskRow {
   } | null;
 }
 
+// ---------------------------------------------------------------------------
+// writeTask: the only way this function is allowed to touch onboarding_tasks.
+//
+// supabase-js resolves with { data, error } and never throws, so every bare
+// `await supabase.from("onboarding_tasks").update(...)` in here used to throw
+// its failure away and let the loop report the task as handled. There is a
+// second, quieter half: an UPDATE filtered by id that matches ZERO rows is not
+// an error either, so checking `error` alone still cannot see a row that was
+// deleted or an id that no longer exists. { count: "exact" } is what makes the
+// rowcount observable.
+//
+// This matters more here than almost anywhere else, because these writes are
+// the only thing that marks work as finished. If one is lost after a reminder
+// email has already gone out, the next cron run (10 minutes later) sends that
+// same member the same email, and so does every run after that, forever. So the
+// log line for that case names the member and says what will repeat.
+// ---------------------------------------------------------------------------
+async function writeTask(
+  supabase: ReturnType<typeof createClient>,
+  taskId: string,
+  patch: Record<string, unknown>,
+  ctx: { taskType: string; memberId: string | null; email: string; alreadyDid: string | null },
+): Promise<{ ok: true } | { ok: false; detail: string }> {
+  const { error, count } = await supabase
+    .from("onboarding_tasks")
+    .update(patch, { count: "exact" })
+    .eq("id", taskId);
+  const who = `task=${taskId} type=${ctx.taskType} member=${ctx.memberId ?? "none"} email=${ctx.email || "none"}`;
+  if (error || count === 0) {
+    const reason = error ? error.message : "id filter matched 0 rows";
+    if (ctx.alreadyDid) {
+      // Loud on purpose: the side effect has already happened and the next run
+      // will repeat it. A human has to see this line and stop it.
+      console.error(
+        `[onboarding-followups] REPEAT-SEND RISK: already ${ctx.alreadyDid}, but could not mark the task done, so the next run WILL do it again. ${who} reason=${reason}`,
+      );
+    } else {
+      console.error(`[onboarding-followups] task write failed ${JSON.stringify(patch)}. ${who} reason=${reason}`);
+    }
+    return { ok: false, detail: `write ${JSON.stringify(patch)} failed: ${reason}` };
+  }
+  if (count == null) {
+    // Not a failure: the write reported no error. Logged anyway, because it
+    // means the rowcount assertion above could not be evaluated on this deploy,
+    // and that assertion is the only thing watching a zero-row write.
+    console.warn(`[onboarding-followups] rowcount unavailable, could not assert the write landed. ${who}`);
+  }
+  return { ok: true };
+}
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -129,7 +179,8 @@ Deno.serve(async (req) => {
     const log: Record<string, unknown> = { task: t.id, type: t.task_type, member: t.member_id, mode };
 
     if (!email || !EMAIL_RE.test(email)) {
-      await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
+      const bkNoEmail = await writeTask(supabase, t.id, { done: true, attempts }, { taskType: t.task_type, memberId: t.member_id, email, alreadyDid: null });
+      if (!bkNoEmail.ok) log.bookkeeping = bkNoEmail.detail;
       log.result = "no valid email, closed";
       results.push(log);
       continue;
@@ -178,16 +229,21 @@ Deno.serve(async (req) => {
           const g = await addMemberToGroup(email, group);
           groups.push(`${group}:${g.action}${g.scopeError ? "(SCOPE_ERROR client-114261141581576499255)" : ""}`);
         }
-        await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
+        // The Slack invites and Google Group adds above have already been made.
+        // A lost "done" here replays all of them on the next run.
+        const bkSynced = await writeTask(supabase, t.id, { done: true, attempts }, { taskType: t.task_type, memberId: t.member_id, email, alreadyDid: "invited this member to the Slack channels" });
+        if (!bkSynced.ok) log.bookkeeping = bkSynced.detail;
         log.result = "in Slack, invited + done";
         log.invites = invited;
         if (groups.length) log.group_adds = groups;
       } else if (attempts >= MAX_SYNC_ATTEMPTS) {
-        await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
+        const bkGaveUp = await writeTask(supabase, t.id, { done: true, attempts }, { taskType: t.task_type, memberId: t.member_id, email, alreadyDid: null });
+        if (!bkGaveUp.ok) log.bookkeeping = bkGaveUp.detail;
         log.result = `not joined after ${attempts} polls, gave up`;
       } else {
         const next = new Date(Date.now() + SYNC_RETRY_MINUTES * 60_000).toISOString();
-        await supabase.from("onboarding_tasks").update({ attempts, run_after: next }).eq("id", t.id);
+        const bkReschedule = await writeTask(supabase, t.id, { attempts, run_after: next }, { taskType: t.task_type, memberId: t.member_id, email, alreadyDid: null });
+        if (!bkReschedule.ok) log.bookkeeping = bkReschedule.detail;
         log.result = mode === "live" ? "not joined yet, reschedule" : `${mode}: no Slack write, reschedule`;
       }
       results.push(log);
@@ -196,7 +252,8 @@ Deno.serve(async (req) => {
 
     if (t.task_type === "slack_join_reminder") {
       if (mode === "live" && inSlack) {
-        await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
+        const bkAlreadyIn = await writeTask(supabase, t.id, { done: true, attempts }, { taskType: t.task_type, memberId: t.member_id, email, alreadyDid: null });
+        if (!bkAlreadyIn.ok) log.bookkeeping = bkAlreadyIn.detail;
         log.result = "already in Slack, no reminder needed";
         results.push(log);
         continue;
@@ -216,10 +273,16 @@ Deno.serve(async (req) => {
           html: built.html, text: built.text, threadId: meta.thread_id ?? null,
           from: built.from, replyTo: built.replyTo,
         });
-        await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
+        // THE SPAM GUARD. The reminder is in the member's inbox by this line.
+        // This write is the only thing standing between them and the same
+        // email again in 10 minutes, and again after that. It is also the one
+        // write in this file whose failure cannot be undone by a later run.
+        const bkSent = await writeTask(supabase, t.id, { done: true, attempts }, { taskType: t.task_type, memberId: t.member_id, email, alreadyDid: `sent the ${variant} reminder email to ${recipient}` });
+        if (!bkSent.ok) log.bookkeeping = bkSent.detail;
         log.result = `${mode.toUpperCase()}: sent ${variant} reminder to ${recipient} [msg ${sent.id}]`;
       } catch (e) {
-        await supabase.from("onboarding_tasks").update({ attempts }).eq("id", t.id);
+        const bkRetry = await writeTask(supabase, t.id, { attempts }, { taskType: t.task_type, memberId: t.member_id, email, alreadyDid: null });
+        if (!bkRetry.ok) log.bookkeeping = bkRetry.detail;
         log.result = `send failed (will retry): ${String(e)}`;
       }
       results.push(log);
@@ -227,10 +290,15 @@ Deno.serve(async (req) => {
     }
 
     // Unknown task type, close it so it doesn't loop forever.
-    await supabase.from("onboarding_tasks").update({ done: true, attempts }).eq("id", t.id);
+    const bkUnknown = await writeTask(supabase, t.id, { done: true, attempts }, { taskType: t.task_type, memberId: t.member_id, email, alreadyDid: null });
+    if (!bkUnknown.ok) log.bookkeeping = bkUnknown.detail;
     log.result = `unknown task_type '${t.task_type}', closed`;
     results.push(log);
   }
 
-  return json({ ok: true, mode, processed: results.length, results });
+  // A cron run is normally read as its summary line, so surface the count of
+  // failed bookkeeping writes there too. Each one is a task that will be
+  // redone on the next run, email and all.
+  const bookkeepingFailures = results.filter((r) => r.bookkeeping).length;
+  return json({ ok: true, mode, processed: results.length, bookkeeping_failures: bookkeepingFailures, results });
 });

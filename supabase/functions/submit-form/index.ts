@@ -1438,11 +1438,46 @@ function hasRealAnswers(data) {
   // Update submission to submitted (scoped to this session). Any prior status
   // other than 'submitted' (in_progress, or an erroneously-abandoned row) is
   // promoted forward here, so an active submit always wins over a stray abandon.
-  await supabase.from('form_submissions').update({
+  //
+  // WHY THE ERROR AND THE COUNT, AND NOT JUST A BARE AWAIT.
+  // supabase-js resolves with { data, error } and never throws, so the bare
+  // await this used to be discarded every failure and still answered the
+  // applicant success:true. There is a second, quieter half: this write is
+  // filtered by session_token, and a filtered UPDATE that matches ZERO rows is
+  // NOT an error, so checking error alone cannot see a token mismatch. That is
+  // the case that returns nothing at all. { count: 'exact' } is what makes the
+  // rowcount observable, and zero rows is a failure here because the id is a
+  // primary key: a successful submit always touches exactly one row.
+  // This is the live intake for membership, chartering and endorsement
+  // applications. A lost write means the person is told they applied and no one
+  // ever sees the application.
+  const { error: submitWriteError, count: submittedRows } = await supabase.from('form_submissions').update({
     data: mergedData,
     status: 'submitted',
     updated_at: new Date().toISOString()
+  }, {
+    count: 'exact'
   }).eq('id', submission_id).eq('session_token', session_token);
+  if (submitWriteError || submittedRows === 0) {
+    console.error(`[submit-form] SUBMIT WRITE FAILED, application NOT recorded: submission=${submission_id} form=${submission.form_id} rows=${submittedRows ?? 'unknown'} reason=${submitWriteError?.message ?? 'session_token filter matched 0 rows'}`);
+    // HTTP 200 with a discriminated body, the same shape the gates above use
+    // and the same one phone-signin uses. supabase-js and supabase_flutter both
+    // DISCARD the response body on any non-2xx, so a 500 would reach the form
+    // as a bare network error and the person would never learn what happened or
+    // what to do about it. Their answers are still on the row, so a retry that
+    // succeeds goes through unchanged.
+    return {
+      success: false,
+      code: 'SUBMIT_WRITE_FAILED',
+      error: 'We could not record your submission just now. Your answers are saved. Please try again shortly.'
+    };
+  }
+  if (submittedRows == null) {
+    // Not treated as a failure: the write reported no error. Logged anyway,
+    // because it means the rowcount assertion above could not be evaluated on
+    // this deploy, and that assertion is the only thing watching the filter.
+    console.error(`[submit-form] rowcount unavailable on submit write for submission=${submission_id}; could not assert the row was touched`);
+  }
   // If subscriber still has placeholder values, try to update from submission data
   if (submission.subscriber_id) {
     const { data: subscriber } = await supabase.from('subscribers').select('name, email, subscription_status').eq('id', submission.subscriber_id).single();

@@ -19,6 +19,22 @@ class SubscriberRepository {
 
   SupabaseClient get _writeClient => _supabase.client;
 
+  /// Page size and hard page cap for the two client-side facets below.
+  ///
+  /// PostgREST silently caps an unranged select at 1000 rows, and `subscribers`
+  /// holds roughly 73k of them, so both facets used to be computed from the
+  /// first 1000 rows: the source breakdown was wrong by about 98 percent, and
+  /// the county/state filter dropdowns silently omitted most of their options,
+  /// which makes a member in an unlisted county unfindable. There is no grouped
+  /// RPC for either facet on the legacy path, so they page explicitly.
+  ///
+  /// The cap exists so a table that grows unexpectedly cannot turn one stats
+  /// load into an unbounded scan on an exec's phone: we stop, say so, and
+  /// return what we have rather than hang. 200 pages is 200k rows, which is
+  /// ample headroom over today's 73k.
+  static const int _facetPageSize = 1000;
+  static const int _facetMaxPages = 200;
+
   Future<SubscriberFetchResult> fetchSubscribers({
     String? searchQuery,
     bool? subscribed,
@@ -62,8 +78,15 @@ class SubscriberRepository {
     // return a new builder (and promote the type from Filter → Transform).
     // Previously the returned builders were dropped on the floor, so every
     // subscriber fetch ran UNSORTED and UNPAGINATED against the full table.
+    // `id` is the tie-break, and it is not decorative. created_at is unique for
+    // almost every row, but the largest tie is 281 subscribers sharing one
+    // timestamp, so a page boundary landing inside that block would repeat some
+    // of them and skip others. A sort key that is only usually unique is not a
+    // sort key for paging.
     postgrest.PostgrestTransformBuilder<List<Map<String, dynamic>>> query =
-        filterQuery.order('created_at', ascending: false);
+        filterQuery
+            .order('created_at', ascending: false)
+            .order('id', ascending: true);
 
     if (limit > 0) {
       query = query.range(offset, offset + limit - 1);
@@ -277,17 +300,33 @@ class SubscriberRepository {
   }
 
   Future<Map<String, int>> _sourceBreakdown() async {
-    final data = await _readClient
-        .from('subscribers')
-        .select('source')
-        .filter('member_id', 'is', null);
-
     final results = <String, int>{};
-    for (final row in (data as List<dynamic>?) ?? []) {
-      final map = row as Map<String, dynamic>;
-      final source = (map['source'] as String?)?.isNotEmpty == true ? map['source'] as String : 'unknown';
-      results[source] = (results[source] ?? 0) + 1;
+
+    for (var page = 0; page < _facetMaxPages; page++) {
+      final from = page * _facetPageSize;
+      // Ordered by a stable key on purpose: `.range()` without an ORDER BY
+      // gives PostgREST no defined row order, so pages could overlap or skip
+      // and the tally would be quietly wrong rather than obviously broken.
+      final data = await _readClient
+          .from('subscribers')
+          .select('source')
+          .filter('member_id', 'is', null)
+          .order('id', ascending: true)
+          .range(from, from + _facetPageSize - 1);
+
+      final rows = (data as List<dynamic>?) ?? const <dynamic>[];
+      for (final row in rows) {
+        final map = row as Map<String, dynamic>;
+        final source = (map['source'] as String?)?.isNotEmpty == true ? map['source'] as String : 'unknown';
+        results[source] = (results[source] ?? 0) + 1;
+      }
+
+      // A short page is the last page.
+      if (rows.length < _facetPageSize) return results;
     }
+
+    debugPrint(
+        '⚠️ Source breakdown stopped at the $_facetMaxPages page cap; these counts are a floor, not a total.');
     return results;
   }
 
@@ -303,21 +342,42 @@ class SubscriberRepository {
     return response.count;
   }
 
+  /// Distinct values for one filter dropdown on the subscribers screen.
+  ///
+  /// Served by the public.get_subscriber_facets() RPC in ONE round trip.
+  ///
+  /// This used to select the whole column and take the distinct values in the
+  /// client. PostgREST caps an unranged select at 1000 rows, so with ~73,100
+  /// subscribers the county and state dropdowns were built from the first 1.4
+  /// percent of the table and quietly omitted most of their options: a member in
+  /// an unlisted county simply could not be filtered to. Paging it client side
+  /// fixed the correctness and cost 74 round trips per column, 222 per screen
+  /// open, with OFFSET paging degrading quadratically (the last page alone
+  /// measures 285 ms and 73,674 buffers). The database has to touch those rows
+  /// either way, so the DISTINCT belongs there.
+  ///
+  /// Returns an empty list on failure rather than throwing, because all three
+  /// callers in subscribers_screen.dart await this inside a bare Future.wait
+  /// with no handler, and a throw would strand the whole screen. The failure is
+  /// logged so it is not silent.
   Future<List<String>> fetchDistinctValues(String column) async {
     if (!isReady) return [];
-    final response = await _readClient
-        .from('subscribers')
-        .select(column)
-        .filter('member_id', 'is', null)
-        .order(column, ascending: true);
 
-    return ((response as List<dynamic>?) ?? [])
-        .map((row) => (row as Map<String, dynamic>)[column] as String?)
-        .whereType<String>()
-        .where((value) => value.trim().isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort((a, b) => a.compareTo(b));
+    try {
+      final rows = await _readClient.rpc('get_subscriber_facets') as List<dynamic>?;
+      final values = <String>{};
+      for (final row in (rows ?? const <dynamic>[])) {
+        final map = row as Map<String, dynamic>;
+        if (map['facet'] == column) {
+          final value = map['value'] as String?;
+          if (value != null && value.trim().isNotEmpty) values.add(value);
+        }
+      }
+      return values.toList()..sort((a, b) => a.compareTo(b));
+    } catch (e) {
+      debugPrint('Failed to load $column filter options: $e');
+      return [];
+    }
   }
 
   /// Fetch a single subscriber by ID

@@ -188,13 +188,31 @@ class EmailCampaignRepository {
         query = query.or('email.ilike.$search,full_name.ilike.$search');
       }
 
-      query.order('sent_at', ascending: false, nullsFirst: false);
+      // PostgREST's fluent builder is NOT mutate-in-place; `.order()` / `.range()`
+      // return a new builder (and promote the type from Filter to Transform).
+      // Previously the returned builders were dropped on the floor, so every
+      // recipient fetch ran UNSORTED and UNPAGINATED against
+      // email_campaign_recipients (~36k rows), got silently capped by PostgREST
+      // at 1000, and the caller's `offset` did nothing: page 2 re-rendered page
+      // 1. Same defect as SubscriberRepository.fetchSubscribers(), but NOT the
+      // same fix: this table needs a unique tie-break that the subscribers path
+      // never did. One blast stamps a single `sent_at` on every recipient row
+      // (campaign 4a6210f3 is 1529 rows sharing ONE timestamp), so ordering by
+      // `sent_at` alone leaves Postgres free to return any order under
+      // OFFSET/LIMIT, and a page boundary inside the tied block both repeats and
+      // skips rows. `id` breaks the tie and makes paging deterministic.
+      // `.order()` appends rather than replaces, so chaining yields
+      // order=sent_at.desc.nullslast,id.asc.
+      postgrest.PostgrestTransformBuilder<List<Map<String, dynamic>>> pagedQuery =
+          query
+              .order('sent_at', ascending: false, nullsFirst: false)
+              .order('id', ascending: true);
 
       if (limit > 0) {
-        query.range(offset, offset + limit - 1);
+        pagedQuery = pagedQuery.range(offset, offset + limit - 1);
       }
 
-      final data = await query;
+      final data = await pagedQuery;
       return _mapRecipients(data);
     } catch (e) {
       debugPrint('❌ Error fetching campaign recipients: $e');
@@ -217,15 +235,25 @@ class EmailCampaignRepository {
         _countRecipients(campaignId, 'failed'),
       ]);
 
-      return {
-        RecipientFilter.all: results[0],
-        RecipientFilter.opened: results[1],
-        RecipientFilter.clicked: results[2],
-        RecipientFilter.bounced: results[3],
-        RecipientFilter.unsubscribed: results[4],
-        RecipientFilter.complained: results[5],
-        RecipientFilter.failed: results[6],
-      };
+      // A count that FAILED is omitted rather than recorded as 0, because the
+      // two are not the same claim and the UI can already tell them apart: the
+      // filter chips render "Opened" with no number for a missing key and
+      // "Opened (0)" for a present zero. Storing 0 on failure told an exec that
+      // nobody opened the campaign when the truth was that we never found out.
+      final counts = <RecipientFilter, int>{};
+      void record(RecipientFilter filter, int? count) {
+        if (count != null) counts[filter] = count;
+      }
+
+      record(RecipientFilter.all, results[0]);
+      record(RecipientFilter.opened, results[1]);
+      record(RecipientFilter.clicked, results[2]);
+      record(RecipientFilter.bounced, results[3]);
+      record(RecipientFilter.unsubscribed, results[4]);
+      record(RecipientFilter.complained, results[5]);
+      record(RecipientFilter.failed, results[6]);
+
+      return counts;
     } catch (e) {
       debugPrint('❌ Error fetching recipient counts: $e');
       return {};
@@ -446,7 +474,10 @@ class EmailCampaignRepository {
     }
   }
 
-  Future<int> _countRecipients(String campaignId, String? filterColumn) async {
+  /// Returns null when the count could not be taken, so a failed query is
+  /// distinguishable from a campaign with genuinely zero matching recipients.
+  /// Callers must not coerce that null to 0.
+  Future<int?> _countRecipients(String campaignId, String? filterColumn) async {
     try {
       var query = _readClient
           .from('email_campaign_recipients')
@@ -462,7 +493,7 @@ class EmailCampaignRepository {
       return response.count;
     } catch (e) {
       debugPrint('❌ Error counting recipients: $e');
-      return 0;
+      return null;
     }
   }
 

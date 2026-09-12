@@ -147,6 +147,10 @@ async function processPendingChanges(supabase, slackToken) {
   console.log(`Processing ${pendingChanges.length} pending changes`);
   let processed = 0;
   let errors = 0;
+  // Counted separately from `errors`. An `errors` row was attempted and marked;
+  // a dispatchWriteFailures row was attempted and NOT marked, so it comes back
+  // next run. The two need different reactions, so they are reported apart.
+  let dispatchWriteFailures = 0;
   for (const change of pendingChanges){
     try {
       let result;
@@ -164,7 +168,13 @@ async function processPendingChanges(supabase, slackToken) {
       // Slack's invite failures are overwhelmingly permanent (user_not_found,
       // channel_not_found, deactivated account), so one attempt is the right
       // number, and error_message records what happened.
-      await supabase.from("slack_channel_membership_log").update({
+      // The bookkeeping write itself MUST be checked. supabase-js returns
+      // { data, error } and never throws, so an unchecked update is a silent
+      // no-op, and a filtered update that matches zero rows is not even an
+      // error. Either way the row stays at dispatch='approved' and becomes
+      // exactly the every-ten-minutes re-invite loop the paragraph above
+      // forbids, which is why the rowcount is asserted and not just the error.
+      const { error: markError, count: markCount } = await supabase.from("slack_channel_membership_log").update({
         success: result.success,
         dispatch: "executed",
         error_message: result.error || null,
@@ -174,7 +184,13 @@ async function processPendingChanges(supabase, slackToken) {
           already_in: result.already_in || false,
           not_in: result.not_in || false
         }
+      }, {
+        count: "exact"
       }).eq("id", change.id);
+      if (markError || markCount !== 1) {
+        dispatchWriteFailures++;
+        console.error(`[slack-sync-to-slack] FAILED to mark log row ${change.id} as executed (rows matched: ${markCount}). The row stays dispatch='approved' and WILL be re-sent to Slack on the next run:`, markError?.message ?? "no row matched");
+      }
       if (result.success) {
         processed++;
       } else {
@@ -186,17 +202,26 @@ async function processPendingChanges(supabase, slackToken) {
       console.error("Error processing change:", error);
       errors++;
       // Update log with error. Same reasoning as above: mark it attempted so a
-      // thrown error cannot become an every-ten-minutes retry loop.
-      await supabase.from("slack_channel_membership_log").update({
+      // thrown error cannot become an every-ten-minutes retry loop, and check
+      // the write, because if this update is lost the row never leaves
+      // dispatch='approved' and the failing invite is retried on every tick.
+      const { error: markErrorAfterThrow, count: markCountAfterThrow } = await supabase.from("slack_channel_membership_log").update({
         success: false,
         dispatch: "executed",
         error_message: error.message
+      }, {
+        count: "exact"
       }).eq("id", change.id);
+      if (markErrorAfterThrow || markCountAfterThrow !== 1) {
+        dispatchWriteFailures++;
+        console.error(`[slack-sync-to-slack] FAILED to mark log row ${change.id} as executed after a thrown error (rows matched: ${markCountAfterThrow}). It WILL be retried on the next run:`, markErrorAfterThrow?.message ?? "no row matched");
+      }
     }
   }
   return {
     processed,
     errors,
+    dispatch_write_failures: dispatchWriteFailures,
     total: pendingChanges.length
   };
 }
@@ -234,6 +259,7 @@ serve(async (req)=>{
         event: "slack-sync-to-slack",
         processed: results.processed,
         errors: results.errors,
+        dispatch_write_failures: results.dispatch_write_failures ?? 0,
         total: results.total ?? null
       }
     }).then(() => {}).catch((e) => console.error("[slack-sync-to-slack] audit_log insert failed:", e));

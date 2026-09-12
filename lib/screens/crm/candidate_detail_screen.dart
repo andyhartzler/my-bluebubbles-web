@@ -4561,31 +4561,16 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
   }
 
   Widget _assigneeAvatar() {
-    final url = c.assignedMemberPhotoUrl;
-    if (url != null && url.isNotEmpty) {
-      return CircleAvatar(
-        radius: 22,
-        backgroundColor: BrandColors.steelBlue.withOpacity(0.3),
-        backgroundImage: NetworkImage(url),
-      );
-    }
-    final initials = (c.assignedMember?['name'] as String? ?? '')
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((s) => s.isNotEmpty)
-        .take(2)
-        .map((s) => s[0].toUpperCase())
-        .join();
-    return CircleAvatar(
+    // CorsAwareAvatar takes the DEFAULT opaque unityBlue disc rather than the
+    // translucent steelBlue this used to carry, per its doc comment: an
+    // opaque fill is what makes white text 12.51:1 on any surface, while a
+    // translucent one over the gradient header measures 1.91:1.
+    final name = c.assignedMember?['name'] as String? ?? '';
+    return CorsAwareAvatar(
+      imageUrl: c.assignedMemberPhotoUrl,
       radius: 22,
-      backgroundColor: BrandColors.steelBlue.withOpacity(0.3),
-      child: initials.isEmpty
-          ? const Icon(Icons.person_outline, color: Colors.white70, size: 22)
-          : Text(initials,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-              )),
+      fallbackText: name,
+      fallbackIcon: Icons.person_outline,
     );
   }
 
@@ -4655,20 +4640,14 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
                       // so the avatar actually renders.
                       final pic = _extractMemberPhotoUrl(m['profile_pictures']);
                       return ListTile(
-                        leading: CircleAvatar(
+                        // Default opaque unityBlue disc, not the translucent
+                        // steelBlue this used to carry: CorsAwareAvatar's doc
+                        // comment says an opaque fill is what makes white
+                        // text 12.51:1 on any surface.
+                        leading: CorsAwareAvatar(
+                          imageUrl: pic,
                           radius: 22,
-                          backgroundColor: BrandColors.steelBlue.withOpacity(0.3),
-                          backgroundImage:
-                              pic != null ? NetworkImage(pic) : null,
-                          child: pic == null
-                              ? Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                )
-                              : null,
+                          fallbackText: name,
                         ),
                         title: Text(name,
                             style: const TextStyle(color: Colors.white)),
@@ -5325,15 +5304,14 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
         ),
         child: Row(
           children: [
-            CircleAvatar(
+            // Default opaque unityBlue disc, not the translucent
+            // momentumBlue this used to carry: white on momentumBlue is
+            // 2.75:1 per CorsAwareAvatar's doc comment, which is why that
+            // color is text-use only.
+            CorsAwareAvatar(
+              imageUrl: pic,
               radius: 24,
-              backgroundColor: BrandColors.momentumBlue.withOpacity(0.3),
-              backgroundImage: pic != null ? NetworkImage(pic) : null,
-              child: pic == null
-                  ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                      style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w800))
-                  : null,
+              fallbackText: name,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -5461,14 +5439,13 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
     }
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-      leading: CircleAvatar(
+      // Default opaque unityBlue disc, not the translucent momentumBlue this
+      // used to carry: white on momentumBlue is 2.75:1 per CorsAwareAvatar's
+      // doc comment, which is why that color is text-use only.
+      leading: CorsAwareAvatar(
+        imageUrl: pic,
         radius: 18,
-        backgroundColor: BrandColors.momentumBlue.withOpacity(0.3),
-        backgroundImage: pic != null ? NetworkImage(pic) : null,
-        child: pic == null
-            ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                style: const TextStyle(color: Colors.white))
-            : null,
+        fallbackText: name,
       ),
       title: Text(name, style: const TextStyle(color: Colors.white)),
       subtitle: Text(email,

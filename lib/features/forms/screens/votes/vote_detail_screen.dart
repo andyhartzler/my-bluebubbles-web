@@ -9,6 +9,7 @@ import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/features/committees/services/pending_share_content.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import '../../models/voting_form.dart';
 import '../../models/vote_analytics.dart';
 import '../../services/votes_service.dart';
@@ -870,19 +871,13 @@ class _VoteDetailScreenState extends State<VoteDetailScreen>
     final answerSummary = _getVoterAnswerSummary(vote, voteData);
 
     return ExpansionTile(
-      leading: CircleAvatar(
+      // Default opaque unityBlue disc rather than a Theme.of(context) colour,
+      // per CorsAwareAvatar's doc comment; a 404/expired storage URL now
+      // falls back to initials instead of a permanently broken disc.
+      leading: CorsAwareAvatar(
+        imageUrl: memberPhotoUrl,
         radius: 24,
-        backgroundColor: colorScheme.primaryContainer,
-        backgroundImage: memberPhotoUrl != null ? NetworkImage(memberPhotoUrl) : null,
-        child: memberPhotoUrl == null
-            ? Text(
-                memberName.isNotEmpty ? memberName[0].toUpperCase() : '?',
-                style: TextStyle(
-                  color: colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                ),
-              )
-            : null,
+        fallbackText: memberName,
       ),
       title: Text(
         memberName,

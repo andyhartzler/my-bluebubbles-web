@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:file_picker/file_picker.dart' as file_picker;
-import 'package:characters/characters.dart';
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tzdata;
@@ -2405,8 +2404,6 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     final displayName = (change.memberName?.trim().isNotEmpty == true)
         ? change.memberName!.trim()
         : (change.memberId.isNotEmpty ? 'Member ${change.memberId.substring(0, 6)}' : 'Unknown member');
-    final avatarSeed = displayName.isNotEmpty ? displayName : change.memberId;
-    final avatarLetter = avatarSeed.isNotEmpty ? avatarSeed.characters.first.toUpperCase() : 'M';
     final primaryPhoto = change.profilePhotos.firstWhere(
       (photo) => photo.isPrimary,
       orElse: () => change.profilePhotos.isNotEmpty
@@ -2428,12 +2425,13 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       elevation: 3,
       child: ListTile(
         onTap: () => _openMemberProfile(change.memberId),
-        leading: avatarUrl != null && avatarUrl.isNotEmpty
-            ? CircleAvatar(backgroundImage: NetworkImage(avatarUrl))
-            : CircleAvatar(
-                backgroundColor: Colors.blueGrey.shade100,
-                child: Text(avatarLetter),
-              ),
+        // CorsAwareAvatar rather than a bare NetworkImage: a 404, an expired
+        // storage path or a CORS refusal on this proposed photo used to
+        // escape to the zone instead of falling back to initials.
+        leading: CorsAwareAvatar(
+          imageUrl: avatarUrl,
+          fallbackText: displayName,
+        ),
         title: Text(displayName),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2840,23 +2838,16 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
     );
 
     final imageUrl = primaryPhoto.publicUrl;
-    final initials = signIn.name.isNotEmpty ? signIn.name.trim()[0].toUpperCase() : '?';
 
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      return CircleAvatar(
-        radius: 20,
-        backgroundImage: NetworkImage(imageUrl),
-        // Subtle translucent backdrop instead of solid white — prevents a
-        // harsh halo while a NetworkImage is loading on navy surfaces.
-        backgroundColor: Colors.white.withOpacity(0.1),
-      );
-    }
-
-    return CircleAvatar(
+    // CorsAwareAvatar's default opaque unityBlue disc, not the translucent
+    // white-10% backdrop this used to carry: this screen's navy surface is
+    // exactly the case its doc comment warns a translucent fill fails on,
+    // and a 404/expired storage URL now falls back to initials instead of a
+    // permanently broken disc.
+    return CorsAwareAvatar(
+      imageUrl: imageUrl,
       radius: 20,
-      backgroundColor: Colors.white.withOpacity(0.1),
-      foregroundColor: Colors.white,
-      child: Text(initials),
+      fallbackText: signIn.name,
     );
   }
 

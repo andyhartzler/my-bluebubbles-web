@@ -350,10 +350,24 @@ serve(async (req) => {
 
     // Check STOP
     if (STOP_WORDS.has(lower)) {
-      await supabase
+      // supabase-js resolves with { data, error } and never throws, so the bare
+      // await this used to be discarded the failure; and a filtered update that
+      // matches ZERO rows is not an error either, so the rowcount has to be
+      // asserted separately. A lost opt-out means we keep texting someone who
+      // said STOP. Logged rather than retried: the confirmation below still goes
+      // out, which is the behaviour a respondent already sees today.
+      const { error: optOutError, count: optOutRows } = await supabase
         .from("survey_sessions")
-        .update({ status: "opted_out", completed_at: new Date().toISOString() })
+        .update(
+          { status: "opted_out", completed_at: new Date().toISOString() },
+          { count: "exact" },
+        )
         .eq("id", session.id);
+      if (optOutError || optOutRows === 0) {
+        console.error(
+          `[survey-webhook] OPT-OUT NOT RECORDED, this number may keep receiving the survey: session=${session.id} reason=${optOutError?.message ?? "filter matched 0 rows"}`,
+        );
+      }
 
       await sendBBMessage(
         phone,
@@ -406,13 +420,34 @@ serve(async (req) => {
       });
     }
 
-    // Record the response
-    await supabase.from("survey_responses").insert({
+    // Record the response. This insert IS the survey: if it is lost the answer is
+    // gone for good and the respondent has no way to know. supabase-js resolves
+    // with { data, error } and never throws, so the bare await this used to be
+    // discarded the failure and then advanced the person to the next question,
+    // which is the one move that makes the loss permanent.
+    const { error: responseError } = await supabase.from("survey_responses").insert({
       session_id: session.id,
       question_id: currentQ.id,
       raw_response: messageText,
       parsed_response: parsed,
     });
+    if (responseError) {
+      console.error(
+        `[survey-webhook] RESPONSE NOT SAVED: session=${session.id} question=${currentQ.id} order=${currentQ.question_order} reason=${responseError.message}`,
+      );
+      // Do NOT advance. The session stays on this question, so a resend is
+      // recorded against the right question instead of the next one. The
+      // respondent is told, because silence here reads to them as an accepted
+      // answer and the answer is simply gone.
+      await sendBBMessage(
+        phone,
+        "Sorry, we could not save that answer. Please send it again.",
+        incomingService,
+      );
+      return new Response(JSON.stringify({ ok: true, action: "response_not_saved" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Audit log (non-blocking) — public webhook, actor is the system.
     supabase.from("audit_log").insert({
@@ -428,7 +463,13 @@ serve(async (req) => {
         question_id: currentQ.id,
         service: incomingService,
       },
-    }).then(() => {}).catch((e: unknown) => console.error("[survey-webhook] audit_log insert failed:", e));
+    }).then(({ error }) => {
+      // The old .catch() here never fired: supabase-js reports a failed insert in
+      // the resolved { error } value rather than by rejecting, so it defended
+      // nothing. Still non-blocking on purpose, but no longer silent. The trailing
+      // catch stays for a genuine network-level throw.
+      if (error) console.error("[survey-webhook] audit_log insert failed:", error.message);
+    }).catch((e: unknown) => console.error("[survey-webhook] audit_log insert threw:", e));
 
     // Advance to next question
     await advanceToNextQuestion(supabase, session, currentQ, phone, incomingService);
@@ -465,13 +506,26 @@ async function advanceToNextQuestion(
     .maybeSingle();
 
   if (nextQ) {
-    await supabase
+    // Same silent-failure shape as every other write in this file: never throws,
+    // and a zero-row filter is not an error. If this is lost the respondent is
+    // sent the next question while the session still points at the previous one,
+    // so their next answer is recorded against the wrong question. Logged rather
+    // than made to block, because stranding them with no reply is worse.
+    const { error: advanceError, count: advanceRows } = await supabase
       .from("survey_sessions")
-      .update({
-        current_question_order: nextOrder,
-        last_message_at: new Date().toISOString(),
-      })
+      .update(
+        {
+          current_question_order: nextOrder,
+          last_message_at: new Date().toISOString(),
+        },
+        { count: "exact" },
+      )
       .eq("id", session.id);
+    if (advanceError || advanceRows === 0) {
+      console.error(
+        `[survey-webhook] ADVANCE NOT RECORDED, the next answer will be filed against the previous question: session=${session.id} from=${currentQuestion.question_order} to=${nextOrder} reason=${advanceError?.message ?? "filter matched 0 rows"}`,
+      );
+    }
 
     const { count } = await supabase
       .from("survey_questions")
@@ -483,14 +537,25 @@ async function advanceToNextQuestion(
     const msg = formatQuestion(surveyTitle, nextQ, nextOrder, total);
     await sendBBMessage(phone, msg, service);
   } else {
-    await supabase
+    const { error: completeError, count: completeRows } = await supabase
       .from("survey_sessions")
-      .update({
-        status: "completed",
-        completed_at: new Date().toISOString(),
-        last_message_at: new Date().toISOString(),
-      })
+      .update(
+        {
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          last_message_at: new Date().toISOString(),
+        },
+        { count: "exact" },
+      )
       .eq("id", session.id);
+    if (completeError || completeRows === 0) {
+      // A lost completion leaves the session 'active', so the survey looks
+      // unfinished to every caller that counts active sessions, including the
+      // rollup a few lines below.
+      console.error(
+        `[survey-webhook] COMPLETION NOT RECORDED, session stays active: session=${session.id} reason=${completeError?.message ?? "filter matched 0 rows"}`,
+      );
+    }
 
     await sendBBMessage(
       phone,

@@ -218,8 +218,15 @@ serve(async (req) => {
             access_token: data.access_token,
           });
 
-          // Store permanently in Supabase
-          await supabase.from("plaid_connections").upsert(
+          // Store permanently in Supabase.
+          // Plaid returns the access_token exactly ONCE, at this moment, and
+          // this upsert is the only copy that will ever exist. supabase-js
+          // returns { data, error } and never throws, so the unchecked write
+          // that used to be here would lose the token forever while still
+          // telling the caller success:true, leaving a bank link that cannot
+          // be recovered and cannot be diagnosed. Check it and fail loudly so
+          // the user is told to link again while Plaid Link is still open.
+          const { error: storeError } = await supabase.from("plaid_connections").upsert(
             {
               item_id: data.item_id,
               institution_id: params.institution_id ?? "unknown",
@@ -238,6 +245,40 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             },
             { onConflict: "item_id" }
+          );
+
+          if (storeError) {
+            console.error(
+              `[plaid] FAILED to store access_token for item ${data.item_id}. The token is now lost and the institution must be linked again:`,
+              storeError.message
+            );
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error:
+                  "Bank connection could not be saved. Please link the account again.",
+                detail: storeError.message,
+              }),
+              {
+                status: 500,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              }
+            );
+          }
+        } else {
+          // No access_token in the exchange response means the link did not
+          // happen. Returning success:true here would have been the same lie
+          // as an unchecked write.
+          console.error("[plaid] /item/public_token/exchange returned no access_token");
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: "Plaid did not return an access token. Please link the account again.",
+            }),
+            {
+              status: 502,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
           );
         }
 

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/slack/models/slack_channel.dart';
 import 'package:bluebubbles/features/slack/services/slack_management_repository.dart';
 import 'package:bluebubbles/features/slack/widgets/channel_sidebar.dart';
@@ -1072,15 +1073,15 @@ class _UnmatchedUserInfoDialog extends StatelessWidget {
               padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  CircleAvatar(
+                  // Default opaque unityBlue disc, not the translucent
+                  // white-20% fill this used to carry: this dialog sits on
+                  // the gradient header, where CorsAwareAvatar's doc comment
+                  // measures white on a translucent fill at 1.91:1 over the
+                  // light end.
+                  CorsAwareAvatar(
+                    imageUrl: user.avatarUrl,
                     radius: 30,
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    backgroundImage: user.avatarUrl != null
-                        ? NetworkImage(user.avatarUrl!)
-                        : null,
-                    child: user.avatarUrl == null
-                        ? const Icon(Icons.person, color: Colors.white, size: 30)
-                        : null,
+                    fallbackText: user.primaryLabel,
                   ),
                   const SizedBox(width: 16),
                   Expanded(

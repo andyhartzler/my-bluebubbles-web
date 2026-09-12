@@ -11,6 +11,7 @@ import '../widgets/review/compare_matrix.dart';
 import '../widgets/review/policy_stance_bars.dart';
 import '../widgets/review/stance_visuals.dart';
 import 'submission_detail_screen.dart';
+import '../../committees/widgets/cors_aware_avatar.dart';
 
 /// Beautiful unified form results screen showing analytics and submissions together
 class FormResultsScreen extends StatefulWidget {
@@ -772,20 +773,15 @@ class _FormResultsScreenState extends State<FormResultsScreen> {
               // Header row
               Row(
                 children: [
-                  CircleAvatar(
-                    backgroundColor: colorScheme.primaryContainer,
+                  // Default opaque unityBlue disc rather than a
+                  // Theme.of(context) colour: CorsAwareAvatar's doc comment
+                  // says the opaque default is what clears contrast on any
+                  // surface, and a 404/expired storage URL now falls back to
+                  // initials instead of a permanently broken disc.
+                  CorsAwareAvatar(
+                    imageUrl: photoUrl,
                     radius: 20,
-                    backgroundImage:
-                        photoUrl != null ? NetworkImage(photoUrl) : null,
-                    child: photoUrl == null
-                        ? Text(
-                            submission.displayInitial,
-                            style: TextStyle(
-                              color: colorScheme.onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          )
-                        : null,
+                    fallbackText: displayName,
                   ),
                   const SizedBox(width: 12),
                   Expanded(

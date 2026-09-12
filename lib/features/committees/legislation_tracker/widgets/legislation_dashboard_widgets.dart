@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import '../models/legislation_widget_config.dart';
 import '../models/tracked_bill.dart';
 import '../services/legislation_service.dart';
+import '../../widgets/cors_aware_avatar.dart';
 
 // Brand colors
 const _unityBlue = Color(0xFF273351);
@@ -1157,23 +1158,10 @@ class LegislatorLeaderboardWidget extends StatelessWidget {
             ),
             SizedBox(width: isVeryCompact ? 6 : 8),
             // Photo
-            CircleAvatar(
+            CorsAwareAvatar(
+              imageUrl: entry.photoUrl,
               radius: avatarRadius,
-              backgroundColor: Colors.white.withOpacity(0.2),
-              backgroundImage:
-                  entry.photoUrl != null && entry.photoUrl!.isNotEmpty
-                  ? NetworkImage(entry.photoUrl!)
-                  : null,
-              child: entry.photoUrl == null || entry.photoUrl!.isEmpty
-                  ? Text(
-                      entry.name.isNotEmpty ? entry.name.substring(0, 1) : '?',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: avatarRadius * 0.8,
-                      ),
-                    )
-                  : null,
+              fallbackText: entry.name,
             ),
             SizedBox(width: isVeryCompact ? 6 : 10),
             // Name and info

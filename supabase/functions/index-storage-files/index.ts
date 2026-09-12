@@ -284,7 +284,15 @@ async function upsertDocument(sourceType, sourceTable, sourceId, title, content,
     if (existing.content_hash === contentHash) {
       return existing.id;
     }
-    await supabase.from("knowledge_documents").update({
+    // Hardening, not an outage. Both knowledge_documents and
+    // knowledge_embedding_queue currently hold 79,118 rows, so this path is
+    // working today and nothing is unsearchable. It was still written as a
+    // fire and forget write: supabase-js returns { data, error } and never
+    // throws, so a failure would have been invisible and the caller would have
+    // been handed a document id as if the refresh had happened. A filtered
+    // update is checked for rowcount too, because matching zero rows is not an
+    // error in PostgREST.
+    const { error: docUpdateError, count: docUpdateCount } = await supabase.from("knowledge_documents").update({
       title,
       content,
       content_hash: contentHash,
@@ -292,14 +300,41 @@ async function upsertDocument(sourceType, sourceTable, sourceId, title, content,
       embedding_status: "pending",
       embedding: null,
       updated_at: new Date().toISOString()
+    }, {
+      count: "exact"
     }).eq("id", existing.id);
-    await supabase.from("knowledge_embedding_queue").upsert({
+    if (docUpdateError || docUpdateCount !== 1) {
+      console.error(`[index-storage-files] Failed to refresh knowledge_documents ${existing.id} (rows matched: ${docUpdateCount}):`, docUpdateError?.message ?? "no row matched");
+      return null;
+    }
+    // The update above already set embedding: null, so without this queue row the
+    // document is left with NO embedding at all and drops out of vector search
+    // entirely. It does not keep a stale one.
+    const { error: requeueError } = await supabase.from("knowledge_embedding_queue").upsert({
       document_id: existing.id,
       priority: 50,
       status: "pending"
     }, {
       onConflict: "document_id"
     });
+    if (requeueError) {
+      console.error(`[index-storage-files] Failed to queue re-embedding for document ${existing.id}:`, requeueError.message);
+      // Returning null is NOT enough on its own, and this is the subtle part.
+      // The caller does skip the knowledge_indexed_files write, so the file is
+      // picked up again next run, but the update above already committed the new
+      // content_hash. On that next run the equality guard at the top of this
+      // function matches, returns early, and never reaches this queue write. The
+      // document would stay permanently unembedded while the file is reported as
+      // indexed, which is exactly the silent shape this whole pass exists to
+      // remove. Clearing the hash is what makes the retry real.
+      const { error: rollbackError } = await supabase.from("knowledge_documents").update({
+        content_hash: null
+      }).eq("id", existing.id);
+      if (rollbackError) {
+        console.error(`[index-storage-files] Could not clear content_hash on ${existing.id} after a failed re-queue, so this document will NOT retry and has no embedding:`, rollbackError.message);
+      }
+      return null;
+    }
     return existing.id;
   }
   const { data: newDoc, error: insertError } = await supabase.from("knowledge_documents").insert({
@@ -317,11 +352,22 @@ async function upsertDocument(sourceType, sourceTable, sourceId, title, content,
     console.error("Insert error:", insertError);
     return null;
   }
-  await supabase.from("knowledge_embedding_queue").insert({
+  // Hardening, not an outage. The counts were taken and both
+  // knowledge_documents and knowledge_embedding_queue hold 79,118 rows, so
+  // this insert is landing. It was nonetheless unchecked, and supabase-js
+  // returns { data, error } rather than throwing, so the day it does start
+  // failing the document would sit with no embedding, never become
+  // searchable, and this function would still report the file as indexed.
+  // Check the error and refuse to claim the document is usable.
+  const { error: queueError } = await supabase.from("knowledge_embedding_queue").insert({
     document_id: newDoc.id,
     priority: 100,
     status: "pending"
   });
+  if (queueError) {
+    console.error(`[index-storage-files] Failed to queue embedding for new document ${newDoc.id}:`, queueError.message);
+    return null;
+  }
   return newDoc.id;
 }
 async function processFile(bucket, file, config) {

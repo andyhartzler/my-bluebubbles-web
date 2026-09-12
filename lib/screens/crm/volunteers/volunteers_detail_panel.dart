@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:universal_html/html.dart' as html;
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
+import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/models/crm/candidate.dart' show Candidate;
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/outreach_activity.dart';
@@ -1614,21 +1615,21 @@ class _RegionDetailViewState extends State<_RegionDetailView> {
   }
 
   Widget _candidateAvatar(String name, String? url) {
-    if (url != null && url.isNotEmpty) {
-      return CircleAvatar(
-        radius: 28,
-        backgroundColor: MapPalette.avatarColorFor(name),
-        backgroundImage: NetworkImage(url),
-        onBackgroundImageError: (_, __) {},
-        child: null,
-      );
-    }
-    return CircleAvatar(
+    // CorsAwareAvatar rather than CircleAvatar plus NetworkImage: the old form's
+    // onBackgroundImageError was an empty callback, so a 404, an expired storage
+    // path or a CORS refusal left a bare coloured disc with no initials at all.
+    //
+    // The per-name MapPalette hue is KEPT. There was never a contrast problem to
+    // solve here: every entry in MapPalette.avatarColors is fully opaque and the
+    // lightest of them, #46647F, is 6.21:1 under white. Dropping it would also
+    // have made every candidate disc identical while the member discs in the
+    // adjacent pane stay colour coded per identity, which is the thing that
+    // makes the two panes readable side by side.
+    return CorsAwareAvatar(
+      imageUrl: url,
       radius: 28,
       backgroundColor: MapPalette.avatarColorFor(name),
-      child: Text(_initials(name),
-          style: const TextStyle(
-              color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+      fallbackText: name,
     );
   }
 

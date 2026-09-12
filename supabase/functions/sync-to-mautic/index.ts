@@ -362,8 +362,13 @@ async function logSync(
   error: string | null,
   success: boolean
 ): Promise<void> {
+  // This used to be try { await supabase... } catch { console.error }. That
+  // catch could never fire: supabase-js returns { data, error } instead of
+  // throwing, so the insert looked defended and was not. A lost row here means
+  // mautic_sync_log quietly under-reports what the sync actually did, which is
+  // the worst possible failure for an audit table. Read the returned error.
   try {
-    await supabase.from("mautic_sync_log").insert({
+    const { error: logError } = await supabase.from("mautic_sync_log").insert({
       direction,
       entity_type: entityType,
       entity_id: entityId,
@@ -374,10 +379,25 @@ async function logSync(
       error,
       success,
     });
-    console.log(`Logged sync operation: ${action} ${entityType} ${entityId} -> Mautic ${mauticId}`);
+    if (logError) {
+      // Deliberately not rethrown. Losing the log line must not undo a sync that
+      // already happened, but it must be visible in the function logs.
+      console.error(`[sync-to-mautic] Failed to log sync operation ${action} ${entityType} ${entityId}:`, logError.message);
+      return;
+    }
   } catch (err) {
-    console.error("Failed to log sync operation:", err);
+    // The catch is NOT dead, and removing it would break the invariant above.
+    // supabase-js resolves with { data, error } for a database level failure,
+    // which is what the check above is for, but it REJECTS on a transport
+    // failure such as a connection reset or a DNS error. Without this arm such a
+    // rejection escapes logSync, reaches the top level handler, and reports a
+    // sync that already completed inside Mautic as an HTTP 500 with a junk
+    // entity_id. The old bug was that this catch was the ONLY defence and the
+    // returned error was ignored; the fix is both, not one instead of the other.
+    console.error(`[sync-to-mautic] Sync log insert rejected for ${action} ${entityType} ${entityId}:`, err);
+    return;
   }
+  console.log(`Logged sync operation: ${action} ${entityType} ${entityId} -> Mautic ${mauticId}`);
 }
 
 serve(async (req) => {
