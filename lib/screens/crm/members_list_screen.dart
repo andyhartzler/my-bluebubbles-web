@@ -198,7 +198,14 @@ class _MembersListScreenState extends State<MembersListScreen> {
     if (seedCounty != null && seedCounty.isNotEmpty) {
       _selectedCounty = seedCounty;
     }
-    _loadData(refreshMetadata: true, includeMetadata: true);
+    // refreshMetadata is FALSE here on purpose. This State's own memo is
+    // empty on a fresh mount, so the seven facet fetchers still run; what
+    // changes is that they no longer force-bust MemberRepository's 5-minute
+    // facet cache. initState used to pass true, and because the State is
+    // disposed on navigation, going to a member detail and back re-ran all
+    // seven from the database every time. Pull-to-refresh (_refreshAll)
+    // still passes true and still forces a real reload.
+    _loadData(refreshMetadata: false, includeMetadata: true);
   }
 
   @override
@@ -291,35 +298,35 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   Future<List<String>> _fetchCounties({bool refresh = false}) {
     if (refresh || _countiesFuture == null) {
-      _countiesFuture = _memberRepo.getUniqueCounties();
+      _countiesFuture = _memberRepo.getUniqueCounties(forceRefresh: refresh);
     }
     return _countiesFuture!;
   }
 
   Future<List<String>> _fetchDistricts({bool refresh = false}) {
     if (refresh || _districtsFuture == null) {
-      _districtsFuture = _memberRepo.getUniqueCongressionalDistricts();
+      _districtsFuture = _memberRepo.getUniqueCongressionalDistricts(forceRefresh: refresh);
     }
     return _districtsFuture!;
   }
 
   Future<List<String>> _fetchCommittees({bool refresh = false}) {
     if (refresh || _committeesFuture == null) {
-      _committeesFuture = _memberRepo.getUniqueCommittees();
+      _committeesFuture = _memberRepo.getUniqueCommittees(forceRefresh: refresh);
     }
     return _committeesFuture!;
   }
 
   Future<Map<String, int>> _fetchChapterCounts({bool refresh = false}) {
     if (refresh || _chapterCountsFuture == null) {
-      _chapterCountsFuture = _memberRepo.getChapterCounts();
+      _chapterCountsFuture = _memberRepo.getChapterCounts(forceRefresh: refresh);
     }
     return _chapterCountsFuture!;
   }
 
   Future<Map<String, int>> _fetchLeadershipCounts({bool refresh = false}) {
     if (refresh || _leadershipCountsFuture == null) {
-      _leadershipCountsFuture = _memberRepo.getLeadershipCountsByChapter();
+      _leadershipCountsFuture = _memberRepo.getLeadershipCountsByChapter(forceRefresh: refresh);
     }
     return _leadershipCountsFuture!;
   }
@@ -333,7 +340,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
 
   Future<AgeBounds> _fetchAgeBounds({bool refresh = false}) {
     if (refresh || _ageBoundsFuture == null) {
-      _ageBoundsFuture = _memberRepo.getAgeBounds();
+      _ageBoundsFuture = _memberRepo.getAgeBounds(forceRefresh: refresh);
     }
     return _ageBoundsFuture!;
   }

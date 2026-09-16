@@ -1325,22 +1325,72 @@ class CandidateRepository {
     }
   }
 
-  /// Fetch MEC contributions for a given mec_id (committee)
-  Future<List<MECContribution>> getMECContributions(String mecId, {int limit = 5000}) async {
-    if (!isReady) return [];
+  /// Explicit projection for public.mec_contributions (3.27M rows), replacing
+  /// the bare `.select()` these two used to send. Every column here is one
+  /// MECContribution.fromJson reads, so the payload cannot grow silently as
+  /// the table gains columns.
+  static const String _mecContributionColumns =
+      'id,mec_id,donor_id,committee_name,report,contributor_committee,'
+      'contributor_company,contributor_last_name,contributor_first_name,'
+      'address1,address2,city,state,zip,employer,occupation,'
+      'contribution_date,contribution_amount,monetary_or_inkind,'
+      'is_committee_contributor,report_type,filing_year,created_at';
 
-    try {
-      final response = await _client
-          .from('mec_contributions')
-          .select()
-          .eq('mec_id', mecId)
+  /// PostgREST's own max-rows ceiling for a single request.
+  static const int _mecPageSize = 1000;
+
+  /// Default row ceiling for the finance tab's contribution list.
+  ///
+  /// The old signature said `limit = 5000` and then sent a single request, so
+  /// PostgREST's max-rows cap applied ON TOP of it and the effective ceiling
+  /// was 1000: the parameter was a lie for any committee above that. These
+  /// now page with .range() until the ceiling is genuinely reached, so the
+  /// number in the signature is the number you get.
+  static const int mecContributionsDefaultLimit = 5000;
+
+  Future<List<MECContribution>> _pageMecContributions(
+    PostgrestFilterBuilder<List<Map<String, dynamic>>> Function(
+            PostgrestFilterBuilder<List<Map<String, dynamic>>> q)
+        applyFilter,
+    int limit,
+  ) async {
+    final all = <MECContribution>[];
+    var offset = 0;
+
+    while (offset < limit) {
+      final pageSize =
+          (limit - offset) < _mecPageSize ? (limit - offset) : _mecPageSize;
+
+      final base = _client.from('mec_contributions').select(_mecContributionColumns);
+      // `contribution_date` is not unique, so `id` is the tie-break. Without
+      // it a page boundary landing inside a block of same-dated rows would
+      // repeat some and skip others, and the list would be quietly wrong
+      // rather than obviously broken.
+      final response = await applyFilter(base)
           .order('contribution_date', ascending: false)
-          .limit(limit);
+          .order('id', ascending: false)
+          .range(offset, offset + pageSize - 1);
 
-      return (response as List<dynamic>)
+      final rows = (response as List<dynamic>)
           .whereType<Map<String, dynamic>>()
           .map(MECContribution.fromJson)
           .toList();
+
+      all.addAll(rows);
+      if (rows.length < pageSize) break;
+      offset += pageSize;
+    }
+
+    return all;
+  }
+
+  /// Fetch MEC contributions for a given mec_id (committee)
+  Future<List<MECContribution>> getMECContributions(String mecId,
+      {int limit = mecContributionsDefaultLimit}) async {
+    if (!isReady) return [];
+
+    try {
+      return await _pageMecContributions((q) => q.eq('mec_id', mecId), limit);
     } catch (e) {
       debugPrint('❌ CandidateRepository.getMECContributions error: $e');
       return [];
@@ -1350,19 +1400,12 @@ class CandidateRepository {
   /// Fetch contributions across multiple committees (aggregated view).
   /// Used when the candidate has >1 linked MEC committee and the user picks
   /// "All committees" in the switcher.
-  Future<List<MECContribution>> getMECContributionsMulti(List<String> mecIds, {int limit = 5000}) async {
+  Future<List<MECContribution>> getMECContributionsMulti(List<String> mecIds,
+      {int limit = mecContributionsDefaultLimit}) async {
     if (!isReady || mecIds.isEmpty) return [];
     try {
-      final response = await _client
-          .from('mec_contributions')
-          .select()
-          .inFilter('mec_id', mecIds)
-          .order('contribution_date', ascending: false)
-          .limit(limit);
-      return (response as List<dynamic>)
-          .whereType<Map<String, dynamic>>()
-          .map(MECContribution.fromJson)
-          .toList();
+      return await _pageMecContributions(
+          (q) => q.inFilter('mec_id', mecIds), limit);
     } catch (e) {
       debugPrint('❌ CandidateRepository.getMECContributionsMulti error: $e');
       return [];

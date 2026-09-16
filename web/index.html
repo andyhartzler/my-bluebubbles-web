@@ -33,6 +33,34 @@
   <meta name="googlebot" content="noindex, nofollow">
   <meta http-equiv="X-Robots-Tag" content="noindex, nofollow">
 
+  <!-- Sentry browser SDK: warm the connection and start the download early.
+
+       initSentry() is the FIRST await inside runZonedGuarded in main(), before
+       runApp, and on web SentryFlutter.init's WebSdkIntegration appends a
+       <script> tag for the URL below and AWAITS its onload. So first paint used
+       to wait on DNS + TLS + download + parse of a third-party host nothing else
+       in the app talks to. These two hints overlap that with Flutter engine boot,
+       so the loader's own script tag resolves from cache.
+
+       This is a pure timing change: the SDK still loads, with identical
+       monitoring coverage. If it is unreachable the hints are inert, exactly as
+       the loader already is.
+
+       VERSION PIN: must match `sentryJsSdkVersion` in
+       sentry_flutter/lib/src/web/sentry_js_sdk_version.dart (10.38.0 for
+       sentry_flutter 9.24.0). RE-CHECK IT ON EVERY sentry_flutter BUMP: a stale
+       version here does not break anything, it just preloads a file nobody
+       asks for, and the browser will warn about an unused preload.
+
+       The integrity hash and crossorigin must match what the loader sets on
+       its own <script> (crossOrigin='anonymous' plus `productionIntegrity`
+       from sentry_js_sdk_version.dart), or the browser will not reuse the
+       preloaded response. A mismatch costs the speedup, not correctness. -->
+  <link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin>
+  <link rel="preload" as="script" crossorigin
+        integrity="sha384-COL1vOWQO+0hwStGhZ6r5BKlWlJzd59gOqtCYmcIvfDd0ifnTHrWzzQQYmUNf/Lr"
+        href="https://browser.sentry-cdn.com/10.38.0/bundle.tracing.min.js">
+
   <!-- Apple Touch Icon -->
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
@@ -51,51 +79,140 @@
   <!-- Google auth details -->
   <meta name="google-signin-client_id" content="500464701389-8trcdkcj7ni5l4dn6n7l795rhb1asnh3.apps.googleusercontent.com">
 
-  <!-- Apple MapKit JS Library — deferred so it never blocks first paint;
-       the app polls window.mapkit readiness (checkMapKit below), so late
-       arrival is already handled. -->
-  <script
-    src="https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.core.js"
-    crossorigin="anonymous"
-    data-libraries="map,annotations,services"
-    defer>
-  </script>
+  <!-- Warm the connections every boot actually uses, so the first request on
+       each pays a DNS lookup and a TLS handshake it has already done.
+       Supabase: every CRM screen queries it immediately after auth.
+       Sentry CDN: sentry_flutter's WebSdkIntegration downloads the browser SDK
+       from here inside initSentry(), which main.dart awaits BEFORE runApp, so
+       this handshake is on the critical path to first paint.
+       Deliberately NOT preconnected: cdn.apple-mapkit.com (now on demand, see
+       below) and cdn.plaid.com (deferred and only used long after boot).
+       `crossorigin` is required on the Supabase entry: its requests are CORS
+       fetches, and a preconnect without it opens a connection in the wrong
+       pool that the real request cannot reuse. -->
+  <link rel="preconnect" href="https://faajpcarasilbfndzkmd.supabase.co" crossorigin>
+  <link rel="dns-prefetch" href="https://faajpcarasilbfndzkmd.supabase.co">
+  <link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin>
 
-  <!-- MapKit Initialization Helper -->
+  <!-- MapKit is injected on demand, so no preconnect here: that would open a
+       TLS connection on every boot for the many screens that never show a map,
+       which is the cost this change exists to remove. dns-prefetch is the
+       cheap half: it resolves the name without a handshake, so the first map
+       view skips the DNS leg of an otherwise cold start. -->
+  <link rel="dns-prefetch" href="https://cdn.apple-mapkit.com">
+
+  <!-- Apple MapKit JS — loaded ON DEMAND rather than on every page load.
+       The Dart contract is unchanged. lib/widgets/event_map_widget.dart calls
+       js.context.callMethod('whenMapKitReady', [cb]) and, when cb fires, reads
+       window.mapkit / window.mapkit.init directly. The only difference is that
+       the CDN script is injected the FIRST time whenMapKitReady is called
+       instead of on every boot, so CRM screens with no map never pay the
+       cross-origin DNS + TLS + download + parse.
+
+       Readiness condition, failure behaviour and callback ordering are all
+       preserved: a queued callback fires only once window.mapkit.init exists,
+       and on load failure it is never invoked, exactly as the old poll did
+       when it gave up. -->
   <script>
-    console.log('[MapKit Setup] Initialization script loaded');
+    (function () {
+      var MAPKIT_SRC = 'https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.core.js';
+      var MAPKIT_LIBRARIES = 'map,annotations,services';
+      var READY_TIMEOUT_MS = 10000;
+      var POLL_INTERVAL_MS = 50;
 
-    // CRITICAL: This prevents "mapkit is not defined" and "$1 is not a function" errors
-    window.mapKitLoaded = false;
-    window.mapKitCallbacks = [];
+      var callbacks = [];
+      var injected = false;
+      var ready = false;
 
-    // Poll for MapKit availability since it loads asynchronously
-    var mapKitCheckCount = 0;
-    (function checkMapKit() {
-      if (window.mapkit && window.mapkit.init) {
-        console.log('[MapKit] Library detected and ready');
-        window.mapKitLoaded = true;
-        window.mapKitCallbacks.forEach(cb => cb());
-        window.mapKitCallbacks = [];
-      } else if (mapKitCheckCount >= 50) {
-        console.warn('[MapKit] Library did not load after 5 seconds; giving up');
-      } else {
-        mapKitCheckCount++;
-        console.log('[MapKit] Still waiting for library...');
-        setTimeout(checkMapKit, 100); // Check every 100ms
+      // Readiness must be gated on the constructors the Dart side actually
+      // dereferences, NOT on `init` alone. window.mapkit and mapkit.init are
+      // defined by mapkit.core.js as it parses, but Geocoder, Map,
+      // MarkerAnnotation, Coordinate, CoordinateSpan, CoordinateRegion and
+      // FeatureVisibility arrive from the separate `map`, `annotations` and
+      // `services` bundles that core fetches afterwards.
+      //
+      // Under the old eager <script defer> those bundles had the whole
+      // boot-to-navigation window to arrive before any map mounted. Loading on
+      // demand removes that slack, so resolving on `init` alone would hand the
+      // callback to lib/widgets/event_map_widget.dart while mapkit['Geocoder']
+      // (line 225) is still undefined, and the map would fail to render.
+      //
+      // waitForGlobal polls every 50 ms to a 10 s deadline, so this simply
+      // waits a few hundred ms longer. There is no deadlock: data-libraries
+      // makes core load these without mapkit.init() having to be called first.
+      var REQUIRED = [
+        'init', 'Map', 'Geocoder', 'MarkerAnnotation',
+        'Coordinate', 'CoordinateSpan', 'CoordinateRegion', 'FeatureVisibility'
+      ];
+
+      function usable() {
+        if (!window.mapkit) return false;
+        for (var i = 0; i < REQUIRED.length; i++) {
+          if (!window.mapkit[REQUIRED[i]]) return false;
+        }
+        return true;
       }
+
+      function flush() {
+        ready = true;
+        var pending = callbacks;
+        callbacks = [];
+        for (var i = 0; i < pending.length; i++) {
+          try {
+            pending[i]();
+          } catch (err) {
+            console.error('[MapKit] ready callback threw', err);
+          }
+        }
+      }
+
+      // mapkit.core.js defines window.mapkit as it parses, but poll briefly
+      // anyway so a slow global assignment cannot drop the callbacks.
+      function waitForGlobal(deadline) {
+        if (usable()) {
+          flush();
+          return;
+        }
+        if (Date.now() >= deadline) {
+          console.warn('[MapKit] script loaded but window.mapkit.init never appeared; map will not render');
+          return;
+        }
+        setTimeout(function () { waitForGlobal(deadline); }, POLL_INTERVAL_MS);
+      }
+
+      function inject() {
+        injected = true;
+        var script = document.createElement('script');
+        script.src = MAPKIT_SRC;
+        script.crossOrigin = 'anonymous';
+        script.async = true;
+        // MapKit reads this off its own script element via document.currentScript,
+        // which is populated for dynamically inserted classic scripts too.
+        script.setAttribute('data-libraries', MAPKIT_LIBRARIES);
+        script.addEventListener('load', function () {
+          waitForGlobal(Date.now() + READY_TIMEOUT_MS);
+        });
+        script.addEventListener('error', function () {
+          console.error('[MapKit] failed to load ' + MAPKIT_SRC);
+        });
+        document.head.appendChild(script);
+      }
+
+      // Called from Dart: js.context.callMethod('whenMapKitReady', [callback]).
+      window.whenMapKitReady = function (callback) {
+        if (typeof callback !== 'function') {
+          return;
+        }
+        if (ready && usable()) {
+          callback();
+          return;
+        }
+        callbacks.push(callback);
+        if (!injected) {
+          inject();
+        }
+      };
     })();
-
-    // Helper function for Flutter code to use
-    // This is what event_map_widget.dart calls via js.context.callMethod('whenMapKitReady', ...)
-    window.whenMapKitReady = function(callback) {
-      console.log('[MapKit] whenMapKitReady called, loaded:', window.mapKitLoaded);
-      if (window.mapKitLoaded) {
-        callback();
-      } else {
-        window.mapKitCallbacks.push(callback);
-      }
-    };
   </script>
 
   <script>
@@ -187,7 +304,7 @@
   <picture id="splash">
       <source srcset="splash/img/light-1x.png 1x, splash/img/light-2x.png 2x, splash/img/light-3x.png 3x, splash/img/light-4x.png 4x" media="(prefers-color-scheme: light)">
       <source srcset="splash/img/dark-1x.png 1x, splash/img/dark-2x.png 2x, splash/img/dark-3x.png 3x, splash/img/dark-4x.png 4x" media="(prefers-color-scheme: dark)">
-      <img class="center" aria-hidden="true" src="splash/img/light-1x.png" alt="">
+      <img class="center" aria-hidden="true" fetchpriority="high" src="splash/img/light-1x.png" alt="">
   </picture>
 
   <script>
@@ -296,27 +413,17 @@
             serviceWorkerVersion: serviceWorkerVersion,
           },
           onEntrypointLoaded: function (engineInitializer) {
-            const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-              navigator.userAgent || ''
-            );
-
-            const supportsWebGL = (() => {
-              try {
-                const canvas = document.createElement('canvas');
-                return !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
-              } catch (_) {
-                return false;
-              }
-            })();
-
-            const preferHtmlRenderer = isMobileDevice || !supportsWebGL;
-
-            const rendererConfig = preferHtmlRenderer
-              ? { renderer: 'html', useColorEmoji: true }
-              : { renderer: 'canvaskit', useColorEmoji: true };
-
+            // There is no HTML renderer in Flutter 3.41: WebRendererMode has
+            // exactly two values, canvaskit and skwasm, and the engine ignores
+            // config.renderer entirely (requestedRendererType in
+            // lib/web_ui/lib/src/engine/configuration.dart has no consumers
+            // anywhere in the engine). The branch this replaced asked for
+            // 'html' on every iPhone and iPad, which has been dead config
+            // since that renderer was removed, and it built a throwaway canvas
+            // and WebGL context on every boot to decide it. Both are gone; the
+            // engine picks canvaskit either way, which is what already shipped.
             engineInitializer
-              .initializeEngine(rendererConfig)
+              .initializeEngine({ useColorEmoji: true })
               .then(function (appRunner) {
                 removeSplashFromWeb();
                 appRunner.runApp();

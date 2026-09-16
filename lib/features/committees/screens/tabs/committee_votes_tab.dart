@@ -5,8 +5,10 @@ import 'package:bluebubbles/features/forms/models/voting_form.dart';
 import 'package:bluebubbles/features/forms/services/votes_service.dart';
 import 'package:bluebubbles/features/forms/services/form_analytics_service.dart';
 import 'package:bluebubbles/features/forms/widgets/vote_card.dart';
-import 'package:bluebubbles/features/forms/screens/votes/vote_builder_screen.dart';
-import 'package:bluebubbles/features/forms/screens/votes/vote_detail_screen.dart';
+// Lazy shims: vote_detail reaches vote_builder and through it flutter_quill
+// (~38K package lines), so both are `deferred as` behind these wrappers.
+import 'package:bluebubbles/features/forms/screens/votes/vote_builder_screen_lazy.dart';
+import 'package:bluebubbles/features/forms/screens/votes/vote_detail_screen_lazy.dart';
 import 'member_votes_view.dart';
 
 // Brand colors matching the main dashboard
@@ -392,7 +394,7 @@ class _CommitteeVotesTabState extends State<CommitteeVotesTab>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => VoteBuilderScreen(committee: _committeeDbName),
+        builder: (_) => VoteBuilderScreenLazy(committee: _committeeDbName),
       ),
     );
   }
@@ -401,7 +403,7 @@ class _CommitteeVotesTabState extends State<CommitteeVotesTab>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => VoteDetailScreen(
+        builder: (_) => VoteDetailScreenLazy(
           voteId: vote.id,
           onSendAsEmail: widget.isMemberView ? null : widget.onNavigateToEmail,
           onSendAsMessage: widget.isMemberView
@@ -418,7 +420,7 @@ class _CommitteeVotesTabState extends State<CommitteeVotesTab>
       context,
       MaterialPageRoute(
         builder: (_) =>
-            VoteBuilderScreen(voteId: vote.id, committee: _committeeDbName),
+            VoteBuilderScreenLazy(voteId: vote.id, committee: _committeeDbName),
       ),
     );
   }

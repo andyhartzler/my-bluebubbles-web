@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:provider/provider.dart';
 
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_overview_tab.dart';
@@ -18,12 +17,14 @@ import 'package:bluebubbles/features/committees/services/committee_repository.da
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/canvas_board/screens/committee_canvas_tab.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
-import 'package:bluebubbles/features/committees/legislation_tracker/screens/legislation_tracker_screen.dart';
-import 'package:bluebubbles/features/committees/legislation_tracker/providers/legislation_provider.dart';
-import 'package:bluebubbles/features/committees/legislation_tracker/providers/bill_search_provider.dart';
+// Lazy shims: the tracker (with its two providers) and the candidates page are
+// `deferred as` behind these wrappers, so neither subtree is compiled into the
+// boot chunk. Importing the real screens here is what defeated
+// `candidates_page_lazy.dart` and `committees_dashboard_screen_lazy.dart`.
+import 'package:bluebubbles/features/committees/legislation_tracker/screens/legislation_tracker_screen_lazy.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_settings_tab.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
-import 'package:bluebubbles/screens/crm/candidates_page.dart';
+import 'package:bluebubbles/screens/crm/candidates_page_lazy.dart';
 
 class CommitteeWorkspaceScreen extends StatefulWidget {
   final Committee committee;
@@ -199,13 +200,11 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
         _TabDefinition(
           label: 'Legislation',
           icon: Icons.gavel_outlined,
-          builder: () => MultiProvider(
-            providers: [
-              ChangeNotifierProvider(create: (_) => LegislationProvider()),
-              ChangeNotifierProvider(create: (_) => BillSearchProvider()),
-            ],
-            child: LegislationTrackerScreen(committeeId: committee.id),
-          ),
+          // The MultiProvider that used to sit here now lives inside
+          // legislation_tracker_entry.dart, behind the deferred boundary, so
+          // the two providers are not compiled into the boot chunk either.
+          builder: () =>
+              LegislationTrackerScreenLazy(committeeId: committee.id),
         ),
       );
     }
@@ -215,7 +214,7 @@ class _CommitteeWorkspaceScreenState extends State<CommitteeWorkspaceScreen>
         _TabDefinition(
           label: 'Candidates',
           icon: Icons.how_to_vote,
-          builder: () => const CandidatesPage(),
+          builder: () => const CandidatesPageLazy(),
         ),
       );
     }

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
-import 'package:bluebubbles/features/forms/screens/endorsement_hub/endorsement_hub_screen.dart';
+// Lazy shims: the endorsement hub (~16K lines) and the volunteers war-room
+// workspace (~14.6K lines) are `deferred as` behind these wrappers, so opening
+// the Field area does not download either of them.
+import 'package:bluebubbles/features/forms/screens/endorsement_hub/endorsement_hub_screen_lazy.dart';
 import 'package:bluebubbles/features/forms/theme/moyd_brand.dart';
 import 'package:bluebubbles/screens/crm/candidates/candidates_mobile_page.dart';
 import 'package:bluebubbles/screens/crm/candidates/candidates_split_page.dart';
-import 'package:bluebubbles/screens/crm/volunteers/candidate_volunteers_workspace.dart';
+import 'package:bluebubbles/screens/crm/volunteers/candidate_volunteers_workspace_lazy.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  CANDIDATES INTELLIGENCE PAGE — ROUTER
@@ -51,8 +54,9 @@ class _CandidatesPageState extends State<CandidatesPage> {
         ),
         Expanded(
           child: switch (_area) {
-            CandidatesArea.volunteers => const CandidateVolunteersWorkspace(),
-            CandidatesArea.endorsementHq => const EndorsementHubScreen(),
+            CandidatesArea.volunteers =>
+              const CandidateVolunteersWorkspaceLazy(),
+            CandidatesArea.endorsementHq => const EndorsementHubScreenLazy(),
             CandidatesArea.field => _fieldBody(),
           },
         ),

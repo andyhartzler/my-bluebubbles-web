@@ -7,6 +7,7 @@ import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
+import 'package:bluebubbles/utils/postgrest_filters.dart';
 
 /// Repository for committee-related data operations
 class CommitteeRepository {
@@ -19,6 +20,97 @@ class CommitteeRepository {
   bool get isReady => _supabase.isInitialized;
 
   SupabaseClient get _readClient => _supabase.client;
+
+  // ── Per-committee member counts, batched ──────────────────────────────
+  //
+  // getMemberCountForCommittee used to fire one exact COUNT() over
+  // public.members per committee, and the committees dashboard calls it once
+  // per committee in CommitteeDefinitions.all, so opening the dashboard cost
+  // seven round trips for one grouped read.
+  // public.get_committee_member_counts() already exists (20260722_stats_rpcs)
+  // and returns {committee_name: member_count} for every non-empty committee
+  // in a single pass. The TTL is deliberately short, and both write paths
+  // invalidate it, so an add/remove is never followed by a stale badge.
+  static const Duration _memberCountTtl = Duration(seconds: 30);
+  static Map<String, int>? _memberCountCache;
+  static DateTime? _memberCountFetchedAt;
+  static Future<Map<String, int>>? _memberCountInFlight;
+
+  /// Drop the cached per-committee member counts (session teardown, and after
+  /// any write that changes a member's committee array).
+  static void clearMemberCountCache() {
+    _memberCountCache = null;
+    _memberCountFetchedAt = null;
+    _memberCountInFlight = null;
+    // Nulling the future does not cancel the request it represents. Bump the
+    // generation so that when that older response does land, it recognises
+    // that the world moved on and discards itself instead of writing its
+    // pre-write counts back over the cache we just cleared.
+    _memberCountGeneration++;
+  }
+
+  /// Incremented by [clearMemberCountCache]. A fetch captures this when it
+  /// starts and only publishes its result if the value still matches, so a
+  /// response that was already in flight when a member was added or removed
+  /// cannot resurrect the old count.
+  static int _memberCountGeneration = 0;
+
+  /// {committee name → member count} for every committee, in one round trip.
+  Future<Map<String, int>> fetchAllCommitteeMemberCounts(
+      {bool forceRefresh = false}) async {
+    if (!isReady) return const {};
+
+    final cached = _memberCountCache;
+    if (!forceRefresh &&
+        cached != null &&
+        _memberCountFetchedAt != null &&
+        DateTime.now().difference(_memberCountFetchedAt!) < _memberCountTtl) {
+      return cached;
+    }
+
+    // Seven getCommitteeStats() calls land together on dashboard open. Share
+    // one in-flight future so they collapse to a single request rather than
+    // seven that each miss the cache.
+    if (!forceRefresh && _memberCountInFlight != null) {
+      return _memberCountInFlight!;
+    }
+
+    final generation = _memberCountGeneration;
+
+    final future = () async {
+      try {
+        final response = await _readClient.rpc('get_committee_member_counts');
+        final counts = <String, int>{};
+        if (response is Map) {
+          response.forEach((key, value) {
+            counts[key.toString()] = (value as num?)?.toInt() ?? 0;
+          });
+        }
+        // Only publish if no write invalidated the cache while this was in
+        // flight. Without this check, adding or removing a committee member
+        // during an open fetch lets the older response overwrite the cache
+        // with counts taken before the user's own edit, and the badge shows
+        // the stale number for the rest of the TTL.
+        if (generation == _memberCountGeneration) {
+          _memberCountCache = counts;
+          _memberCountFetchedAt = DateTime.now();
+        }
+        return counts;
+      } catch (e) {
+        debugPrint('Error fetching committee member counts: $e');
+        return _memberCountCache ?? const <String, int>{};
+      } finally {
+        // Do not clear a newer in-flight future that a post-invalidation
+        // caller may already have installed.
+        if (generation == _memberCountGeneration) {
+          _memberCountInFlight = null;
+        }
+      }
+    }();
+
+    _memberCountInFlight = future;
+    return future;
+  }
 
   /// Get all members belonging to a committee
   Future<List<Member>> getMembersForCommittee(String committeeName, {int? limit}) async {
@@ -43,21 +135,15 @@ class CommitteeRepository {
     }
   }
 
-  /// Get member count for a committee
+  /// Get member count for a committee.
+  ///
+  /// Reads the batched map rather than firing its own exact COUNT(), so N
+  /// committees cost one request instead of N. A committee with no members is
+  /// absent from the map and correctly reports 0.
   Future<int> getMemberCountForCommittee(String committeeName) async {
     if (!isReady) return 0;
-
-    try {
-      final PostgrestResponse response = await _readClient
-          .from('members')
-          .select('id')
-          .contains('committee', [committeeName])
-          .count(CountOption.exact);
-      return response.count ?? 0;
-    } catch (e) {
-      debugPrint('Error counting committee members: $e');
-      return 0;
-    }
+    final counts = await fetchAllCommitteeMemberCounts();
+    return counts[committeeName] ?? 0;
   }
 
   /// Add a member to a committee
@@ -96,6 +182,7 @@ class CommitteeRepository {
           .update({'committee': currentCommittees})
           .eq('id', memberId);
 
+      clearMemberCountCache();
       return true;
     } catch (e) {
       debugPrint('Error adding member to committee: $e');
@@ -134,6 +221,7 @@ class CommitteeRepository {
           .update({'committee': currentCommittees})
           .eq('id', memberId);
 
+      clearMemberCountCache();
       return true;
     } catch (e) {
       debugPrint('Error removing member from committee: $e');
@@ -141,36 +229,64 @@ class CommitteeRepository {
     }
   }
 
+  /// Columns the "add member to committee" picker actually renders: the
+  /// avatar resolver needs avatar_url + profile_pictures, the subtitle needs
+  /// email + school_email (Member.preferredEmail), and the exclusion below
+  /// needs `committee`. The old bare `.select()` pulled every column of every
+  /// member row (~1.4 kB each) to draw a name, an email and a face.
+  static const String _pickerColumns =
+      'id, name, email, school_email, avatar_url, profile_pictures, committee';
+
+  /// Results the picker shows. The dialog is a typeahead, so this is a display
+  /// bound rather than a data bound.
+  static const int _pickerResultLimit = 50;
+
   /// Get all members NOT in a specific committee (for adding new members)
   Future<List<Member>> getMembersNotInCommittee(String committeeName, {String? searchQuery}) async {
     if (!isReady) return [];
 
     try {
-      // Get all members and filter out those in the committee
-      var query = _readClient
-          .from('members')
-          .select()
-          .order('name', ascending: true);
+      // The search runs SERVER-side now. It used to download the whole members
+      // table and substring-match in Dart, which also meant the query was
+      // silently capped at 1000 rows once the roster outgrew that.
+      //
+      // The committee exclusion stays in Dart deliberately. Expressing it as
+      // PostgREST `not.cs` is a trap: NOT over a NULL array is NULL, so every
+      // member with no committees would be excluded from the picker, which is
+      // precisely the set you most want to add. The rows are already narrow
+      // and bounded by the search, so filtering them here is cheap and cannot
+      // get that wrong.
+      final all = <Member>[];
+      const pageSize = 1000;
+      var offset = 0;
 
-      final data = await query;
-      final allMembers = _mapMembers(data as List<dynamic>);
+      while (true) {
+        var query = _readClient.from('members').select(_pickerColumns);
 
-      // Filter to members NOT in this committee
-      var filtered = allMembers.where((m) {
-        final committees = m.committee ?? [];
-        return !committees.contains(committeeName);
-      }).toList();
+        if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+          query = query.or(buildIlikeOrClauses(
+            const ['name', 'email', 'school_email'],
+            searchQuery.trim(),
+          ));
+        }
 
-      // Apply search query if provided
-      if (searchQuery != null && searchQuery.isNotEmpty) {
-        final query = searchQuery.toLowerCase();
-        filtered = filtered.where((m) {
-          return m.name.toLowerCase().contains(query) ||
-              (m.email?.toLowerCase().contains(query) ?? false);
-        }).toList();
+        final data = await query
+            .order('name', ascending: true)
+            .order('id', ascending: true)
+            .range(offset, offset + pageSize - 1);
+
+        final rows = data as List<dynamic>;
+        all.addAll(_mapMembers(rows));
+        if (rows.length < pageSize) break;
+        offset += pageSize;
       }
 
-      return filtered.take(50).toList(); // Limit results
+      final filtered = all.where((m) {
+        final committees = m.committee ?? const <String>[];
+        return !committees.contains(committeeName);
+      }).take(_pickerResultLimit).toList();
+
+      return filtered;
     } catch (e) {
       debugPrint('Error fetching non-committee members: $e');
       return [];

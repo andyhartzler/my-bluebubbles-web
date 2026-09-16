@@ -246,3 +246,22 @@ class PlayerStreams {
       this.height,
       );
 }
+
+
+/// Web stub for `media_kit_video`'s `AdaptiveVideoControls`.
+///
+/// The real one is a `Widget Function(VideoState)` living in
+/// `media_kit_video/media_kit_video_controls/media_kit_video_controls.dart`.
+/// `fullscreen_video.dart` imported that library UNCONDITIONALLY, which
+/// bypassed the `if (dart.library.html)` swap in models.dart and dragged the
+/// real media_kit_video (31 files) and, through it, media_kit (47 files) into
+/// the web bundle even though every other media_kit symbol was already stubbed
+/// here. That file now uses the same conditional import, and this is what it
+/// resolves to on web.
+///
+/// Rendering a blank box loses nothing: models.dart already swaps the entire
+/// media_kit `Player` for the stub above, and [Video] renders
+/// `SizedBox.shrink()`, so video playback on web was already inert and these
+/// controls were never reachable.
+// ignore: non_constant_identifier_names
+Widget AdaptiveVideoControls(dynamic state) => const SizedBox.shrink();

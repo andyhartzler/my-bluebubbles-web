@@ -3,6 +3,10 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timezone/timezone.dart' as tz;
+// tzLocation() initializes the IANA database on first lookup. main() no
+// longer calls initializeTimeZones() before runApp, so a bare
+// tz.getLocation() here would throw LocationNotFoundException at render.
+import 'package:bluebubbles/helpers/tz_location.dart';
 import '../../models/job.dart';
 import '../../models/job_application.dart';
 import '../../models/job_notification_log.dart';
@@ -1991,7 +1995,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   String _formatCentralTime(DateTime dateTime) {
-    final central = tz.getLocation('America/Chicago');
+    final central = tzLocation('America/Chicago');
     final centralTime = tz.TZDateTime.from(dateTime.toUtc(), central);
     return DateFormat.MMMd().add_jm().format(centralTime);
   }

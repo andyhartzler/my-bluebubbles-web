@@ -241,14 +241,40 @@ class _FinancesPageState extends State<FinancesPage>
     }
   }
 
+  /// Completed donations, PAGED.
+  ///
+  /// `_donationCount` and `_donationTotal` are the headline raised figures on
+  /// this page and they are folded from these rows, so the fetch has to be
+  /// complete or both numbers are wrong. It used to send no `.range()` and no
+  /// `.limit()`, which means PostgREST would cap it at the first 1000 rows by
+  /// date the moment the table passed that mark, and both figures would
+  /// silently become "the most recent 1000 donations" with no error. donations
+  /// holds 0 rows today, so this is dormant rather than benign.
   Future<void> _loadDonations() async {
     try {
-      final resp = await _supabase.client
-          .from('donations')
-          .select('amount, donation_date, donor_id, payment_method, status')
-          .eq('status', 'completed')
-          .order('donation_date', ascending: false);
-      final list = (resp as List).cast<Map<String, dynamic>>();
+      const pageSize = 1000;
+      final list = <Map<String, dynamic>>[];
+      var offset = 0;
+
+      while (true) {
+        final resp = await _supabase.client
+            .from('donations')
+            .select('id, amount, donation_date, donor_id, payment_method, status')
+            .eq('status', 'completed')
+            .order('donation_date', ascending: false)
+            // donation_date is not unique, so `id` is the page tie-break:
+            // without it a boundary landing inside a block of same-dated rows
+            // would repeat some and skip others, and the total would be
+            // quietly wrong rather than obviously broken.
+            .order('id', ascending: false)
+            .range(offset, offset + pageSize - 1);
+
+        final page = (resp as List).cast<Map<String, dynamic>>();
+        list.addAll(page);
+        if (page.length < pageSize) break;
+        offset += pageSize;
+      }
+
       if (mounted) setState(() {
         _donations = list;
         _donationCount = list.length;

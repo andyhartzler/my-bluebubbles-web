@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
+// tzLocation() initializes the IANA database on first lookup. main() no
+// longer calls initializeTimeZones() before runApp, so a bare
+// tz.getLocation() here would throw LocationNotFoundException at render.
+import 'package:bluebubbles/helpers/tz_location.dart';
 
 import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/screens/crm/event_detail_screen.dart';
@@ -261,7 +265,7 @@ class _ActivityPanelState extends State<ActivityPanel>
   /// optional HH:MM[:SS] component when `date` is just a date.
   static String _formatChicago(String? date, String? start) {
     if (date == null || date.isEmpty) return '';
-    final chicago = tz.getLocation('America/Chicago');
+    final chicago = tzLocation('America/Chicago');
     DateTime? parsed;
 
     if (date.contains('T') || date.contains(' ')) {

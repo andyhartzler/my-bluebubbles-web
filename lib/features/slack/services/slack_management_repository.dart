@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:postgrest/postgrest.dart' show CountOption, PostgrestResponse;
 
 import 'package:bluebubbles/features/slack/models/slack_channel.dart';
 import 'package:bluebubbles/features/slack/models/slack_analytics.dart';
@@ -259,23 +258,6 @@ class SlackManagementRepository {
     } catch (e) {
       debugPrint('Error fetching unmatched users: $e');
       return [];
-    }
-  }
-
-  /// Get count of unmatched users
-  Future<int> getUnmatchedUsersCount() async {
-    if (!isReady) return 0;
-
-    try {
-      final PostgrestResponse response = await _readClient
-          .from('slack_users_unmatched')
-          .select('id')
-          .eq('manually_rejected', false)
-          .count(CountOption.exact);
-      return response.count ?? 0;
-    } catch (e) {
-      debugPrint('Error counting unmatched users: $e');
-      return 0;
     }
   }
 

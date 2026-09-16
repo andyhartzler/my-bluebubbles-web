@@ -2022,6 +2022,20 @@ class _MecResearchTabState extends State<MecResearchTab> {
                         fontSize: 14,
                       ),
                     ),
+                    // `total` and `count` are the RPC's figures over every
+                    // matching row. The list below is filtered out of the
+                    // capped slice, so it can be shorter. Say which is which
+                    // rather than let the header contradict the rows.
+                    if (matching.length < count) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Showing the ${matching.length} most recent',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -2193,7 +2207,14 @@ class _MecResearchTabState extends State<MecResearchTab> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'All Contributions (${contributions.length})',
+          // The rows are capped at MecRepository.contributionRowDisplayLimit
+          // while the totals in the header above come from the RPC over every
+          // matching row. Without this label the two disagree on screen and
+          // the page looks wrong. Name the bound instead of hiding it.
+          contributions.length >= MecRepository.contributionRowDisplayLimit
+              ? 'Contributions (most recent '
+                  '${contributions.length} of ${_profileData['count'] ?? contributions.length})'
+              : 'All Contributions (${contributions.length})',
           style: BrandTextStyles.titleLarge,
         ),
         const SizedBox(height: 12),

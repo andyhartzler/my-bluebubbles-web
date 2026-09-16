@@ -1249,17 +1249,6 @@ class JobsService {
         .toList();
   }
 
-  /// Get notification log count for a job
-  Future<int> getNotificationLogCountForJob(String jobId) async {
-    final response = await _readClient
-        .from('job_notification_log')
-        .select()
-        .eq('job_id', jobId)
-        .count(CountOption.exact);
-
-    return response.count;
-  }
-
   // ============================================================================
   // Job Analytics Methods
   // ============================================================================

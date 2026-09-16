@@ -50,6 +50,21 @@ Future<T?> createAsyncTask<T>(AsyncTask<List<dynamic>, T> task) async {
   return task.result;
 }
 
+/// LOAD-BEARING FOR THE WEB BUNDLE SIZE. Do not reorder this expression.
+///
+/// This is a runtime getter over universal_io's `Platform`, not a const, so on
+/// its own dart2js could not fold it. The trailing `&& !kIsWeb` is what saves
+/// us: `kIsWeb` IS a compile-time constant and is true on web, so the whole
+/// conjunction folds to constant false and every `if (kIsDesktop)` body is
+/// dropped. Measured against the shipped main.dart.js: window_manager,
+/// screen_retriever, google_ml_kit, bitsdojo_window, flutter_acrylic,
+/// local_notifier, system_tray, tray_manager, windows_taskbar and
+/// flutter_timezone all contribute ZERO sources to the source map.
+///
+/// Dropping the `!kIsWeb` term, or normalising this to just the three Platform
+/// checks, silently pulls all of those packages back into the web bundle,
+/// worth several megabytes. If you touch this line, re-run a source-map
+/// package census on build/web/main.dart.js and confirm they are still absent.
 bool get kIsDesktop => (Platform.isWindows || Platform.isLinux || Platform.isMacOS) && !kIsWeb;
 
 bool get isSnap => !kIsWeb && Platform.isLinux && Platform.environment.containsKey('SNAP');

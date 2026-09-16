@@ -42,7 +42,11 @@ import 'package:bluebubbles/screens/crm/member_portal/member_portal_management_s
 import 'package:bluebubbles/screens/crm/subscribers_screen.dart';
 import 'package:bluebubbles/screens/crm/wallet_notification_composer.dart';
 import 'package:bluebubbles/features/committees/screens/committees_dashboard_screen_lazy.dart';
-import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
+// dashboard_screen.dart is deliberately NOT imported here. It was a dead import
+// (no symbol from it is referenced in this file) and it reached the whole
+// committees and candidates tree, which is what defeated
+// committees_dashboard_screen_lazy.dart. DashboardShellScreen now mounts it
+// through dashboard_screen_lazy.dart instead.
 import 'package:bluebubbles/screens/crm/personalized_home/personalized_home_screen.dart';
 import 'package:bluebubbles/screens/crm/dashboard_shell/dashboard_shell_screen.dart';
 import 'package:bluebubbles/features/campaigns/screens/mautic_embed_screen.dart';
@@ -79,8 +83,11 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:secure_application/secure_application.dart';
 import 'package:system_tray/system_tray.dart' as st;
-import 'package:timezone/data/latest.dart' as tz;
+// `timezone/data/latest.dart` is deliberately NOT imported here. Loading the
+// IANA database is now lazy, via lib/helpers/tz_location.dart, so it no longer
+// runs on the critical path to first paint.
 import 'package:timezone/timezone.dart' as tz;
+import 'package:bluebubbles/helpers/tz_location.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'dart:js' as js;
 import 'package:universal_html/html.dart' as html;
@@ -92,7 +99,10 @@ import 'package:bluebubbles/features/ai_assistant/providers/ai_assistant_provide
 import 'package:bluebubbles/features/ai_assistant/screens/ai_assistant_screen.dart';
 import 'package:bluebubbles/features/ai_assistant/screens/knowledge_admin_screen.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
-import 'package:bluebubbles/features/committees/screens/committee_hub_screen.dart';
+// Lazy shim: CommitteeHubScreen reaches committee_member_workspace_screen and
+// from there most of the committees tree, so importing it eagerly here defeated
+// committees_dashboard_screen_lazy.dart.
+import 'package:bluebubbles/features/committees/screens/committee_hub_screen_lazy.dart';
 import 'package:windows_taskbar/windows_taskbar.dart';
 
 bool isAuthing = false;
@@ -142,7 +152,25 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
         DeviceOrientation.portraitDown,
       ]);
 
-      await dotenv.load(fileName: '.env', isOptional: true);
+      // On web this used to be `await dotenv.load(...)`, which issues an HTTP
+      // GET for `assets/.env`. pubspec.yaml deliberately does not ship that
+      // asset (see the comment there: bundling it would publish secrets), so
+      // the request always 404s, throws, and is swallowed by isOptional, after
+      // a full network round trip that first paint waits on.
+      //
+      // `loadFromString` is the synchronous equivalent: it sets dotenv's
+      // initialized flag with an empty map and performs no I/O, which is the
+      // exact state the 404 produced. It must run rather than being skipped,
+      // because CRMConfig reads `dotenv.env[...]` directly and that getter
+      // throws NotInitializedError when load has never been called.
+      //
+      // Values on web come from the compile-time --dart-define block in
+      // StartupTasks._resolveEnvValue, not from this file.
+      if (kIsWeb) {
+        dotenv.loadFromString(envString: '', isOptional: true);
+      } else {
+        await dotenv.load(fileName: '.env', isOptional: true);
+      }
 
       if (CRMConfig.crmEnabled) {
         try {
@@ -191,12 +219,20 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
         await initializeDateFormatting('en_US');
 
         /* ----- MEDIAKIT INITIALIZATION ----- */
-        MediaKit.ensureInitialized();
+        // Desktop and mobile only. On web `MediaKit` resolves to the stub in
+        // lib/database/html/media_kit.dart via the conditional export in
+        // models.dart, so this call is already an empty method there; the guard
+        // just says so. Do NOT remove the conditional export in models.dart:
+        // that is the mechanism keeping media_kit out of the web bundle.
+        if (!kIsWeb) MediaKit.ensureInitialized();
 
         /* ----- TIME ZONE INITIALIZATION ----- */
-        // Must run on every platform: web/desktop widgets (e.g. the Meetings
-        // panels) call tz.getLocation() during render.
-        tz.initializeTimeZones();
+        // Deliberately NOT initialized here. The old comment claimed the
+        // Meetings panels call tz.getLocation() during render; they do not
+        // (meetings_screen.dart contains no tz reference at all), and first
+        // paint is the auth gate, which reaches no tz consumer. Loading the
+        // IANA blob is now lazy: every consumer goes through tzLocation() in
+        // lib/helpers/tz_location.dart, which initializes on first lookup.
 
         /* ----- SPLASH SCREEN INITIALIZATION ----- */
         if (!ss.settings.finishedSetup.value && !kIsWeb && !kIsDesktop) {
@@ -220,8 +256,11 @@ Future<Null> initApp(bool bubble, List<String> arguments) async {
         if (!kIsWeb && !kIsDesktop) {
           /* ----- LOCAL TIME ZONE DETECTION ----- */
           try {
+            // tzLocation() initializes the IANA database on first use, which
+            // is what the removed tz.initializeTimeZones() above used to do
+            // for this call site.
             tz.setLocalLocation(
-              tz.getLocation(await FlutterTimezone.getLocalTimezone()),
+              tzLocation(await FlutterTimezone.getLocalTimezone()),
             );
           } catch (e) {
             debugPrint('main.initTimezone error: $e');
@@ -2596,7 +2635,7 @@ class _AuthenticatedAppState extends State<AuthenticatedApp> {
 
         if (session.isCommitteeMember) {
           // Committee members get the Committee Hub
-          return const CommitteeHubScreen();
+          return const CommitteeHubScreenLazy();
         }
 
         // Fallback: no valid access (shouldn't happen if auth gate worked correctly)

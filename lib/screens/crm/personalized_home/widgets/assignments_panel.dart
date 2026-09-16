@@ -2,13 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:bluebubbles/features/committees/legislation_tracker/screens/bill_detail_screen.dart';
-import 'package:bluebubbles/features/forms/screens/endorsement_hub/endorsement_hub_screen.dart';
-import 'package:bluebubbles/features/forms/screens/jobs/job_detail_screen.dart';
+// Lazy shims. This panel sits on the personalized home screen, which is the
+// first surface most execs see, so importing these four screens eagerly pulled
+// the legislation tracker, the endorsement hub, the jobs module and the
+// volunteers war room into the boot bundle. Each is now `deferred as` behind
+// its wrapper and downloads only when the exec taps through to it.
+import 'package:bluebubbles/features/committees/legislation_tracker/screens/bill_detail_screen_lazy.dart';
+import 'package:bluebubbles/features/forms/screens/endorsement_hub/endorsement_hub_screen_lazy.dart';
+import 'package:bluebubbles/features/forms/screens/jobs/job_detail_screen_lazy.dart';
 import 'package:bluebubbles/models/crm/assignment.dart';
 import 'package:bluebubbles/models/crm/event.dart';
 import 'package:bluebubbles/screens/crm/candidate_detail_screen.dart';
-import 'package:bluebubbles/screens/crm/volunteers/candidate_volunteers_workspace.dart';
+import 'package:bluebubbles/screens/crm/volunteers/candidate_volunteers_workspace_lazy.dart';
 import 'package:bluebubbles/screens/crm/event_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/member_portal/member_portal_management_screen.dart';
@@ -271,7 +276,7 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
       await navigator.push(MaterialPageRoute(
         builder: (_) => Scaffold(
           appBar: AppBar(title: const Text('Endorsement HQ')),
-          body: const EndorsementHubScreen(),
+          body: const EndorsementHubScreenLazy(),
         ),
       ));
       await _refreshAuto();
@@ -294,7 +299,7 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => Scaffold(
         appBar: AppBar(title: const Text('Candidate Volunteers')),
-        body: const CandidateVolunteersWorkspace(),
+        body: const CandidateVolunteersWorkspaceLazy(),
       ),
     ));
   }
@@ -351,7 +356,7 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
           navigator.push(MaterialPageRoute(builder: (_) => EventDetailScreen(initialEvent: ev)));
           return;
         case 'job':
-          navigator.push(MaterialPageRoute(builder: (_) => JobDetailScreen(jobId: id)));
+          navigator.push(MaterialPageRoute(builder: (_) => JobDetailScreenLazy(jobId: id)));
           return;
         case 'bill':
           if (committeeId == null || committeeId.isEmpty) {
@@ -361,7 +366,8 @@ class _AssignmentsPanelState extends State<AssignmentsPanel>
             return;
           }
           navigator.push(MaterialPageRoute(
-            builder: (_) => BillDetailScreen(billId: id, committeeId: committeeId),
+            builder: (_) =>
+                BillDetailScreenLazy(billId: id, committeeId: committeeId),
           ));
           return;
         default:

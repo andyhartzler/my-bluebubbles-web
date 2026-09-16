@@ -34,8 +34,11 @@ import 'package:bluebubbles/features/forms/models/form_submission.dart';
 import 'package:bluebubbles/features/forms/services/forms_service.dart';
 import 'package:bluebubbles/features/forms/services/votes_service.dart';
 import 'package:bluebubbles/features/forms/widgets/submission_status_badge.dart';
-import 'package:bluebubbles/features/forms/screens/submission_detail_screen.dart';
-import 'package:bluebubbles/features/forms/screens/votes/vote_detail_screen.dart';
+// Lazy shims: the endorsement submission review and the vote detail screen
+// (which reaches vote_builder and flutter_quill) are `deferred as` behind these
+// wrappers, so neither is compiled into the boot chunk.
+import 'package:bluebubbles/features/forms/screens/submission_detail_screen_lazy.dart';
+import 'package:bluebubbles/features/forms/screens/votes/vote_detail_screen_lazy.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -2649,7 +2652,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => isEndorsement
-            ? SubmissionDetailScreen(
+            ? SubmissionDetailScreenLazy(
                 formId: submission.formId,
                 submissionId: submission.id,
               )
@@ -2674,7 +2677,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => VoteDetailScreen(voteId: voteId),
+        builder: (context) => VoteDetailScreenLazy(voteId: voteId),
       ),
     );
   }

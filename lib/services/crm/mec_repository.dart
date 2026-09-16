@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
@@ -14,6 +15,27 @@ class MecRepository {
   bool get isReady => CRMConfig.crmEnabled && _supabase.isInitialized;
 
   SupabaseClient get _readClient => _supabase.client;
+
+  /// Explicit projection for public.mec_contributions, replacing the bare
+  /// `.select()` this repository used to send against a 3.27M-row table.
+  /// Every column here is one MecContribution.fromJson reads; naming them
+  /// stops the payload growing silently as the table gains columns.
+  static const String _contributionColumns =
+      'id,mec_id,donor_id,committee_name,report,contributor_committee,'
+      'contributor_company,contributor_last_name,contributor_first_name,'
+      'address1,address2,city,state,zip,employer,occupation,'
+      'contribution_date,contribution_amount,monetary_or_inkind,'
+      'is_committee_contributor,report_type,filing_year,created_at';
+
+  /// How many contribution rows the contributor profile renders.
+  ///
+  /// Deliberately 1000, which is exactly the ceiling PostgREST was already
+  /// imposing on the old unranged select. The rendered list is therefore the
+  /// same set of rows it has always been; what changes is that the totals
+  /// beside it are now computed server-side over EVERY matching row instead
+  /// of being folded from this slice. Making the bound explicit is the point:
+  /// the cap is now a decision rather than an accident.
+  static const int contributionRowDisplayLimit = 1000;
 
   // ---------------------------------------------------------------------------
   // searchDonors (RPC — aggregated donor search)
@@ -199,89 +221,108 @@ class MecRepository {
     String? firstName,
     String? company,
   }) async {
+    const empty = <String, dynamic>{
+      'contributions': <MecContribution>[],
+      'totalAmount': 0.0,
+      'count': 0,
+      'committees': <Map<String, dynamic>>[],
+      'firstYear': null,
+      'lastYear': null,
+    };
+
     if (!isReady) {
-      return {
-        'contributions': <MecContribution>[],
-        'totalAmount': 0.0,
-        'count': 0,
-        'committees': <Map<String, dynamic>>[],
-        'firstYear': null,
-        'lastYear': null,
-      };
+      return Map<String, dynamic>.from(empty);
     }
 
-    var builder = _readClient
-        .from('mec_contributions')
-        .select()
-        .ilike('contributor_last_name', lastName);
-
-    if (firstName != null && firstName.isNotEmpty) {
-      builder = builder.ilike('contributor_first_name', firstName);
-    }
-    if (company != null && company.isNotEmpty) {
-      builder = builder.ilike('contributor_company', company);
-    }
-
-    final data = await builder.order('contribution_date', ascending: false);
-
-    final contributions = (data as List<dynamic>? ?? [])
-        .whereType<Map<String, dynamic>>()
-        .map(MecContribution.fromJson)
-        .toList();
-
-    if (contributions.isEmpty) {
-      return {
-        'contributions': <MecContribution>[],
-        'totalAmount': 0.0,
-        'count': 0,
-        'committees': <Map<String, dynamic>>[],
-        'firstYear': null,
-        'lastYear': null,
-      };
-    }
-
-    // Aggregate totals
+    // The aggregates used to be folded in Dart over the result of an UNRANGED
+    // `.select()` against public.mec_contributions (3.27M rows). PostgREST
+    // caps an unranged select at 1000 rows, so totalAmount, count and the
+    // year bounds were computed from the 1000 most recent contributions and
+    // any contributor above that reported a total that was simply wrong, with
+    // no error. public.get_mec_contributor_profile() computes them over every
+    // matching row server-side.
+    //
+    // NOTE FOR THE HANDOFF: these numbers move UPWARD after this change for
+    // any contributor with more than 1000 contributions. That is the
+    // correction landing, not a regression.
     double totalAmount = 0;
+    int count = 0;
     int? firstYear;
     int? lastYear;
+    var committees = <Map<String, dynamic>>[];
 
-    // Aggregate by committee
-    final committeeMap = <String, _CommitteeAgg>{};
-
-    for (final c in contributions) {
-      final amt = c.contributionAmount ?? 0;
-      totalAmount += amt;
-
-      final year = c.filingYear ?? c.contributionDate?.year;
-      if (year != null) {
-        firstYear = firstYear == null ? year : (year < firstYear ? year : firstYear);
-        lastYear = lastYear == null ? year : (year > lastYear ? year : lastYear);
-      }
-
-      final key = c.mecId ?? c.committeeName ?? 'unknown';
-      final agg = committeeMap.putIfAbsent(
-        key,
-        () => _CommitteeAgg(mecId: c.mecId, committeeName: c.committeeName),
+    try {
+      final agg = await _readClient.rpc(
+        'get_mec_contributor_profile',
+        params: {
+          'p_last_name': lastName,
+          'p_first_name': firstName,
+          'p_company': company,
+        },
       );
-      agg.total += amt;
-      agg.count += 1;
+
+      if (agg is Map) {
+        totalAmount = (agg['total_amount'] as num?)?.toDouble() ?? 0;
+        count = (agg['count'] as num?)?.toInt() ?? 0;
+        firstYear = (agg['first_year'] as num?)?.toInt();
+        lastYear = (agg['last_year'] as num?)?.toInt();
+
+        final rawCommittees = agg['committees'];
+        if (rawCommittees is List) {
+          committees = rawCommittees
+              .whereType<Map>()
+              .map((c) => <String, dynamic>{
+                    'mecId': c['mecId'] as String?,
+                    'committeeName': c['committeeName'] as String?,
+                    'total': (c['total'] as num?)?.toDouble() ?? 0,
+                    'count': (c['count'] as num?)?.toInt() ?? 0,
+                  })
+              .toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ MecRepository.getContributorProfile aggregate error: $e');
+      return Map<String, dynamic>.from(empty);
     }
 
-    final committees = committeeMap.values.toList()
-      ..sort((a, b) => b.total.compareTo(a.total));
+    if (count == 0) {
+      return Map<String, dynamic>.from(empty);
+    }
 
-    return {
+    // The row list is for DISPLAY only now, so it carries an explicit column
+    // list and an explicit .range() instead of relying on the PostgREST cap.
+    // The headline figures above no longer depend on how many rows come back.
+    final contributions = <MecContribution>[];
+    try {
+      var rowQuery = _readClient
+          .from('mec_contributions')
+          .select(_contributionColumns)
+          .ilike('contributor_last_name', lastName);
+
+      if (firstName != null && firstName.isNotEmpty) {
+        rowQuery = rowQuery.ilike('contributor_first_name', firstName);
+      }
+      if (company != null && company.isNotEmpty) {
+        rowQuery = rowQuery.ilike('contributor_company', company);
+      }
+
+      final data = await rowQuery
+          .order('contribution_date', ascending: false)
+          .order('id', ascending: false)
+          .range(0, contributionRowDisplayLimit - 1);
+
+      contributions.addAll((data as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(MecContribution.fromJson));
+    } catch (e) {
+      debugPrint('❌ MecRepository.getContributorProfile rows error: $e');
+    }
+
+    return <String, dynamic>{
       'contributions': contributions,
       'totalAmount': totalAmount,
-      'count': contributions.length,
-      'committees': committees
-          .map((c) => {
-                'mecId': c.mecId,
-                'committeeName': c.committeeName,
-                'total': c.total,
-                'count': c.count,
-              })
-          .toList(),
+      'count': count,
+      'committees': committees,
       'firstYear': firstYear,
       'lastYear': lastYear,
     };
@@ -303,68 +344,6 @@ class MecRepository {
 
     if (response == null) return null;
     return MecCommittee.fromJson(response as Map<String, dynamic>);
-  }
-
-  // ---------------------------------------------------------------------------
-  // getTopContributors
-  // ---------------------------------------------------------------------------
-
-  /// Get the top contributors to a specific committee, aggregated by
-  /// contributor name.
-  ///
-  /// Returns a list of maps sorted by total amount descending, each with:
-  /// `name`, `total`, `count`, `city`, `state`, `employer`, `occupation`,
-  /// `lastDate`.
-  Future<List<Map<String, dynamic>>> getTopContributors({
-    required String mecId,
-    int limit = 25,
-  }) async {
-    if (!isReady) return [];
-
-    final data = await _readClient
-        .from('mec_contributions')
-        .select()
-        .eq('mec_id', mecId)
-        .order('contribution_date', ascending: false);
-
-    final rows = (data as List<dynamic>? ?? [])
-        .whereType<Map<String, dynamic>>()
-        .map(MecContribution.fromJson)
-        .toList();
-
-    // Aggregate by contributor display name
-    final map = <String, _ContributorAgg>{};
-
-    for (final c in rows) {
-      final name = c.contributorDisplayName;
-      final agg = map.putIfAbsent(name, () => _ContributorAgg(name: name));
-      final amt = c.contributionAmount ?? 0;
-      agg.total += amt;
-      agg.count += 1;
-
-      // Keep the most recent metadata
-      if (agg.lastDate == null ||
-          (c.contributionDate != null && c.contributionDate!.isAfter(agg.lastDate!))) {
-        agg.lastDate = c.contributionDate;
-        agg.city = c.city;
-        agg.state = c.state;
-        agg.employer = c.employer;
-        agg.occupation = c.occupation;
-      }
-    }
-
-    final sorted = map.values.toList()..sort((a, b) => b.total.compareTo(a.total));
-
-    return sorted.take(limit).map((a) => {
-          'name': a.name,
-          'total': a.total,
-          'count': a.count,
-          'city': a.city,
-          'state': a.state,
-          'employer': a.employer,
-          'occupation': a.occupation,
-          'lastDate': a.lastDate?.toIso8601String(),
-        }).toList();
   }
 
   // ---------------------------------------------------------------------------
@@ -489,30 +468,4 @@ class MecRepository {
     final data = await _readClient.rpc('search_committees_unified', params: params);
     return (data as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
   }
-}
-
-// ---------------------------------------------------------------------------
-// Private aggregation helpers
-// ---------------------------------------------------------------------------
-
-class _CommitteeAgg {
-  final String? mecId;
-  final String? committeeName;
-  double total = 0;
-  int count = 0;
-
-  _CommitteeAgg({this.mecId, this.committeeName});
-}
-
-class _ContributorAgg {
-  final String name;
-  double total = 0;
-  int count = 0;
-  String? city;
-  String? state;
-  String? employer;
-  String? occupation;
-  DateTime? lastDate;
-
-  _ContributorAgg({required this.name});
 }

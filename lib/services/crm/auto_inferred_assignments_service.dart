@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'package:bluebubbles/helpers/tz_location.dart';
 import 'package:bluebubbles/models/crm/assignment.dart';
 import 'supabase_service.dart';
 
@@ -12,19 +12,17 @@ import 'supabase_service.dart';
 // anywhere. A later alert job can lift this wholesale.
 const String kEndorsementVoteDeadlineZone = 'America/Chicago';
 
-/// Resolve the Central [tz.Location]. main.dart runs tz.initializeTimeZones()
-/// on EVERY platform (web included) before runApp, so the catch branch only
-/// fires when this service is exercised outside the normal boot path (tests,
-/// tooling). latest.dart carries full DST rules for America/Chicago, so no
-/// fixed-offset fallback is ever needed.
-tz.Location endorsementDeadlineLocation() {
-  try {
-    return tz.getLocation(kEndorsementVoteDeadlineZone);
-  } on tz.LocationNotFoundException {
-    tzdata.initializeTimeZones();
-    return tz.getLocation(kEndorsementVoteDeadlineZone);
-  }
-}
+/// Resolve the Central [tz.Location].
+///
+/// main.dart NO LONGER calls tz.initializeTimeZones() before runApp: loading
+/// the IANA blob was on the critical path to first paint and nothing on the
+/// first screen needs it. The try/catch this function used to implement inline
+/// now lives in lib/helpers/tz_location.dart and is shared by every consumer,
+/// so the database is parsed once, on the first lookup anywhere in the app.
+/// latest.dart carries full DST rules for America/Chicago, so no fixed-offset
+/// fallback is ever needed.
+tz.Location endorsementDeadlineLocation() =>
+    tzLocation(kEndorsementVoteDeadlineZone);
 
 /// When endorsement voting closes, as an explicit date.
 ///

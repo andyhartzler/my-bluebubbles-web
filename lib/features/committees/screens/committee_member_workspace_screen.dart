@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:provider/provider.dart';
 
 import 'package:bluebubbles/features/committees/models/committee.dart';
 import 'package:bluebubbles/features/committees/screens/tabs/committee_slack_tab.dart';
@@ -18,9 +17,9 @@ import 'package:bluebubbles/features/committees/services/committee_repository.da
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/features/canvas_board/screens/committee_canvas_tab.dart';
-import 'package:bluebubbles/features/committees/legislation_tracker/screens/legislation_tracker_screen.dart';
-import 'package:bluebubbles/features/committees/legislation_tracker/providers/legislation_provider.dart';
-import 'package:bluebubbles/features/committees/legislation_tracker/providers/bill_search_provider.dart';
+// Lazy shim: the tracker screen AND its two providers are `deferred as` behind
+// this wrapper, so the legislation subtree is not compiled into the boot chunk.
+import 'package:bluebubbles/features/committees/legislation_tracker/screens/legislation_tracker_screen_lazy.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
 
 /// Workspace screen for committee members (non-executive)
@@ -176,15 +175,11 @@ class _CommitteeMemberWorkspaceScreenState
         label: 'Legislation',
         icon: Icons.gavel_outlined,
         slug: 'legislation',
-        builder: () => MultiProvider(
-          providers: [
-            ChangeNotifierProvider(create: (_) => LegislationProvider()),
-            ChangeNotifierProvider(create: (_) => BillSearchProvider()),
-          ],
-          child: LegislationTrackerScreen(
-            committeeId: committee.id,
-            isMemberView: true,
-          ),
+        // The MultiProvider that used to sit here now lives inside
+        // legislation_tracker_entry.dart, behind the deferred boundary.
+        builder: () => LegislationTrackerScreenLazy(
+          committeeId: committee.id,
+          isMemberView: true,
         ),
       ),
       'social-media': _TabDefinition(

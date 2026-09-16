@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
+// tzLocation() initializes the IANA database on first lookup. main() no
+// longer calls initializeTimeZones() before runApp, so a bare
+// tz.getLocation() here would throw LocationNotFoundException at render.
+import 'package:bluebubbles/helpers/tz_location.dart';
 
 import 'package:bluebubbles/screens/crm/meeting_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
@@ -166,7 +170,7 @@ class _MeetingHistoryPanelState extends State<MeetingHistoryPanel>
   /// date-only string with a separate `start_time` HH:MM[:SS].
   static String _formatMeetingTime(String? date, String? start) {
     if (date == null || date.isEmpty) return '';
-    final chicago = tz.getLocation('America/Chicago');
+    final chicago = tzLocation('America/Chicago');
     DateTime? parsed;
 
     // Try the full ISO timestamp form first (e.g. "2025-10-31T00:30:00+00:00").

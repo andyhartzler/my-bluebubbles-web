@@ -4,7 +4,12 @@ import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest_all.dart' as tzdata;
+// latest.dart, NOT latest_all.dart. This file was the only importer of
+// latest_all, and dart2js embedded BOTH IANA blobs into main.dart.js as a
+// result: 2,309,374 chars, 10.6% of the shipped bundle, of which latest_all's
+// 1,473,566 were pure duplication. America/Chicago, the only zone this screen
+// asks for, is present in latest.dart.
+import 'package:bluebubbles/helpers/tz_location.dart';
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/database/global/platform_file.dart';
@@ -106,12 +111,10 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
   final Set<String> _selectedFieldCategories = {};
   String _profileChangeStatus = 'pending';
   String? _profileChangesError;
-  static bool _tzInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _ensureTzInitialized();
     _statsFuture = _repository.fetchDashboardStats();
     _recentSignInsFuture = _repository.fetchRecentSignIns();
     _meetingsFuture = _repository.fetchPortalMeetings();
@@ -145,12 +148,6 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
       _statsFuture = _repository.fetchDashboardStats();
       _recentSignInsFuture = _repository.fetchRecentSignIns();
     });
-  }
-
-  void _ensureTzInitialized() {
-    if (_tzInitialized) return;
-    tzdata.initializeTimeZones();
-    _tzInitialized = true;
   }
 
   Future<void> _reloadMeetings() async {
@@ -2939,7 +2936,9 @@ class _MemberPortalManagementScreenState extends State<MemberPortalManagementScr
 
   String _formatCentralSignIn(DateTime lastSignIn) {
     try {
-      final location = tz.getLocation('America/Chicago');
+      // tzLocation() initializes the timezone database on first lookup, which
+      // is what the old _ensureTzInitialized() in initState did eagerly.
+      final location = tzLocation('America/Chicago');
       final centralTime = tz.TZDateTime.from(lastSignIn.toUtc(), location);
       return '${_signInFormat.format(centralTime)} CT';
     } catch (_) {

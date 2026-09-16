@@ -234,74 +234,42 @@ class AIAssistantService {
     final byType = <String, int>{};
     double totalCostCents = 0;
 
-    // Get total document count using count query (not limited to 1000)
+    // ── Knowledge base figures: ONE grouped RPC ──────────────────────────
+    //
+    // This used to be three `.select()` + exact-count calls plus an ~80-page
+    // pagination loop. The three counts each pulled up to 1000 COMPLETE rows
+    // of public.knowledge_documents (79k rows / 1664 MB, ~9.9 kB per row
+    // including the `content` text and the pgvector `embedding`) and then read
+    // only `.count`, discarding every body. The loop then paged the entire
+    // table 1000 rows at a time just to build the byTable / byType tallies.
+    //
+    // public.get_knowledge_stats() does all five figures in a single grouped
+    // pass. The counts stay EXACT rather than becoming reltuples estimates:
+    // operators act on the pending and failed embedding numbers, so an
+    // approximation here would be both wrong and unnecessary.
     try {
-      final totalResponse = await _supabase
-          .from('knowledge_documents')
-          .select()
-          .count(CountOption.exact);
-      total = totalResponse.count ?? 0;
-    } catch (e) {
-      debugPrint('Error fetching total count: $e');
-    }
+      final stats = await _supabase.rpc('get_knowledge_stats');
+      if (stats is Map) {
+        total = (stats['total_documents'] as num?)?.toInt() ?? 0;
+        pending = (stats['pending_embeddings'] as num?)?.toInt() ?? 0;
+        failed = (stats['failed_embeddings'] as num?)?.toInt() ?? 0;
 
-    // Get pending count
-    try {
-      final pendingResponse = await _supabase
-          .from('knowledge_documents')
-          .select()
-          .eq('embedding_status', 'pending')
-          .count(CountOption.exact);
-      pending = pendingResponse.count ?? 0;
-    } catch (e) {
-      debugPrint('Error fetching pending count: $e');
-    }
+        final rawByTable = stats['by_table'];
+        if (rawByTable is Map) {
+          rawByTable.forEach((key, value) {
+            byTable[key.toString()] = (value as num?)?.toInt() ?? 0;
+          });
+        }
 
-    // Get failed count
-    try {
-      final failedResponse = await _supabase
-          .from('knowledge_documents')
-          .select()
-          .eq('embedding_status', 'failed')
-          .count(CountOption.exact);
-      failed = failedResponse.count ?? 0;
-    } catch (e) {
-      debugPrint('Error fetching failed count: $e');
-    }
-
-    // Get documents by table - fetch in batches to avoid 1000 limit
-    try {
-      int offset = 0;
-      const batchSize = 1000;
-      bool hasMore = true;
-
-      while (hasMore) {
-        final response = await _supabase
-            .from('knowledge_documents')
-            .select('source_table, source_type')
-            .range(offset, offset + batchSize - 1);
-
-        final docs = response as List;
-        if (docs.isEmpty) {
-          hasMore = false;
-        } else {
-          for (final doc in docs) {
-            final table = doc['source_table'] as String?;
-            final type = doc['source_type'] as String?;
-
-            if (table != null) {
-              byTable[table] = (byTable[table] ?? 0) + 1;
-            }
-            if (type != null) {
-              byType[type] = (byType[type] ?? 0) + 1;
-            }
-          }
-          offset += batchSize;
-          hasMore = docs.length == batchSize;
+        final rawByType = stats['by_type'];
+        if (rawByType is Map) {
+          rawByType.forEach((key, value) {
+            byType[key.toString()] = (value as num?)?.toInt() ?? 0;
+          });
         }
       }
     } catch (e) {
-      debugPrint('Error fetching document breakdown: $e');
+      debugPrint('Error fetching knowledge stats: $e');
     }
 
     // Get usage for current month

@@ -359,14 +359,14 @@ class _FakeMemberRepository extends MemberRepository {
   }
 
   @override
-  Future<List<String>> getUniqueCounties() async => _uniqueStrings(members.map((m) => m.county));
+  Future<List<String>> getUniqueCounties({bool forceRefresh = false}) async => _uniqueStrings(members.map((m) => m.county));
 
   @override
-  Future<List<String>> getUniqueCongressionalDistricts() async =>
+  Future<List<String>> getUniqueCongressionalDistricts({bool forceRefresh = false}) async =>
       _uniqueStrings(members.map((m) => m.congressionalDistrict));
 
   @override
-  Future<List<String>> getUniqueCommittees() async {
+  Future<List<String>> getUniqueCommittees({bool forceRefresh = false}) async {
     final set = <String>{};
     for (final member in members) {
       final committees = member.committee;
@@ -382,18 +382,18 @@ class _FakeMemberRepository extends MemberRepository {
   }
 
   @override
-  Future<Map<String, int>> getChapterCounts() async =>
+  Future<Map<String, int>> getChapterCounts({bool forceRefresh = false}) async =>
       _countOccurrences(members.map((member) => member.chapterName));
 
   @override
-  Future<Map<String, int>> getLeadershipCountsByChapter() async => _countOccurrences(
+  Future<Map<String, int>> getLeadershipCountsByChapter({bool forceRefresh = false}) async => _countOccurrences(
         members
             .where((member) => member.chapterPosition != null && member.chapterPosition!.trim().isNotEmpty)
             .map((member) => member.chapterName),
       );
 
   @override
-  Future<AgeBounds> getAgeBounds() async {
+  Future<AgeBounds> getAgeBounds({bool forceRefresh = false}) async {
     final ages = members.map((member) => member.age).whereType<int>().toList()..sort();
     if (ages.isEmpty) {
       return const AgeBounds();

@@ -94,6 +94,59 @@ class MemberRepository {
 
   SupabaseClient get _readClient => _supabase.client;
 
+  // ── Filter-facet cache (5 min TTL, shared across screen instances) ─────
+  //
+  // MembersListScreen memoised these fetchers on its own State, and initState
+  // always passed refreshMetadata: true. The State is disposed on navigation,
+  // so opening a member and coming back re-ran all seven: counties,
+  // congressional districts, committees, chapter counts, leadership counts,
+  // chapters and age bounds, on top of the member page fetch itself.
+  //
+  // These are facet lists for filter dropdowns. Five minutes of staleness is
+  // invisible there, and the explicit pull-to-refresh still busts the cache
+  // via forceRefresh, so a member edited elsewhere is one manual refresh away
+  // rather than stuck behind a TTL.
+  static const Duration _facetTtl = Duration(minutes: 5);
+  static final Map<String, _CachedFacet> _facetCache = {};
+
+  /// Drop every cached facet list. Call on session teardown as well as from
+  /// the manual refresh path.
+  static void clearFacetCache() => _facetCache.clear();
+
+  Future<T> _cachedFacet<T>(
+    String key,
+    bool forceRefresh,
+    Future<T> Function() load,
+  ) async {
+    final hit = _facetCache[key];
+    if (!forceRefresh &&
+        hit != null &&
+        DateTime.now().difference(hit.fetchedAt) < _facetTtl) {
+      return hit.value as T;
+    }
+    final value = await load();
+    // Do NOT cache an empty result. Every loader this wraps returns [] or {}
+    // both when the Supabase client is not ready yet and from its own catch
+    // block, so caching indiscriminately pins a failure for the full TTL.
+    // With members_list_screen no longer passing refreshMetadata: true on
+    // mount, a single failed first load would leave every filter dropdown
+    // empty for five minutes, and pull-to-refresh would be the only way out.
+    // An empty facet list is never a meaningful answer here: a CRM with zero
+    // counties, zero committees or zero chapters is not a real state. So
+    // treating empty as "did not load" costs nothing and cannot poison.
+    if (!_isEmptyResult(value)) {
+      _facetCache[key] = _CachedFacet(value: value, fetchedAt: DateTime.now());
+    }
+    return value;
+  }
+
+  static bool _isEmptyResult(Object? value) {
+    if (value == null) return true;
+    if (value is Iterable) return value.isEmpty;
+    if (value is Map) return value.isEmpty;
+    return false;
+  }
+
   SupabaseClient get _writeClient => _supabase.client;
 
 
@@ -601,7 +654,10 @@ class MemberRepository {
 
   /// Get all unique counties (for filter UI)
   /// Only includes counties from membership eligible members
-  Future<List<String>> getUniqueCounties() async {
+  Future<List<String>> getUniqueCounties({bool forceRefresh = false}) =>
+      _cachedFacet('counties', forceRefresh, _loadUniqueCounties);
+
+  Future<List<String>> _loadUniqueCounties() async {
     if (!_isReady) return [];
 
     try {
@@ -678,7 +734,11 @@ class MemberRepository {
     }
   }
 
-  Future<Map<String, int>> getLeadershipCountsByChapter() async {
+  Future<Map<String, int>> getLeadershipCountsByChapter({bool forceRefresh = false}) =>
+      _cachedFacet('leadership_counts', forceRefresh,
+          _loadLeadershipCountsByChapter);
+
+  Future<Map<String, int>> _loadLeadershipCountsByChapter() async {
     if (!_isReady) return {};
 
     try {
@@ -706,7 +766,10 @@ class MemberRepository {
     }
   }
 
-  Future<AgeBounds> getAgeBounds() async {
+  Future<AgeBounds> getAgeBounds({bool forceRefresh = false}) =>
+      _cachedFacet('age_bounds', forceRefresh, _loadAgeBounds);
+
+  Future<AgeBounds> _loadAgeBounds() async {
     if (!_isReady) return const AgeBounds();
 
     try {
@@ -746,9 +809,14 @@ class MemberRepository {
         normalize: Member.normalizeText,
       );
 
-  Future<Map<String, int>> getChapterCounts() => _aggregateTextField(
-        'chapter_name',
-        normalize: Member.normalizeText,
+  Future<Map<String, int>> getChapterCounts({bool forceRefresh = false}) =>
+      _cachedFacet(
+        'chapter_counts',
+        forceRefresh,
+        () => _aggregateTextField(
+          'chapter_name',
+          normalize: Member.normalizeText,
+        ),
       );
 
   Future<Map<String, int>> getGraduationYearCounts() => _aggregateTextField(
@@ -928,7 +996,11 @@ class MemberRepository {
 
   /// Get all unique congressional districts (for filter UI)
   /// Only includes districts from membership eligible members
-  Future<List<String>> getUniqueCongressionalDistricts() async {
+  Future<List<String>> getUniqueCongressionalDistricts({bool forceRefresh = false}) =>
+      _cachedFacet('congressional_districts', forceRefresh,
+          _loadUniqueCongressionalDistricts);
+
+  Future<List<String>> _loadUniqueCongressionalDistricts() async {
     if (!_isReady) return [];
 
     try {
@@ -957,7 +1029,10 @@ class MemberRepository {
 
   /// Get all unique committees (for filter UI)
   /// Only includes committees from membership eligible members
-  Future<List<String>> getUniqueCommittees() async {
+  Future<List<String>> getUniqueCommittees({bool forceRefresh = false}) =>
+      _cachedFacet('committees', forceRefresh, _loadUniqueCommittees);
+
+  Future<List<String>> _loadUniqueCommittees() async {
     if (!_isReady) return [];
 
     try {
@@ -1501,9 +1576,21 @@ class MemberRepository {
     }
   }
 
+  /// Default ceiling for [searchMembers]. Every caller is a search-as-you-type
+  /// picker, so this is a display bound.
+  static const int searchMembersDefaultLimit = 200;
+
   /// Search members by name or phone
   /// Only returns membership eligible members for bulk messaging safety
-  Future<List<Member>> searchMembers(String query) async {
+  ///
+  /// The bound and the sort are both EXPLICIT. This used to send no limit and
+  /// no order at all, which meant PostgREST capped it at 1000 rows in an
+  /// undefined order: a broad search was silently truncated at an arbitrary
+  /// boundary, and the same query could return a different set twice.
+  Future<List<Member>> searchMembers(
+    String query, {
+    int limit = searchMembersDefaultLimit,
+  }) async {
     if (!_isReady) return [];
 
     try {
@@ -1511,7 +1598,10 @@ class MemberRepository {
           .from('members')
           .select()
           .eq('membership_eligible', true)
-          .or(buildIlikeOrClauses(const ['name', 'phone', 'phone_e164'], query));
+          .or(buildIlikeOrClauses(const ['name', 'phone', 'phone_e164'], query))
+          .order('name', ascending: true)
+          .order('id', ascending: true)
+          .limit(limit);
 
       return (response as List<dynamic>)
           .map((json) => Member.fromJson(json as Map<String, dynamic>))
@@ -2083,6 +2173,14 @@ class AgeBounds {
   final int? max;
 
   const AgeBounds({this.min, this.max});
+}
+
+/// One cached filter-facet result plus the instant it was fetched.
+class _CachedFacet {
+  final Object? value;
+  final DateTime fetchedAt;
+
+  const _CachedFacet({required this.value, required this.fetchedAt});
 }
 
 Map<String, dynamic>? _coerceJsonMap(dynamic value) {

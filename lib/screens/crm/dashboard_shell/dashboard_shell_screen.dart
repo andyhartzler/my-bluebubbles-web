@@ -3,7 +3,12 @@ import 'package:provider/provider.dart';
 
 import 'package:bluebubbles/models/crm/dashboard_page.dart';
 import 'package:bluebubbles/providers/user_session_provider.dart';
-import 'package:bluebubbles/screens/dashboard/dashboard_screen.dart';
+// Lazy shim: DashboardScreen reaches committee_workspace_screen and from there
+// the whole committees and candidates tree, so importing it eagerly here is
+// what kept committees_dashboard_screen_lazy.dart from deferring anything.
+// The shim keeps a stable widget identity, so the drag-drop edit state inside
+// DashboardScreen still survives tab switches exactly as before.
+import 'package:bluebubbles/screens/dashboard/dashboard_screen_lazy.dart';
 import 'package:bluebubbles/services/crm/dashboard_pages_service.dart';
 
 import 'add_page_dialog.dart';
@@ -221,7 +226,7 @@ class _DashboardShellScreenState extends State<DashboardShellScreen>
               controller: tabs,
               physics: const NeverScrollableScrollPhysics(),
               children: [
-                const DashboardScreen(),
+                const DashboardScreenLazy(),
                 ..._pages.map((p) => PersonalDashboardPageView(page: p)),
                 // "+" tab — never reached because the tab listener intercepts it.
                 const SizedBox.shrink(),

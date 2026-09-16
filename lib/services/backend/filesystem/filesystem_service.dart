@@ -21,7 +21,16 @@ FilesystemService fs = Get.isRegistered<FilesystemService>() ? Get.find<Filesyst
 
 class FilesystemService extends GetxService {
   late Directory appDocDir;
-  late final PackageInfo packageInfo;
+  /// NOT `late final`. On web the real value is fetched in the background (see
+  /// [init]) and assigned when it arrives, so this starts as a placeholder
+  /// rather than as an uninitialised late field. Readers therefore never see a
+  /// LateInitializationError, they may briefly see the placeholder version.
+  PackageInfo packageInfo = PackageInfo(
+    appName: 'BlueBubbles',
+    packageName: 'com.bluebubbles.messaging',
+    version: '0.0.0',
+    buildNumber: '0',
+  );
   AndroidDeviceInfo? androidInfo;
   late final idb.Database webDb;
   late final Uint8List noVideoPreviewIcon;
@@ -65,7 +74,24 @@ class FilesystemService extends GetxService {
         unplayableVideoIcon = file2.buffer.asUint8List();
       }
     }
-    packageInfo = await PackageInfo.fromPlatform();
+    // NOT awaited on web. PackageInfo.fromPlatform fetches `version.json` with
+    // a per-call cache-buster query, so it can never be cached and the round
+    // trip landed on the critical path to first paint: fs.init() is the first
+    // await inside StartupTasks.initStartupServices, which main() awaits before
+    // runApp. The only web-reachable reader is the About panel, which the user
+    // opens long after boot, so letting it resolve in the background is safe.
+    // settings_service's update check reads it too but returns early on web.
+    if (kIsWeb) {
+      // ignore: unawaited_futures
+      PackageInfo.fromPlatform()
+          .then((info) => packageInfo = info)
+          .catchError((e) {
+        Logger.warn('Failed to load package info: $e');
+        return packageInfo;
+      });
+    } else {
+      packageInfo = await PackageInfo.fromPlatform();
+    }
     if (!headless && Platform.isAndroid) {
       androidInfo = await DeviceInfoPlugin().androidInfo;
     }

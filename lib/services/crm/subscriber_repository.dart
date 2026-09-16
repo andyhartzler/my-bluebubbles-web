@@ -19,22 +19,6 @@ class SubscriberRepository {
 
   SupabaseClient get _writeClient => _supabase.client;
 
-  /// Page size and hard page cap for the two client-side facets below.
-  ///
-  /// PostgREST silently caps an unranged select at 1000 rows, and `subscribers`
-  /// holds roughly 73k of them, so both facets used to be computed from the
-  /// first 1000 rows: the source breakdown was wrong by about 98 percent, and
-  /// the county/state filter dropdowns silently omitted most of their options,
-  /// which makes a member in an unlisted county unfindable. There is no grouped
-  /// RPC for either facet on the legacy path, so they page explicitly.
-  ///
-  /// The cap exists so a table that grows unexpectedly cannot turn one stats
-  /// load into an unbounded scan on an exec's phone: we stop, say so, and
-  /// return what we have rather than hang. 200 pages is 200k rows, which is
-  /// ample headroom over today's 73k.
-  static const int _facetPageSize = 1000;
-  static const int _facetMaxPages = 200;
-
   Future<SubscriberFetchResult> fetchSubscribers({
     String? searchQuery,
     bool? subscribed,
@@ -135,15 +119,6 @@ class SubscriberRepository {
       final result = await _readClient.rpc('get_subscriber_stats');
       return _statsFromRpc(result);
     } on postgrest.PostgrestException catch (e) {
-      // Only fall back when the function is genuinely missing (e.g. app deployed
-      // ahead of the DB migration). Any other DB error (permissions, timeout)
-      // should surface as empty stats rather than silently re-running the slow
-      // legacy scan, matching the previous catch-all behaviour.
-      if (_isFunctionNotFound(e)) {
-        debugPrint(
-            'ℹ️ get_subscriber_stats() unavailable, using legacy stats path: ${e.message}');
-        return _fetchStatsLegacy();
-      }
       debugPrint('❌ Error fetching subscriber stats: ${e.message}');
       return const SubscriberStats();
     } catch (e) {
@@ -177,62 +152,6 @@ class SubscriberRepository {
       recentOptIns: asInt(payload['recent_opt_ins']),
       bySource: bySource,
     );
-  }
-
-  /// True when [e] indicates the RPC does not exist yet (stale deploy): PostgREST
-  /// reports PGRST202 when a function is absent from its schema cache; Postgres
-  /// raises 42883 (undefined_function).
-  bool _isFunctionNotFound(postgrest.PostgrestException e) {
-    final code = e.code ?? '';
-    if (code == 'PGRST202' || code == '42883') {
-      return true;
-    }
-    final message = e.message.toLowerCase();
-    return message.contains('could not find the function') ||
-        message.contains('does not exist');
-  }
-
-  /// Legacy seven-round-trip stats path. Retained only as a fallback for when
-  /// get_subscriber_stats() is not yet deployed, so the stats screen never
-  /// blanks out against an older database.
-  Future<SubscriberStats> _fetchStatsLegacy() async {
-    try {
-      final results = await Future.wait([
-        _countWhere(const {}),
-        _countWhere({'subscribed': true}),
-        _countWhere({'subscribed': false}),
-        _countWhere(const {}, notNullColumn: 'donor_id'),
-        _countWhere(const {}, orFilter: 'phone_e164.not.is.null,address.not.is.null'),
-        _recentOptIns(),
-        _sourceBreakdown(),
-      ]);
-
-      var totalSubscribers = results[0] as int;
-      var activeSubscribers = results[1] as int;
-      var unsubscribed = results[2] as int;
-
-      if (activeSubscribers == 0 && unsubscribed == 0) {
-        activeSubscribers = await _countWhere({'subscription_status': 'subscribed'});
-        unsubscribed = await _countWhere({'subscription_status': 'unsubscribed'});
-      }
-
-      if (unsubscribed == 0 && totalSubscribers > activeSubscribers) {
-        unsubscribed = totalSubscribers - activeSubscribers;
-      }
-
-      return SubscriberStats(
-        totalSubscribers: totalSubscribers,
-        activeSubscribers: activeSubscribers,
-        unsubscribed: unsubscribed,
-        donorCount: results[3] as int,
-        contactInfoCount: results[4] as int,
-        recentOptIns: results[5] as int,
-        bySource: results[6] as Map<String, int>,
-      );
-    } catch (e) {
-      debugPrint('❌ Error fetching subscriber stats (legacy): $e');
-      return const SubscriberStats();
-    }
   }
 
   postgrest.PostgrestFilterBuilder<T> _applyFilters<T>(
@@ -279,67 +198,6 @@ class SubscriberRepository {
     }
 
     return query;
-  }
-
-  Future<int> _countWhere(Map<String, dynamic> filters,
-      {String? notNullColumn, String? orFilter}) async {
-    postgrest.PostgrestFilterBuilder<List<Map<String, dynamic>>> query = _readClient
-        .from('subscribers')
-        .select('id')
-      ..filter('member_id', 'is', null);
-    filters.forEach((key, value) => query = query.eq(key, value));
-    if (notNullColumn != null) {
-      query = query.not(notNullColumn, 'is', null);
-    }
-    if (orFilter != null) {
-      query = query.or(orFilter);
-    }
-    final postgrest.PostgrestResponse response =
-        await query.count(postgrest.CountOption.exact);
-    return response.count;
-  }
-
-  Future<Map<String, int>> _sourceBreakdown() async {
-    final results = <String, int>{};
-
-    for (var page = 0; page < _facetMaxPages; page++) {
-      final from = page * _facetPageSize;
-      // Ordered by a stable key on purpose: `.range()` without an ORDER BY
-      // gives PostgREST no defined row order, so pages could overlap or skip
-      // and the tally would be quietly wrong rather than obviously broken.
-      final data = await _readClient
-          .from('subscribers')
-          .select('source')
-          .filter('member_id', 'is', null)
-          .order('id', ascending: true)
-          .range(from, from + _facetPageSize - 1);
-
-      final rows = (data as List<dynamic>?) ?? const <dynamic>[];
-      for (final row in rows) {
-        final map = row as Map<String, dynamic>;
-        final source = (map['source'] as String?)?.isNotEmpty == true ? map['source'] as String : 'unknown';
-        results[source] = (results[source] ?? 0) + 1;
-      }
-
-      // A short page is the last page.
-      if (rows.length < _facetPageSize) return results;
-    }
-
-    debugPrint(
-        '⚠️ Source breakdown stopped at the $_facetMaxPages page cap; these counts are a floor, not a total.');
-    return results;
-  }
-
-  Future<int> _recentOptIns() async {
-    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-    final postgrest.PostgrestResponse response = await _readClient
-        .from('subscribers')
-        .select('id')
-        .filter('member_id', 'is', null)
-        .eq('subscribed', true)
-        .gte('optin_date', thirtyDaysAgo.toIso8601String())
-        .count(postgrest.CountOption.exact);
-    return response.count;
   }
 
   /// Distinct values for one filter dropdown on the subscribers screen.
@@ -428,39 +286,42 @@ class SubscriberRepository {
     return Subscriber.fromJson(response);
   }
 
-  Future<List<Subscriber>> _enrichWithEventCounts(List<Subscriber> subscribers) async {
-    final emails = subscribers.map((s) => s.email).where((email) => email.isNotEmpty).toSet().toList();
+  /// Attendance counts for a page of subscribers, in ONE grouped read.
+  ///
+  /// This used to slice `emails` into batches of 50 and fire one query per
+  /// batch, but the query inside that loop never referenced the batch: it was
+  /// an UNFILTERED read of `event_attendees` that PostgREST caps at 1000 rows,
+  /// and the batch was only applied afterwards, in Dart, as a `contains`
+  /// check. So every fetchSubscribers() call fired ceil(N/50) identical
+  /// full-table reads and derived attendance from whichever 1000 attendee
+  /// rows happened to come back. event_attendees holds 0 rows today, which is
+  /// exactly why the truncation is invisible now and certain later.
+  ///
+  /// public.get_subscriber_event_counts() does the GROUP BY server-side for
+  /// the whole page in one round trip. The `eventAttendeesOnly` filter in
+  /// fetchSubscribers() reads these counts, so a wrong mapping would hide
+  /// subscribers from that filter rather than fail loudly.
+  Future<List<Subscriber>> _enrichWithEventCounts(
+      List<Subscriber> subscribers) async {
+    final emails = subscribers
+        .map((s) => s.email)
+        .where((email) => email.isNotEmpty)
+        .toSet()
+        .toList();
     if (emails.isEmpty) return subscribers;
 
     try {
-      // Use the standard Supabase client (not service role) to avoid web auth issues
-      // This query works with authenticated RLS policies
-      final client = _supabase.isInitialized ? _supabase.client : _readClient;
+      final rows = await _readClient.rpc(
+        'get_subscriber_event_counts',
+        params: {'p_emails': emails},
+      ) as List<dynamic>?;
 
-      // Batch emails to avoid URL length limits (max ~50 emails per query)
-      const batchSize = 50;
       final counts = <String, int>{};
-
-      for (var i = 0; i < emails.length; i += batchSize) {
-        final batch = emails.sublist(
-          i,
-          i + batchSize > emails.length ? emails.length : i + batchSize,
-        );
-
-        // Query event_attendees joined with members to get email
-        // event_attendees has member_id, not email directly
-        final response = await client
-            .from('event_attendees')
-            .select('member:members!member_id(email)')
-            .not('member_id', 'is', null);
-
-        for (final row in (response as List<dynamic>?) ?? []) {
-          final map = row as Map<String, dynamic>;
-          final member = map['member'] as Map<String, dynamic>?;
-          final email = member?['email'] as String?;
-          if (email == null || !batch.contains(email)) continue;
-          counts[email] = (counts[email] ?? 0) + 1;
-        }
+      for (final row in (rows ?? const <dynamic>[])) {
+        if (row is! Map) continue;
+        final email = row['email'] as String?;
+        if (email == null || email.isEmpty) continue;
+        counts[email] = (row['attendance_count'] as num?)?.toInt() ?? 0;
       }
 
       return subscribers

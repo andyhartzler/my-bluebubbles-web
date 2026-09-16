@@ -8,6 +8,7 @@ import 'package:bluebubbles/app/layouts/settings/pages/server/server_management_
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/helpers/helpers.dart';
 import 'package:bluebubbles/helpers/ui/facetime_helpers.dart';
+import 'package:bluebubbles/helpers/tz_location.dart';
 import 'package:bluebubbles/database/models.dart';
 import 'package:bluebubbles/database/database.dart';
 import 'package:bluebubbles/services/services.dart';
@@ -152,6 +153,14 @@ class NotificationsService extends GetxService {
   }
 
   Future<void> createReminder(Chat? chat, Message? message, DateTime time, {String? chatTitle, String? messageText}) async {
+    // `local` below is timezone's `late Location _local`, which is assigned
+    // only by initializeTimeZones() or an explicit setLocalLocation().
+    // main() no longer calls initializeTimeZones() unconditionally, so
+    // reading it here would throw LateInitializationError rather than the
+    // LocationNotFoundException that tzLocation() catches. This is the one
+    // consumer that cannot route through tzLocation(), because it wants the
+    // local zone rather than a named one.
+    ensureTimeZonesInitialized();
     await flnp.zonedSchedule(
       Random().nextInt(9998) + 50000,
       chatTitle ?? 'Reminder: ${chat!.getTitle()}',

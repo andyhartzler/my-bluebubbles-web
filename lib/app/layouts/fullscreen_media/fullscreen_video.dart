@@ -12,7 +12,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:media_kit_video/media_kit_video_controls/media_kit_video_controls.dart' as media_kit_video_controls;
+// Conditional, matching the media_kit swap in database/models.dart. This was
+// the one unconditional media_kit_video import in the tree, and it pulled the
+// real package plus media_kit itself into the web bundle past every other
+// stub. See the AdaptiveVideoControls note in database/html/media_kit.dart.
+import 'package:media_kit_video/media_kit_video_controls/media_kit_video_controls.dart'
+    if (dart.library.html) 'package:bluebubbles/database/html/media_kit.dart'
+    as media_kit_video_controls;
 import 'package:universal_html/html.dart' as html;
 
 class FullscreenVideo extends StatefulWidget {

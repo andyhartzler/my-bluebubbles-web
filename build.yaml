@@ -10,3 +10,15 @@ targets:
             - lib/**.dart
           exclude:
             - lib/objectbox.dart
+      # hive_ce_generator's registrar builder writes lib/hive_registrar.g.dart,
+      # a duplicate of the adapter list tmail already registers itself in
+      # lib/features/mail/_tmail/.../caching/config/hive_cache_config.dart.
+      # Nothing imports the generated file and nothing calls
+      # HiveRegistrar.registerAdapters(), so it contributes zero bytes to the
+      # bundle, but it is dead code that invites someone to wire it up on the
+      # eager side of the mail deferred boundary. The builder is
+      # auto_apply: dependents, so it has to be disabled here in the app's own
+      # $default target. Disabling it is what stops the deleted file coming
+      # back on the next `dart run build_runner build`.
+      hive_ce_generator|hive_registrar_generator:
+        enabled: false
