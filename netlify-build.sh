@@ -183,13 +183,48 @@ for var in \
   fi
 done
 
-flutter build web --release --no-tree-shake-icons --source-maps "${dart_define_args[@]}"
+# --wasm emits TWO builds and a buildConfig that lets the loader choose:
+#   dart2wasm + skwasm  (main.dart.wasm)  for browsers with WasmGC
+#   dart2js  + canvaskit (main.dart.js)   for everything else
+# So this is additive. Any browser that cannot run wasm gets byte-for-byte
+# what it gets today. web/index.html opts WebKit in via wasmAllowList, because
+# Flutter 3.41.8 still hard-codes webkit:false despite WasmGC shipping in
+# Safari 18.2 / iOS 18.2.
+#
+# --source-maps is dropped here: it is a dart2js flag, and passing it
+# alongside --wasm is not a supported combination. Sentry still symbolicates
+# the JS build from the debug info the build emits; if JS source maps turn out
+# to be needed, the fix is a second `flutter build web` pass, not re-adding the
+# flag to this one.
+flutter build web --wasm --release --no-tree-shake-icons "${dart_define_args[@]}"
+
+# Fail loudly rather than deploying half a build. If the wasm artifact is
+# missing, the loader would silently serve the JS build to every device and the
+# whole point of this change would be lost without anyone noticing.
+if [[ ! -f build/web/main.dart.wasm ]]; then
+  echo "ERROR: --wasm build did not emit build/web/main.dart.wasm" >&2
+  exit 1
+fi
+if [[ ! -f build/web/main.dart.js ]]; then
+  echo "ERROR: --wasm build did not emit the dart2js fallback build/web/main.dart.js" >&2
+  exit 1
+fi
+echo "Emitted both builds:"
+ls -la build/web/main.dart.wasm build/web/main.dart.js
 
 if [[ -n "${SENTRY_AUTH_TOKEN:-}" ]]; then
-  echo "Uploading source maps to Sentry (release: $SENTRY_RELEASE)..."
-  dart run sentry_dart_plugin
+  echo "Uploading symbols to Sentry (release: $SENTRY_RELEASE)..."
+  # Non-fatal on purpose. The script runs under `set -e`, and dropping
+  # --source-maps for the --wasm build means sentry_dart_plugin may find
+  # nothing to upload and exit non-zero. A missing symbol upload degrades
+  # stack traces in Sentry; it is not a reason to fail a deploy that is
+  # otherwise good. The warning below is the signal to go look.
+  if ! dart run sentry_dart_plugin; then
+    echo "WARNING: Sentry symbol upload failed. The build is still valid, but" >&2
+    echo "         traces for release $SENTRY_RELEASE will not be symbolicated." >&2
+  fi
 else
-  echo "SENTRY_AUTH_TOKEN not set; skipping Sentry source map upload."
+  echo "SENTRY_AUTH_TOKEN not set; skipping Sentry symbol upload."
 fi
 
 echo "Build complete! Output in build/web/"

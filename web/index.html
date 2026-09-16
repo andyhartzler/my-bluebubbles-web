@@ -215,12 +215,15 @@
     })();
   </script>
 
-  <script>
-    // The value below is injected by flutter build, do not touch.
-    // Flutter ≥3.41 substitutes this token as `"<hash>" /* deprecation comment */`,
-    // so it must NOT be wrapped in quotes (the comment contains an apostrophe).
-    const serviceWorkerVersion = {{flutter_service_worker_version}};
-  </script>
+  <!-- The {{flutter_service_worker_version}} token and its
+       `const serviceWorkerVersion` used to live here. Both are gone with the
+       move to loader.load(), which no longer registers a service worker.
+       The deployed flutter_service_worker.js was Flutter's self-unregistering
+       stub: skipWaiting, then registration.unregister() and a navigate on
+       every client, with no fetch handler and no Cache API use. It provided
+       no offline launch and no caching, so nothing is lost by not registering
+       it, and the token substitution that once bricked boot when it was
+       quoted can no longer do so. -->
   <!-- Plaid Link JS SDK (required for plaid_flutter on web) — deferred so
        it never blocks first paint; only used long after boot. -->
   <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js" defer></script>
@@ -407,10 +410,46 @@
         return;
       }
 
+      // `load()`, not the deprecated `loadEntrypoint()`.
+      //
+      // Only `load()` reads `_flutter.buildConfig`, evaluates which of the
+      // emitted builds this browser can run, and honours `config`. The
+      // deprecated path has no `config` parameter at all, so it can never
+      // select the dart2wasm build and always fetches main.dart.js.
+      //
+      // wasmAllowList is the reason this migration exists. Flutter 3.41.8
+      // ships `defaultWasmSupport = { blink: true, gecko: false,
+      // webkit: false, unknown: false }` in flutter_js/src/browser_environment.js,
+      // so on an iPhone the loader rejects the wasm build even when the
+      // browser can run it. That default is stale: WebKit shipped WasmGC in
+      // Safari 18.2, which Apple's release notes state covers iOS 18.2, and
+      // Flutter's own gate is a feature probe (`supportsWasmGC`) rather than
+      // a user-agent check. dart2wasm does not need JSPI; it uses JS String
+      // Builtins with a JS polyfill fallback, so there is no iOS 27 floor.
+      //
+      // Setting webkit: true does NOT force wasm. The loader still requires
+      // `supportsWasmGC` and a working WebGL context, and falls back to the
+      // dart2js + CanvasKit build otherwise. `flutter build web --wasm`
+      // emits both, so any browser that cannot run wasm gets exactly what it
+      // gets today.
+      //
+      // Threading: skwasm runs multi-threaded only under cross-origin
+      // isolation. We deliberately do not set COOP/COEP, because
+      // `require-corp` would break the cross-origin resources this app
+      // loads without CORP headers (Apple MapKit, Google sign-in, the Sentry
+      // CDN), and Safari ignores `credentialless` entirely. The loader
+      // detects this and passes `skwasmSingleThreaded: true` by itself.
+      //
+      // The service worker block is gone: the deployed
+      // flutter_service_worker.js is Flutter's self-unregistering stub. Its
+      // whole body skips waiting, calls registration.unregister(), then
+      // navigates every client. There is no fetch handler and no Cache API
+      // use, so there is no offline capability to preserve, and keeping it
+      // only bought a getRegistration round trip plus a one-time reload.
       loader
-        .loadEntrypoint({
-          serviceWorker: {
-            serviceWorkerVersion: serviceWorkerVersion,
+        .load({
+          config: {
+            wasmAllowList: { webkit: true },
           },
           onEntrypointLoaded: function (engineInitializer) {
             // There is no HTML renderer in Flutter 3.41: WebRendererMode has

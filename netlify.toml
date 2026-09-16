@@ -46,6 +46,28 @@
 
 # Heavy, rarely-changing assets (incl. the 7.2MB canvaskit.wasm): serve from
 # browser cache for a week instead of a revalidation round trip per visit.
+# The dart2wasm artifacts. main.dart.wasm is the wasm equivalent of
+# main.dart.js and is NOT content-hashed either, so it gets the same
+# must-revalidate treatment: never mark it immutable or a deploy will not
+# reach devices that already have it.
+[[headers]]
+  for = "/main.dart.wasm"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/main.dart.mjs"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# skwasm is the renderer that the wasm build uses in place of canvaskit. Like
+# canvaskit it is versioned with the engine and rarely changes, so it can sit
+# in the browser cache for a week.
+[[headers]]
+  for = "/canvaskit/skwasm*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
+
 [[headers]]
   for = "/canvaskit/*"
   [headers.values]
