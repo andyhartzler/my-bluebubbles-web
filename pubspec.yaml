@@ -582,8 +582,9 @@ sentry:
   org: missouri-young-democrats
   upload_source_maps: true
   upload_sources: true
-  # Netlify builds from a shallow clone, so the previous release's commit is
-  # often not in the local tree and set-commits --auto dies on it (exit 1,
-  # failing the whole deploy after a good compile). --ignore-missing keeps
-  # commit association and skips the unreachable range instead.
-  ignore_missing: true
+  # No commit association. Sentry has no GitHub repo integration for this
+  # project, so set-commits falls back to walking the local git tree, and
+  # Netlify's shallow clone does not have the previous release's commit.
+  # sentry-cli then exits 1 after a clean compile and fails the deploy
+  # (seen 2026-09-25; --ignore-missing does not cover a missing local object).
+  commits: false
