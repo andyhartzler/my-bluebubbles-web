@@ -345,7 +345,9 @@ function mapSubscriberToMautic(subscriber: any): any {
   if (subscriber.senate_district) mapped.senate_district = subscriber.senate_district;
   if (subscriber.house_district) mapped.house_district = subscriber.house_district;
   if (subscriber.date_of_birth) mapped.date_of_birth = subscriber.date_of_birth;
-  
+  if (subscriber.employer) mapped.company = subscriber.employer;
+  if (subscriber.occupation) mapped.position = subscriber.occupation;
+
   console.log(`Mapped subscriber data: ${JSON.stringify(mapped, null, 2)}`);
   return mapped;
 }
