@@ -516,7 +516,19 @@ serve(async (req) => {
       
       await addToSegment(mauticId, SEGMENT_ALL_CONTACTS);
       await addToSegment(mauticId, SEGMENT_NON_MEMBER_SUBSCRIBERS);
-      
+
+      // An unsubscribed row must never land in Mautic as emailable. Without
+      // this, any substantive edit to an unsubscribed subscriber (or a stale
+      // mautic_id whose contact was deleted) re-creates a clean, mailable
+      // contact. Resubscribing does NOT clear DNC here on purpose: lifting a
+      // do-not-contact is a human decision, not a side effect of a row edit.
+      if (record.subscription_status === "unsubscribed" || record.subscribed === false) {
+        await mauticRequest(`contacts/${mauticId}/dnc/email/add`, "POST", {
+          reason: 1,
+          comments: "Unsubscribed in Supabase subscribers",
+        });
+      }
+
       // Update mautic_id in Supabase directly
       try {
         await updateMauticId("subscribers", record.id, mauticId);
