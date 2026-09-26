@@ -487,7 +487,7 @@ class _QuickSubscriberSheet extends StatelessWidget {
                             style: theme.textTheme.headlineSmall,
                           ),
                           Text(
-                            subscriber.email,
+                            subscriber.email ?? 'No email',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),

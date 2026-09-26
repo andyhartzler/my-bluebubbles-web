@@ -4,7 +4,8 @@ class Subscriber {
   final String id;
   final DateTime? createdAt;
   final DateTime? updatedAt;
-  final String email;
+  /// Null for phone- or mail-only contacts (e.g. donor imports with no email).
+  final String? email;
   final String name;
   final String? phone;
   final String? phoneE164;
@@ -32,7 +33,7 @@ class Subscriber {
 
   const Subscriber({
     required this.id,
-    required this.email,
+    this.email,
     required this.name,
     this.createdAt,
     this.updatedAt,
@@ -64,7 +65,7 @@ class Subscriber {
   factory Subscriber.fromJson(Map<String, dynamic> json) {
     return Subscriber(
       id: json['id'] as String,
-      email: json['email'] as String,
+      email: json['email'] as String?,
       name: (json['name'] as String?)?.trim() ?? 'N/A',
       createdAt: _parseDate(json['created_at']),
       updatedAt: _parseDate(json['updated_at']),

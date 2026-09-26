@@ -551,7 +551,7 @@ class _SubscriberDetailBottomSheet extends StatelessWidget {
                       context,
                       icon: Icons.email_outlined,
                       label: 'Email',
-                      value: subscriber.email,
+                      value: subscriber.email ?? 'No email',
                     ),
                     if (subscriber.phoneE164 != null)
                       _buildInfoTile(

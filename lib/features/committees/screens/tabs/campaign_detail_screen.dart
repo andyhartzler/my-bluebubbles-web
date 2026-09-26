@@ -1485,7 +1485,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen>
                   const SizedBox(height: 24),
                   const Divider(),
                   const SizedBox(height: 16),
-                  _buildSubscriberInfoRow(Icons.email, 'Email', subscriber.email),
+                  _buildSubscriberInfoRow(Icons.email, 'Email', subscriber.email ?? 'No email'),
                   if (subscriber.phone != null)
                     _buildSubscriberInfoRow(Icons.phone, 'Phone', subscriber.phone!),
                   if (subscriber.zipCode != null)

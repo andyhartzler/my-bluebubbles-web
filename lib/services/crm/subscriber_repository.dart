@@ -305,6 +305,7 @@ class SubscriberRepository {
       List<Subscriber> subscribers) async {
     final emails = subscribers
         .map((s) => s.email)
+        .whereType<String>()
         .where((email) => email.isNotEmpty)
         .toSet()
         .toList();

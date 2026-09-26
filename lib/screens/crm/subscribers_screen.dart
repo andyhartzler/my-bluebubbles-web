@@ -957,9 +957,9 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
       );
 
       // If no results by ID, try by email
-      if (recipients.isEmpty && _subscriber.email.isNotEmpty) {
+      if (recipients.isEmpty && (_subscriber.email?.isNotEmpty ?? false)) {
         recipients = await _campaignRepository.fetchSubscriberCampaignsByEmail(
-          email: _subscriber.email,
+          email: _subscriber.email!,
           limit: 10,
         );
       }
@@ -1183,7 +1183,7 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
                   children: [
                     _detailItem(
                       'Email',
-                      _subscriber.email,
+                      _subscriber.email ?? 'No email',
                       icon: Icons.email_outlined,
                     ),
                     if (_subscriber.phoneE164?.isNotEmpty ?? false)
@@ -1531,7 +1531,7 @@ class _SubscriberDetailSheetState extends State<_SubscriberDetailSheet> {
     final items = <Widget>[
       _detailItem(
         'Email',
-        subscriber.email,
+        subscriber.email ?? 'No email',
         icon: Icons.email_outlined,
       ),
     ];
@@ -1732,7 +1732,7 @@ class _SubscriberEditSheetState extends State<_SubscriberEditSheet> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.subscriber.name);
-    _emailController = TextEditingController(text: widget.subscriber.email);
+    _emailController = TextEditingController(text: widget.subscriber.email ?? '');
     _phoneController = TextEditingController(text: widget.subscriber.phone ?? widget.subscriber.phoneE164 ?? '');
     _cityController = TextEditingController(text: widget.subscriber.city ?? '');
     _stateController = TextEditingController(text: widget.subscriber.state ?? '');
@@ -1787,7 +1787,6 @@ class _SubscriberEditSheetState extends State<_SubscriberEditSheet> {
               TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(labelText: 'Email'),
-                validator: (value) => (value == null || value.trim().isEmpty) ? 'Email is required' : null,
               ),
               const SizedBox(height: 10),
               TextFormField(
@@ -1882,7 +1881,7 @@ class _SubscriberEditSheetState extends State<_SubscriberEditSheet> {
     final trimmedPhone = _phoneController.text.trim();
     final payload = <String, dynamic>{
       'name': _nameController.text.trim(),
-      'email': _emailController.text.trim(),
+      'email': _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
       'phone': trimmedPhone.isEmpty ? null : trimmedPhone,
       'phone_e164': trimmedPhone.startsWith('+') ? trimmedPhone : widget.subscriber.phoneE164,
       'city': _cityController.text.trim().isEmpty ? null : _cityController.text.trim(),
