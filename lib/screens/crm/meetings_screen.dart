@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:bluebubbles/helpers/mobile_selection_area.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
+import 'package:bluebubbles/features/calendar/models/calendar_event.dart';
+import 'package:bluebubbles/helpers/tz_location.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
+import 'package:bluebubbles/models/crm/meeting_agenda.dart';
 import 'package:bluebubbles/screens/crm/meeting_detail_screen.dart';
+import 'package:bluebubbles/services/crm/meeting_agenda_matcher.dart';
+import 'package:bluebubbles/services/crm/meeting_agenda_repository.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/member_lookup_service.dart';
 
@@ -24,20 +32,47 @@ class MeetingsScreen extends StatefulWidget {
 
 const _unityBlue = Color(0xFF273351);
 const _momentumBlue = Color(0xFF32A6DE);
-const _sunriseGold = Color(0xFFFDB813);
-const _actionRed = Color(0xFFE63946);
-const _justicePurple = Color(0xFF6A1B9A);
-const _grassrootsGreen = Color(0xFF43A047);
 
-enum _DateRangeFilter { all, last30, last90, upcoming }
+/// Meetings are held in Missouri, and agenda titles carry the Missouri date.
+tz.TZDateTime _inCentral(DateTime time) => tz.TZDateTime.from(time, tzLocation('America/Chicago'));
+
+DateTime _centralDay(DateTime time) {
+  final central = _inCentral(time);
+  return DateTime(central.year, central.month, central.day);
+}
+
+String _centralLabel(DateTime time) {
+  final central = _inCentral(time);
+  return '${DateFormat('EEE, MMM d, y • h:mm a').format(central)} ${central.timeZoneName}';
+}
+
+String _meetingKey(Meeting meeting) => 'meeting:${meeting.id}';
+String _eventKey(CalendarEvent event) => 'event:${event.id}';
+
+enum _DateRangeFilter { all, last30, last90 }
+
+/// A load that may fail without taking the rest of the page down with it.
+Future<(T?, Object?)> _settle<T>(Future<T> future) async {
+  try {
+    return (await future, null);
+  } catch (error) {
+    return (null, error);
+  }
+}
 
 class _MeetingsScreenState extends State<MeetingsScreen> {
   final MeetingRepository _meetingRepository = MeetingRepository();
+  final MeetingAgendaRepository _agendaRepository = MeetingAgendaRepository();
   final CRMMemberLookupService _memberLookup = CRMMemberLookupService();
 
   List<Meeting> _meetings = [];
+  List<CalendarEvent> _upcoming = [];
+  Map<String, MeetingAgenda> _agendaByKey = {};
+  int _agendaCount = 0;
   bool _loading = true;
   String? _error;
+  String? _upcomingError;
+  String? _agendaError;
 
   _DateRangeFilter _dateRangeFilter = _DateRangeFilter.all;
   String? _selectedHostFilter;
@@ -48,10 +83,10 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMeetings();
+    _load();
   }
 
-  Future<void> _loadMeetings() async {
+  Future<void> _load() async {
     if (!_isCrmReady) {
       setState(() {
         _loading = false;
@@ -64,6 +99,11 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
       _loading = true;
       _error = null;
     });
+
+    // Upcoming events and agendas load beside the recorded meetings. If either
+    // fails, the page still shows the meetings and says what is missing.
+    final upcomingFuture = _settle(_meetingRepository.getUpcomingCalendarMeetings());
+    final agendasFuture = _settle(_agendaRepository.listAgendas());
 
     try {
       final meetings = await _meetingRepository.getMeetings(includeAttendance: true);
@@ -80,9 +120,30 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
         }
       }
 
+      final (upcoming, upcomingError) = await upcomingFuture;
+      final (agendas, agendaError) = await agendasFuture;
+
+      final events = upcoming ?? const <CalendarEvent>[];
+      final agendaList = agendas ?? const <MeetingAgenda>[];
+      final targets = <AgendaMatchTarget>[
+        for (final event in events)
+          AgendaMatchTarget(key: _eventKey(event), title: event.title, centralDay: _centralDay(event.startTime)),
+        for (final meeting in meetings)
+          AgendaMatchTarget(
+            key: _meetingKey(meeting),
+            title: meeting.meetingTitle,
+            centralDay: _centralDay(meeting.meetingDate),
+          ),
+      ];
+
       if (!mounted) return;
       setState(() {
         _meetings = meetings;
+        _upcoming = events;
+        _agendaByKey = matchAgendas(targets, agendaList);
+        _agendaCount = agendaList.length;
+        _upcomingError = upcomingError == null ? null : 'Upcoming meetings could not be loaded: $upcomingError';
+        _agendaError = agendaError == null ? null : 'Agendas could not be loaded from Google Drive: $agendaError';
         _loading = false;
       });
     } catch (e) {
@@ -110,9 +171,24 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
     );
   }
 
+  Future<void> _openLink(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That link could not be opened.')),
+      );
+    }
+  }
+
+  /// Recorded meetings that have already happened, newest first.
   List<Meeting> _filterMeetings(List<Meeting> source) {
     final now = DateTime.now();
     final filtered = source.where((meeting) {
+      if (meeting.meetingDate.isAfter(now)) {
+        return false;
+      }
       switch (_dateRangeFilter) {
         case _DateRangeFilter.all:
           break;
@@ -123,11 +199,6 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
           break;
         case _DateRangeFilter.last90:
           if (meeting.meetingDate.isBefore(now.subtract(const Duration(days: 90)))) {
-            return false;
-          }
-          break;
-        case _DateRangeFilter.upcoming:
-          if (meeting.meetingDate.isBefore(now)) {
             return false;
           }
           break;
@@ -154,7 +225,6 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
     return filtered;
   }
 
-
   String _formatDateRangeLabel(_DateRangeFilter filter) {
     switch (filter) {
       case _DateRangeFilter.all:
@@ -163,8 +233,6 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
         return 'Last 30 days';
       case _DateRangeFilter.last90:
         return 'Last 90 days';
-      case _DateRangeFilter.upcoming:
-        return 'Upcoming';
     }
   }
 
@@ -216,19 +284,10 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
               ElevatedButton.icon(
                 icon: const Icon(Icons.refresh),
                 label: const Text('Retry'),
-                onPressed: _loadMeetings,
+                onPressed: _load,
               ),
             ],
           ),
-        ),
-      );
-    }
-
-    if (_meetings.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24.0),
-          child: Text('No meetings have been recorded yet.'),
         ),
       );
     }
@@ -254,42 +313,65 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
   Widget _buildContent() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final filteredMeetings = _filterMeetings(_meetings);
+        final pastMeetings = _filterMeetings(_meetings);
         final isCompact = constraints.maxWidth < 720;
+        final sideBySide = constraints.maxWidth >= 960;
         final horizontalPadding = isCompact ? 12.0 : 32.0;
-        final topPadding = 24.0;
         final bottomPadding = isCompact ? 16.0 : 32.0;
 
         return MobileAwareSelectionArea(
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             slivers: [
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(horizontalPadding, topPadding, horizontalPadding, 0),
-              sliver: SliverToBoxAdapter(
-                child: _buildHeader(filteredMeetings.length),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 24, horizontalPadding, 0),
+                sliver: SliverToBoxAdapter(child: _buildHeader()),
               ),
-            ),
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 0),
-              sliver: SliverToBoxAdapter(
-                child: _buildFilterControls(isCompact),
+              if (_agendaError != null)
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 0),
+                  sliver: SliverToBoxAdapter(child: _buildNotice(_agendaError!)),
+                ),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 24, horizontalPadding, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _buildSectionTitle('Upcoming', Icons.event_outlined),
+                ),
               ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, bottomPadding),
-              sliver: _buildMeetingSliver(filteredMeetings),
-            ),
-          ],
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 12, horizontalPadding, 0),
+                sliver: _buildUpcomingSliver(sideBySide),
+              ),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 32, horizontalPadding, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _buildSectionTitle('Past meetings', Icons.history),
+                ),
+              ),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 12, horizontalPadding, 0),
+                sliver: SliverToBoxAdapter(child: _buildFilterControls(isCompact)),
+              ),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, bottomPadding),
+                sliver: _buildPastSliver(pastMeetings, sideBySide),
+              ),
+            ],
           ),
         );
       },
     );
   }
 
-  Widget _buildHeader(int meetingCount) {
+  Widget _buildHeader() {
     final theme = Theme.of(context);
+    final pastCount = _meetings.where((m) => !m.meetingDate.isAfter(DateTime.now())).length;
+    final summary = [
+      '${_upcoming.length} upcoming',
+      '$pastCount recorded',
+      if (_agendaError == null) '$_agendaCount agenda${_agendaCount == 1 ? '' : 's'} in Drive',
+    ].join(' • ');
+
     return Row(
       children: [
         Container(
@@ -310,9 +392,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
                 style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
               Text(
-                meetingCount == 0
-                    ? 'No meetings match the current filters.'
-                    : '$meetingCount meeting${meetingCount == 1 ? '' : 's'} ready to review',
+                summary,
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
             ],
@@ -321,45 +401,178 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
         IconButton(
           tooltip: 'Refresh',
           icon: const Icon(Icons.refresh),
-          onPressed: _loadMeetings,
+          onPressed: _load,
         ),
       ],
     );
   }
 
-  Widget _buildMeetingSliver(List<Meeting> meetings) {
-    if (meetings.isEmpty) {
-      final theme = Theme.of(context);
-      return SliverFillRemaining(
-        hasScrollBody: false,
-        child: Center(
-          child: Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: theme.colorScheme.outlineVariant ?? theme.dividerColor),
-            ),
+  Widget _buildSectionTitle(String title, IconData icon) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: theme.colorScheme.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNotice(String message) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer.withOpacity(0.85),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: theme.colorScheme.onErrorContainer),
+          const SizedBox(width: 12),
+          Expanded(
             child: Text(
-              'Adjust your filters or refresh to see more meetings.',
-              style: theme.textTheme.bodyMedium,
-              textAlign: TextAlign.center,
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onErrorContainer),
             ),
           ),
-        ),
-      );
-    }
+        ],
+      ),
+    );
+  }
 
-    final itemCount = meetings.length * 2 - 1;
+  Widget _buildEmpty(String message) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Text(message, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+    );
+  }
+
+  Widget _buildRowList<T>(List<T> items, Widget Function(T item) buildRow) {
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
-          if (index.isOdd) {
-            return const SizedBox(height: 12);
-          }
-          final itemIndex = index ~/ 2;
-          return _buildMeetingPill(meetings[itemIndex]);
+          if (index.isOdd) return const SizedBox(height: 16);
+          return buildRow(items[index ~/ 2]);
         },
-        childCount: itemCount > 0 ? itemCount : 0,
+        childCount: items.isEmpty ? 0 : items.length * 2 - 1,
+      ),
+    );
+  }
+
+  Widget _buildUpcomingSliver(bool sideBySide) {
+    if (_upcomingError != null) {
+      return SliverToBoxAdapter(child: _buildNotice(_upcomingError!));
+    }
+    if (_upcoming.isEmpty) {
+      return SliverToBoxAdapter(child: _buildEmpty('Nothing is on the calendar yet.'));
+    }
+    return _buildRowList<CalendarEvent>(
+      _upcoming,
+      (event) => _MeetingRow(
+        sideBySide: sideBySide,
+        meeting: _buildUpcomingPill(event),
+        agenda: _AgendaPanel(
+          key: ValueKey('agenda-${_eventKey(event)}'),
+          agenda: _agendaByKey[_eventKey(event)],
+          agendasUnavailable: _agendaError != null,
+          repository: _agendaRepository,
+          onOpen: _openLink,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPastSliver(List<Meeting> meetings, bool sideBySide) {
+    if (meetings.isEmpty) {
+      return SliverToBoxAdapter(
+        child: _buildEmpty(
+          _meetings.isEmpty
+              ? 'No meetings have been recorded yet.'
+              : 'Adjust your filters or refresh to see more meetings.',
+        ),
+      );
+    }
+    return _buildRowList<Meeting>(
+      meetings,
+      (meeting) => _MeetingRow(
+        sideBySide: sideBySide,
+        meeting: _buildMeetingPill(meeting),
+        agenda: _AgendaPanel(
+          key: ValueKey('agenda-${_meetingKey(meeting)}'),
+          agenda: _agendaByKey[_meetingKey(meeting)],
+          agendasUnavailable: _agendaError != null,
+          repository: _agendaRepository,
+          onOpen: _openLink,
+        ),
+      ),
+    );
+  }
+
+  String _countdownLabel(CalendarEvent event) {
+    final now = DateTime.now();
+    if (!now.isBefore(event.startTime)) return 'Happening now';
+    final days = _centralDay(event.startTime).difference(_centralDay(now)).inDays;
+    if (days <= 0) return 'Today';
+    if (days == 1) return 'Tomorrow';
+    return 'In $days days';
+  }
+
+  Widget _buildUpcomingPill(CalendarEvent event) {
+    final theme = Theme.of(context);
+    final when = event.isAllDay
+        ? DateFormat('EEE, MMM d, y').format(_inCentral(event.startTime))
+        : _centralLabel(event.startTime);
+    final link = event.meetingLink;
+
+    return Card(
+      elevation: 2,
+      margin: EdgeInsets.zero,
+      color: _momentumBlue,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              event.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              when,
+              style: theme.textTheme.bodySmall?.copyWith(color: Colors.white.withOpacity(0.9)),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _buildInfoChip(Icons.schedule, _countdownLabel(event)),
+                if (link != null && link.isNotEmpty)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: () => _openLink(link),
+                    child: _buildInfoChip(Icons.videocam_outlined, 'Join link'),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -372,6 +585,7 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
 
     return Card(
       elevation: 2,
+      margin: EdgeInsets.zero,
       color: _unityBlue,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: InkWell(
@@ -382,13 +596,12 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
           child: Row(
             children: [
               Expanded(
-                flex: 3,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       meeting.meetingTitle,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
@@ -397,24 +610,21 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${meeting.formattedDate} • ${meeting.formattedTime} CST',
+                      _centralLabel(meeting.meetingDate),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: Colors.white.withOpacity(0.85),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 2,
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    _buildInfoChip(Icons.schedule, durationLabel),
-                    _buildInfoChip(Icons.person_outline, hostName),
-                    _buildInfoChip(Icons.groups_outlined, '$attendeeCount'),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        _buildInfoChip(Icons.schedule, durationLabel),
+                        _buildInfoChip(Icons.person_outline, hostName),
+                        _buildInfoChip(Icons.groups_outlined, '$attendeeCount'),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -560,6 +770,203 @@ class _MeetingsScreenState extends State<MeetingsScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A meeting card with its agenda beside it on wide screens, or under it on
+/// narrow ones.
+class _MeetingRow extends StatelessWidget {
+  final bool sideBySide;
+  final Widget meeting;
+  final Widget agenda;
+
+  const _MeetingRow({
+    required this.sideBySide,
+    required this.meeting,
+    required this.agenda,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!sideBySide) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          meeting,
+          const SizedBox(height: 8),
+          agenda,
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: 5, child: meeting),
+        const SizedBox(width: 16),
+        Expanded(flex: 4, child: agenda),
+      ],
+    );
+  }
+}
+
+/// The agenda for one meeting. Its text is fetched from Drive only when
+/// someone opens it.
+class _AgendaPanel extends StatefulWidget {
+  final MeetingAgenda? agenda;
+  final bool agendasUnavailable;
+  final MeetingAgendaRepository repository;
+  final Future<void> Function(String url) onOpen;
+
+  const _AgendaPanel({
+    super.key,
+    required this.agenda,
+    required this.agendasUnavailable,
+    required this.repository,
+    required this.onOpen,
+  });
+
+  @override
+  State<_AgendaPanel> createState() => _AgendaPanelState();
+}
+
+class _AgendaPanelState extends State<_AgendaPanel> {
+  bool _expanded = false;
+  Future<String>? _text;
+
+  void _toggle() {
+    final agenda = widget.agenda;
+    if (agenda == null) return;
+    setState(() {
+      _expanded = !_expanded;
+      if (_expanded) {
+        _text ??= widget.repository.agendaText(agenda.fileId);
+      }
+    });
+  }
+
+  void _retry() {
+    final agenda = widget.agenda;
+    if (agenda == null) return;
+    setState(() {
+      _text = widget.repository.agendaText(agenda.fileId);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final agenda = widget.agenda;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: agenda == null ? _buildMissing(theme) : _buildAgenda(theme, agenda),
+    );
+  }
+
+  Widget _buildMissing(ThemeData theme) {
+    return Row(
+      children: [
+        Icon(Icons.description_outlined, size: 20, color: theme.colorScheme.onSurfaceVariant),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            widget.agendasUnavailable ? 'Agenda unavailable right now.' : 'No agenda in Drive for this date (yet).',
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAgenda(ThemeData theme, MeetingAgenda agenda) {
+    final modified = agenda.modifiedTime;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.description, size: 20, color: theme.colorScheme.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    agenda.title,
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  if (modified != null)
+                    Text(
+                      'Updated ${DateFormat('MMM d, y').format(modified)}',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton.tonalIcon(
+              onPressed: _toggle,
+              icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+              label: Text(_expanded ? 'Hide agenda' : 'Read agenda'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => widget.onOpen(agenda.url.toString()),
+              icon: const Icon(Icons.open_in_new, size: 18),
+              label: const Text('Open in Google Docs'),
+            ),
+          ],
+        ),
+        if (_expanded) ...[
+          const SizedBox(height: 12),
+          FutureBuilder<String>(
+            future: _text,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'The agenda could not be loaded: ${snapshot.error}',
+                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
+                      ),
+                    ),
+                    TextButton(onPressed: _retry, child: const Text('Retry')),
+                  ],
+                );
+              }
+              final text = (snapshot.data ?? '').trim();
+              return ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 420),
+                child: SingleChildScrollView(
+                  child: Text(
+                    text.isEmpty ? 'This agenda is empty.' : text,
+                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ],
     );
   }
 }

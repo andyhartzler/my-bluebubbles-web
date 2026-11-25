@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:bluebubbles/features/calendar/models/calendar_event.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
@@ -20,6 +21,33 @@ class MeetingRepository {
   Future<List<Meeting>> getMeetings({bool includeAttendance = true}) async {
     final results = await _fetchMeetings(includeAttendance: includeAttendance);
     return results;
+  }
+
+  /// Upcoming events on the organization calendar, soonest first.
+  ///
+  /// `calendar_events` is filled by the hourly `sync-google-calendar` job,
+  /// which upserts every event Google returns and never deletes one. An event
+  /// removed or moved in Google therefore stays behind with an old
+  /// `synced_at`. Only rows the sync has confirmed within [freshFor] are
+  /// shown, so a meeting that is no longer on the calendar does not appear
+  /// here as upcoming.
+  Future<List<CalendarEvent>> getUpcomingCalendarMeetings({
+    int limit = 6,
+    Duration freshFor = const Duration(days: 3),
+  }) async {
+    if (!_isReady) return [];
+    final now = DateTime.now().toUtc();
+    final response = await _supabase.client
+        .from('calendar_events')
+        .select()
+        .gte('end_time', now.toIso8601String())
+        .eq('status', 'confirmed')
+        .gte('synced_at', now.subtract(freshFor).toIso8601String())
+        .order('start_time', ascending: true)
+        .limit(limit);
+    return _coerceJsonList(response)
+        .map(CalendarEvent.fromJson)
+        .toList(growable: false);
   }
 
   Future<Meeting?> getMeetingById(String id, {bool includeAttendance = true}) async {
