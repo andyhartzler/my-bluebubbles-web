@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
-import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/models/crm/chapter.dart';
-import 'package:bluebubbles/screens/crm/chapter_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/chapters/chapter_navigation.dart';
 import 'package:bluebubbles/services/crm/chapter_repository.dart';
 
 /// Chapters tab for College Democrats and High School Democrats committees
@@ -84,13 +82,7 @@ class _CommitteeChaptersTabState extends State<CommitteeChaptersTab> {
   }
 
   void _openChapterDetail(Chapter chapter) {
-    Navigator.of(context).push(
-      ThemeSwitcher.buildPageRoute(
-        builder: (context) => TitleBarWrapper(
-          child: ChapterDetailScreen(chapter: chapter),
-        ),
-      ),
-    );
+    ChapterNavigation.openChapter(context, chapter);
   }
 
   @override
@@ -160,7 +152,18 @@ class _CommitteeChaptersTabState extends State<CommitteeChaptersTab> {
                   'Chartered',
                   Colors.green,
                 ),
-                const Spacer(),
+                // Every chapter, charter review included, lives in the hub.
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => ChapterNavigation.openHub(context),
+                      icon: const Icon(Icons.account_tree_outlined, size: 18),
+                      label: const Text('All chapters', overflow: TextOverflow.ellipsis, maxLines: 1),
+                      style: TextButton.styleFrom(minimumSize: const Size(0, 44)),
+                    ),
+                  ),
+                ),
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: _loadChapters,

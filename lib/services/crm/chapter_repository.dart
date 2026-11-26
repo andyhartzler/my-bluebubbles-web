@@ -44,6 +44,63 @@ class ChapterRepository {
     }
   }
 
+  /// Finds a chapter by name the way members link to one: case and spacing
+  /// do not matter. Returns null when there is no such chapter, and throws
+  /// when the lookup itself fails, so a link can tell the two apart.
+  Future<Chapter?> getChapterByName(String chapterName) async {
+    if (!_isReady) throw StateError('Chapters are not available yet');
+    final wanted = _nameKey(chapterName);
+    if (wanted.isEmpty) return null;
+    final exact = await _readClient
+        .from('chapters')
+        .select()
+        .eq('chapter_name', chapterName)
+        .limit(1);
+    final exactRows = exact as List<dynamic>;
+    if (exactRows.isNotEmpty) {
+      return Chapter.fromJson(Map<String, dynamic>.from(exactRows.first as Map));
+    }
+    final all = await _readClient.from('chapters').select() as List<dynamic>;
+    for (final row in all) {
+      final chapter = Chapter.fromJson(Map<String, dynamic>.from(row as Map));
+      if (_nameKey(chapter.chapterName) == wanted) return chapter;
+    }
+    return null;
+  }
+
+  static String _nameKey(String value) =>
+      value.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  /// Charters a chapter: active, chartered, with the date the executive
+  /// committee approved it.
+  Future<Chapter?> charterChapter(Chapter chapter, DateTime charterDate) {
+    final date = DateTime(charterDate.year, charterDate.month, charterDate.day);
+    return updateChapter(chapter.id, {
+      'status': 'active',
+      'is_chartered': true,
+      'charter_date': date.toIso8601String().split('T').first,
+      'last_updated': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  /// Hides a pending row from charter review (a duplicate, or an answer that
+  /// is not a chapter name). Members keep whatever chapter name they typed.
+  Future<Chapter?> archiveChapter(Chapter chapter) {
+    return updateChapter(chapter.id, {
+      'status': 'archived',
+      'last_updated': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  /// Takes a row out of Archived: a chartered chapter goes back to active,
+  /// anything else goes back into charter review.
+  Future<Chapter?> restoreChapter(Chapter chapter) {
+    return updateChapter(chapter.id, {
+      'status': chapter.isChartered ? 'active' : 'pending',
+      'last_updated': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
   Future<List<ChapterDocument>> getDocumentsForChapter(String chapterName) async {
     if (!_isReady) return [];
 

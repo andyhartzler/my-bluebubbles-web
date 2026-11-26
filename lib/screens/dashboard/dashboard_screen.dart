@@ -18,6 +18,7 @@ import 'package:bluebubbles/features/committees/screens/committee_workspace_scre
 import 'package:bluebubbles/features/slack/screens/slack_management_screen.dart';
 import 'package:bluebubbles/features/ai_assistant/screens/ai_assistant_screen.dart';
 import 'package:bluebubbles/screens/crm/bulk_message_screen.dart';
+import 'package:bluebubbles/screens/crm/chapters/chapter_navigation.dart';
 import 'package:bluebubbles/screens/crm/donor_command_center.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
@@ -1136,11 +1137,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     return maxY;
   }
 
-  void _openMembersList(BuildContext context, {bool showChaptersOnly = false}) {
+  void _openMembersList(BuildContext context) {
     Navigator.of(context).push(
       ThemeSwitcher.buildPageRoute(
         builder: (_) => TitleBarWrapper(
-          child: MembersListScreen(showChaptersOnly: showChaptersOnly),
+          child: const MembersListScreen(),
         ),
       ),
     );
@@ -1252,9 +1253,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       return () => _openSubscribersScreen(context);
     }
 
-    // Chapter-related keys
+    // Chapter-related keys open the Chapters hub
     if (dataSourceKey.toLowerCase().contains('chapter')) {
-      return () => _openMembersList(context, showChaptersOnly: true);
+      return () => ChapterNavigation.openHub(context);
     }
 
     // Social media / impressions related keys

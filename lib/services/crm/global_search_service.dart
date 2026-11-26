@@ -4,17 +4,19 @@ import 'package:flutter/foundation.dart';
 import 'package:postgrest/postgrest.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:bluebubbles/models/crm/chapter.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/utils/postgrest_filters.dart';
 
-enum GlobalSearchItemType { member, meeting, transcript, document }
+enum GlobalSearchItemType { member, chapter, meeting, transcript, document }
 
 class GlobalSearchResults {
   const GlobalSearchResults({
     required this.query,
     this.members = const <Member>[],
+    this.chapters = const <Chapter>[],
     this.meetings = const <Meeting>[],
     this.transcripts = const <GlobalSearchTranscript>[],
     this.documents = const <GlobalSearchDocument>[],
@@ -22,17 +24,25 @@ class GlobalSearchResults {
 
   final String query;
   final List<Member> members;
+  final List<Chapter> chapters;
   final List<Meeting> meetings;
   final List<GlobalSearchTranscript> transcripts;
   final List<GlobalSearchDocument> documents;
 
   bool get isEmpty =>
-      members.isEmpty && meetings.isEmpty && transcripts.isEmpty && documents.isEmpty;
+      members.isEmpty &&
+      chapters.isEmpty &&
+      meetings.isEmpty &&
+      transcripts.isEmpty &&
+      documents.isEmpty;
 
   Map<GlobalSearchItemType, int> get facetCounts {
     final counts = <GlobalSearchItemType, int>{};
     if (members.isNotEmpty) {
       counts[GlobalSearchItemType.member] = members.length;
+    }
+    if (chapters.isNotEmpty) {
+      counts[GlobalSearchItemType.chapter] = chapters.length;
     }
     if (meetings.isNotEmpty) {
       counts[GlobalSearchItemType.meeting] = meetings.length;
@@ -59,6 +69,7 @@ class GlobalSearchResults {
     }
 
     addAll(GlobalSearchItemType.member, members);
+    addAll(GlobalSearchItemType.chapter, chapters);
     addAll(GlobalSearchItemType.meeting, meetings);
     addAll(GlobalSearchItemType.transcript, transcripts);
     addAll(GlobalSearchItemType.document, documents);
@@ -187,19 +198,22 @@ class GlobalSearchService {
 
     final futures = await Future.wait<List<Object>>([
       _searchMembers(query),
+      _searchChapters(query),
       _searchMeetings(query),
       _searchTranscripts(query),
       _enumerateDocuments(query),
     ]);
 
     final members = futures[0].whereType<Member>().toList();
-    final meetings = futures[1].whereType<Meeting>().toList();
-    final transcripts = futures[2].whereType<GlobalSearchTranscript>().toList();
-    final documents = futures[3].whereType<GlobalSearchDocument>().toList();
+    final chapters = futures[1].whereType<Chapter>().toList();
+    final meetings = futures[2].whereType<Meeting>().toList();
+    final transcripts = futures[3].whereType<GlobalSearchTranscript>().toList();
+    final documents = futures[4].whereType<GlobalSearchDocument>().toList();
 
     return GlobalSearchResults(
       query: query,
       members: members,
+      chapters: chapters,
       meetings: meetings,
       transcripts: transcripts,
       documents: documents,
@@ -225,6 +239,35 @@ class GlobalSearchService {
       return members;
     } catch (error) {
       debugPrint('⚠️ CRM global search (members) failed: $error');
+      return const [];
+    }
+  }
+
+  /// Chapters by name, school or abbreviation. Archived rows (duplicates and
+  /// non-answers staff set aside) stay out; chartered chapters come first.
+  Future<List<Object>> _searchChapters(String rawQuery) async {
+    if (!isReady) return const [];
+
+    try {
+      final client = _supabase.client;
+      var query = client.from('chapters').select();
+      query = query.or(buildIlikeOrClauses(
+        const ['chapter_name', 'standardized_name', 'school_name', 'name_abbreviation'],
+        rawQuery,
+      ));
+      final response = await query.limit(25);
+      final rows = _coerceList(response);
+      final chapters = rows
+          .map(Chapter.fromJson)
+          .where((chapter) => chapter.status != 'archived')
+          .toList()
+        ..sort((a, b) {
+          if (a.isChartered != b.isChartered) return a.isChartered ? -1 : 1;
+          return a.chapterName.toLowerCase().compareTo(b.chapterName.toLowerCase());
+        });
+      return chapters;
+    } catch (error) {
+      debugPrint('⚠️ CRM global search (chapters) failed: $error');
       return const [];
     }
   }

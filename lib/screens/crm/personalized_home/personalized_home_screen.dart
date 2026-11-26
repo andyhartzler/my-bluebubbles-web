@@ -10,6 +10,7 @@ import 'package:bluebubbles/services/crm/user_home_preferences_service.dart';
 import 'widgets/activity_panel.dart';
 import 'widgets/assignments_panel.dart';
 import 'widgets/avatar_upload_dialog.dart';
+import 'widgets/charter_review_card.dart';
 
 import 'widgets/branded_panel.dart';
 import 'widgets/home_customize_dialog.dart';
@@ -162,6 +163,10 @@ class _PersonalizedHomeScreenState extends State<PersonalizedHomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Chapters waiting on staff review. Hides itself when
+                    // nothing is pending.
+                    if (session.isExecutive || session.isCommitteeMember)
+                      const CharterReviewCard(),
                     // Wide desktop: Assignments + Activity sit side-by-side
                     // in a 50/50 row above the full-width Calendar.
                     if (prefs.showAssignments &&

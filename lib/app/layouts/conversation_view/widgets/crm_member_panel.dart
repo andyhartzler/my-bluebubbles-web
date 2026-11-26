@@ -5,6 +5,7 @@ import 'package:bluebubbles/app/wrappers/titlebar_wrapper.dart';
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/screens/crm/chapters/chapter_navigation.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/supabase_service.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
@@ -130,7 +131,13 @@ class _CRMMemberPanelState extends State<CRMMemberPanel> {
         if (_hasText(_member!.currentChapterMember))
           _buildInfoTile(Icons.groups, 'Chapter Member', _member!.currentChapterMember!.trim()),
         if (_hasText(_member!.chapterName))
-          _buildInfoTile(Icons.school, 'Chapter Name', _member!.chapterName!.trim()),
+          _buildInfoTile(
+            Icons.school,
+            'Chapter Name',
+            _member!.chapterName!.trim(),
+            onTap: () => ChapterNavigation.openChapterByName(context, _member!.chapterName!),
+            tooltip: 'Open chapter',
+          ),
         if (_hasText(_member!.graduationYear))
           _buildInfoTile(Icons.calendar_today, 'Graduation Year', _member!.graduationYear!.trim()),
         if (_member!.age != null)
@@ -165,13 +172,16 @@ class _CRMMemberPanelState extends State<CRMMemberPanel> {
     );
   }
 
-  Widget _buildInfoTile(IconData icon, String label, String value) {
-    return ListTile(
+  Widget _buildInfoTile(IconData icon, String label, String value, {VoidCallback? onTap, String? tooltip}) {
+    final tile = ListTile(
       leading: Icon(icon, size: 20),
       title: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       subtitle: Text(value),
+      trailing: onTap == null ? null : const Icon(Icons.chevron_right, size: 20),
+      onTap: onTap,
       dense: true,
     );
+    return tooltip == null ? tile : Tooltip(message: tooltip, child: tile);
   }
 
   /// A second copy of member_detail_screen's _formatDate, and the two have

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:bluebubbles/models/crm/dashboard_metrics.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/screens/crm/chapters/chapter_navigation.dart';
 import 'package:bluebubbles/screens/dashboard/models/dashboard_widget_config.dart';
 import 'package:bluebubbles/screens/dashboard/widgets/dashboard_widgets.dart';
 
@@ -45,10 +46,14 @@ class DashboardWidgetRenderer {
     switch (config.type) {
       case DashboardWidgetType.statCard:
       case DashboardWidgetType.trendCard:
-        return StatCardWidget(
-          config: config,
-          value: _scalarValue(config.dataSourceKey, metrics),
-          onTap: onTap,
+        // Chapter counts open the Chapters hub, as on the Universal tab.
+        final opensHub = onTap == null && config.dataSourceKey.toLowerCase().contains('chapter');
+        return Builder(
+          builder: (context) => StatCardWidget(
+            config: config,
+            value: _scalarValue(config.dataSourceKey, metrics),
+            onTap: opensHub ? () => ChapterNavigation.openHub(context) : onTap,
+          ),
         );
 
       case DashboardWidgetType.progressRing:
