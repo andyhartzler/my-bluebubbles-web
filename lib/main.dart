@@ -36,6 +36,8 @@ import 'package:bluebubbles/screens/crm/meetings_screen.dart';
 import 'package:bluebubbles/features/committees/theme/brand_colors.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 import 'package:bluebubbles/screens/crm/members_list_screen.dart';
+import 'package:bluebubbles/screens/crm/chapters/chapters_hub_screen.dart';
+import 'package:bluebubbles/screens/crm/chapters/chapter_navigation.dart';
 import 'package:bluebubbles/screens/crm/events_screen.dart';
 import 'package:bluebubbles/screens/crm/donor_command_center.dart';
 import 'package:bluebubbles/screens/crm/member_portal/member_portal_management_screen.dart';
@@ -948,6 +950,7 @@ class _HomeState extends OptimizedState<Home>
     WidgetsBinding.instance.addObserver(this);
 
     _checkMailAlias();
+    ChapterNavigation.showChaptersSection = _showChaptersSection;
 
     /* ----- APP REFRESH LISTENER INITIALIZATION ----- */
     eventDispatcher.stream.listen((event) {
@@ -1241,6 +1244,9 @@ class _HomeState extends OptimizedState<Home>
 
   @override
   void dispose() {
+    if (identical(ChapterNavigation.showChaptersSection, _showChaptersSection)) {
+      ChapterNavigation.showChaptersSection = null;
+    }
     // Clean up observer when app is fully closed
     WidgetsBinding.instance.removeObserver(this);
     windowManager.removeListener(DesktopWindowListener.instance);
@@ -1408,10 +1414,8 @@ class _HomeState extends OptimizedState<Home>
                       ),
                       _lazySection(
                         _HomeSection.chapters,
-                        () => const MembersListScreen(
+                        () => const ChaptersHubScreen(
                           key: PageStorageKey('chapters-view'),
-                          embed: true,
-                          showChaptersOnly: true,
                         ),
                       ),
                       _lazySection(
@@ -2479,6 +2483,16 @@ class _HomeState extends OptimizedState<Home>
             )
           : const SizedBox.shrink(),
     );
+  }
+
+  /// Lets chapter links anywhere in the app land on the Chapters section
+  /// instead of stacking a second copy of it.
+  bool _showChaptersSection() {
+    if (!mounted) return false;
+    final crmReady = CRMConfig.crmEnabled && CRMSupabaseService().isInitialized;
+    if (!crmReady) return false;
+    _setSection(_HomeSection.chapters);
+    return true;
   }
 
   void _setSection(_HomeSection section) {

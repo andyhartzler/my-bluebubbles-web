@@ -17,13 +17,12 @@ import 'package:bluebubbles/services/crm/supabase_service.dart';
 
 import 'bulk_email_screen.dart';
 import 'bulk_message_screen.dart';
-import 'chapter_detail_screen.dart';
+import 'chapters/chapter_navigation.dart';
 import 'member_detail_screen.dart';
 
 /// Screen showing all CRM members with search and filters
 class MembersListScreen extends StatefulWidget {
   final bool embed;
-  final bool showChaptersOnly;
   final MemberRepository? memberRepository;
   final ChapterRepository? chapterRepository;
   final int pageSize;
@@ -37,7 +36,6 @@ class MembersListScreen extends StatefulWidget {
   const MembersListScreen({
     Key? key,
     this.embed = false,
-    this.showChaptersOnly = false,
     this.memberRepository,
     this.chapterRepository,
     this.pageSize = 50,
@@ -85,14 +83,11 @@ class _MembersListScreenState extends State<MembersListScreen> {
   List<Member> _members = [];
   List<Member> _filteredMembers = [];
   List<Member> _agedOutMembers = [];
-  List<Chapter> _chapters = [];
-  List<Chapter> _filteredChapters = [];
   Map<String, Chapter> _chaptersByKey = {};
 
   bool _loading = true;
   bool _crmReady = false;
   String _searchQuery = '';
-  late int _activeView;
   bool _filtersExpandedOnMobile = false;
   bool _showAgedOutMembers = false;
 
@@ -132,8 +127,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
   List<String> _chapterNames = [];
   List<String> _leadershipChapterOptions = [];
 
-  Map<String, int> _memberCountByChapter = {};
-  Map<String, int> _leaderCountByChapter = {};
   int? _availableMinAge;
   int? _availableMaxAge;
 
@@ -193,7 +186,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
     _searchController = TextEditingController(text: _searchQuery)
       ..addListener(_handleSearchTextChanged);
     _crmReady = _supabaseService.isInitialized && CRMConfig.crmEnabled;
-    _activeView = widget.showChaptersOnly ? 1 : 0;
     final seedCounty = widget.initialCounty?.trim();
     if (seedCounty != null && seedCounty.isNotEmpty) {
       _selectedCounty = seedCounty;
@@ -209,14 +201,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   @override
-  void didUpdateWidget(covariant MembersListScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.showChaptersOnly != widget.showChaptersOnly) {
-      _activeView = widget.showChaptersOnly ? 1 : 0;
-    }
-  }
-
-  @override
   void dispose() {
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
@@ -224,8 +208,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
     _searchController.dispose();
     super.dispose();
   }
-
-  bool get _showingChapters => widget.showChaptersOnly || _activeView == 1;
 
   MessageFilter _buildCurrentMessageFilter() {
     return MessageFilter(
@@ -369,7 +351,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
       final chapters = results[5] as List<Chapter>;
       final ageBounds = results[6] as AgeBounds;
 
-      final normalizedChapterCounts = <String, int>{};
       final normalizedLeadershipCounts = <String, int>{};
       final chapterNameMap = <String, String>{};
 
@@ -378,7 +359,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
         if (cleaned == null) return;
         final normalized = _normalizeKey(cleaned);
         if (normalized == null) return;
-        normalizedChapterCounts[normalized] = value;
         chapterNameMap[normalized] = cleaned;
       });
 
@@ -413,12 +393,9 @@ class _MembersListScreenState extends State<MembersListScreen> {
         _counties = counties;
         _districts = districts;
         _committees = committees;
-        _chapters = chapters;
         _chaptersByKey = _buildChapterLookup(chapters);
         _chapterNames = chapterNames;
         _leadershipChapterOptions = leadershipChapterOptions;
-        _memberCountByChapter = normalizedChapterCounts;
-        _leaderCountByChapter = normalizedLeadershipCounts;
         if (ageBounds.min != null) {
           final clampedMin = ageBounds.min!.clamp(_minAllowedAge, _maxAllowedAge).toInt();
           _availableMinAge = clampedMin;
@@ -433,7 +410,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
             _maxAgeFilter = clampedMax;
           }
         }
-        _filteredChapters = _computeFilteredChapters();
       });
     } catch (e) {
       if (!mounted) return;
@@ -540,7 +516,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
     if (_agedOutMembers.isEmpty) {
       _showAgedOutMembers = false;
     }
-    _filteredChapters = _computeFilteredChapters();
 
     if ((_availableMinAge == null || _availableMaxAge == null) && _members.isNotEmpty) {
       _deriveAgeBounds(_members);
@@ -587,7 +562,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   void _handleScroll() {
-    if (_showingChapters) return;
     if (!_shouldUsePaging) return;
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
@@ -634,10 +608,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   }
 
   void _updateFilters(void Function() updater) {
-    setState(() {
-      updater();
-      _filteredChapters = _computeFilteredChapters();
-    });
+    setState(updater);
 
     if (_crmReady) {
       _reloadMembersOnly();
@@ -1119,22 +1090,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  List<Chapter> _computeFilteredChapters() {
-    final query = _searchQuery.trim().toLowerCase();
-    final filtered = _chapters.where((chapter) {
-      if (query.isEmpty) return true;
-      bool contains(String? value) => value != null && value.toLowerCase().contains(query);
-      return contains(chapter.chapterName) ||
-          contains(chapter.standardizedName) ||
-          contains(chapter.schoolName) ||
-          contains(chapter.chapterType) ||
-          contains(chapter.status);
-    }).toList()
-      ..sort((a, b) => a.chapterName.toLowerCase().compareTo(b.chapterName.toLowerCase()));
-
-    return filtered;
-  }
-
   Map<String, Chapter> _buildChapterLookup(List<Chapter> chapters) {
     final lookup = <String, Chapter>{};
 
@@ -1268,18 +1223,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
     if (normA == null && normB == null) return true;
     if (normA == null || normB == null) return false;
     return normA == normB;
-  }
-
-  int _memberCountForChapter(String? name) {
-    final key = _normalizeKey(name);
-    if (key == null) return 0;
-    return _memberCountByChapter[key] ?? 0;
-  }
-
-  int _leaderCountForChapter(String? name) {
-    final key = _normalizeKey(name);
-    if (key == null) return 0;
-    return _leaderCountByChapter[key] ?? 0;
   }
 
   void _clearFilters() {
@@ -1432,32 +1375,22 @@ class _MembersListScreenState extends State<MembersListScreen> {
       );
     }
 
-    final showingChapters = _showingChapters;
-
     final visibleMembersCount = _filteredMembers.length;
     final fetchedCount = visibleMembersCount + _agedOutMembers.length;
     final knownTotalMembers = _totalAvailableMembers ?? fetchedCount;
     final membersLabel = _totalAvailableMembers != null
         ? 'Showing $visibleMembersCount of $knownTotalMembers members'
         : 'Showing $visibleMembersCount members';
-    final countLabel = showingChapters
-        ? 'Showing ${_filteredChapters.length} of ${_chapters.length} chapters'
-        : membersLabel;
 
     // The Slack page's header idiom: one white search band, then one gradient
     // band carrying the controls. The count label rides in the gradient band
     // so it is white on tileGradient rather than theme ink on the background.
     final slivers = <Widget>[
       SliverToBoxAdapter(child: _buildSearchBand()),
-      SliverToBoxAdapter(child: _buildFilterBand(countLabel)),
+      SliverToBoxAdapter(child: _buildFilterBand(membersLabel)),
       const SliverToBoxAdapter(child: SizedBox(height: 24)),
+      ..._buildMembersSlivers(),
     ];
-
-    if (showingChapters) {
-      slivers.add(_buildChaptersSliver());
-    } else {
-      slivers.addAll(_buildMembersSlivers());
-    }
 
     return RefreshIndicator(
       onRefresh: _refreshAll,
@@ -1477,9 +1410,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
   /// opaque white rather than channels_tab's 0.95 so the ratio does not
   /// depend on what the background image happens to be behind it.
   Widget _buildSearchBand() {
-    final hint = _showingChapters
-        ? 'Search chapters by name, contact, or status...'
-        : 'Search by name, contact, chapter, or committee...';
+    const hint = 'Search by name, contact, chapter, or committee...';
 
     OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -1605,18 +1536,50 @@ class _MembersListScreenState extends State<MembersListScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (!_showingChapters) ...[
-            _buildFilterRow(isMobile: isMobile),
-            const SizedBox(height: 14),
-          ],
-          countText,
+          _buildFilterRow(isMobile: isMobile),
+          const SizedBox(height: 14),
+          if (_selectedChapter == null)
+            countText
+          else
+            // Filtered to one chapter: offer the way to that chapter's page.
+            Wrap(
+              spacing: 12,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                countText,
+                ChapterTapTarget(
+                  chapterName: _selectedChapter!,
+                  borderRadius: BorderRadius.circular(8),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.account_tree_outlined, size: 18, color: _ink),
+                        SizedBox(width: 6),
+                        Text(
+                          'Open chapter page',
+                          style: TextStyle(
+                            color: _ink,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                            decorationColor: _ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
   }
 
   Widget _buildFilterRow({required bool isMobile}) {
-    if (_showingChapters) return const SizedBox.shrink();
     final hasFilters = _selectedCounty != null ||
         _selectedDistrict != null ||
         _selectedChapter != null ||
@@ -1646,7 +1609,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
       _buildFilterChip(
         label: _selectedChapter ?? 'Chapter',
         selected: _selectedChapter != null,
-        onTap: _showingChapters ? null : _showChapterFilter,
+        onTap: _showChapterFilter,
         icon: Icons.flag_outlined,
       ),
       _buildFilterChip(
@@ -2063,230 +2026,7 @@ class _MembersListScreenState extends State<MembersListScreen> {
     );
   }
 
-  Widget _buildChaptersSliver() {
-    if (_filteredChapters.isEmpty) {
-      return SliverFillRemaining(
-        hasScrollBody: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 48),
-                _buildEmptyChaptersState(),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    final itemCount = _filteredChapters.length * 2 - 1;
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            if (index.isOdd) {
-              return const SizedBox(height: 24);
-            }
-            final itemIndex = index ~/ 2;
-            return _buildChapterCard(_filteredChapters[itemIndex]);
-          },
-          childCount: itemCount > 0 ? itemCount : 0,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChapterCard(Chapter chapter) {
-    final chapterName = _cleanValue(chapter.chapterName) ?? 'Unnamed Chapter';
-    final schoolName = _cleanValue(chapter.schoolName);
-    final contactEmail = _cleanValue(chapter.contactEmail);
-    final website = _cleanValue(chapter.website);
-    final memberCount = _memberCountForChapter(chapter.chapterName);
-    final leaderCount = _leaderCountForChapter(chapter.chapterName);
-
-    final chips = <Widget>[
-      if (_cleanValue(chapter.chapterType) != null)
-        _buildMetaTag(Icons.category, chapter.chapterType.toUpperCase()),
-      if (_cleanValue(chapter.status) != null)
-        _buildMetaTag(Icons.flag, _cleanValue(chapter.status)!),
-      _buildMetaTag(
-        chapter.isChartered ? Icons.verified : Icons.pending,
-        chapter.isChartered ? 'Chartered' : 'Not Chartered',
-      ),
-      if (chapter.charterDate != null)
-        _buildMetaTag(Icons.calendar_month, 'Chartered ${_formatDate(chapter.charterDate!)}'),
-    ];
-
-    final borderRadius = BorderRadius.circular(16);
-
-    // Chapters share this screen with members, so they take the same gradient
-    // card rather than a themed Card that would be the one odd surface on the
-    // branded background.
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: BrandColors.tileGradient,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: borderRadius,
-        boxShadow: [
-          BoxShadow(
-            color: BrandColors.unityBlue.withValues(alpha: 0.28),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _openChapter(chapter),
-          borderRadius: borderRadius,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  chapterName,
-                  style: const TextStyle(color: _ink, fontSize: 24, fontWeight: FontWeight.w800, height: 1.15),
-                ),
-                if (schoolName != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    schoolName,
-                    style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w500, height: 1.3),
-                  ),
-                ],
-                if (chips.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: chips,
-                  ),
-                ],
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  children: [
-                    _buildStatTile(Icons.people_alt, '$memberCount members'),
-                    if (leaderCount > 0) _buildStatTile(Icons.emoji_events, '$leaderCount leaders'),
-                  ],
-                ),
-                if (contactEmail != null) _buildChapterInfoRow(Icons.email_outlined, contactEmail),
-                if (website != null) _buildChapterInfoRow(Icons.link, website),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// A count on a chapter card: solid unityBlue tile, white ink, 12.51:1.
-  Widget _buildStatTile(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: BrandColors.unityBlue,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _rule, width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: _ink),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(color: _ink, fontSize: 15, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// A contact line on a chapter card. Links are full white with an
-  /// underline for affordance; a tinted link colour would fail on the light
-  /// end of the gradient (sunriseGold on tileGradientEnd is 2.63:1).
-  Widget _buildChapterInfoRow(IconData icon, String value) {
-    final uri = _parseChapterUri(value);
-    final displayValue = uri != null && _isWebUrl(uri) ? _formatWebsiteLabel(uri) : value;
-    final textStyle = TextStyle(
-      color: _ink,
-      fontSize: 15,
-      fontWeight: FontWeight.w500,
-      height: 1.3,
-      decoration: uri != null ? TextDecoration.underline : null,
-      decorationColor: _ink,
-    );
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: uri != null ? () => launchUrl(uri, mode: LaunchMode.externalApplication) : null,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, size: 18, color: _ink),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    displayValue,
-                    style: textStyle,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMetaTag(IconData icon, String label) => _buildInfoChip(icon, label);
-
-  void _openChapter(Chapter chapter) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ChapterDetailScreen(chapter: chapter)),
-    );
-  }
-
   String _formatDate(DateTime date) => '${date.month}/${date.day}/${date.year}';
-
-  Uri? _parseChapterUri(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return null;
-    if (trimmed.contains('@') && !trimmed.contains(' ')) {
-      return Uri(scheme: 'mailto', path: trimmed);
-    }
-    final normalized = trimmed.startsWith('http') ? trimmed : 'https://$trimmed';
-    return Uri.tryParse(normalized);
-  }
-
-  bool _isWebUrl(Uri uri) => uri.scheme == 'http' || uri.scheme == 'https';
-
-  String _formatWebsiteLabel(Uri uri) {
-    final host = uri.host.replaceFirst(RegExp(r'^www\.'), '');
-    final path = uri.path == '/' ? '' : uri.path;
-    final query = uri.hasQuery ? '?${uri.query}' : '';
-    final fragment = uri.hasFragment ? '#${uri.fragment}' : '';
-    return '$host$path$query$fragment';
-  }
 
   /// A filter control in the Slack tab bar's idiom rather than a themed
   /// FilterChip. Inactive: white ink and a white decorative border over the
@@ -2355,14 +2095,6 @@ class _MembersListScreenState extends State<MembersListScreen> {
       icon: Icons.people_outline,
       title: 'No members match your filters',
       body: 'Try adjusting your filters or refreshing to see everyone in your database.',
-    );
-  }
-
-  Widget _buildEmptyChaptersState() {
-    return _buildEmptyState(
-      icon: Icons.account_tree_outlined,
-      title: 'No chapters found',
-      body: 'Try adjusting your search or refresh to pull the latest chapter roster.',
     );
   }
 
@@ -2512,7 +2244,19 @@ class _MembersListScreenState extends State<MembersListScreen> {
                 Text(chapterPosition, style: roleTitleStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
                 if (chapterAffiliation != null) ...[
                   const SizedBox(height: 2),
-                  Text(chapterAffiliation, style: roleDetailStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  // Opens the chapter. Its own tap target inside the card,
+                  // which opens the profile everywhere else.
+                  ChapterTapTarget(
+                    chapterName: member.chapterName ?? chapterAffiliation,
+                    chapter: _findChapterForMember(member),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Text(
+                      chapterAffiliation,
+                      style: roleDetailStyle.copyWith(decoration: TextDecoration.underline, decorationColor: _ink),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ],
               if (isExecutive) ...[

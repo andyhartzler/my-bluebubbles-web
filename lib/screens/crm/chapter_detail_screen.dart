@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart' as file_picker;
 
 import 'package:bluebubbles/config/crm_config.dart';
 import 'package:bluebubbles/models/crm/chapter.dart';
 import 'package:bluebubbles/models/crm/chapter_document.dart';
+import 'package:bluebubbles/models/crm/chapter_hub.dart';
 import 'package:bluebubbles/models/crm/email_template.dart';
 import 'package:bluebubbles/models/crm/member.dart';
 import 'package:bluebubbles/models/crm/message_filter.dart';
+import 'package:bluebubbles/services/crm/chapter_hub_service.dart';
 import 'package:bluebubbles/services/crm/chapter_repository.dart';
 import 'package:bluebubbles/services/crm/crm_message_service.dart';
 import 'package:bluebubbles/services/crm/email_template_repository.dart';
@@ -19,6 +22,8 @@ import 'package:bluebubbles/widgets/email_template_picker.dart';
 import 'editors/chapter_edit_sheet.dart';
 import 'bulk_email_screen.dart';
 import 'bulk_message_screen.dart';
+import 'chapters/chapter_charter_panel.dart';
+import 'chapters/hub/hub_widgets.dart';
 import 'member_detail_screen.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
 
@@ -42,6 +47,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
   List<Member> _members = [];
   List<ChapterDocument> _documents = [];
   late Chapter _chapter;
+  ChapterHubEntry? _hubEntry;
   bool _openingBulkMessage = false;
   bool _openingBulkEmail = false;
   bool _browsingTemplates = false;
@@ -88,9 +94,10 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
       });
     } catch (e) {
       if (!mounted) return;
+      debugPrint('Chapter detail: load failed: $e');
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading chapter: $e')),
+        const SnackBar(content: Text("Couldn't load this chapter. Pull down to try again.")),
       );
     }
   }
@@ -109,7 +116,18 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
 
     if (!mounted || updated == null) return;
     setState(() => _chapter = updated);
+    ChapterHubService.instance.invalidate();
     await _loadChapter();
+  }
+
+  void _onChapterChanged(Chapter updated) {
+    if (!mounted) return;
+    setState(() => _chapter = updated);
+  }
+
+  void _onHubEntryLoaded(ChapterHubEntry? entry) {
+    if (!mounted) return;
+    setState(() => _hubEntry = entry);
   }
 
   @override
@@ -157,6 +175,12 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
                     padding: const EdgeInsets.all(16),
                     children: [
                       _buildChapterHeader(context),
+                      const SizedBox(height: 16),
+                      ChapterCharterPanel(
+                        chapter: _chapter,
+                        onChapterChanged: _onChapterChanged,
+                        onEntryLoaded: _onHubEntryLoaded,
+                      ),
                       if (_crmReady) ...[
                         const SizedBox(height: 16),
                         _buildChapterActions(context),
@@ -221,9 +245,10 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
       if (!mounted || selection == null) return;
       await _launchBulkEmail(template: selection);
     } catch (error) {
+      debugPrint('Chapter detail: templates failed: $error');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load templates: $error')),
+        const SnackBar(content: Text("Couldn't load email templates. Try again.")),
       );
     } finally {
       if (mounted) {
@@ -393,6 +418,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
 
       await _loadChapter();
     } catch (e) {
+      debugPrint('Chapter detail: intro send failed: $e');
       if (progressDialogVisible) {
         Navigator.of(context, rootNavigator: true).pop();
         progressDialogVisible = false;
@@ -400,7 +426,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error sending intro messages: $e')),
+        const SnackBar(content: Text("Couldn't send the intro messages. Check your connection and try again.")),
       );
     } finally {
       if (mounted) {
@@ -442,6 +468,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
       if (!mounted) return;
 
       if (uploaded != null) {
+        ChapterHubService.instance.invalidate();
         setState(() {
           final updated = List<ChapterDocument>.from(_documents)
             ..removeWhere((doc) => doc.id == uploaded.id)
@@ -459,9 +486,10 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
         );
       }
     } catch (error) {
+      debugPrint('Chapter detail: upload failed: $error');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error uploading document: $error')),
+        const SnackBar(content: Text("Couldn't upload that document. Try again.")),
       );
     } finally {
       if (mounted) {
@@ -476,23 +504,13 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
     final theme = Theme.of(context);
     final chips = <Widget>[];
 
-    chips.add(_buildPill(Icons.category, _chapter.chapterType.toUpperCase()));
-
-    if (_chapter.status != null && _chapter.status!.trim().isNotEmpty) {
-      chips.add(_buildPill(Icons.flag, _chapter.status!.trim()));
+    final typeLabel = _chapterTypeLabel(_chapter.chapterType);
+    if (typeLabel.isNotEmpty) {
+      chips.add(_buildPill(Icons.category, typeLabel));
     }
 
-    chips.add(_buildPill(
-      _chapter.isChartered ? Icons.verified : Icons.pending,
-      _chapter.isChartered ? 'Chartered' : 'Not Chartered',
-    ));
-
-    if (_chapter.charterDate != null) {
-      chips.add(_buildPill(
-        Icons.calendar_month,
-        'Chartered ${_formatDate(_chapter.charterDate!)}',
-      ));
-    }
+    final stage = chapterStageOf(_chapter, entry: _hubEntry, documentCount: _documents.length);
+    chips.add(ChapterStageBadge(stage: stage, charterDate: _chapter.charterDate, onDark: true));
 
     final detailRows = <Widget>[];
     if (_chapter.schoolName.isNotEmpty) {
@@ -646,7 +664,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
               Text(
                 _chapter.displaySubtitle,
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                 ),
               ),
             ],
@@ -838,9 +856,9 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
         width: 260,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: theme.colorScheme.primary.withOpacity(0.08),
+          color: theme.colorScheme.primary.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: theme.colorScheme.primary.withOpacity(0.15)),
+          border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.15)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -944,7 +962,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
         fontWeight: FontWeight.w600,
         color: Colors.white,
       ),
-      backgroundColor: Colors.white.withOpacity(0.2),
+      backgroundColor: Colors.white.withValues(alpha: 0.2),
     );
   }
 
@@ -1207,7 +1225,23 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
     return '${size.toStringAsFixed(unitIndex == 0 ? 0 : 1)} ${units[unitIndex]}';
   }
 
-  String _formatDate(DateTime date) => '${date.month}/${date.day}/${date.year}';
+  static final DateFormat _dateFormat = DateFormat('MMM d, y');
+
+  String _formatDate(DateTime date) => _dateFormat.format(date.toLocal());
+
+  String _chapterTypeLabel(String type) {
+    switch (type.trim().toLowerCase()) {
+      case 'college':
+        return 'College';
+      case 'highschool':
+        return 'High school';
+      case 'county':
+        return 'County';
+      default:
+        final t = type.trim();
+        return t.isEmpty ? '' : '${t[0].toUpperCase()}${t.substring(1)}';
+    }
+  }
 
   Widget _buildDocumentUploadButton({bool compact = false}) {
     final label = _uploadingDocument ? 'Uploading…' : 'Add Document';
@@ -1254,7 +1288,7 @@ class _ChapterDetailScreenState extends State<ChapterDetailScreen> {
     final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open ${uri.toString()}')),
+        const SnackBar(content: Text("Couldn't open that link.")),
       );
     }
   }

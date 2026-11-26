@@ -6,6 +6,7 @@ import '../../../models/crm/dashboard_metrics.dart';
 import '../../../models/crm/member.dart';
 import '../models/dashboard_widget_config.dart';
 import 'package:bluebubbles/features/committees/widgets/cors_aware_avatar.dart';
+import 'package:bluebubbles/screens/crm/chapters/chapter_navigation.dart';
 
 // Brand colors
 const _unityBlue = Color(0xFF273351);
@@ -428,6 +429,56 @@ class StatCardWidget extends StatelessWidget {
   }
 }
 
+/// A members-by-chapter chart is a way into chapters: tapping a bar or a
+/// row opens that chapter through the same helper as every chapter link.
+const _membersByChapterKey = 'membersByChapter';
+
+/// False for the buckets that are not a chapter: the "Other (N more)" roll-up,
+/// members with no chapter, and blank names. Those bars and rows don't open
+/// anything.
+bool _isChapterBucket(String name) {
+  final value = name.trim().toLowerCase();
+  if (value.isEmpty) return false;
+  if (value == 'other' || value.startsWith('other (')) return false;
+  const nonChapters = {'unknown', 'none', 'no chapter', 'unassigned', 'n/a', 'null'};
+  return !nonChapters.contains(value);
+}
+
+BaseTouchCallback<BarTouchResponse> _openChapterOnBarTap(
+  BuildContext context,
+  List<NameCount> displayData,
+) {
+  return (event, response) {
+    if (event is! FlTapUpEvent) return;
+    final index = response?.spot?.touchedBarGroupIndex;
+    if (index == null || index < 0 || index >= displayData.length) return;
+    final name = displayData[index].name;
+    if (!_isChapterBucket(name)) return;
+    ChapterNavigation.openChapterByName(context, name);
+  };
+}
+
+MouseCursorResolver<BarTouchResponse> _chapterBarCursor(List<NameCount> displayData) {
+  return (event, response) {
+    final index = response?.spot?.touchedBarGroupIndex;
+    if (index == null || index < 0 || index >= displayData.length) return MouseCursor.defer;
+    return _isChapterBucket(displayData[index].name) ? SystemMouseCursors.click : MouseCursor.defer;
+  };
+}
+
+Widget _chapterBarRow(BuildContext context, String chapterName, Widget row) {
+  if (!_isChapterBucket(chapterName)) return row;
+  return Semantics(
+    link: true,
+    label: 'Open chapter $chapterName',
+    child: InkWell(
+      onTap: () => ChapterNavigation.openChapterByName(context, chapterName),
+      borderRadius: BorderRadius.circular(4),
+      child: row,
+    ),
+  );
+}
+
 /// Renders a bar chart widget with horizontal scrolling for mobile
 class BarChartWidget extends StatelessWidget {
   final DashboardWidgetConfig config;
@@ -483,7 +534,7 @@ class BarChartWidget extends StatelessWidget {
                   if (isSmall) {
                     return _buildHorizontalBars(displayData, constraints);
                   }
-                  return _buildVerticalChart(displayData, constraints);
+                  return _buildVerticalChart(context, displayData, constraints);
                 },
               ),
             ),
@@ -494,9 +545,11 @@ class BarChartWidget extends StatelessWidget {
   }
 
   Widget _buildVerticalChart(
+    BuildContext context,
     List<NameCount> displayData,
     BoxConstraints constraints,
   ) {
+    final opensChapters = config.dataSourceKey == _membersByChapterKey;
     final maxValue = displayData.fold<int>(
       0,
       (prev, e) => e.count > prev ? e.count : prev,
@@ -552,6 +605,8 @@ class BarChartWidget extends StatelessWidget {
         ),
         barTouchData: BarTouchData(
           enabled: true,
+          touchCallback: opensChapters ? _openChapterOnBarTap(context, displayData) : null,
+          mouseCursorResolver: opensChapters ? _chapterBarCursor(displayData) : null,
           touchTooltipData: BarTouchTooltipData(
             getTooltipColor: (_) => _unityBlue.withOpacity(0.95),
             tooltipRoundedRadius: 8,
@@ -587,6 +642,7 @@ class BarChartWidget extends StatelessWidget {
     List<NameCount> displayData,
     BoxConstraints constraints,
   ) {
+    final opensChapters = config.dataSourceKey == _membersByChapterKey;
     final maxValue = displayData.fold<int>(
       0,
       (prev, e) => e.count > prev ? e.count : prev,
@@ -599,7 +655,7 @@ class BarChartWidget extends StatelessWidget {
         final entry = displayData[index];
         final percentage = maxValue > 0 ? entry.count / maxValue : 0.0;
 
-        return Tooltip(
+        final row = Tooltip(
           message: '${entry.name}: ${entry.count}',
           waitDuration: const Duration(milliseconds: 300),
           child: Padding(
@@ -663,6 +719,7 @@ class BarChartWidget extends StatelessWidget {
             ),
           ),
         );
+        return opensChapters ? _chapterBarRow(context, entry.name, row) : row;
       },
     );
   }
@@ -1010,6 +1067,7 @@ class _DynamicDistributionChartWidgetState
     int maxValue,
     BoxConstraints constraints,
   ) {
+    final opensChapters = _selectedKey == _membersByChapterKey;
     final barWidth = ((constraints.maxWidth - 60) / displayData.length).clamp(
       14.0,
       32.0,
@@ -1077,6 +1135,8 @@ class _DynamicDistributionChartWidgetState
         ),
         barTouchData: BarTouchData(
           enabled: true,
+          touchCallback: opensChapters ? _openChapterOnBarTap(context, displayData) : null,
+          mouseCursorResolver: opensChapters ? _chapterBarCursor(displayData) : null,
           touchTooltipData: BarTouchTooltipData(
             getTooltipColor: (_) => _unityBlue.withOpacity(0.95),
             tooltipRoundedRadius: 8,
@@ -1109,6 +1169,7 @@ class _DynamicDistributionChartWidgetState
   }
 
   Widget _buildHorizontalBars(List<NameCount> displayData, int maxValue) {
+    final opensChapters = _selectedKey == _membersByChapterKey;
     return ListView.builder(
       itemCount: displayData.length,
       padding: EdgeInsets.zero,
@@ -1116,7 +1177,7 @@ class _DynamicDistributionChartWidgetState
         final entry = displayData[index];
         final percentage = maxValue > 0 ? entry.count / maxValue : 0.0;
 
-        return Tooltip(
+        final row = Tooltip(
           message: '${entry.name}: ${entry.count}',
           waitDuration: const Duration(milliseconds: 300),
           child: Padding(
@@ -1180,6 +1241,7 @@ class _DynamicDistributionChartWidgetState
             ),
           ),
         );
+        return opensChapters ? _chapterBarRow(context, entry.name, row) : row;
       },
     );
   }
@@ -1310,11 +1372,6 @@ class _PieChartWidgetState extends State<PieChartWidget> {
     final height = constraints.maxHeight;
     final isCompact = width < 250 || height < 200;
     final isLarge = width >= 400 && height >= 300;
-    final isMedium = !isCompact && !isLarge;
-    final textColor = WidgetBackgrounds.getTextColor(widget.config.options);
-    final secondaryTextColor = WidgetBackgrounds.getSecondaryTextColor(
-      widget.config.options,
-    );
 
     // Dynamic maxItems based on size
     final maxItems = isCompact ? 5 : (isLarge ? 12 : 8);

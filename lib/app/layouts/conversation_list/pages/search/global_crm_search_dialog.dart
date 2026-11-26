@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -9,10 +8,15 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:bluebubbles/app/wrappers/theme_switcher.dart';
 import 'package:bluebubbles/config/crm_config.dart';
+import 'package:bluebubbles/models/crm/chapter.dart';
+import 'package:bluebubbles/models/crm/chapter_hub.dart';
 import 'package:bluebubbles/models/crm/meeting.dart';
 import 'package:bluebubbles/models/crm/member.dart';
+import 'package:bluebubbles/screens/crm/chapters/chapter_navigation.dart';
+import 'package:bluebubbles/screens/crm/chapters/hub/hub_widgets.dart';
 import 'package:bluebubbles/screens/crm/meeting_detail_screen.dart';
 import 'package:bluebubbles/screens/crm/member_detail_screen.dart';
+import 'package:bluebubbles/services/crm/chapter_hub_service.dart';
 import 'package:bluebubbles/services/crm/global_search_service.dart';
 import 'package:bluebubbles/services/crm/meeting_repository.dart';
 import 'package:bluebubbles/services/crm/storage_uri_resolver.dart';
@@ -37,6 +41,10 @@ class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
   GlobalSearchResults? _results;
   GlobalSearchItemType? _selectedFacet;
   bool _initializedFocus = false;
+
+  /// The Chapters hub's snapshot, for stage badges on chapter results. The
+  /// service shares its cache, so this is usually free.
+  ChapterHubSnapshot? _hubSnapshot;
 
   @override
   void initState() {
@@ -103,6 +111,7 @@ class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
     try {
       final response = await _searchService.search(trimmed);
       if (!mounted) return;
+      if (response.items(GlobalSearchItemType.chapter).isNotEmpty) _loadHubSnapshot();
       setState(() {
         _results = response;
         if (_selectedFacet != null &&
@@ -126,6 +135,23 @@ class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
         });
       }
     }
+  }
+
+  /// Decorates chapter results with what the Chapters page already loaded.
+  /// Search never starts a chapters load of its own; without a cached
+  /// snapshot the badges fall back to each chapter's own fields.
+  void _loadHubSnapshot() {
+    final cached = ChapterHubService.instance.cached;
+    if (cached != null && mounted) setState(() => _hubSnapshot = cached);
+  }
+
+  ChapterHubEntry? _hubEntryFor(Chapter chapter) {
+    final snapshot = _hubSnapshot;
+    if (snapshot == null) return null;
+    for (final e in snapshot.entries) {
+      if (e.chapter.id == chapter.id) return e;
+    }
+    return snapshot.entryFor(chapter.chapterName);
   }
 
   @override
@@ -235,7 +261,7 @@ class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
                     textInputAction: TextInputAction.search,
                     onSubmitted: _performSearch,
                     decoration: InputDecoration(
-                      hintText: 'Search members, meetings, transcripts, documents...',
+                      hintText: 'Search members, chapters, meetings, transcripts, documents...',
                       border: InputBorder.none,
                       suffixIcon: _queryController.text.isEmpty
                           ? null
@@ -257,12 +283,10 @@ class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
               ),
             ),
             const SizedBox(width: 12),
-            Tooltip(
-              message: 'Close search',
-              child: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).maybePop(),
-              ),
+            IconButton(
+              tooltip: 'Close search',
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).maybePop(),
             ),
           ],
         ),
@@ -332,7 +356,7 @@ class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
 
     if (_results == null) {
       return _buildMessageCard(
-        'Start typing to search Supabase members, meetings, transcripts, and documents.',
+        'Start typing to search members, chapters, meetings, transcripts, and documents.',
       );
     }
 
@@ -354,6 +378,8 @@ class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
         switch (item.type) {
           case GlobalSearchItemType.member:
             return _buildMemberTile(item.payload as Member);
+          case GlobalSearchItemType.chapter:
+            return _buildChapterTile(item.payload as Chapter);
           case GlobalSearchItemType.meeting:
             return _buildMeetingTile(item.payload as Meeting);
           case GlobalSearchItemType.transcript:
@@ -380,6 +406,43 @@ class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
         subtitle: subtitleParts.isEmpty ? null : Text(subtitleParts.join(' • ')),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => _openMember(member),
+      ),
+    );
+  }
+
+  Widget _buildChapterTile(Chapter chapter) {
+    final school = chapter.schoolName.trim();
+    final type = chapter.chapterType.trim().isEmpty ? null : chapterTypeLabel(chapter.chapterType);
+    final subtitleParts = <String>[
+      if (type != null) type,
+      if (school.isNotEmpty && school != chapter.chapterName.trim()) school,
+    ];
+    // The hub's entry knows whether an application is in; without it,
+    // the chapter's own fields still say chartered, pending or archived.
+    final entry = _hubEntryFor(chapter);
+    final badge = entry != null
+        ? ChapterStageBadge.of(entry)
+        : ChapterStageBadge(stage: chapterStageOf(chapter), charterDate: chapter.charterDate);
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        leading: const CircleAvatar(child: Icon(Icons.account_tree_outlined)),
+        title: Text(chapter.chapterName.trim()),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              badge,
+              if (subtitleParts.isNotEmpty) Text(subtitleParts.join(' • ')),
+            ],
+          ),
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => ChapterNavigation.openChapter(context, chapter),
       ),
     );
   }
@@ -550,6 +613,8 @@ class _GlobalCrmSearchDialogState extends State<GlobalCrmSearchDialog> {
     switch (type) {
       case GlobalSearchItemType.member:
         return 'Members';
+      case GlobalSearchItemType.chapter:
+        return 'Chapters';
       case GlobalSearchItemType.meeting:
         return 'Meetings';
       case GlobalSearchItemType.transcript:

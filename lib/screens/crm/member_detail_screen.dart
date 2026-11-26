@@ -17,6 +17,7 @@ import 'package:bluebubbles/screens/crm/voter_file/voter_crossref_card.dart';
 import 'package:bluebubbles/services/crm/voter_file_service.dart';
 import 'package:bluebubbles/screens/crm/member_detail/email_history_tab.dart';
 import 'package:bluebubbles/screens/crm/meetings_screen.dart';
+import 'package:bluebubbles/screens/crm/chapters/chapter_navigation.dart';
 import 'package:bluebubbles/screens/crm/member_detail/slack_activity_tab.dart';
 import 'package:bluebubbles/screens/crm/member_detail/member_submission_screen.dart';
 import 'package:bluebubbles/screens/crm/volunteers/member_outreach_section.dart';
@@ -2855,7 +2856,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       if (_member.membershipEligible == false)
         const ProfilePill(label: 'Ineligible', style: ProfilePillStyle.danger),
       if (chapterName != null)
-        ProfilePill(label: 'Chapter $chapterName', style: ProfilePillStyle.soft),
+        ChapterTapTarget(
+          chapterName: chapterName,
+          borderRadius: BorderRadius.circular(ProfileTokens.pillRadius),
+          child: ProfilePill(label: 'Chapter $chapterName', style: ProfilePillStyle.soft),
+        ),
     ];
 
     final congressional = _cleanText(_member.congressionalDistrict);
@@ -2936,6 +2941,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             spacing: 8,
             runSpacing: 8,
             alignment: wide ? WrapAlignment.start : WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: pills,
           ),
         ],
@@ -3208,6 +3214,16 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             label: field.label,
             value: value,
             onCopy: () => _copyToClipboard(field.label, value),
+          );
+        }
+        if (field.key == 'chapter_name') {
+          // Drawn as the profile's own link (underlined, tappable); it opens
+          // the chapter in the app, so the Uri only marks it as a link.
+          return ProfileField(
+            label: field.label,
+            value: value,
+            link: Uri(scheme: 'chapter', path: value),
+            onOpenLink: (_) => ChapterNavigation.openChapterByName(context, _member.chapterName ?? value),
           );
         }
         return ProfileField(label: field.label, value: value);
@@ -5446,12 +5462,20 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   profileChip(attendance.durationSummary, icon: Icons.schedule),
                   if (attendance.joinWindow != null)
                     profileChip(attendance.joinWindow!, icon: Icons.login),
                   profileChip(hostName, icon: Icons.person),
-                  if (chapterName != null) profileChip(chapterName, icon: Icons.group),
+                  // The host's chapter opens that chapter; the rest of the
+                  // block still opens the meeting.
+                  if (chapterName != null)
+                    ChapterTapTarget(
+                      chapterName: chapterName,
+                      borderRadius: BorderRadius.circular(ProfileTokens.chipRadius),
+                      child: profileChip(chapterName, icon: Icons.group),
+                    ),
                 ],
               ),
             ],
